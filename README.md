@@ -1,12 +1,26 @@
 # Renovo
 
 A self-hosted tracker for subscriptions and recurring bills. Multi-user,
-permission-scoped, with per-currency totals, upcoming-renewal windows, notice
-periods and a light/dark interface.
+permission-scoped, with multi-currency totals, budgets, a twelve-month forecast,
+price history, free-trial tracking, shared-cost splitting, upcoming-renewal
+windows, notice periods and a light/dark interface.
 
-Built in phases. **Phase 1 — foundation, auth, roles and core tracking — is
-complete.** See `PHASE.md` for what is in scope now and `SPEC.md` for the whole
-plan.
+Built in phases:
+
+- **Phase 1 — foundation, auth, roles and core tracking — complete.** Slim 4 on
+  PostgreSQL or MySQL, argon2id sign-in, household roles, SHARED/ISOLATED data
+  isolation applied centrally, and subscription tracking with billing-cycle
+  normalisation.
+- **Phase 2 — money — complete.** Exchange rates behind a pluggable provider,
+  append-only price history with scheduled changes, free trials that convert,
+  budgets that trigger on projected spend, a twelve-month forecast, per-period
+  and year-over-year figures, a usage signal, a cancel-by dashboard,
+  shared-cost splitting and bulk actions. See [Money features](#money-features).
+
+Still to come: outbound notifications and the scheduler, advanced auth (OIDC,
+2FA), a versioned JSON API, and internationalisation.
+
+See `PHASE.md` for what is in scope now and `SPEC.md` for the whole plan.
 
 ---
 
@@ -74,7 +88,7 @@ The `migrate` container applies the schema and then exits — seeing it as
 | `app`       | php-fpm running the application                                    |
 | `database`  | PostgreSQL 16, also published on `127.0.0.1:5432` for host tooling |
 | `migrate`   | Applies migrations once, then exits                                |
-| `scheduler` | Runs the daily console command (no scheduled work in this phase)   |
+| `scheduler` | Runs the daily console commands — see [Commands](#commands)        |
 | `mailpit`   | Catches outbound mail in development — http://localhost:8025       |
 
 ### Running against MySQL / MariaDB
@@ -164,6 +178,12 @@ php bin/console reminders:run       # scheduler entry point; no reminder work ye
 php bin/console rates:refresh       # fetch and cache exchange rates
 php bin/console maintenance:prune   # expired sessions, tokens, throttle records
 ```
+
+The `scheduler` container runs `reminders:run` and `maintenance:prune` daily. It
+does **not** yet run `rates:refresh` — rates are refreshed lazily on page views
+instead, and are cached for 12 hours, so an instance nobody visits will serve
+stale rates. If that matters to you, add it to your own cron until the Phase 3
+scheduler takes it over.
 
 ### Tests
 
