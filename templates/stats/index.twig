@@ -1,0 +1,160 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Statistics — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>Statistics</h1>
+    </div>
+
+    <section class="stat-grid">
+        {% for label, amount in per_period %}
+            <article class="card stat">
+                <h2 class="stat-label">Per {{ label|replace({'daily': 'day', 'weekly': 'week',
+                    'monthly': 'month', 'yearly': 'year'}) }}</h2>
+                <p class="stat-value">
+                    {{ amount is not null ? amount|money(combined_yearly.currency) : '—' }}
+                </p>
+            </article>
+        {% endfor %}
+    </section>
+
+    {% if combined_yearly.amount_minor is null %}
+        <p class="muted note">
+            These cannot be combined into {{ base_currency }}: no exchange rate is available for
+            {{ combined_yearly.unconvertible|join(', ') }}. The per-currency figures below are the complete
+            picture; a combined number leaving that spending out would not be.
+        </p>
+        <section class="card">
+            <h2>Recurring cost per year, by currency</h2>
+            <ul class="plain">
+                {% for currency, amount in by_currency %}
+                    <li>{{ amount|money(currency) }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% else %}
+        <p class="muted note">
+            All four are derived from the yearly figure, so they always multiply up to one another. Days and
+            weeks use the mean Gregorian year of 365.25 days. One-off and lifetime entries are excluded.
+        </p>
+    {% endif %}
+
+    <section class="card">
+        <h2>Year over year</h2>
+        {% set yoy = year_over_year %}
+
+        {% if yoy.current.amount_minor is null or yoy.previous.amount_minor is null %}
+            <p class="muted">Not enough convertible data to compare the two years.</p>
+        {% elseif yoy.previous.amount_minor == 0 %}
+            <p class="muted">
+                Nothing recorded for the year before last, so there is nothing to compare against.
+                {{ yoy.current.amount_minor|money(yoy.current.currency) }} in the last twelve months.
+            </p>
+        {% else %}
+            <div class="columns">
+                <div>
+                    <h3 class="stat-label">Last 12 months</h3>
+                    <p class="stat-value">{{ yoy.current.amount_minor|money(yoy.current.currency) }}</p>
+                </div>
+                <div>
+                    <h3 class="stat-label">The 12 before that</h3>
+                    <p class="stat-value">{{ yoy.previous.amount_minor|money(yoy.previous.currency) }}</p>
+                </div>
+                <div>
+                    <h3 class="stat-label">Change</h3>
+                    <p class="stat-value {{ yoy.change_minor > 0 ? 'is-increase' : 'is-decrease' }}">
+                        {{ yoy.change_minor > 0 ? '+' : '' }}{{ yoy.change_minor|money(yoy.current.currency) }}
+                        {% if yoy.change_percent is not null %}
+                            <span class="stat-unit">({{ yoy.change_percent > 0 ? '+' : '' }}{{
+                                yoy.change_percent }}%)</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+
+        <p class="hint">
+            Reconstructed from start dates, billing cycles and recorded price history — this application
+            tracks what is due rather than keeping a ledger of payments taken.
+            {% if yoy.excluded_count > 0 %}
+                {{ yoy.excluded_count }} subscription{{ yoy.excluded_count == 1 ? ' has' : 's have' }} no start
+                date and so contribute{{ yoy.excluded_count == 1 ? 's' : '' }} nothing to either year.
+            {% endif %}
+        </p>
+    </section>
+
+    <section class="card">
+        <h2>Worth it?</h2>
+        <p class="muted">Cost per use, highest first. Something with no uses recorded is unmeasured rather
+            than poor value, and sorts to the bottom.</p>
+
+        {% if value_signals is empty %}
+            <p class="muted empty">No active recurring subscriptions to rank.</p>
+        {% else %}
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th scope="col">Subscription</th>
+                        <th scope="col" class="numeric">Per month</th>
+                        <th scope="col" class="numeric">Uses</th>
+                        <th scope="col" class="numeric">Cost per use</th>
+                        <th scope="col">Rating</th>
+                        <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for signal in value_signals %}
+                        {% set subscription = signal.subscription %}
+                        <tr class="{{ signal.is_low_use ? 'is-urgent' : '' }}">
+                            <td>
+                                <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
+                                {% if signal.is_low_use %}
+                                    <span class="badge badge-warning">Rarely used</span>
+                                {% endif %}
+                            </td>
+                            <td class="numeric">{{
+                                subscription.monthlyMinor|money(subscription.price.currency) }}</td>
+                            <td class="numeric">
+                                {{ subscription.usageCount }}
+                                {% if signal.uses_per_month is not null %}
+                                    <div class="hint">{{ signal.uses_per_month|number_format(1) }} / month</div>
+                                {% endif %}
+                            </td>
+                            <td class="numeric">
+                                {% if signal.cost_per_use_minor is not null %}
+                                    {{ signal.cost_per_use_minor|money(subscription.price.currency) }}
+                                {% else %}
+                                    <span class="muted" title="No uses recorded">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if subscription.usageRating %}
+                                    <span aria-label="{{ subscription.usageRating }} out of {{ max_rating }}">
+                                        {%- for star in 1..max_rating -%}
+                                            {{ star <= subscription.usageRating ? '★' : '☆' }}
+                                        {%- endfor -%}
+                                    </span>
+                                {% else %}
+                                    <span class="muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="actions">
+                                {% if can(scope, 'usage.record') %}
+                                    <form method="post" action="/subscriptions/{{ subscription.id }}/usage"
+                                          class="inline">
+                                        {{ csrf_field() }}
+                                        <input type="hidden" name="return_to" value="/stats">
+                                        <button type="submit" class="button button-quiet">Used it</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}

@@ -19,6 +19,8 @@ declare(strict_types=1);
 use App\Persistence\PdoSessionHandler;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\TokenRepository;
+use App\Service\ExchangeRate\RateProviderException;
+use App\Service\ExchangeRateService;
 use App\Support\Clock;
 use Psr\Container\ContainerInterface;
 use Slim\App;
@@ -47,10 +49,29 @@ $out = static function (string $message): void {
 
 switch ($command) {
     case 'reminders:run':
-        // Placeholder. Reminders, budget re-evaluation and rate refresh all
-        // land in later phases; this exits cleanly so the scheduler container
-        // has a valid command and a working health signal today.
-        $out('reminders:run — no scheduled work in this phase.');
+        // Still a placeholder: reminders and budget alerts are Phase 3. Rate
+        // refreshing, which used to be described here as future work, now has
+        // its own command above and is real.
+        $out('reminders:run — no reminder work in this phase. See rates:refresh.');
+        exit(0);
+
+    case 'rates:refresh':
+        // Real work, and the only scheduled work this phase has. Reminders
+        // remain a later phase; this command exists because an instance should
+        // be able to keep its rates current without depending on somebody
+        // loading a page.
+        $rates = $container->get(ExchangeRateService::class);
+
+        try {
+            $count = $rates->refresh();
+        } catch (RateProviderException $exception) {
+            // A non-zero exit so the scheduler can tell a failed refresh from a
+            // successful one, without the failure being fatal to anything else.
+            fwrite(STDERR, 'Exchange-rate refresh failed: ' . $exception->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        $out(sprintf('Cached %d rate(s) from %s.', $count, $rates->provider()->label()));
         exit(0);
 
     case 'maintenance:prune':
@@ -78,7 +99,8 @@ switch ($command) {
         $out('');
         $out('Usage: php bin/console <command>');
         $out('');
-        $out('  reminders:run        Scheduler entry point (no work in this phase)');
+        $out('  reminders:run        Scheduler entry point (no reminder work in this phase)');
+        $out('  rates:refresh        Fetch and cache exchange rates from the configured provider');
         $out('  maintenance:prune    Delete expired sessions, tokens and throttle records');
         exit(0);
 

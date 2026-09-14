@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Domain\Currency;
 use App\Domain\IsolationMode;
 use App\Repository\InstanceSettingsRepository;
+use DateTimeImmutable;
 
 /**
  * Reads and writes the handful of instance-wide settings.
@@ -22,6 +23,9 @@ final class InstanceSettingsService
     public const KEY_SETUP_COMPLETED_AT = 'setup_completed_at';
     public const KEY_INSTANCE_NAME = 'instance_name';
     public const KEY_ALLOW_REGISTRATION = 'allow_registration';
+    public const KEY_RATE_PROVIDER = 'rate_provider';
+    public const KEY_RATE_PROVIDER_KEY = 'rate_provider_key';
+    public const KEY_RATES_LAST_ATTEMPT_AT = 'rates_last_attempt_at';
 
     /** @var array<string, string>|null */
     private ?array $cache = null;
@@ -69,6 +73,59 @@ final class InstanceSettingsService
     public function setRegistrationAllowed(bool $allowed): void
     {
         $this->set(self::KEY_ALLOW_REGISTRATION, $allowed ? '1' : '0');
+    }
+
+    /**
+     * The chosen exchange-rate provider's key, or null when the operator has
+     * expressed no preference and the registry's default should be used.
+     */
+    public function rateProvider(): ?string
+    {
+        $value = $this->get(self::KEY_RATE_PROVIDER, '');
+
+        return $value === '' ? null : $value;
+    }
+
+    public function setRateProvider(string $key): void
+    {
+        $this->set(self::KEY_RATE_PROVIDER, $key);
+    }
+
+    /**
+     * The API key stored through the wizard or settings page.
+     *
+     * Callers must not read this directly — ExchangeRateService resolves it,
+     * because an environment variable takes precedence over whatever is in the
+     * database. That ordering is the standing rule about secrets applied to a
+     * value the UI also has to be able to collect: an operator who would rather
+     * keep the key out of the database entirely can, and their choice wins.
+     */
+    public function storedRateProviderKey(): string
+    {
+        return $this->get(self::KEY_RATE_PROVIDER_KEY, '');
+    }
+
+    public function setRateProviderKey(string $key): void
+    {
+        $this->set(self::KEY_RATE_PROVIDER_KEY, $key);
+    }
+
+    /**
+     * When a rate refresh was last attempted, successful or not.
+     *
+     * Recorded so that a provider which is down is not re-tried on every page
+     * view by every user.
+     */
+    public function ratesLastAttemptAt(): ?DateTimeImmutable
+    {
+        $value = $this->get(self::KEY_RATES_LAST_ATTEMPT_AT, '');
+
+        return $value === '' ? null : new DateTimeImmutable($value);
+    }
+
+    public function markRatesAttempted(DateTimeImmutable $at): void
+    {
+        $this->set(self::KEY_RATES_LAST_ATTEMPT_AT, $at->format('Y-m-d H:i:s'));
     }
 
     public function isSetupComplete(): bool

@@ -7,6 +7,8 @@ namespace App\Domain\Entity;
 use App\Domain\BillingCycle;
 use App\Domain\Money;
 use App\Domain\NoticePeriod;
+use App\Domain\Rounding;
+use App\Domain\SplitMode;
 use App\Domain\SubscriptionType;
 use DateTimeImmutable;
 
@@ -37,6 +39,15 @@ final class Subscription
         public readonly ?DateTimeImmutable $startDate,
         public readonly ?int $anchorDay,
         public readonly NoticePeriod $noticePeriod,
+        public readonly bool $isTrial,
+        public readonly ?DateTimeImmutable $trialEndDate,
+        public readonly ?Money $convertsToPrice,
+        public readonly ?BillingCycle $convertsToBillingCycle,
+        public readonly ?int $convertsToCycleDays,
+        public readonly SplitMode $splitMode,
+        public readonly int $usageCount,
+        public readonly ?int $usageRating,
+        public readonly ?DateTimeImmutable $usageCountedSince,
         public readonly bool $isActive,
         public readonly ?string $logoPath,
         public readonly ?int $categoryId,
@@ -72,24 +83,135 @@ final class Subscription
     }
 
     /**
+     * The next date money actually changes hands.
+     *
+     * For a running trial that is the conversion date, not `nextPaymentDate` —
+     * a trial has no payment date yet, and whatever the column holds is either
+     * null or a leftover default. Anything reasoning about the next charge has
+     * to ask this rather than reading the column, or it will quietly answer for
+     * a payment that is not going to happen.
+     */
+    public function nextChargeDate(): ?DateTimeImmutable
+    {
+        if ($this->isTrial && $this->trialEndDate !== null) {
+            return $this->trialEndDate;
+        }
+
+        return $this->nextPaymentDate;
+    }
+
+    /**
      * The last day on which the subscription can be cancelled and still avoid
      * the next charge.
+     *
+     * Measured from the next *charge*, which for a trial is its conversion.
+     * Getting that wrong would tell somebody on a 30-day notice that their
+     * deadline had already passed when in fact they had a fortnight — the
+     * single most damaging thing this page could do.
      */
     public function cancellationDeadline(): ?DateTimeImmutable
     {
-        if ($this->nextPaymentDate === null) {
+        $charge = $this->nextChargeDate();
+        if ($charge === null) {
             return null;
         }
 
-        return $this->noticePeriod->deadlineBefore($this->nextPaymentDate);
+        return $this->noticePeriod->deadlineBefore($charge);
     }
 
     public function daysUntilNextPayment(DateTimeImmutable $today): ?int
     {
-        if ($this->nextPaymentDate === null) {
+        return $this->daysUntil($this->nextPaymentDate, $today);
+    }
+
+    /**
+     * True while the trial is still running.
+     *
+     * A trial whose end date has passed is not "a trial that ended" — it is a
+     * paid subscription whose conversion has not been applied yet. The
+     * catch-up turns one into the other.
+     */
+    public function isTrialActiveOn(DateTimeImmutable $date): bool
+    {
+        return $this->isTrial
+            && $this->trialEndDate !== null
+            && $this->trialEndDate->setTime(0, 0) >= $date->setTime(0, 0);
+    }
+
+    public function trialHasEndedBy(DateTimeImmutable $date): bool
+    {
+        return $this->isTrial
+            && $this->trialEndDate !== null
+            && $this->trialEndDate->setTime(0, 0) < $date->setTime(0, 0);
+    }
+
+    public function daysUntilTrialEnds(DateTimeImmutable $today): ?int
+    {
+        return $this->daysUntil($this->trialEndDate, $today);
+    }
+
+    /**
+     * What this subscription will cost once the trial converts — the
+     * converts-to price when one was recorded, and otherwise the price it
+     * already has.
+     */
+    public function priceAfterConversion(): Money
+    {
+        return $this->convertsToPrice ?? $this->price;
+    }
+
+    public function billingCycleAfterConversion(): ?BillingCycle
+    {
+        return $this->convertsToBillingCycle ?? $this->billingCycle;
+    }
+
+    public function cycleDaysAfterConversion(): ?int
+    {
+        return $this->convertsToBillingCycle !== null ? $this->convertsToCycleDays : $this->cycleDays;
+    }
+
+    /**
+     * Cost per recorded use, in minor units, or null when there is nothing to
+     * divide by.
+     *
+     * Measured against the period the count covers rather than against a single
+     * bill: forty uses is excellent over a month and poor over three years, and
+     * a figure that ignored the period would rate them the same.
+     */
+    public function costPerUseMinor(DateTimeImmutable $today): ?int
+    {
+        if ($this->usageCount <= 0) {
             return null;
         }
 
-        return (int) $today->setTime(0, 0)->diff($this->nextPaymentDate->setTime(0, 0))->format('%r%a');
+        $monthly = $this->monthlyMinor();
+        if ($monthly === null) {
+            return null;
+        }
+
+        $months = max(1, $this->usageMonths($today));
+
+        return Rounding::divide($monthly * $months, $this->usageCount);
+    }
+
+    /**
+     * Whole months the usage count covers, at least one.
+     */
+    public function usageMonths(DateTimeImmutable $today): int
+    {
+        $since = $this->usageCountedSince ?? $this->startDate ?? $this->createdAt;
+
+        $months = (int) $since->setTime(0, 0)->diff($today->setTime(0, 0))->format('%r%a');
+
+        return max(1, (int) round($months / 30.44));
+    }
+
+    private function daysUntil(?DateTimeImmutable $date, DateTimeImmutable $today): ?int
+    {
+        if ($date === null) {
+            return null;
+        }
+
+        return (int) $today->setTime(0, 0)->diff($date->setTime(0, 0))->format('%r%a');
     }
 }

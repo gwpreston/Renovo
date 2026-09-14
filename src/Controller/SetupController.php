@@ -9,6 +9,7 @@ use App\Domain\Currency;
 use App\Domain\IsolationMode;
 use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
+use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\SetupService;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
@@ -26,18 +27,17 @@ final class SetupController extends Controller
         SessionInterface $session,
         private readonly SetupService $setup,
         private readonly MembershipRepository $memberships,
+        private readonly ExchangeRateProviderRegistry $rateProviders,
     ) {
         parent::__construct($view, $session);
     }
 
     public function showForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->render($request, $response, 'setup/wizard.twig', [
-            'currencies' => Currency::common(),
-            'isolation_modes' => IsolationMode::cases(),
-            'values' => ['base_currency' => 'GBP', 'isolation_mode' => IsolationMode::Shared->value],
-            'errors' => [],
-        ]);
+        return $this->render($request, $response, 'setup/wizard.twig', $this->formData([
+            'base_currency' => 'GBP',
+            'isolation_mode' => IsolationMode::Shared->value,
+        ]));
     }
 
     public function submit(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -47,12 +47,12 @@ final class SetupController extends Controller
         try {
             $user = $this->setup->complete($body);
         } catch (ValidationException $exception) {
-            return $this->render($request, $response->withStatus(422), 'setup/wizard.twig', [
-                'currencies' => Currency::common(),
-                'isolation_modes' => IsolationMode::cases(),
-                'values' => $body,
-                'errors' => $exception->errors(),
-            ]);
+            return $this->render(
+                $request,
+                $response->withStatus(422),
+                'setup/wizard.twig',
+                $this->formData($body, $exception->errors()),
+            );
         }
 
         $this->session->regenerate();
@@ -66,5 +66,22 @@ final class SetupController extends Controller
         $this->flash('success', 'Your instance is ready. Add your first subscription to get started.');
 
         return $this->redirect($response, '/');
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @param array<string, string> $errors
+     * @return array<string, mixed>
+     */
+    private function formData(array $values, array $errors = []): array
+    {
+        return [
+            'currencies' => Currency::common(),
+            'isolation_modes' => IsolationMode::cases(),
+            'rate_providers' => $this->rateProviders->all(),
+            'default_rate_provider' => $this->rateProviders->default()->key(),
+            'values' => $values,
+            'errors' => $errors,
+        ];
     }
 }

@@ -77,6 +77,55 @@
 
                 <label for="start_date">Started on</label>
                 <input type="date" id="start_date" name="start_date" value="{{ values.start_date|default('') }}">
+                <p class="hint">Used to reconstruct what you spent in previous years, and to date the first
+                    entry in the price history.</p>
+
+                <fieldset class="stack">
+                    <legend>Free trial</legend>
+
+                    <input type="hidden" name="is_trial" value="0">
+                    <label class="choice">
+                        <input type="checkbox" name="is_trial" value="1"
+                               {{ values.is_trial|default('0') == '1' ? 'checked' : '' }}>
+                        <span>This is a free trial</span>
+                    </label>
+
+                    <label for="trial_end_date">Trial ends</label>
+                    <input type="date" id="trial_end_date" name="trial_end_date"
+                           value="{{ values.trial_end_date|default('') }}">
+                    <p class="hint">The last free day — and the day the first charge falls.</p>
+                    {% if errors.trial_end_date is defined %}
+                        <p class="field-error">{{ errors.trial_end_date }}</p>
+                    {% endif %}
+
+                    <label for="converts_to_price">Converts to</label>
+                    <input type="text" id="converts_to_price" name="converts_to_price" inputmode="decimal"
+                           value="{{ values.converts_to_price|default('') }}" placeholder="9.99">
+                    <p class="hint">Leave blank if it converts to the price above.</p>
+                    {% if errors.converts_to_price is defined %}
+                        <p class="field-error">{{ errors.converts_to_price }}</p>
+                    {% endif %}
+
+                    <label for="converts_to_billing_cycle">Converts to cycle</label>
+                    <select id="converts_to_billing_cycle" name="converts_to_billing_cycle">
+                        <option value="">Same as above</option>
+                        {% for cycle in cycles %}
+                            <option value="{{ cycle.value }}"
+                                    {{ values.converts_to_billing_cycle|default('') == cycle.value
+                                        ? 'selected' : '' }}>
+                                {{ cycle_label(cycle.value) }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <label for="converts_to_cycle_days">Converts to days between payments</label>
+                    <input type="number" id="converts_to_cycle_days" name="converts_to_cycle_days"
+                           min="1" max="3650" value="{{ values.converts_to_cycle_days|default('') }}">
+                    <p class="hint">Only used when it converts to a custom cycle.</p>
+                    {% if errors.converts_to_cycle_days is defined %}
+                        <p class="field-error">{{ errors.converts_to_cycle_days }}</p>
+                    {% endif %}
+                </fieldset>
 
                 <label for="notice_period_amount">Notice period</label>
                 <div class="input-group">

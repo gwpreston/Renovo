@@ -144,6 +144,31 @@ final class ScopingTest extends DatabaseTestCase
         );
     }
 
+    public function testAnUpdateThatChangesNothingIsNotAScopeViolation(): void
+    {
+        // A genuine cross-engine trap. PostgreSQL's affected-row count is
+        // "rows matched"; MySQL's is "rows actually changed", so writing a row
+        // the values it already holds reports zero there. Inferring "no such
+        // row in scope" from that count alone raises a scope violation — and a
+        // 404 — for a harmless no-op, on one engine only.
+        $scope = $this->scope($this->alice, IsolationMode::Shared);
+        $id = $this->createSubscription($scope, 'Streaming');
+
+        $this->subscriptions->update($scope, $id, ['name' => 'Streaming'], []);
+
+        self::assertSame('Streaming', $this->subscriptions->find($scope, $id)?->name);
+
+        // And a row that really is out of scope still fails, so the fix has not
+        // simply made the check toothless.
+        $theirs = $this->createSubscription(
+            $this->scope($this->outsider, IsolationMode::Shared, $this->otherHousehold),
+            'Theirs',
+        );
+
+        $this->expectException(ScopeViolationException::class);
+        $this->subscriptions->update($scope, $theirs, ['name' => 'Theirs'], []);
+    }
+
     public function testIsolatedModeForcesNewRowsToBelongToTheirCreator(): void
     {
         // Otherwise a user could create a row they immediately could not see.

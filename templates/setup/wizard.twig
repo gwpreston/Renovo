@@ -70,6 +70,39 @@
             </fieldset>
             {% if errors.isolation_mode is defined %}<p class="field-error">{{ errors.isolation_mode }}</p>{% endif %}
 
+            <fieldset class="stack">
+                <legend>Exchange rates</legend>
+                <p class="hint">Used to show one combined total when you track subscriptions in more than one
+                    currency. Amounts are always stored in the currency you entered them in; rates only affect
+                    what is displayed.</p>
+
+                {% for provider in rate_providers %}
+                    <label class="choice">
+                        <input type="radio" name="rate_provider" value="{{ provider.key }}"
+                               data-requires-key="{{ provider.requiresApiKey ? '1' : '0' }}"
+                               {{ values.rate_provider|default(default_rate_provider) == provider.key
+                                   ? 'checked' : '' }}>
+                        <span>
+                            <strong>{{ provider.label }}</strong>
+                            <span class="muted block">{{ provider.description }}</span>
+                        </span>
+                    </label>
+                {% endfor %}
+                {% if errors.rate_provider is defined %}
+                    <p class="field-error">{{ errors.rate_provider }}</p>
+                {% endif %}
+
+                <label for="rate_provider_key">API key</label>
+                <input type="password" id="rate_provider_key" name="rate_provider_key"
+                       autocomplete="off" placeholder="Only needed by some providers">
+                <p class="hint">Leave blank for a provider that needs no key. Setting
+                    <code>EXCHANGE_RATE_API_KEY</code> in the environment instead keeps the key out of the
+                    database entirely, and takes precedence over anything entered here.</p>
+                {% if errors.rate_provider_key is defined %}
+                    <p class="field-error">{{ errors.rate_provider_key }}</p>
+                {% endif %}
+            </fieldset>
+
             <button type="submit" class="button button-primary">Finish setup</button>
         </form>
     </section>

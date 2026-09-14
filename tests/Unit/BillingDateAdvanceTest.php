@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\Domain\BillingCycle;
-use App\Domain\Money;
 use App\Domain\NoticePeriod;
 use App\Domain\SubscriptionType;
 use App\Domain\Entity\Subscription;
+use App\Tests\Support\SubscriptionFactory;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 
@@ -96,36 +96,45 @@ final class BillingDateAdvanceTest extends TestCase
         self::assertNull($noNotice->cancellationDeadline());
     }
 
+    public function testATrialsCancellationDeadlineIsMeasuredFromItsConversion(): void
+    {
+        // A trial has no payment date yet, so the next money that changes hands
+        // is the conversion. Measuring the notice period from a leftover
+        // next_payment_date would tell somebody their deadline had passed when
+        // they still had two weeks — the most damaging way to be wrong here.
+        $trial = SubscriptionFactory::make(
+            nextPaymentDate: new DateTimeImmutable('2026-09-14'),
+            noticePeriod: NoticePeriod::of(30, NoticePeriod::UNIT_DAYS),
+            isTrial: true,
+            trialEndDate: new DateTimeImmutable('2026-09-28'),
+        );
+
+        self::assertSame('2026-09-28', $trial->nextChargeDate()?->format('Y-m-d'));
+        self::assertSame('2026-08-29', $trial->cancellationDeadline()?->format('Y-m-d'));
+    }
+
+    public function testANonTrialStillMeasuresFromItsPaymentDate(): void
+    {
+        $subscription = SubscriptionFactory::make(
+            nextPaymentDate: new DateTimeImmutable('2026-10-02'),
+            noticePeriod: NoticePeriod::of(1, NoticePeriod::UNIT_MONTHS),
+        );
+
+        self::assertSame('2026-10-02', $subscription->nextChargeDate()?->format('Y-m-d'));
+        self::assertSame('2026-09-02', $subscription->cancellationDeadline()?->format('Y-m-d'));
+    }
+
     private function subscription(
         SubscriptionType $type,
         BillingCycle $cycle,
         ?NoticePeriod $notice = null,
         ?DateTimeImmutable $nextPayment = null,
     ): Subscription {
-        return new Subscription(
-            id: 1,
-            householdId: 1,
-            ownerUserId: 1,
-            payerUserId: null,
-            name: 'Example',
-            notes: null,
-            price: Money::of(1000, 'GBP'),
+        return SubscriptionFactory::make(
             type: $type,
-            billingCycle: $cycle,
-            cycleDays: null,
-            nextPaymentDate: $nextPayment ?? new DateTimeImmutable('2026-06-01'),
-            startDate: null,
-            anchorDay: null,
-            noticePeriod: $notice ?? NoticePeriod::none(),
-            isActive: true,
-            logoPath: null,
-            categoryId: null,
-            categoryName: null,
-            ownerName: null,
-            payerName: null,
-            tags: [],
-            createdAt: new DateTimeImmutable('2026-01-01'),
-            updatedAt: new DateTimeImmutable('2026-01-01'),
+            cycle: $cycle,
+            nextPaymentDate: $nextPayment,
+            noticePeriod: $notice,
         );
     }
 }

@@ -23,7 +23,23 @@ use App\Security\ScopeViolationException;
  *   household_id = :scope   AND (when the instance is ISOLATED and the table
  *                                has an owner) owner_user_id = :scope_user
  *
- * Two properties are worth stating explicitly because both are easy to
+ * There are in fact two predicates, and the difference between them is the
+ * subtlest thing in this class:
+ *
+ *  - `scopePredicate()` is the **write** predicate, used by updateScoped,
+ *    deleteScoped and existsForWrite. It is the rule above, exactly.
+ *  - `readPredicate()` is the **read** predicate, used by scopedWhere and
+ *    therefore by every SELECT. It is the same rule, optionally widened by
+ *    `readVisibilityPredicate()` for rows a user is entitled to see without
+ *    owning — a subscription they pay a share of, and nothing else so far.
+ *
+ * Keeping them separate is what stops "can see" from quietly becoming "can
+ * change". If the widening lived in one shared predicate, a member listed on a
+ * shared-cost split would gain UPDATE and DELETE on somebody else's
+ * subscription the moment the feature shipped, and no existing test would
+ * notice.
+ *
+ * Two further properties are worth stating explicitly because both are easy to
  * implement backwards:
  *
  *  - Writes are scoped exactly like reads. A scoped UPDATE or DELETE carries
@@ -85,12 +101,94 @@ abstract class AbstractScopedRepository extends AbstractRepository
     }
 
     /**
+     * An extra condition that widens what a scope may *read*, OR-ed with the
+     * owner clause.
+     *
+     * The one use of it is shared-cost splitting: a member who is a participant
+     * in a split must be able to see the subscription they are paying part of,
+     * even when the instance is ISOLATED and they do not own it. Returning null
+     * — the default — means no widening at all.
+     *
+     * Two constraints on any implementation, both load-bearing:
+     *
+     *  - It never escapes the household. It is OR-ed with the owner clause
+     *    only; `household_id = :scope` is AND-ed outside it and stays
+     *    absolute.
+     *  - It is read-only, by construction rather than by convention. This hook
+     *    is consulted by `scopedWhere()`, which serves the SELECT methods and
+     *    nothing else. `scopePredicate()` — which is what UPDATE, DELETE and
+     *    the in-scope assertion use — does not consult it. Being able to see a
+     *    subscription you contribute to is not the same as being able to
+     *    change it, and the split between the two predicates is what makes
+     *    that structural instead of something each call site has to remember.
+     *
+     * @param array<string, mixed> $params
+     */
+    protected function readVisibilityPredicate(Scope $scope, array &$params): ?string
+    {
+        return null;
+    }
+
+    /**
+     * The predicate for reads: the write predicate, optionally widened.
+     *
+     * @param array<string, mixed> $params
+     */
+    final protected function readPredicate(Scope $scope, array &$params): string
+    {
+        if (!$scope->hasHousehold()) {
+            return '1 = 0';
+        }
+
+        $ownerColumn = $this->ownerColumn();
+        if ($ownerColumn === null || !$scope->isOwnerRestricted()) {
+            // With no owner column, or in SHARED mode, the household predicate
+            // is already the whole answer and there is nothing to widen.
+            return $this->scopePredicate($scope, $params);
+        }
+
+        $extra = $this->readVisibilityPredicate($scope, $params);
+        if ($extra === null) {
+            return $this->scopePredicate($scope, $params);
+        }
+
+        $params[self::SCOPE_HOUSEHOLD_PARAM] = $scope->householdId;
+        $params[self::SCOPE_OWNER_PARAM] = $scope->userId;
+
+        return $this->qualify($this->householdColumn()) . ' = :' . self::SCOPE_HOUSEHOLD_PARAM
+            . ' AND (' . $this->qualify($ownerColumn) . ' = :' . self::SCOPE_OWNER_PARAM
+            . ' OR ' . $extra . ')';
+    }
+
+    /**
+     * A WHERE clause restricted to rows this scope may *write*.
+     *
+     * Used by the queries whose whole purpose is to feed a write — finding
+     * overdue payment dates, finding trials to convert. Reading those through
+     * the wider read predicate and then writing through the narrower one would
+     * hand the caller a row it is about to be refused, and the refusal is an
+     * exception rather than a no-op. A member who is merely a participant in a
+     * split would therefore turn an ordinary dashboard load into a 404.
+     *
+     * @param array<string, mixed> $params
+     */
+    final protected function writableWhere(Scope $scope, Criteria $criteria, array &$params): string
+    {
+        $conditions = array_merge(
+            [$this->scopePredicate($scope, $params)],
+            $this->compileConditions($criteria, $params),
+        );
+
+        return ' WHERE ' . implode(' AND ', $conditions);
+    }
+
+    /**
      * @param array<string, mixed> $params
      */
     final protected function scopedWhere(Scope $scope, Criteria $criteria, array &$params): string
     {
         $conditions = array_merge(
-            [$this->scopePredicate($scope, $params)],
+            [$this->readPredicate($scope, $params)],
             $this->compileConditions($criteria, $params),
         );
 
@@ -122,6 +220,24 @@ abstract class AbstractScopedRepository extends AbstractRepository
             . ' LIMIT 1';
 
         return $this->db->fetchOne($sql, $params);
+    }
+
+    /**
+     * Whether a row is within scope *for writing*.
+     *
+     * Deliberately not expressed as a read: a caller about to modify a row must
+     * ask the write predicate whether it may, and the read predicate can be
+     * wider. Guards on mutating operations use this.
+     */
+    final protected function existsForWrite(Scope $scope, int $id): bool
+    {
+        $params = ['__id' => $id];
+        $sql = 'SELECT 1 FROM ' . $this->quote($this->table())
+            . ' WHERE ' . $this->qualify('id') . ' = :__id'
+            . ' AND ' . $this->scopePredicate($scope, $params)
+            . ' LIMIT 1';
+
+        return $this->db->fetchValue($sql, $params) !== null;
     }
 
     protected function countScoped(Scope $scope, Criteria $criteria): int
@@ -195,7 +311,14 @@ abstract class AbstractScopedRepository extends AbstractRepository
             . ' WHERE ' . $this->quote($this->table()) . '.' . $this->quote('id') . ' = :__id'
             . ' AND ' . $this->scopePredicate($scope, $params);
 
-        if ($this->db->execute($sql, $params) < 1) {
+        if ($this->db->execute($sql, $params) < 1 && !$this->existsForWrite($scope, $id)) {
+            // Zero affected rows does not mean the same thing on both engines.
+            // PostgreSQL counts matches, so zero means "no such row in scope".
+            // MySQL counts actual changes, so an update writing the values a
+            // row already holds also reports zero — and treating that as a
+            // scope violation would turn a harmless no-op into a 404 on one
+            // engine only. The second check settles which it was, and only
+            // runs in the rare case where it matters.
             throw ScopeViolationException::forRow($this->table(), $id);
         }
     }

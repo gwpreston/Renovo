@@ -27,7 +27,12 @@ final class PermissionService
             Permission::UpdateSubscription,
             Permission::DeleteSubscription,
             Permission::ManageCategories,
-            Permission::ManageTags => $scope->canWrite(),
+            Permission::ManageTags,
+            Permission::ManageBudgets,
+            Permission::ManagePrices,
+            Permission::ManageSplits,
+            Permission::RecordUsage,
+            Permission::BulkEdit => $scope->canWrite(),
 
             Permission::ManageHousehold => $scope->canManageHousehold(),
 

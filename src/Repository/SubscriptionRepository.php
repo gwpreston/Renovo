@@ -9,6 +9,7 @@ use App\Domain\Entity\Subscription;
 use App\Domain\Entity\Tag;
 use App\Domain\Money;
 use App\Domain\NoticePeriod;
+use App\Domain\SplitMode;
 use App\Domain\SubscriptionFilter;
 use App\Domain\SubscriptionType;
 use App\Persistence\Criteria;
@@ -44,6 +45,37 @@ final class SubscriptionRepository extends AbstractScopedRepository
         return 'subscriptions';
     }
 
+    /**
+     * A member listed on a shared-cost split may see the subscription they are
+     * paying part of, even in ISOLATED mode and even though they do not own it.
+     *
+     * This is the single use of the read-visibility hook in the application,
+     * and the reasoning is worth keeping next to it: a household that has
+     * agreed to divide a bill has, by agreeing, made that bill the business of
+     * everybody named in it. Hiding it from them would leave a member with a
+     * share of a cost they are not allowed to look at.
+     *
+     * Three things this does *not* do, each load-bearing:
+     *
+     *  - it does not cross a household — the household predicate is AND-ed
+     *    outside this clause by readPredicate() and stays absolute;
+     *  - it does not grant any write — the base class consults this hook from
+     *    scopedWhere() only, so UPDATE, DELETE and the in-scope assertion still
+     *    use the unwidened predicate;
+     *  - it does not apply in SHARED mode, where the owner clause is absent
+     *    and everybody in the household can see everything anyway.
+     *
+     * @param array<string, mixed> $params
+     */
+    protected function readVisibilityPredicate(Scope $scope, array &$params): string
+    {
+        $params['__participant'] = $scope->userId;
+
+        return 'EXISTS (SELECT 1 FROM ' . $this->quote('subscription_splits') . ' split'
+            . ' WHERE split.' . $this->quote('subscription_id') . ' = ' . $this->qualify('id')
+            . ' AND split.' . $this->quote('user_id') . ' = :__participant)';
+    }
+
     protected function filterableColumns(): array
     {
         return [
@@ -58,6 +90,11 @@ final class SubscriptionRepository extends AbstractScopedRepository
             'subscription_type',
             'billing_cycle',
             'next_payment_date',
+            'is_trial',
+            'trial_end_date',
+            'split_mode',
+            'usage_count',
+            'usage_rating',
             'is_active',
             'category_id',
             'created_at',
@@ -134,6 +171,84 @@ final class SubscriptionRepository extends AbstractScopedRepository
     }
 
     /**
+     * Trials ending within the given window, soonest first.
+     *
+     * Surfaced prominently because this is the deadline people actually lose
+     * money to: a trial that converts unnoticed is the whole reason for
+     * tracking them.
+     *
+     * @return list<Subscription>
+     */
+    public function findTrialsEnding(Scope $scope, DateTimeImmutable $from, DateTimeImmutable $to): array
+    {
+        $criteria = Criteria::new()
+            ->equals('is_active', true)
+            ->equals('is_trial', true)
+            ->where('trial_end_date', '>=', $from->format('Y-m-d'))
+            ->where('trial_end_date', '<=', $to->format('Y-m-d'))
+            ->orderBy('trial_end_date', 'asc');
+
+        $params = [];
+        $sql = $this->selectWithJoins()
+            . $this->scopedWhere($scope, $criteria, $params)
+            . $this->compileOrderBy($criteria);
+
+        return $this->hydrateAll($scope, $this->db->fetchAll($sql, $params));
+    }
+
+    /**
+     * Trials whose end date has passed and which therefore need converting.
+     *
+     * Restricted to rows this scope may write, not merely read. The conversion
+     * that follows is an UPDATE, and handing back a row the caller is about to
+     * be refused would turn a page view into an error — see writableWhere().
+     *
+     * @return list<Subscription>
+     */
+    public function findTrialsToConvert(Scope $scope, DateTimeImmutable $today): array
+    {
+        $criteria = Criteria::new()
+            ->equals('is_active', true)
+            ->equals('is_trial', true)
+            ->where('trial_end_date', '<', $today->format('Y-m-d'))
+            ->orderBy('trial_end_date', 'asc');
+
+        $params = [];
+        $sql = $this->selectWithJoins()
+            . $this->writableWhere($scope, $criteria, $params)
+            . $this->compileOrderBy($criteria);
+
+        return $this->hydrateAll($scope, $this->db->fetchAll($sql, $params));
+    }
+
+    /**
+     * Turn a trial into the paid subscription it became.
+     *
+     * The price itself is not set here: that is a price-history row, written by
+     * PriceHistoryService in the same transaction, so that the conversion shows
+     * up in the trend as the step it is.
+     */
+    public function convertTrial(
+        Scope $scope,
+        int $id,
+        ?BillingCycle $cycle,
+        ?int $cycleDays,
+        DateTimeImmutable $nextPaymentDate,
+    ): void {
+        $this->updateScoped($scope, $id, [
+            'is_trial' => false,
+            'converts_to_price_minor' => null,
+            'converts_to_billing_cycle' => null,
+            'converts_to_cycle_days' => null,
+            'billing_cycle' => $cycle?->value,
+            'cycle_days' => $cycleDays,
+            'next_payment_date' => $nextPaymentDate->format('Y-m-d'),
+            'anchor_day' => (int) $nextPaymentDate->format('j'),
+            'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
      * Active subscriptions whose next payment falls within the given window.
      *
      * @return list<Subscription>
@@ -158,6 +273,9 @@ final class SubscriptionRepository extends AbstractScopedRepository
      * Active recurring subscriptions whose next payment date is in the past,
      * for the cycle auto-advance.
      *
+     * Write-scoped for the same reason as findTrialsToConvert: every row
+     * returned here is about to be updated.
+     *
      * @return list<Subscription>
      */
     public function findOverdue(Scope $scope, DateTimeImmutable $today): array
@@ -168,7 +286,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
             ->where('next_payment_date', '<', $today->format('Y-m-d'));
 
         $params = [];
-        $sql = $this->selectWithJoins() . $this->scopedWhere($scope, $criteria, $params);
+        $sql = $this->selectWithJoins() . $this->writableWhere($scope, $criteria, $params);
 
         return $this->hydrateAll($scope, $this->db->fetchAll($sql, $params));
     }
@@ -232,6 +350,123 @@ final class SubscriptionRepository extends AbstractScopedRepository
     }
 
     /**
+     * Record one use.
+     *
+     * The increment is done in SQL rather than read-modify-write so that two
+     * people tapping "used it" at once cannot lose a count between them.
+     * `usage_counted_since` is set on the first use so that the count always
+     * has a period to be judged against.
+     */
+    public function incrementUsage(Scope $scope, int $id, DateTimeImmutable $today): void
+    {
+        $params = [
+            '__id' => $id,
+            'now' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'today' => $today->format('Y-m-d'),
+        ];
+
+        $sql = 'UPDATE ' . $this->quote('subscriptions')
+            . ' SET ' . $this->quote('usage_count') . ' = ' . $this->quote('usage_count') . ' + 1,'
+            . ' ' . $this->quote('usage_counted_since') . ' = COALESCE('
+            . $this->quote('usage_counted_since') . ', :today),'
+            . ' ' . $this->quote('updated_at') . ' = :now'
+            . ' WHERE ' . $this->quote('id') . ' = :__id'
+            . ' AND ' . $this->scopePredicateUnqualified($scope, $params);
+
+        if ($this->db->execute($sql, $params) < 1) {
+            throw \App\Security\ScopeViolationException::forRow($this->table(), $id);
+        }
+    }
+
+    public function setUsageRating(Scope $scope, int $id, ?int $rating): void
+    {
+        $this->updateScoped($scope, $id, [
+            'usage_rating' => $rating,
+            'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    public function resetUsage(Scope $scope, int $id, DateTimeImmutable $today): void
+    {
+        $this->updateScoped($scope, $id, [
+            'usage_count' => 0,
+            'usage_counted_since' => $today->format('Y-m-d'),
+            'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * Apply one field to many subscriptions at once, each write individually
+     * scoped.
+     *
+     * There is no bulk UPDATE ... WHERE id IN (...) here on purpose. Writing
+     * them one at a time means each carries the scope predicate and each
+     * reports whether it matched, so a bulk action cannot quietly modify a row
+     * the caller could not have modified individually.
+     *
+     * @param list<int>            $ids
+     * @param array<string, mixed> $data
+     * @return int Number of rows actually changed.
+     */
+    public function updateMany(Scope $scope, array $ids, array $data): int
+    {
+        if ($ids === [] || $data === []) {
+            return 0;
+        }
+
+        return $this->db->transactional(function () use ($scope, $ids, $data): int {
+            $changed = 0;
+            foreach (array_unique($ids) as $id) {
+                try {
+                    $this->updateScoped($scope, $id, $data + [
+                        'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+                    ]);
+                    $changed++;
+                } catch (\App\Security\ScopeViolationException) {
+                    // A row that is not this caller's to change is skipped
+                    // rather than failing the whole action: a bulk edit run
+                    // over a stale selection should do what it can and report
+                    // the count, not abort on the one row somebody else has
+                    // since deleted.
+                    continue;
+                }
+            }
+
+            return $changed;
+        });
+    }
+
+    /**
+     * Change how a subscription's cost is divided.
+     */
+    public function setSplitMode(Scope $scope, int $id, SplitMode $mode): void
+    {
+        $this->updateScoped($scope, $id, [
+            'split_mode' => $mode->value,
+            'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * Update the denormalised current price.
+     *
+     * `subscriptions.price_minor` is a cache of "the latest price-history row
+     * that has taken effect". It exists because the list view sorts, filters
+     * and totals on it, and a correlated sub-query on every row would be a poor
+     * trade. The invariant that keeps the two honest is that this method is
+     * only ever called from PriceHistoryService, inside the same transaction as
+     * the history row it reflects.
+     */
+    public function setPrice(Scope $scope, int $id, Money $price): void
+    {
+        $this->updateScoped($scope, $id, [
+            'price_minor' => $price->amountMinor,
+            'currency' => $price->currency,
+            'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
      * Distinct currencies in scope, for the filter pick-list.
      *
      * @return list<string>
@@ -250,11 +485,38 @@ final class SubscriptionRepository extends AbstractScopedRepository
     }
 
     /**
+     * Guard for the operations that modify a subscription's associations.
+     *
+     * It asks the *write* predicate, not the read one. Since shared-cost splits
+     * let a participant see a subscription they do not own, a read-based check
+     * here would let that participant rewrite its tags — the tag sync deletes
+     * and re-inserts join rows directly, so this assertion is the only thing
+     * standing in front of it.
+     *
      * @throws \App\Security\ScopeViolationException
      */
+    /**
+     * The subscription, but only if the caller may write to it.
+     *
+     * find() is widened for split participants, so a service that reads with
+     * find() and then writes has already lost the distinction. Anything that
+     * needs the row *in order to change something* asks for it here instead.
+     */
+    public function findForWrite(Scope $scope, int $id): ?Subscription
+    {
+        $criteria = Criteria::new()->equals('id', $id);
+
+        $params = [];
+        $sql = $this->selectWithJoins() . $this->writableWhere($scope, $criteria, $params);
+
+        $row = $this->db->fetchOne($sql, $params);
+
+        return $row === null ? null : $this->hydrateAll($scope, [$row])[0];
+    }
+
     private function assertInScope(Scope $scope, int $id): void
     {
-        if ($this->findOneScoped($scope, Criteria::new()->equals('id', $id)) === null) {
+        if (!$this->existsForWrite($scope, $id)) {
             throw \App\Security\ScopeViolationException::forRow($this->table(), $id);
         }
     }
@@ -380,7 +642,13 @@ final class SubscriptionRepository extends AbstractScopedRepository
             . ' INNER JOIN ' . $this->quote('subscriptions')
             . ' ON ' . $this->qualify('id') . ' = st.' . $this->quote('subscription_id')
             . ' WHERE st.' . $this->quote('subscription_id') . ' IN (' . implode(', ', $placeholders) . ')'
-            . ' AND ' . $this->scopePredicate($scope, $params)
+            // The read predicate, deliberately, and the one place in this class
+            // where that choice is easy to get wrong. This runs on every read
+            // path to decorate rows that have *already* been found by the read
+            // predicate; narrowing it here would hand a split participant a
+            // subscription stripped of its tags, silently, with no error — the
+            // same row shown differently to two people looking at it.
+            . ' AND ' . $this->readPredicate($scope, $params)
             . ' ORDER BY t.' . $this->quote('name') . ' ASC';
 
         $grouped = [];
@@ -439,6 +707,20 @@ final class SubscriptionRepository extends AbstractScopedRepository
                 $this->nullableInt($row['notice_period_amount'] ?? null),
                 $this->nullableString($row['notice_period_unit'] ?? null),
             ),
+            isTrial: $this->db->platform()->toBoolean($row['is_trial'] ?? false),
+            trialEndDate: $this->nullableDate($row['trial_end_date'] ?? null),
+            convertsToPrice: isset($row['converts_to_price_minor'])
+                ? Money::of((int) $row['converts_to_price_minor'], (string) $row['currency'])
+                : null,
+            convertsToBillingCycle: BillingCycle::tryFromString(
+                $this->nullableString($row['converts_to_billing_cycle'] ?? null),
+            ),
+            convertsToCycleDays: $this->nullableInt($row['converts_to_cycle_days'] ?? null),
+            splitMode: SplitMode::tryFromString($this->nullableString($row['split_mode'] ?? null))
+                ?? SplitMode::None,
+            usageCount: (int) ($row['usage_count'] ?? 0),
+            usageRating: $this->nullableInt($row['usage_rating'] ?? null),
+            usageCountedSince: $this->nullableDate($row['usage_counted_since'] ?? null),
             isActive: $this->db->platform()->toBoolean($row['is_active']),
             logoPath: $this->nullableString($row['logo_path'] ?? null),
             categoryId: $this->nullableInt($row['category_id'] ?? null),

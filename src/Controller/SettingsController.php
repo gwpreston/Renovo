@@ -11,6 +11,8 @@ use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\UserRepository;
 use App\Security\SessionInterface;
+use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
+use App\Service\ExchangeRateService;
 use App\Service\InstanceSettingsService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -34,6 +36,8 @@ final class SettingsController extends Controller
         private readonly UserRepository $users,
         private readonly HouseholdRepository $households,
         private readonly MembershipRepository $memberships,
+        private readonly ExchangeRateService $rates,
+        private readonly ExchangeRateProviderRegistry $rateProviders,
     ) {
         parent::__construct($view, $session);
     }
@@ -51,6 +55,15 @@ final class SettingsController extends Controller
             'themes' => self::THEMES,
             'currencies' => Currency::common(),
             'isolation_modes' => IsolationMode::cases(),
+            'rate_providers' => $this->rateProviders->all(),
+            'rates' => [
+                'provider' => $this->rates->provider()->key(),
+                'provider_label' => $this->rates->provider()->label(),
+                'last_refreshed_at' => $this->rates->lastRefreshedAt(),
+                'is_stale' => $this->rates->isStale(),
+                'is_misconfigured' => $this->rates->isMisconfigured(),
+                'currency_count' => count($this->rates->availableCurrencies()),
+            ],
             'instance' => [
                 'name' => $this->settings->instanceName(),
                 'base_currency' => $this->settings->baseCurrency(),
@@ -104,8 +117,18 @@ final class SettingsController extends Controller
 
         $rawCurrency = is_scalar($body['base_currency'] ?? null) ? (string) $body['base_currency'] : '';
         $currency = Currency::normalise($rawCurrency);
+        $baseCurrencyChanged = Currency::isValidCode($currency) && $currency !== $this->settings->baseCurrency();
         if (Currency::isValidCode($currency)) {
             $this->settings->setBaseCurrency($currency);
+        }
+
+        $providerChanged = $this->applyRateProviderChange($body);
+
+        // Cached rates are stored against one base and sourced from one
+        // provider. Changing either makes every cached row answer a question
+        // nobody asked, so they are dropped rather than left to expire.
+        if ($baseCurrencyChanged || $providerChanged) {
+            $this->rates->invalidate();
         }
 
         $isolation = IsolationMode::tryFrom(
@@ -120,6 +143,33 @@ final class SettingsController extends Controller
         $this->flash('success', 'Instance settings saved.');
 
         return $this->redirectAfterWrite($request, $response, '/settings');
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return bool Whether the provider actually changed.
+     */
+    private function applyRateProviderChange(array $body): bool
+    {
+        $requested = is_scalar($body['rate_provider'] ?? null) ? (string) $body['rate_provider'] : '';
+        $changed = false;
+
+        if ($this->rateProviders->has($requested) && $requested !== $this->rates->provider()->key()) {
+            $this->settings->setRateProvider($requested);
+            $changed = true;
+        }
+
+        // An empty field leaves the stored key alone: the input is rendered
+        // blank every time (it is a secret and is never echoed back), so
+        // treating blank as "clear it" would wipe the key on every save.
+        $key = trim(is_scalar($body['rate_provider_key'] ?? null) ? (string) $body['rate_provider_key'] : '');
+        if ($key !== '') {
+            $this->settings->setRateProviderKey($key);
+        } elseif (($body['clear_rate_provider_key'] ?? '') === '1') {
+            $this->settings->setRateProviderKey('');
+        }
+
+        return $changed;
     }
 
     /**

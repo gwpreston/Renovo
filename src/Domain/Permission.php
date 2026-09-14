@@ -18,6 +18,15 @@ enum Permission: string
     case ManageCategories = 'category.manage';
     case ManageTags = 'tag.manage';
 
+    // Money. Viewing budgets and forecasts is part of viewing subscriptions —
+    // a figure derived from data you can already see discloses nothing new —
+    // so only the writes need permissions of their own.
+    case ManageBudgets = 'budget.manage';
+    case ManagePrices = 'price.manage';
+    case ManageSplits = 'split.manage';
+    case RecordUsage = 'usage.record';
+    case BulkEdit = 'subscription.bulk_edit';
+
     case ManageHousehold = 'household.manage';
 
     case ManageInstance = 'instance.manage';

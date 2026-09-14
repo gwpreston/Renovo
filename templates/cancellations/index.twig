@@ -1,0 +1,81 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Cancel by — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>Cancel by</h1>
+    </div>
+
+    <p class="muted note">
+        The date that matters is not the renewal — it is the last day you can still give notice and avoid the
+        next charge. Only subscriptions with a notice period appear here; everything else can be cancelled
+        right up to its renewal date, which the subscriptions list already shows.
+    </p>
+
+    {% if deadlines is empty %}
+        <section class="card">
+            <p class="muted empty">Nothing with a notice period. Add one to a subscription and it will appear
+                here.</p>
+        </section>
+    {% else %}
+        <section class="card">
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th scope="col">Subscription</th>
+                        <th scope="col">Cancel by</th>
+                        <th scope="col">Next charge</th>
+                        <th scope="col">Notice</th>
+                        <th scope="col" class="numeric">Price</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in deadlines %}
+                        <tr class="{{ row.is_passed ? 'is-passed' : (row.is_urgent ? 'is-urgent' : '') }}">
+                            <td>
+                                <a href="/subscriptions/{{ row.subscription.id }}/edit">{{
+                                    row.subscription.name }}</a>
+                                {% if row.subscription.categoryName %}
+                                    <div class="hint">{{ row.subscription.categoryName }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ row.deadline|date('j M Y') }}</strong>
+                                <div class="hint">
+                                    {% if row.is_passed %}
+                                        <span class="badge badge-danger">Deadline passed</span>
+                                        {{ (row.days_remaining * -1) }} day{{ row.days_remaining == -1 ? '' : 's' }}
+                                        ago — this renewal is already committed.
+                                    {% elseif row.days_remaining == 0 %}
+                                        <span class="badge badge-warning">Today</span>
+                                    {% else %}
+                                        {{ row.days_remaining }} day{{ row.days_remaining == 1 ? '' : 's' }} left
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {{ row.subscription.nextChargeDate
+                                    ? row.subscription.nextChargeDate|date('j M Y') : '—' }}
+                                {% if row.subscription.isTrial %}
+                                    <div class="hint">Trial converts</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ notice_label(row.subscription.noticePeriod.amount,
+                                row.subscription.noticePeriod.unit) }}</td>
+                            <td class="numeric">{{
+                                row.subscription.price.amountMinor|money(row.subscription.price.currency) }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <p class="muted note">
+            Deadlines within {{ urgent_days }} days are highlighted. Anything already passed is kept on the
+            list rather than hidden — you have been committed to another period, and that is worth knowing.
+        </p>
+    {% endif %}
+{% endblock %}

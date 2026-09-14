@@ -5,7 +5,14 @@
 #}
 {% import _self as list %}
 
+{#
+    The bulk form wraps the table so a checkbox in any row posts with it. It is
+    a plain form rather than an htmx swap: a bulk edit changes rows that may
+    drop out of the current filter, so a full reload is the honest response.
+#}
 <section id="subscription-list" class="card">
+{% set can_bulk = can(scope, 'subscription.bulk_edit') %}
+{% if can_bulk and subscriptions is not empty %}<form method="post" action="/subscriptions/bulk">{{ csrf_field() }}{% endif %}
     {% if subscriptions is empty %}
         <p class="muted empty">
             {% if filter.hasActiveFilters %}
@@ -22,11 +29,14 @@
             <table class="table">
                 <thead>
                 <tr>
+                    {% if can_bulk %}
+                        <th scope="col" class="select-column"><span class="visually-hidden">Select</span></th>
+                    {% endif %}
                     <th scope="col">{{ list.sort_link('name', 'Name', filter) }}</th>
                     <th scope="col">Category</th>
                     <th scope="col">Member</th>
                     <th scope="col">Cycle</th>
-                    <th scope="col">{{ list.sort_link('next_payment', 'Next payment', filter) }}</th>
+                    <th scope="col">{{ list.sort_link('next_payment', 'Next charge', filter) }}</th>
                     <th scope="col" class="numeric">{{ list.sort_link('price', 'Price', filter) }}</th>
                     <th scope="col" class="numeric">Per month</th>
                     <th scope="col"><span class="visually-hidden">Actions</span></th>
@@ -35,6 +45,12 @@
                 <tbody>
                 {% for subscription in subscriptions %}
                     <tr class="{{ subscription.isActive ? '' : 'is-paused' }}">
+                        {% if can_bulk %}
+                            <td class="select-column">
+                                <input type="checkbox" name="ids[]" value="{{ subscription.id }}"
+                                       aria-label="Select {{ subscription.name }}">
+                            </td>
+                        {% endif %}
                         <td>
                             <div class="cell-name">
                                 {% if subscription.logoPath %}
@@ -43,6 +59,13 @@
                                 <div>
                                     <a href="/subscriptions/{{ subscription.id }}/edit">{{ subscription.name }}</a>
                                     {% if not subscription.isActive %}<span class="badge">Paused</span>{% endif %}
+                                    {% if subscription.isTrial %}
+                                        <span class="badge badge-warning">Trial</span>
+                                    {% endif %}
+                                    {% if subscription.splitMode.isSplit %}
+                                        <span class="badge"
+                                              title="{{ split_label(subscription.splitMode.value) }}">Shared</span>
+                                    {% endif %}
                                     {% if subscription.tags %}
                                         <div class="tag-list">
                                             {% for tag in subscription.tags %}
@@ -62,8 +85,12 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if subscription.nextPaymentDate %}
-                                {{ subscription.nextPaymentDate|date('j M Y') }}
+                            {# For a trial this is the conversion, not the stale payment date. #}
+                            {% if subscription.nextChargeDate %}
+                                {{ subscription.nextChargeDate|date('j M Y') }}
+                                {% if subscription.isTrial %}
+                                    <div class="hint">Trial converts</div>
+                                {% endif %}
                                 {% set deadline = subscription.cancellationDeadline %}
                                 {% if deadline %}
                                     <div class="hint">Cancel by {{ deadline|date('j M Y') }}</div>
@@ -81,6 +108,8 @@
                             {% endif %}
                         </td>
                         <td class="actions">
+                            <a class="button button-quiet"
+                               href="/subscriptions/{{ subscription.id }}/money">Cost</a>
                             {% if can(scope, 'subscription.update') %}
                                 <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="inline">
                                     {{ csrf_field() }}
@@ -103,6 +132,49 @@
             </table>
         </div>
 
+        {% if can_bulk %}
+            <div class="bulk-bar">
+                <label for="bulk-action">With selected</label>
+                <select id="bulk-action" name="action">
+                    <option value="category">Set category</option>
+                    <option value="add_tag">Add tag</option>
+                    <option value="remove_tag">Remove tag</option>
+                    <option value="owner">Set member</option>
+                    <option value="payer">Set payer</option>
+                    <option value="currency">Convert currency</option>
+                    <option value="activate">Resume</option>
+                    <option value="deactivate">Pause</option>
+                </select>
+
+                <select name="category_id" aria-label="Category">
+                    <option value="">No category</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <input type="text" name="tag" placeholder="Tag" aria-label="Tag">
+
+                <select name="user_id" aria-label="Member">
+                    <option value="">Nobody</option>
+                    {% for member in members %}
+                        <option value="{{ member.id }}">{{ member.display_name }}</option>
+                    {% endfor %}
+                </select>
+
+                <select name="currency" aria-label="Currency">
+                    {% for code in all_currencies %}
+                        <option value="{{ code }}">{{ code }}</option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit" class="button">Apply</button>
+            </div>
+            <p class="hint">Converting currency uses today's exchange rate and records the result in each
+                subscription's price history. If a rate is unavailable the whole action is refused rather than
+                re-labelling the amount, which would be a silent price change.</p>
+        {% endif %}
+
         {% if page_count > 1 %}
             <nav class="pager" aria-label="Pagination">
                 {% if filter.page > 1 %}
@@ -123,6 +195,7 @@
             </nav>
         {% endif %}
     {% endif %}
+{% if can_bulk and subscriptions is not empty %}</form>{% endif %}
 </section>
 
 {% macro sort_link(key, label, filter) %}

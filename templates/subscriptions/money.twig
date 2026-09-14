@@ -1,0 +1,207 @@
+{% extends 'layout.twig' %}
+
+{% block title %}{{ subscription.name }} — cost — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>{{ subscription.name }}</h1>
+        <a class="button button-quiet" href="/subscriptions/{{ subscription.id }}/edit">Edit subscription</a>
+    </div>
+
+    {% include 'partials/errors.twig' %}
+
+    {% if subscription.isTrial and subscription.trialEndDate %}
+        <section class="card callout">
+            <h2>Free trial</h2>
+            <p>
+                Free until <strong>{{ subscription.trialEndDate|date('j M Y') }}</strong>, which is also the day
+                the first charge falls — the last day of the trial, not the day after.
+            </p>
+            <p>
+                It converts to
+                <strong>{{ subscription.priceAfterConversion.amountMinor|money(
+                    subscription.priceAfterConversion.currency) }}</strong>
+                {% if subscription.billingCycleAfterConversion %}
+                    · {{ cycle_label(subscription.billingCycleAfterConversion.value,
+                        subscription.cycleDaysAfterConversion) }}
+                {% endif %}
+            </p>
+        </section>
+    {% endif %}
+
+    <div class="columns">
+        <section class="card">
+            <h2>Price history</h2>
+            <p class="muted">Every price is kept. A change is a new entry, never an edit, so what this cost
+                last year stays knowable.</p>
+
+            {% if trend is empty %}
+                <p class="muted empty">No price history recorded yet.</p>
+            {% else %}
+                <ol class="timeline">
+                    {% for entry in trend %}
+                        <li class="{{ entry.is_scheduled ? 'is-scheduled' : '' }}">
+                            <div class="timeline-date">
+                                {{ entry.change.effectiveFrom|date('j M Y') }}
+                                {% if entry.is_scheduled %}
+                                    <span class="badge badge-warning">Scheduled</span>
+                                {% endif %}
+                            </div>
+                            <div class="timeline-amount">
+                                {{ entry.change.price.amountMinor|money(entry.change.price.currency) }}
+                                {% if entry.difference_minor is not null and entry.difference_minor != 0 %}
+                                    <span class="{{ entry.difference_minor > 0 ? 'is-increase' : 'is-decrease' }}">
+                                        {{ entry.difference_minor > 0 ? '+' : '' }}{{
+                                            entry.difference_minor|money(entry.change.price.currency) }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="hint">
+                                {{ price_change_label(entry.change.source.value) }}
+                                {% if entry.change.note %} · {{ entry.change.note }}{% endif %}
+                                {% if entry.change.createdByName %} · {{ entry.change.createdByName }}{% endif %}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ol>
+            {% endif %}
+
+            {% if can(scope, 'price.manage') %}
+                <form method="post" action="/subscriptions/{{ subscription.id }}/price-changes" class="stack">
+                    {{ csrf_field() }}
+                    <h3>Schedule a price change</h3>
+                    <p class="hint">For an increase you have been told about but which has not happened yet.
+                        It is counted in forecasts and budgets from its date, and becomes the current price on
+                        the day it arrives.</p>
+
+                    <label for="price">New price</label>
+                    <div class="field-row">
+                        <input type="text" id="price" name="price" inputmode="decimal" placeholder="12.99" required>
+                        <select name="currency" aria-label="Currency">
+                            <option value="{{ subscription.price.currency }}">{{ subscription.price.currency }}</option>
+                        </select>
+                    </div>
+
+                    <label for="effective_from">Starts on</label>
+                    <input type="date" id="effective_from" name="effective_from" required>
+
+                    <label for="note">Note (optional)</label>
+                    <input type="text" id="note" name="note" maxlength="255"
+                           placeholder="Announced in their email of 3 March">
+
+                    <button type="submit" class="button">Schedule change</button>
+                </form>
+            {% endif %}
+        </section>
+
+        <section class="card">
+            <h2>Shared cost</h2>
+
+            {% if shares is empty %}
+                <p class="muted">The whole cost sits with
+                    {{ subscription.ownerName ?? 'its owner' }}.</p>
+            {% else %}
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th scope="col">Member</th>
+                        <th scope="col" class="numeric">Share</th>
+                        <th scope="col" class="numeric">Amount</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for share in shares %}
+                        <tr>
+                            <td>{{ share.user_name ?? '—' }}</td>
+                            <td class="numeric">{{ share.share_units }}</td>
+                            <td class="numeric">{{ share.amount.amountMinor|money(share.amount.currency) }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <p class="hint">Shares are worked out from the current price every time, and always add up to
+                    it exactly — the odd penny goes to one member rather than disappearing.</p>
+            {% endif %}
+
+            {% if can_edit_split and can(scope, 'split.manage') %}
+                <form method="post" action="/subscriptions/{{ subscription.id }}/split" class="stack">
+                    {{ csrf_field() }}
+
+                    <label for="split_mode">How it is split</label>
+                    <select id="split_mode" name="split_mode">
+                        <option value="none" {{ subscription.splitMode.value == 'none' ? 'selected' : '' }}>
+                            Not split
+                        </option>
+                        <option value="equal" {{ subscription.splitMode.value == 'equal' ? 'selected' : '' }}>
+                            Equally between the members below
+                        </option>
+                        <option value="custom" {{ subscription.splitMode.value == 'custom' ? 'selected' : '' }}>
+                            By the shares below
+                        </option>
+                    </select>
+
+                    <fieldset class="stack">
+                        <legend>Members</legend>
+                        <p class="hint">A share of 0 means that member is not part of the split. Shares are
+                            relative weights, not percentages — 2 and 1 means two thirds and one third.</p>
+                        {% for member in members %}
+                            {% set current = 0 %}
+                            {% for participant in participants %}
+                                {% if participant.userId == member.id %}{% set current = participant.shareUnits %}{% endif %}
+                            {% endfor %}
+                            <label class="field-row">
+                                <span class="field-label">{{ member.display_name }}</span>
+                                <input type="number" name="shares[{{ member.id }}]" min="0" max="10000"
+                                       value="{{ current }}">
+                            </label>
+                        {% endfor %}
+                    </fieldset>
+
+                    <button type="submit" class="button">Save split</button>
+                </form>
+            {% elseif subscription.splitMode.isSplit %}
+                <p class="hint">Only the member who owns this subscription can change how it is split.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <section class="card">
+        <h2>Usage</h2>
+        <p class="muted">
+            Recorded {{ subscription.usageCount }} time{{ subscription.usageCount == 1 ? '' : 's' }}
+            {%- if subscription.usageCountedSince %} since
+                {{- ' ' }}{{ subscription.usageCountedSince|date('j M Y') }}
+            {%- endif -%}.
+        </p>
+
+        {% if can(scope, 'usage.record') %}
+            <div class="form-actions">
+                <form method="post" action="/subscriptions/{{ subscription.id }}/usage" class="inline">
+                    {{ csrf_field() }}
+                    <button type="submit" class="button button-primary">Used it</button>
+                </form>
+
+                <form method="post" action="/subscriptions/{{ subscription.id }}/usage/rating" class="inline">
+                    {{ csrf_field() }}
+                    <label for="rating" class="visually-hidden">Rating</label>
+                    <select id="rating" name="rating">
+                        <option value="">No rating</option>
+                        {% for value in 1..max_rating %}
+                            <option value="{{ value }}"
+                                    {{ subscription.usageRating == value ? 'selected' : '' }}>
+                                {{ value }} / {{ max_rating }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="button">Save rating</button>
+                </form>
+
+                <form method="post" action="/subscriptions/{{ subscription.id }}/usage/reset" class="inline"
+                      onsubmit="return confirm('Reset the usage count to zero?')">
+                    {{ csrf_field() }}
+                    <button type="submit" class="button button-quiet">Reset count</button>
+                </form>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}

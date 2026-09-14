@@ -18,11 +18,16 @@ use App\Controller\Auth\LoginController;
 use App\Controller\Auth\PasswordResetController;
 use App\Controller\Auth\RegisterController;
 use App\Controller\Auth\VerifyEmailController;
+use App\Controller\BudgetController;
+use App\Controller\CancellationController;
 use App\Controller\CategoryController;
 use App\Controller\DashboardController;
+use App\Controller\ForecastController;
 use App\Controller\SettingsController;
 use App\Controller\SetupController;
+use App\Controller\StatsController;
 use App\Controller\SubscriptionController;
+use App\Controller\SubscriptionMoneyController;
 use App\Domain\Permission;
 // Imported by name: `App\Security\...` would resolve against the `Slim\App`
 // import below rather than the application's root namespace.
@@ -94,6 +99,72 @@ return static function (App $app): void {
 
         $group->post('/subscriptions/{id:[0-9]+}/delete', [SubscriptionController::class, 'delete'])
             ->add($requires(Permission::DeleteSubscription));
+
+        // ------------------------------------------------------------------
+        // Phase 2: money
+        //
+        // Reading a budget, a forecast or a statistic needs no permission
+        // beyond ViewSubscriptions — every figure is derived from data the
+        // scope can already see, so none of them discloses anything new. Each
+        // write names the permission it needs, as everywhere else.
+        // ------------------------------------------------------------------
+        $group->post('/subscriptions/bulk', [SubscriptionController::class, 'bulk'])
+            ->setName('subscriptions-bulk')
+            ->add($requires(Permission::BulkEdit));
+
+        $group->get('/subscriptions/{id:[0-9]+}/money', [SubscriptionMoneyController::class, 'show'])
+            ->setName('subscription-money')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post(
+            '/subscriptions/{id:[0-9]+}/price-changes',
+            [SubscriptionMoneyController::class, 'schedulePriceChange'],
+        )->add($requires(Permission::ManagePrices));
+
+        $group->post('/subscriptions/{id:[0-9]+}/split', [SubscriptionMoneyController::class, 'updateSplit'])
+            ->add($requires(Permission::ManageSplits));
+
+        $group->post('/subscriptions/{id:[0-9]+}/usage', [SubscriptionMoneyController::class, 'recordUse'])
+            ->add($requires(Permission::RecordUsage));
+
+        $group->post('/subscriptions/{id:[0-9]+}/usage/rating', [SubscriptionMoneyController::class, 'rate'])
+            ->add($requires(Permission::RecordUsage));
+
+        $group->post('/subscriptions/{id:[0-9]+}/usage/reset', [SubscriptionMoneyController::class, 'resetUsage'])
+            ->add($requires(Permission::RecordUsage));
+
+        $group->get('/budgets', [BudgetController::class, 'index'])
+            ->setName('budgets')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->get('/budgets/new', [BudgetController::class, 'createForm'])
+            ->setName('budget-new')
+            ->add($requires(Permission::ManageBudgets));
+
+        $group->post('/budgets', [BudgetController::class, 'create'])
+            ->add($requires(Permission::ManageBudgets));
+
+        $group->get('/budgets/{id:[0-9]+}/edit', [BudgetController::class, 'editForm'])
+            ->setName('budget-edit')
+            ->add($requires(Permission::ManageBudgets));
+
+        $group->post('/budgets/{id:[0-9]+}', [BudgetController::class, 'update'])
+            ->add($requires(Permission::ManageBudgets));
+
+        $group->post('/budgets/{id:[0-9]+}/delete', [BudgetController::class, 'delete'])
+            ->add($requires(Permission::ManageBudgets));
+
+        $group->get('/forecast', [ForecastController::class, 'index'])
+            ->setName('forecast')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->get('/cancellations', [CancellationController::class, 'index'])
+            ->setName('cancellations')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->get('/stats', [StatsController::class, 'index'])
+            ->setName('stats')
+            ->add($requires(Permission::ViewSubscriptions));
 
         $group->get('/categories', [CategoryController::class, 'index'])
             ->setName('categories')

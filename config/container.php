@@ -18,11 +18,19 @@ use App\Persistence\PdoSessionHandler;
 use App\Persistence\Platform;
 use App\Persistence\PlatformFactory;
 use App\Repository\AuthAttemptRepository;
+use App\Repository\ExchangeRateRepository;
 use App\Security\CsrfTokenManager;
 use App\Security\Session;
 use App\Security\SessionInterface;
 use App\Service\AuthService;
+use App\Service\ExchangeRate\ExchangeRateHostProvider;
+use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
+use App\Service\ExchangeRate\FixerProvider;
+use App\Service\ExchangeRate\FrankfurterProvider;
+use App\Service\ExchangeRateService;
+use App\Service\InstanceSettingsService;
 use App\Service\LogoStorage;
+use App\Service\SetupService;
 use App\Service\MailerService;
 use App\Service\PasswordResetService;
 use App\Service\RateLimiter;
@@ -35,9 +43,11 @@ use Monolog\Level;
 use Monolog\Logger;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
+use Slim\Psr7\Factory\RequestFactory;
 use Slim\Psr7\Factory\ResponseFactory;
 use Slim\Psr7\Factory\StreamFactory;
 use Slim\Views\Twig;
@@ -73,6 +83,7 @@ return static function (ContainerBuilder $builder, array $settings): void {
         // ------------------------------------------------------------------
         // HTTP
         // ------------------------------------------------------------------
+        RequestFactoryInterface::class => autowire(RequestFactory::class),
         ResponseFactoryInterface::class => autowire(ResponseFactory::class),
         StreamFactoryInterface::class => autowire(StreamFactory::class),
 
@@ -93,6 +104,35 @@ return static function (ContainerBuilder $builder, array $settings): void {
 
         // Every outbound call in the application resolves to this one client.
         ClientInterface::class => autowire(HttpClient::class),
+
+        // ------------------------------------------------------------------
+        // Exchange rates
+        // ------------------------------------------------------------------
+        // Order matters: the first entry is the default for a new instance, and
+        // it is the free, keyless one on purpose — currency conversion works
+        // out of the box without the operator signing up to anything. Fixer is
+        // offered but never first.
+        ExchangeRateProviderRegistry::class => static fn (ContainerInterface $c): ExchangeRateProviderRegistry
+            => new ExchangeRateProviderRegistry([
+                $c->get(FrankfurterProvider::class),
+                $c->get(ExchangeRateHostProvider::class),
+                $c->get(FixerProvider::class),
+            ]),
+
+        ExchangeRateService::class => static function (ContainerInterface $c): ExchangeRateService {
+            $rates = $c->get('settings')['rates'];
+
+            return new ExchangeRateService(
+                $c->get(ExchangeRateRepository::class),
+                $c->get(ExchangeRateProviderRegistry::class),
+                $c->get(InstanceSettingsService::class),
+                $c->get(Clock::class),
+                $c->get(LoggerInterface::class),
+                $rates['ttl_seconds'],
+                $rates['retry_seconds'],
+                $rates['api_key'],
+            );
+        },
 
         // ------------------------------------------------------------------
         // Session & security
@@ -172,6 +212,13 @@ return static function (ContainerBuilder $builder, array $settings): void {
         PasswordResetService::class => autowire()->constructorParameter(
             'appUrl',
             factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
+
+        // The wizard needs to know whether an environment key is already
+        // present, so that it does not demand one the operator has supplied.
+        SetupService::class => autowire()->constructorParameter(
+            'environmentApiKey',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['rates']['api_key']),
         ),
 
         LogoStorage::class => static function (ContainerInterface $c): LogoStorage {

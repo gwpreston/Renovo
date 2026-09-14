@@ -9,8 +9,10 @@ use App\Domain\Currency;
 use App\Domain\Entity\Subscription;
 use App\Domain\Money;
 use App\Domain\NoticePeriod;
+use App\Domain\PriceChangeSource;
 use App\Domain\SubscriptionFilter;
 use App\Domain\SubscriptionType;
+use App\Persistence\Database;
 use App\Repository\CategoryRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\SubscriptionRepository;
@@ -37,6 +39,8 @@ final class SubscriptionService
         private readonly CategoryRepository $categories,
         private readonly TagRepository $tags,
         private readonly MembershipRepository $memberships,
+        private readonly PriceHistoryService $priceHistory,
+        private readonly Database $db,
         private readonly Clock $clock,
     ) {
     }
@@ -67,7 +71,22 @@ final class SubscriptionService
     {
         [$data, $tagIds] = $this->validate($scope, $input);
 
-        return $this->subscriptions->create($scope, $data, $tagIds);
+        // The subscription and the first row of its price history are one
+        // fact, so they are written as one. A subscription with no history
+        // would have no current price to resolve and no trend to draw.
+        return $this->db->transactional(function () use ($scope, $data, $tagIds): int {
+            $id = $this->subscriptions->create($scope, $data, $tagIds);
+
+            $this->priceHistory->recordInitialPrice(
+                $scope,
+                $id,
+                Money::of((int) $data['price_minor'], (string) $data['currency']),
+                $this->date((string) ($data['start_date'] ?? '')),
+                (int) $data['owner_user_id'],
+            );
+
+            return $id;
+        });
     }
 
     /**
@@ -76,9 +95,105 @@ final class SubscriptionService
      */
     public function update(Scope $scope, int $id, array $input): void
     {
+        $existing = $this->subscriptions->find($scope, $id);
         [$data, $tagIds] = $this->validate($scope, $input, $id);
 
-        $this->subscriptions->update($scope, $id, $data, $tagIds);
+        $price = Money::of((int) $data['price_minor'], (string) $data['currency']);
+
+        $this->db->transactional(function () use ($scope, $id, $data, $tagIds, $existing, $price): void {
+            $this->subscriptions->update($scope, $id, $data, $tagIds);
+
+            // A price that has actually moved becomes a new history row rather
+            // than overwriting the old one. Editing anything else about a
+            // subscription leaves its history alone.
+            if ($existing !== null && !$this->isSamePrice($existing->price, $price)) {
+                $this->priceHistory->recordCurrentPrice(
+                    $scope,
+                    $id,
+                    $price,
+                    $existing->price->currency === $price->currency
+                        ? PriceChangeSource::Manual
+                        : PriceChangeSource::CurrencyChange,
+                    (int) $data['owner_user_id'],
+                );
+            }
+        });
+    }
+
+    /**
+     * Validate the trial fields.
+     *
+     * A trial is only meaningful on something that recurs: a one-off purchase
+     * with a free trial is not a thing, and allowing it would put a conversion
+     * date on a row the conversion logic never looks at.
+     *
+     * @param array<string, mixed> $input
+     * @return array{0: array<string, mixed>, 1: array<string, string>}
+     */
+    private function validateTrial(array $input, SubscriptionType $type): array
+    {
+        $none = [
+            'is_trial' => false,
+            'trial_end_date' => null,
+            'converts_to_price_minor' => null,
+            'converts_to_billing_cycle' => null,
+            'converts_to_cycle_days' => null,
+        ];
+
+        if (($input['is_trial'] ?? '0') !== '1' || !$type->hasBillingCycle()) {
+            return [$none, []];
+        }
+
+        $errors = [];
+
+        $endDate = $this->date($this->str($input, 'trial_end_date'));
+        if ($endDate === null) {
+            $errors['trial_end_date'] = 'Enter the date the trial ends.';
+        }
+
+        // The converts-to price is optional: plenty of trials convert to
+        // whatever the subscription already says it costs.
+        $convertsToMinor = null;
+        $convertsToRaw = trim($this->str($input, 'converts_to_price'));
+        if ($convertsToRaw !== '') {
+            $currency = Currency::normalise($this->str($input, 'currency'));
+            try {
+                $converts = Money::fromUserInput($convertsToRaw, Currency::isValidCode($currency) ? $currency : 'GBP');
+                if ($converts->isNegative()) {
+                    $errors['converts_to_price'] = 'Enter a price of zero or more.';
+                } else {
+                    $convertsToMinor = $converts->amountMinor;
+                }
+            } catch (InvalidArgumentException) {
+                $errors['converts_to_price'] = 'Enter the price it converts to, for example 9.99.';
+            }
+        }
+
+        $convertsToCycle = BillingCycle::tryFromString($this->str($input, 'converts_to_billing_cycle'));
+        $convertsToCycleDays = null;
+        if ($convertsToCycle !== null && $convertsToCycle->requiresCycleDays()) {
+            $convertsToCycleDays = (int) $this->str($input, 'converts_to_cycle_days');
+            if ($convertsToCycleDays < 1 || $convertsToCycleDays > 3650) {
+                $errors['converts_to_cycle_days'] = 'Enter the number of days between payments (1-3650).';
+            }
+        }
+
+        if ($errors !== []) {
+            return [$none, $errors];
+        }
+
+        return [[
+            'is_trial' => true,
+            'trial_end_date' => $endDate?->format('Y-m-d'),
+            'converts_to_price_minor' => $convertsToMinor,
+            'converts_to_billing_cycle' => $convertsToCycle?->value,
+            'converts_to_cycle_days' => $convertsToCycleDays,
+        ], []];
+    }
+
+    private function isSamePrice(Money $a, Money $b): bool
+    {
+        return $a->currency === $b->currency && $a->amountMinor === $b->amountMinor;
     }
 
     public function delete(Scope $scope, int $id): void
@@ -147,6 +262,18 @@ final class SubscriptionService
         }
 
         return $current;
+    }
+
+    /**
+     * Trials ending in the next $days days.
+     *
+     * @return list<Subscription>
+     */
+    public function trialsEndingSoon(Scope $scope, int $days): array
+    {
+        $today = $this->clock->today();
+
+        return $this->subscriptions->findTrialsEnding($scope, $today, $today->modify(sprintf('+%d days', $days)));
     }
 
     /**
@@ -229,7 +356,10 @@ final class SubscriptionService
         }
 
         $nextPaymentDate = $this->date($this->str($input, 'next_payment_date'));
-        if ($type->hasBillingCycle() && $nextPaymentDate === null) {
+        $isTrial = ($input['is_trial'] ?? '0') === '1';
+        if ($type->hasBillingCycle() && $nextPaymentDate === null && !$isTrial) {
+            // A trial has no payment date yet — that is the point of it. The
+            // conversion sets one when the trial ends.
             $errors['next_payment_date'] = 'Enter the next payment date.';
         }
         if ($this->str($input, 'next_payment_date') !== '' && $nextPaymentDate === null) {
@@ -237,6 +367,9 @@ final class SubscriptionService
         }
 
         $startDate = $this->date($this->str($input, 'start_date'));
+
+        [$trial, $trialErrors] = $this->validateTrial($input, $type);
+        $errors += $trialErrors;
 
         $noticeAmountRaw = trim($this->str($input, 'notice_period_amount'));
         $noticeAmount = $noticeAmountRaw === '' ? null : (int) $noticeAmountRaw;
@@ -304,6 +437,11 @@ final class SubscriptionService
             'anchor_day' => $nextPaymentDate !== null ? (int) $nextPaymentDate->format('j') : null,
             'notice_period_amount' => $notice->amount,
             'notice_period_unit' => $notice->isSet() ? $notice->unit : null,
+            'is_trial' => $trial['is_trial'],
+            'trial_end_date' => $trial['trial_end_date'],
+            'converts_to_price_minor' => $trial['converts_to_price_minor'],
+            'converts_to_billing_cycle' => $trial['converts_to_billing_cycle'],
+            'converts_to_cycle_days' => $trial['converts_to_cycle_days'],
             'is_active' => ($input['is_active'] ?? '1') !== '0',
             'category_id' => $categoryId,
             'owner_user_id' => $ownerUserId,

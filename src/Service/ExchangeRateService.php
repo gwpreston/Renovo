@@ -1,0 +1,297 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service;
+
+use App\Domain\Currency;
+use App\Domain\ExchangeRate;
+use App\Domain\Money;
+use App\Domain\Rounding;
+use App\Repository\ExchangeRateRepository;
+use App\Service\ExchangeRate\ExchangeRateProvider;
+use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
+use App\Service\ExchangeRate\RateProviderException;
+use App\Support\Clock;
+use DateTimeImmutable;
+use Psr\Log\LoggerInterface;
+
+/**
+ * Currency conversion, and the honesty about when it is not available.
+ *
+ * Three things are worth understanding before changing anything here.
+ *
+ * **Every rate is stored against the instance's base currency.** A conversion
+ * between two other currencies is a cross-rate through the base:
+ * X -> Y is (base -> Y) divided by (base -> X). One row per currency rather
+ * than one per pair, and a single refresh keeps all of them current.
+ *
+ * **A missing rate is a first-class answer.** `convert()` returns null rather
+ * than throwing or substituting 1:1, and callers surface per-currency
+ * subtotals instead of a combined figure. A total that silently treats a
+ * hundred yen as a hundred pounds is worse than no total at all, so the
+ * degraded path is the one the UI is built around and the one that is tested.
+ *
+ * **Refreshing never blocks a page.** The lazy refresh is best-effort: it is
+ * attempted at most once per retry window, any failure is logged and swallowed,
+ * and the previous cached table keeps being used. Operators who want rates kept
+ * current without depending on someone loading a page run `rates:refresh` from
+ * the scheduler.
+ */
+final class ExchangeRateService
+{
+    /** @var array<string, ExchangeRate>|null */
+    private ?array $cache = null;
+
+    public function __construct(
+        private readonly ExchangeRateRepository $repository,
+        private readonly ExchangeRateProviderRegistry $registry,
+        private readonly InstanceSettingsService $settings,
+        private readonly Clock $clock,
+        private readonly LoggerInterface $logger,
+        private readonly int $ttlSeconds,
+        private readonly int $retrySeconds,
+        private readonly string $environmentApiKey,
+    ) {
+    }
+
+    /**
+     * The rate needed to turn $from into $to, or null when it cannot be
+     * derived from what is cached.
+     */
+    public function rateFor(string $from, string $to): ?ExchangeRate
+    {
+        $from = Currency::normalise($from);
+        $to = Currency::normalise($to);
+
+        if ($from === $to) {
+            return ExchangeRate::of($from, $to, ExchangeRate::SCALE, null, 'identity');
+        }
+
+        $base = $this->settings->baseCurrency();
+        $rates = $this->cachedRates();
+
+        $fromRate = $from === $base ? ExchangeRate::SCALE : ($rates[$from]->rateScaled ?? null);
+        $toRate = $to === $base ? ExchangeRate::SCALE : ($rates[$to]->rateScaled ?? null);
+
+        if ($fromRate === null || $toRate === null) {
+            return null;
+        }
+
+        $sample = $rates[$to] ?? $rates[$from] ?? null;
+
+        return ExchangeRate::of(
+            $from,
+            $to,
+            Rounding::multiplyDivide($toRate, ExchangeRate::SCALE, $fromRate),
+            $sample?->asOfDate,
+            $sample !== null ? $sample->provider : '',
+        );
+    }
+
+    /**
+     * Convert an amount, or return null when no rate is available.
+     */
+    public function convert(Money $money, string $to): ?Money
+    {
+        $rate = $this->rateFor($money->currency, $to);
+        if ($rate === null) {
+            return null;
+        }
+
+        return Money::of($rate->convertMinor($money->amountMinor), $rate->quoteCurrency);
+    }
+
+    public function convertMinor(int $amountMinor, string $from, string $to): ?int
+    {
+        return $this->rateFor($from, $to)?->convertMinor($amountMinor);
+    }
+
+    /**
+     * True when every one of the given currencies can reach the target.
+     *
+     * Callers use this to decide between a combined total and per-currency
+     * subtotals, so it is deliberately all-or-nothing: a "total" covering four
+     * currencies out of five, with no indication which, is a wrong number
+     * rather than a partial one.
+     *
+     * @param list<string> $currencies
+     */
+    public function canCombine(array $currencies, string $target): bool
+    {
+        foreach ($currencies as $currency) {
+            if ($this->rateFor($currency, $target) === null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Convert every amount into one currency and add them up, or null when any
+     * of them has no rate.
+     *
+     * @param array<string, int> $amountsByCurrency
+     */
+    public function combine(array $amountsByCurrency, string $target): ?int
+    {
+        $total = 0;
+        foreach ($amountsByCurrency as $currency => $amountMinor) {
+            $converted = $this->convertMinor($amountMinor, (string) $currency, $target);
+            if ($converted === null) {
+                return null;
+            }
+            $total += $converted;
+        }
+
+        return $total;
+    }
+
+    /**
+     * Attempt a refresh if the cache is stale, swallowing any failure.
+     *
+     * Called from the dashboard. It must never turn a provider outage into a
+     * broken page, and it must not let a page view become a synchronous
+     * network call more than once per retry window.
+     */
+    public function refreshIfStale(): void
+    {
+        if (!$this->isStale() || !$this->mayAttemptNow()) {
+            return;
+        }
+
+        try {
+            $this->refresh();
+        } catch (RateProviderException $exception) {
+            // Logged, not surfaced: the cached table (possibly empty) stays in
+            // use and the UI falls back to per-currency subtotals.
+            $this->logger->warning('Exchange-rate refresh failed.', ['reason' => $exception->getMessage()]);
+        }
+    }
+
+    /**
+     * Fetch and store the current table.
+     *
+     * @return int Number of rates cached.
+     * @throws RateProviderException
+     */
+    public function refresh(): int
+    {
+        $base = $this->settings->baseCurrency();
+        $provider = $this->provider();
+
+        $this->settings->markRatesAttempted($this->clock->now());
+
+        $table = $provider->fetch($base, $this->apiKey());
+
+        // A provider that could not serve the base we asked for answered in its
+        // own; re-expressing it here is exactly why the table knows its base.
+        $rebased = $table->rebasedTo($base);
+        if ($rebased === null) {
+            throw RateProviderException::malformed(
+                $provider->label(),
+                sprintf('it published %s rates, which cannot be converted to %s', $table->baseCurrency, $base),
+            );
+        }
+
+        $rates = $rebased->toExchangeRates();
+        $this->repository->replaceBase($base, $rates, $this->clock->now());
+        $this->cache = null;
+
+        return count($rates);
+    }
+
+    /**
+     * Forget everything cached. Used when the provider or the base currency
+     * changes and the stored numbers no longer came from where they should.
+     */
+    public function invalidate(): void
+    {
+        $this->repository->clear();
+        $this->cache = null;
+    }
+
+    public function isStale(): bool
+    {
+        $fetchedAt = $this->repository->lastFetchedAt($this->settings->baseCurrency());
+        if ($fetchedAt === null) {
+            return true;
+        }
+
+        return $fetchedAt->getTimestamp() + $this->ttlSeconds <= $this->clock->now()->getTimestamp();
+    }
+
+    public function lastRefreshedAt(): ?DateTimeImmutable
+    {
+        return $this->repository->lastFetchedAt($this->settings->baseCurrency());
+    }
+
+    /**
+     * Currencies that can currently be converted to the base.
+     *
+     * @return list<string>
+     */
+    public function availableCurrencies(): array
+    {
+        $codes = array_keys($this->cachedRates());
+        $base = $this->settings->baseCurrency();
+        if (!in_array($base, $codes, true)) {
+            $codes[] = $base;
+        }
+
+        sort($codes);
+
+        return $codes;
+    }
+
+    public function provider(): ExchangeRateProvider
+    {
+        return $this->registry->resolve($this->settings->rateProvider());
+    }
+
+    /**
+     * True when the configured provider needs a key and has not been given one.
+     * Surfaced in settings so a silently non-functioning provider is visible.
+     */
+    public function isMisconfigured(): bool
+    {
+        return $this->provider()->requiresApiKey() && $this->apiKey() === null;
+    }
+
+    /**
+     * The key to use: the environment's if set, otherwise the stored one.
+     *
+     * The precedence is the point. An operator who puts the key in their
+     * environment has said they do not want it in the database, and no amount
+     * of clicking in the settings page should override that.
+     */
+    private function apiKey(): ?string
+    {
+        if ($this->environmentApiKey !== '') {
+            return $this->environmentApiKey;
+        }
+
+        $stored = $this->settings->storedRateProviderKey();
+
+        return $stored === '' ? null : $stored;
+    }
+
+    private function mayAttemptNow(): bool
+    {
+        $lastAttempt = $this->settings->ratesLastAttemptAt();
+        if ($lastAttempt === null) {
+            return true;
+        }
+
+        return $lastAttempt->getTimestamp() + $this->retrySeconds <= $this->clock->now()->getTimestamp();
+    }
+
+    /**
+     * @return array<string, ExchangeRate>
+     */
+    private function cachedRates(): array
+    {
+        return $this->cache ??= $this->repository->findAllForBase($this->settings->baseCurrency());
+    }
+}

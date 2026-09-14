@@ -99,6 +99,48 @@
                 </select>
 
                 <fieldset class="stack">
+                    <legend>Exchange rates</legend>
+                    <p class="hint">Rates are cached and used only for display. Amounts stay in the currency
+                        they were entered in. When a rate is unavailable, totals are shown per currency
+                        instead of combined.</p>
+
+                    {% for provider in rate_providers %}
+                        <label class="choice">
+                            <input type="radio" name="rate_provider" value="{{ provider.key }}"
+                                   {{ rates.provider == provider.key ? 'checked' : '' }}>
+                            <span>
+                                <strong>{{ provider.label }}</strong>
+                                <span class="muted block">{{ provider.description }}</span>
+                            </span>
+                        </label>
+                    {% endfor %}
+
+                    <label for="rate_provider_key">API key</label>
+                    <input type="password" id="rate_provider_key" name="rate_provider_key" autocomplete="off"
+                           placeholder="Leave blank to keep the current key">
+                    <label class="choice">
+                        <input type="checkbox" name="clear_rate_provider_key" value="1">
+                        <span>Remove the stored API key</span>
+                    </label>
+                    <p class="hint"><code>EXCHANGE_RATE_API_KEY</code> in the environment overrides whatever is
+                        stored here.</p>
+
+                    <p class="muted">
+                        {% if rates.is_misconfigured %}
+                            <strong>{{ rates.provider_label }} needs an API key</strong> and has not been given
+                            one, so no rates are being fetched.
+                        {% elseif rates.last_refreshed_at %}
+                            {{ rates.currency_count }} currencies cached, last updated
+                            {{ rates.last_refreshed_at|date('j M Y H:i') }} UTC{{ rates.is_stale
+                                ? ' — due a refresh' : '' }}.
+                        {% else %}
+                            No rates cached yet. They are fetched the first time a dashboard is viewed, or by
+                            running <code>php bin/console rates:refresh</code>.
+                        {% endif %}
+                    </p>
+                </fieldset>
+
+                <fieldset class="stack">
                     <legend>Data isolation</legend>
                     {% for mode in isolation_modes %}
                         <label class="choice">

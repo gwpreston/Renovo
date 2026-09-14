@@ -6,9 +6,12 @@ namespace App\Application\Twig;
 
 use App\Domain\BillingCycle;
 use App\Domain\IsolationMode;
+use App\Domain\BudgetPeriod;
 use App\Domain\NoticePeriod;
 use App\Domain\Permission;
+use App\Domain\PriceChangeSource;
 use App\Domain\Role;
+use App\Domain\SplitMode;
 use App\Domain\SubscriptionType;
 use App\Security\CsrfTokenManager;
 use App\Security\PermissionService;
@@ -45,6 +48,9 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('role_label', $this->roleLabel(...)),
             new TwigFunction('isolation_label', $this->isolationLabel(...)),
             new TwigFunction('notice_label', $this->noticeLabel(...)),
+            new TwigFunction('price_change_label', $this->priceChangeLabel(...)),
+            new TwigFunction('split_label', $this->splitLabel(...)),
+            new TwigFunction('budget_period_label', $this->budgetPeriodLabel(...)),
         ];
     }
 
@@ -115,6 +121,41 @@ final class AppExtension extends AbstractExtension
         return match (IsolationMode::tryFrom($mode ?? '')) {
             IsolationMode::Shared => 'Shared — everyone in a household sees its subscriptions',
             IsolationMode::Isolated => 'Isolated — each member sees only their own',
+            null => '—',
+        };
+    }
+
+    /**
+     * Why a price changed. Worth naming: a trial ending and a provider putting
+     * their prices up look identical on a chart unless the entry says which.
+     */
+    public function priceChangeLabel(?string $source): string
+    {
+        return match (PriceChangeSource::tryFrom($source ?? '')) {
+            PriceChangeSource::Initial => 'Starting price',
+            PriceChangeSource::Manual => 'Price changed',
+            PriceChangeSource::Scheduled => 'Scheduled change',
+            PriceChangeSource::TrialConversion => 'Free trial ended',
+            PriceChangeSource::CurrencyChange => 'Currency converted',
+            null => 'Price',
+        };
+    }
+
+    public function splitLabel(?string $mode): string
+    {
+        return match (SplitMode::tryFrom($mode ?? '')) {
+            SplitMode::None => 'Not split',
+            SplitMode::Equal => 'Split equally',
+            SplitMode::Custom => 'Split by share',
+            null => '—',
+        };
+    }
+
+    public function budgetPeriodLabel(?string $period): string
+    {
+        return match (BudgetPeriod::tryFrom($period ?? '')) {
+            BudgetPeriod::Monthly => 'Next month',
+            BudgetPeriod::Annual => 'Next 12 months',
             null => '—',
         };
     }

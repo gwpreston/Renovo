@@ -144,7 +144,69 @@ final class PermissionEnforcementTest extends DatabaseTestCase
             ['POST', '/categories/1'],
             ['POST', '/categories/1/delete'],
             ['POST', '/tags/1/delete'],
+            // Phase 2. Every one of these changes money or the record of it,
+            // so every one of them is closed to a read-only role — and the
+            // corresponding pages that only *display* those things are not,
+            // which the tests below assert separately.
+            ['POST', '/subscriptions/bulk'],
+            ['POST', '/subscriptions/{id}/price-changes'],
+            ['POST', '/subscriptions/{id}/split'],
+            ['POST', '/subscriptions/{id}/usage'],
+            ['POST', '/subscriptions/{id}/usage/rating'],
+            ['POST', '/subscriptions/{id}/usage/reset'],
+            ['POST', '/budgets'],
+            ['POST', '/budgets/1'],
+            ['POST', '/budgets/1/delete'],
         ];
+    }
+
+    /**
+     * @return list<array{string, string}>
+     */
+    public static function writeOnlyPages(): array
+    {
+        return [
+            ['GET', '/budgets/new'],
+            ['GET', '/budgets/1/edit'],
+        ];
+    }
+
+    public function testViewerIsRefusedTheFormsThatOnlyExistToWrite(): void
+    {
+        // A form a viewer could never submit is not something to render for
+        // them: hiding the link is a courtesy, and this is the enforcement.
+        $this->signIn($this->viewerId);
+
+        foreach (self::writeOnlyPages() as [$method, $path]) {
+            $response = $this->request($method, $path);
+
+            self::assertSame(
+                403,
+                $response->getStatusCode(),
+                sprintf('%s %s must be refused for a viewer.', $method, $path),
+            );
+        }
+    }
+
+    public function testViewerMayStillReadTheMoneyPages(): void
+    {
+        // The other half of the rule. A budget, a forecast and a cost breakdown
+        // are all derived from subscriptions the viewer can already see, so
+        // withholding them would protect nothing and hide something useful.
+        $this->signIn($this->viewerId);
+
+        foreach (['/budgets', '/forecast', '/cancellations', '/stats'] as $path) {
+            self::assertSame(
+                200,
+                $this->request('GET', $path)->getStatusCode(),
+                sprintf('GET %s should be readable by a viewer.', $path),
+            );
+        }
+
+        self::assertSame(
+            200,
+            $this->request('GET', '/subscriptions/' . $this->subscriptionId . '/money')->getStatusCode(),
+        );
     }
 
     public function testViewerIsRefusedByEveryMutatingRoute(): void

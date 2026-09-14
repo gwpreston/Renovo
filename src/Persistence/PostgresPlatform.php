@@ -60,6 +60,14 @@ final class PostgresPlatform implements Platform
         return sprintf('LOWER(%s) LIKE %s', $quotedColumn, $placeholder);
     }
 
+    public function reportsMatchedRowsOnUpdate(): bool
+    {
+        // PostgreSQL counts every row the WHERE clause matched, whether or not
+        // the values changed, so an affected-row count of zero genuinely means
+        // "no such row".
+        return true;
+    }
+
     public function connectionOptions(): array
     {
         return [];

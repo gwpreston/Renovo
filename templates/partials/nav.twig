@@ -6,6 +6,14 @@
             <a href="/" class="{{ current_path == '/' ? 'is-active' : '' }}">Dashboard</a>
             <a href="/subscriptions"
                class="{{ current_path starts with '/subscriptions' ? 'is-active' : '' }}">Subscriptions</a>
+            <a href="/budgets"
+               class="{{ current_path starts with '/budgets' ? 'is-active' : '' }}">Budgets</a>
+            <a href="/forecast"
+               class="{{ current_path starts with '/forecast' ? 'is-active' : '' }}">Forecast</a>
+            <a href="/cancellations"
+               class="{{ current_path starts with '/cancellations' ? 'is-active' : '' }}">Cancel by</a>
+            <a href="/stats"
+               class="{{ current_path starts with '/stats' ? 'is-active' : '' }}">Stats</a>
             <a href="/categories"
                class="{{ current_path starts with '/categories' ? 'is-active' : '' }}">Categories</a>
             <a href="/settings" class="{{ current_path starts with '/settings' ? 'is-active' : '' }}">Settings</a>

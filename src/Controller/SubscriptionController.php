@@ -14,6 +14,8 @@ use App\Security\ScopeViolationException;
 use App\Security\SessionInterface;
 use App\Service\CategoryService;
 use App\Service\LogoStorage;
+use App\Service\BulkActionService;
+use App\Service\CatchUpService;
 use App\Service\SubscriptionService;
 use App\Service\TagService;
 use App\Service\ValidationException;
@@ -36,6 +38,8 @@ final class SubscriptionController extends Controller
         private readonly TagService $tags,
         private readonly MembershipRepository $memberships,
         private readonly LogoStorage $logos,
+        private readonly CatchUpService $catchUp,
+        private readonly BulkActionService $bulkActions,
     ) {
         parent::__construct($view, $session);
     }
@@ -45,7 +49,7 @@ final class SubscriptionController extends Controller
         $scope = $this->scope($request);
         $filter = SubscriptionFilter::fromQueryParams($request->getQueryParams());
 
-        $this->subscriptions->advanceDuePayments($scope);
+        $this->catchUp->run($scope);
 
         $total = $this->subscriptions->count($scope, $filter);
         $items = $this->subscriptions->list($scope, $filter);
@@ -61,7 +65,11 @@ final class SubscriptionController extends Controller
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],
             'currencies' => $this->subscriptions->currenciesInUse($scope),
+            // The filter offers only currencies actually in use; converting to
+            // one needs the full pick-list.
+            'all_currencies' => Currency::common(),
             'types' => SubscriptionType::cases(),
+            'bulk_actions' => BulkActionService::actions(),
         ];
 
         // htmx asks for just the table when filtering, sorting or paging.
@@ -72,6 +80,36 @@ final class SubscriptionController extends Controller
             'subscriptions/_list.twig',
             $data,
         );
+    }
+
+    /**
+     * Apply one action to a selection of subscriptions.
+     *
+     * Guarded by the BulkEdit permission on the route, and by the scoping layer
+     * on every individual write — a selection containing ids the caller cannot
+     * write simply changes fewer rows, and says so.
+     */
+    public function bulk(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body = $this->body($request);
+
+        try {
+            $changed = $this->bulkActions->apply($this->scope($request), $body);
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $message) {
+                $this->flash('error', $message);
+            }
+
+            return $this->redirectAfterWrite($request, $response, '/subscriptions');
+        }
+
+        $this->flash('success', sprintf(
+            '%d subscription%s updated.',
+            $changed,
+            $changed === 1 ? '' : 's',
+        ));
+
+        return $this->redirectAfterWrite($request, $response, '/subscriptions');
     }
 
     public function createForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -134,6 +172,11 @@ final class SubscriptionController extends Controller
             'cycle_days' => $subscription->cycleDays,
             'next_payment_date' => $subscription->nextPaymentDate?->format('Y-m-d'),
             'start_date' => $subscription->startDate?->format('Y-m-d'),
+            'is_trial' => $subscription->isTrial ? '1' : '0',
+            'trial_end_date' => $subscription->trialEndDate?->format('Y-m-d'),
+            'converts_to_price' => $subscription->convertsToPrice?->toDecimalString(),
+            'converts_to_billing_cycle' => $subscription->convertsToBillingCycle?->value,
+            'converts_to_cycle_days' => $subscription->convertsToCycleDays,
             'notice_period_amount' => $subscription->noticePeriod->amount,
             'notice_period_unit' => $subscription->noticePeriod->unit,
             'category_id' => $subscription->categoryId,

@@ -138,6 +138,8 @@ list. `.env` is never committed. The ones that matter most:
 | `APP_URL`                   | Used to build links in emails — set it to the real URL.       |
 | `SESSION_COOKIE_SECURE`     | Leave `true` unless you are serving plain HTTP on a trusted network. |
 | `AUTH_MAX_ATTEMPTS_PER_*`   | Login and reset throttling, per account and per IP.           |
+| `EXCHANGE_RATE_API_KEY`     | Only for providers that need one. Takes precedence over a key entered in the UI. |
+| `EXCHANGE_RATE_TTL_SECONDS` | How long a cached rate table stays current. 12 hours by default. |
 
 ---
 
@@ -158,7 +160,8 @@ vendor/bin/phinx seed:run    # a few starter categories (run after setup)
 
 # Console
 php bin/console list
-php bin/console reminders:run       # scheduler entry point; no work yet
+php bin/console reminders:run       # scheduler entry point; no reminder work yet
+php bin/console rates:refresh       # fetch and cache exchange rates
 php bin/console maintenance:prune   # expired sessions, tokens, throttle records
 ```
 
@@ -203,6 +206,7 @@ src/
   Repository/ All persistence. The only place SQL is written.
   Security/   Scope, permissions, password hashing, CSRF, sessions.
   Persistence/ PDO wrapper and the PostgreSQL/MySQL differences.
+  Service/ExchangeRate/  Rate providers behind one interface.
   Http/       The single shared outbound HTTP client.
   Domain/     Money, cycles, roles, entities. No I/O.
 templates/    Twig. No logic.
@@ -252,12 +256,99 @@ Monthly and yearly figures are integer arithmetic throughout.
 - **One-off and lifetime entries are excluded** from recurring totals and shown
   separately. Amortising a lifetime licence over an arbitrary horizon would make
   the headline figures mean something other than what they say.
-- **Totals are per currency and are never added together.** Combining them needs
-  exchange rates, which arrive in Phase 2.
+- **Per-currency subtotals are always shown.** A combined total is offered
+  alongside them when every currency involved can be converted; when one cannot,
+  the combined figure is withheld and the missing currency is named. A total
+  that silently omits a currency is a wrong number, not an approximate one.
 
 Renewal dates clamp at month end: 31 January plus one month is 28 or 29
 February, and the original day of the month is restored as soon as a month is
 long enough, so a subscription billed on the 31st does not drift to the 28th.
+
+---
+
+## Money features
+
+### Exchange rates
+
+Rates are fetched through the shared HTTP client from a pluggable provider and
+cached instance-wide.
+
+| Provider           | Key needed | Notes                                          |
+|--------------------|------------|------------------------------------------------|
+| **Frankfurter**    | No         | **Default.** European Central Bank daily rates. |
+| exchangerate.host  | Yes        | Wider currency list; free account required.    |
+| Fixer              | Yes        | Never the default. Free tier is EUR-based; other bases are derived. |
+
+The provider is chosen in the first-run wizard and can be changed in
+**Settings → Instance**. A key may be entered there, but `EXCHANGE_RATE_API_KEY`
+in the environment takes precedence — an operator who keeps the key out of the
+database is not overridden by anything typed into the UI.
+
+Rates are stored as integers scaled by 10^8, against the instance's base
+currency; any other pair is cross-rated through it. Conversion is integer
+arithmetic that refuses rather than overflowing.
+
+**Everything degrades rather than guesses.** No rate for a currency means no
+combined total for anything containing it — the per-currency figures are shown
+instead, and the budget or statistic says which currency it could not convert.
+A refresh is attempted lazily when the dashboard is viewed and the cache is
+stale, at most once an hour, and any failure is logged and ignored. Run
+`php bin/console rates:refresh` from the scheduler to keep rates current without
+depending on somebody loading a page.
+
+### Price history
+
+Prices are **append-only**. A change is a new row with the date it takes effect;
+nothing is ever overwritten, so what a subscription cost last year stays
+knowable. The current price is the latest row whose date has arrived, and a
+**scheduled** change is one whose date has not. Scheduled changes are counted in
+forecasts and budgets from their own dates, and become the current price when
+the day arrives.
+
+### Trials
+
+A trial is the subscription it will become, not a separate record. **The trial's
+last day is the day the first charge falls** — a trial ending on the 30th is
+free up to and including the 30th, and the conversion is dated the 30th even if
+nobody opens the application for a fortnight afterwards. Conversion keeps the
+subscription's identity, category, tags and history, and appears in the price
+trend as the step it is.
+
+### Budgets
+
+A budget belongs to a member and measures **that member's own share** — their
+subscriptions, plus their portion of anything split. The trigger is **projected**
+spend, taken from the same forecast the Forecast page shows, so the two can
+never disagree. Both periods are rolling windows from today ("the next month",
+"the next 12 months") rather than calendar periods, because this application
+tracks what is *due* rather than keeping a ledger of what has been *paid*, and a
+calendar month would have to leave out whatever was charged earlier in it.
+
+### Forecast
+
+Twelve months, each renewal shown in the month it actually falls rather than
+spread evenly. Scheduled price changes and trial conversions are applied from
+their own dates, so a figure does not move when the change eventually happens.
+
+### Shared costs
+
+A cost can be split equally or by weight between household members. **Weights
+are stored; amounts are derived** from the current price every time, so a price
+rise divides the same way the original did. Shares always sum to the price
+exactly — the odd penny goes to a specific member rather than disappearing.
+
+A member listed on a split can **see** the subscription they help pay for even
+when the instance is ISOLATED and they do not own it. They cannot change it,
+delete it, re-tag it or alter the split: the scoping layer applies that widening
+to reads only, and every write path uses the unwidened predicate.
+
+### Year over year
+
+Reconstructed from start dates, billing cycles and recorded price history —
+there is no payment ledger. A subscription with no start date contributes
+nothing to either year, which under-reports the past rather than inventing
+spending that may never have happened. The page says how many were excluded.
 
 ---
 

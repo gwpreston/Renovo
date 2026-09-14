@@ -51,6 +51,18 @@ interface Platform
     public function toBoolean(mixed $value): bool;
 
     /**
+     * Whether an UPDATE's affected-row count means "rows matched" or "rows
+     * actually changed".
+     *
+     * PostgreSQL reports matches; MySQL reports changes, so an UPDATE that
+     * writes the values a row already holds reports zero. Anywhere the count is
+     * used to decide whether a row existed, this has to be consulted — the
+     * alternative is a scope violation raised for a write that was simply a
+     * no-op, on one engine only.
+     */
+    public function reportsMatchedRowsOnUpdate(): bool;
+
+    /**
      * A case-insensitive LIKE predicate. ILIKE is PostgreSQL-only, so both
      * engines use LOWER(column) LIKE ? and callers lower-case the pattern.
      */

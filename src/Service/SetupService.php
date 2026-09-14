@@ -12,6 +12,7 @@ use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\UserRepository;
 use App\Security\PasswordHasher;
+use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Support\Clock;
 use RuntimeException;
 
@@ -34,9 +35,11 @@ final class SetupService
         private readonly HouseholdRepository $households,
         private readonly MembershipRepository $memberships,
         private readonly InstanceSettingsService $settings,
+        private readonly ExchangeRateProviderRegistry $rateProviders,
         private readonly PasswordHasher $hasher,
         private readonly AuthService $auth,
         private readonly Clock $clock,
+        private readonly string $environmentApiKey = '',
     ) {
     }
 
@@ -87,6 +90,16 @@ final class SetupService
             $errors['isolation_mode'] = 'Choose how data is shared.';
         }
 
+        // An unrecognised provider key falls back to the default rather than
+        // failing the whole wizard: rates are a convenience, and refusing to
+        // create the administrator account over one would be disproportionate.
+        $rateProvider = $this->rateProviders->resolve($this->str($input, 'rate_provider'));
+        $rateProviderKey = trim($this->str($input, 'rate_provider_key'));
+
+        if ($rateProvider->requiresApiKey() && $rateProviderKey === '' && $this->environmentApiKey === '') {
+            $errors['rate_provider_key'] = sprintf('%s needs an API key.', $rateProvider->label());
+        }
+
         $errors += $this->auth->validatePassword($password, $confirm);
 
         if ($errors !== []) {
@@ -109,6 +122,10 @@ final class SetupService
         $this->memberships->create($householdId, $userId, Role::OwnerAdmin);
 
         $this->settings->setBaseCurrency($currency);
+        $this->settings->setRateProvider($rateProvider->key());
+        if ($rateProviderKey !== '') {
+            $this->settings->setRateProviderKey($rateProviderKey);
+        }
         $this->settings->setIsolationMode($isolation ?? IsolationMode::Shared);
         $this->settings->setInstanceName($instanceName);
         $this->settings->markSetupComplete($this->clock->now()->format('Y-m-d H:i:s'));

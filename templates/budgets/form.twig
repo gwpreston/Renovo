@@ -1,0 +1,108 @@
+{% extends 'layout.twig' %}
+
+{% block title %}{{ budget_id ? 'Edit budget' : 'New budget' }} — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>{{ budget_id ? 'Edit budget' : 'New budget' }}</h1>
+    </div>
+
+    {% include 'partials/errors.twig' %}
+
+    <section class="card narrow">
+        <form method="post" action="{{ budget_id ? '/budgets/' ~ budget_id : '/budgets' }}" class="stack">
+            {{ csrf_field() }}
+
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" value="{{ values.name|default('') }}" required autofocus>
+            {% if errors.name is defined %}<p class="field-error">{{ errors.name }}</p>{% endif %}
+
+            <label for="amount">Limit</label>
+            <div class="field-row">
+                <input type="text" id="amount" name="amount" inputmode="decimal"
+                       value="{{ values.amount|default('') }}" placeholder="150.00" required>
+                <select name="currency" aria-label="Currency">
+                    {% for code in currencies %}
+                        <option value="{{ code }}"
+                                {{ values.currency|default('GBP') == code ? 'selected' : '' }}>{{ code }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if errors.amount is defined %}<p class="field-error">{{ errors.amount }}</p>{% endif %}
+            {% if errors.currency is defined %}<p class="field-error">{{ errors.currency }}</p>{% endif %}
+
+            <label for="period">Period</label>
+            <select id="period" name="period">
+                {% for period in periods %}
+                    <option value="{{ period.value }}"
+                            {{ values.period|default('monthly') == period.value ? 'selected' : '' }}>
+                        {{ budget_period_label(period.value) }}
+                    </option>
+                {% endfor %}
+            </select>
+            <p class="hint">Both are rolling windows measured from today, so the figure is always a complete
+                one. This application tracks what is due rather than what has been paid, so a calendar month
+                would have to leave out whatever was already charged earlier in it.</p>
+            {% if errors.period is defined %}<p class="field-error">{{ errors.period }}</p>{% endif %}
+
+            <label for="category_id">Category</label>
+            <select id="category_id" name="category_id">
+                <option value="">Everything</option>
+                {% for category in categories %}
+                    <option value="{{ category.id }}"
+                            {{ values.category_id|default('') == category.id ? 'selected' : '' }}>
+                        {{ category.name }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% if errors.category_id is defined %}<p class="field-error">{{ errors.category_id }}</p>{% endif %}
+
+            {% if not scope.isOwnerRestricted and members|length > 1 %}
+                <label for="owner_user_id">Whose budget</label>
+                <select id="owner_user_id" name="owner_user_id">
+                    {% for member in members %}
+                        <option value="{{ member.id }}"
+                                {{ values.owner_user_id|default(current_user.id) == member.id ? 'selected' : '' }}>
+                            {{ member.display_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p class="hint">A budget counts only this member's own share of what is spent.</p>
+                {% if errors.owner_user_id is defined %}
+                    <p class="field-error">{{ errors.owner_user_id }}</p>
+                {% endif %}
+            {% endif %}
+
+            <label for="warn_threshold_percent">Warn at (optional)</label>
+            <div class="field-row">
+                <input type="number" id="warn_threshold_percent" name="warn_threshold_percent" min="1" max="100"
+                       value="{{ values.warn_threshold_percent|default('') }}" placeholder="90">
+                <span class="field-suffix">%</span>
+            </div>
+            <p class="hint">Flag the budget once projected spend reaches this share of the limit.</p>
+            {% if errors.warn_threshold_percent is defined %}
+                <p class="field-error">{{ errors.warn_threshold_percent }}</p>
+            {% endif %}
+
+            <input type="hidden" name="is_active" value="0">
+            <label class="choice">
+                <input type="checkbox" name="is_active" value="1"
+                       {{ values.is_active|default('1') == '1' ? 'checked' : '' }}>
+                <span>Active</span>
+            </label>
+
+            <div class="form-actions">
+                <button type="submit" class="button button-primary">Save budget</button>
+                <a class="button button-quiet" href="/budgets">Cancel</a>
+            </div>
+        </form>
+
+        {% if budget_id and can(scope, 'budget.manage') %}
+            <form method="post" action="/budgets/{{ budget_id }}/delete" class="stack"
+                  onsubmit="return confirm('Delete this budget?')">
+                {{ csrf_field() }}
+                <button type="submit" class="button button-danger">Delete budget</button>
+            </form>
+        {% endif %}
+    </section>
+{% endblock %}

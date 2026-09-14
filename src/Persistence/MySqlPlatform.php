@@ -64,11 +64,29 @@ final class MySqlPlatform implements Platform
 
     public function connectionOptions(): array
     {
-        // Deliberately empty. The obvious candidate, MYSQL_ATTR_INIT_COMMAND,
-        // is deprecated in PHP 8.5 in favour of a constant that does not exist
-        // before 8.4, so the same session setup is done in initialStatements()
-        // instead — which works identically on every supported version.
+        // Deliberately empty, and two constants are deliberately *not* here.
+        //
+        // MYSQL_ATTR_INIT_COMMAND is deprecated in PHP 8.5 in favour of a
+        // constant that does not exist before 8.4, so the session setup lives
+        // in initialStatements() instead.
+        //
+        // MYSQL_ATTR_FOUND_ROWS has the same version problem, and it would
+        // otherwise be tempting: without it, MySQL reports zero affected rows
+        // for an UPDATE that sets a column to the value it already holds,
+        // where PostgreSQL reports one. Rather than depend on a client flag
+        // this codebase cannot name portably, the two places that care about
+        // that distinction — the settings upsert and the scoped update — no
+        // longer infer existence from the affected-row count at all. See
+        // reportsMatchedRowsOnUpdate().
         return [];
+    }
+
+    public function reportsMatchedRowsOnUpdate(): bool
+    {
+        // MySQL counts rows it actually changed, so an UPDATE writing identical
+        // values reports nothing happened. Callers that need "did this row
+        // exist" must ask separately.
+        return false;
     }
 
     public function initialStatements(): array

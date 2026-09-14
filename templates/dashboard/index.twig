@@ -51,9 +51,54 @@
             {% endfor %}
         </section>
 
-        {% if stats.recurring|length > 1 or stats.one_off|length > 1 %}
-            <p class="muted note">Totals are shown per currency. Converting between them needs exchange
-                rates, which this version does not have.</p>
+        {% if stats.combined_monthly.amount_minor is not null and stats.recurring|length > 1 %}
+            <section class="card stat">
+                <h2 class="stat-label">Combined · {{ stats.combined_monthly.currency }}</h2>
+                <p class="stat-value">
+                    {{ stats.combined_monthly.amount_minor|money(stats.combined_monthly.currency) }}
+                    <span class="stat-unit"> / month</span>
+                </p>
+                <p class="muted">
+                    {{ stats.combined_yearly.amount_minor|money(stats.combined_yearly.currency) }} per year,
+                    converted at the latest cached rates. The per-currency figures above are the amounts
+                    actually charged.
+                </p>
+            </section>
+        {% elseif stats.combined_monthly.unconvertible is not empty %}
+            <p class="muted note">
+                Totals are shown per currency. They cannot be combined because no exchange rate is available
+                for {{ stats.combined_monthly.unconvertible|join(', ') }} — a total leaving that out would be
+                a wrong number rather than an approximate one.
+            </p>
+        {% endif %}
+
+        {% if stats.trials is not empty %}
+            <section class="card callout">
+                <h2>Trials ending soon</h2>
+                <p class="muted">Free today. About to stop being.</p>
+                <ul class="renewals">
+                    {% for trial in stats.trials %}
+                        <li>
+                            <span class="renewal-name">
+                                <a href="/subscriptions/{{ trial.id }}/money">{{ trial.name }}</a>
+                            </span>
+                            <span class="renewal-date">
+                                converts {{ trial.trialEndDate|date('j M') }}
+                            </span>
+                            <span class="renewal-amount">
+                                {{ trial.priceAfterConversion.amountMinor|money(
+                                    trial.priceAfterConversion.currency) }}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p class="muted">
+                    {% for total in stats.trial_totals %}
+                        {{ total.total_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
+                    {% endfor %}
+                    about to start being charged
+                </p>
+            </section>
         {% endif %}
 
         <div class="columns">
@@ -67,6 +112,18 @@
                 {{ ui.upcoming(stats.upcoming_30, stats.upcoming_30_totals) }}
             </section>
         </div>
+
+        <section class="stat-grid">
+            {% for label, amount in stats.per_period %}
+                <article class="card stat stat-small">
+                    <h2 class="stat-label">Per {{ label|replace({'daily': 'day', 'weekly': 'week',
+                        'monthly': 'month', 'yearly': 'year'}) }}</h2>
+                    <p class="stat-value">
+                        {{ amount is not null ? amount|money(stats.combined_yearly.currency) : '—' }}
+                    </p>
+                </article>
+            {% endfor %}
+        </section>
 
         {% if stats.by_category %}
             <section class="card">

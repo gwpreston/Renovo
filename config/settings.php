@@ -86,6 +86,20 @@ return [
         'no_proxy' => array_values(array_filter(array_map('trim', explode(',', $env('NO_PROXY', ''))))),
     ],
 
+    'rates' => [
+        // How long a cached rate table is considered current. Daily feeds move
+        // once a working day, so twelve hours keeps an instance in step without
+        // asking anything of the provider that it has not already published.
+        'ttl_seconds' => (int) $env('EXCHANGE_RATE_TTL_SECONDS', '43200'),
+        // Minimum gap between refresh attempts, successful or not. Without it a
+        // provider outage would mean a failed network call on every page view.
+        'retry_seconds' => (int) $env('EXCHANGE_RATE_RETRY_SECONDS', '3600'),
+        // Takes precedence over a key stored through the wizard: an operator
+        // who keeps the key in the environment has said they do not want it in
+        // the database, and the UI must not override that.
+        'api_key' => $env('EXCHANGE_RATE_API_KEY', ''),
+    ],
+
     'auth' => [
         'max_attempts_per_account' => (int) $env('AUTH_MAX_ATTEMPTS_PER_ACCOUNT', '5'),
         'max_attempts_per_ip' => (int) $env('AUTH_MAX_ATTEMPTS_PER_IP', '20'),

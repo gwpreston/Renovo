@@ -94,7 +94,11 @@ abstract class DatabaseTestCase extends TestCase
         foreach (
             [
             'subscription_tags',
+            'subscription_splits',
+            'budgets',
+            'subscription_price_history',
             'subscriptions',
+            'exchange_rates',
             'tags',
             'categories',
             'auth_tokens',
