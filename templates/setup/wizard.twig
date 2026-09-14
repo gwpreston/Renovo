@@ -1,0 +1,76 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Set up {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <section class="card narrow">
+        <h1>Welcome</h1>
+        <p class="muted">This instance has no accounts yet. The account you create here is the instance
+            administrator.</p>
+
+        {% include 'partials/errors.twig' %}
+
+        <form method="post" action="/setup" class="stack">
+            {{ csrf_field() }}
+
+            <h2>Your account</h2>
+
+            <label for="display_name">Your name</label>
+            <input type="text" id="display_name" name="display_name"
+                   value="{{ values.display_name|default('') }}" required autofocus>
+            {% if errors.display_name is defined %}<p class="field-error">{{ errors.display_name }}</p>{% endif %}
+
+            <label for="email">Email address</label>
+            <input type="email" id="email" name="email" value="{{ values.email|default('') }}"
+                   autocomplete="username" required>
+            {% if errors.email is defined %}<p class="field-error">{{ errors.email }}</p>{% endif %}
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="new-password" required>
+            <p class="hint">At least 10 characters.</p>
+            {% if errors.password is defined %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+
+            <label for="password_confirm">Confirm password</label>
+            <input type="password" id="password_confirm" name="password_confirm"
+                   autocomplete="new-password" required>
+            {% if errors.password_confirm is defined %}
+                <p class="field-error">{{ errors.password_confirm }}</p>
+            {% endif %}
+
+            <h2>This instance</h2>
+
+            <label for="instance_name">Instance name</label>
+            <input type="text" id="instance_name" name="instance_name"
+                   value="{{ values.instance_name|default('Renovo') }}">
+
+            <label for="household_name">Household name</label>
+            <input type="text" id="household_name" name="household_name"
+                   value="{{ values.household_name|default('') }}" placeholder="Leave blank to use your name">
+
+            <label for="base_currency">Base currency</label>
+            <select id="base_currency" name="base_currency">
+                {% for code in currencies %}
+                    <option value="{{ code }}"
+                            {{ values.base_currency|default('GBP') == code ? 'selected' : '' }}>{{ code }}</option>
+                {% endfor %}
+            </select>
+            {% if errors.base_currency is defined %}<p class="field-error">{{ errors.base_currency }}</p>{% endif %}
+
+            <fieldset class="stack">
+                <legend>How is data shared?</legend>
+                {% for mode in isolation_modes %}
+                    <label class="choice">
+                        <input type="radio" name="isolation_mode" value="{{ mode.value }}"
+                               {{ values.isolation_mode|default('shared') == mode.value ? 'checked' : '' }}>
+                        <span>{{ isolation_label(mode.value) }}</span>
+                    </label>
+                {% endfor %}
+                <p class="hint">This can be changed later in settings, but it affects what everybody sees, so
+                    it is worth getting right now.</p>
+            </fieldset>
+            {% if errors.isolation_mode is defined %}<p class="field-error">{{ errors.isolation_mode }}</p>{% endif %}
+
+            <button type="submit" class="button button-primary">Finish setup</button>
+        </form>
+    </section>
+{% endblock %}

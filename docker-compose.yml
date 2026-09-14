@@ -1,0 +1,133 @@
+# One-command start: `docker compose up`.
+#
+# PostgreSQL is the default engine. To run against MySQL instead, add the
+# override file: `docker compose -f docker-compose.yml -f docker-compose.mysql.yml up`.
+# Local development deliberately uses the same engine as production; SQLite is
+# not used anywhere in this project.
+
+# The Compose project name is pinned rather than taken from the directory, so
+# container and volume names stay "renovo_*" wherever the repository is checked
+# out or whatever the folder is called.
+name: renovo
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: app
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      DB_DRIVER: ${DB_DRIVER:-pgsql}
+      DB_HOST: database
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-renovo}
+      DB_USER: ${DB_USER:-renovo}
+      DB_PASSWORD: ${DB_PASSWORD:-renovo}
+      SESSION_KEY: "${SESSION_KEY:?Set SESSION_KEY in .env. Generate one with 'openssl rand -hex 32'}"
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_ENCRYPTION: ${SMTP_ENCRYPTION:-none}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-renovo@localhost}
+    volumes:
+      - logos:/var/www/html/public/assets/logos
+      - appvar:/var/www/html/var
+
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./public:/var/www/html/public:ro
+      - logos:/var/www/html/public/assets/logos:ro
+
+  database:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Bound to loopback only: this is for host-side tooling (phinx, phpunit,
+    # psql), not for exposing the database to the network.
+    ports:
+      - "127.0.0.1:${DB_PORT_PUBLISHED:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-renovo}
+      POSTGRES_USER: ${DB_USER:-renovo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-renovo}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-renovo} -d ${DB_NAME:-renovo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Applies migrations once, then exits. `docker compose up` waits for it
+  # before the app is useful, and re-running it is harmless.
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: app
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DB_DRIVER: ${DB_DRIVER:-pgsql}
+      DB_HOST: database
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-renovo}
+      DB_USER: ${DB_USER:-renovo}
+      DB_PASSWORD: ${DB_PASSWORD:-renovo}
+      SESSION_KEY: ${SESSION_KEY:-unused-by-migrations}
+    command: ["vendor/bin/phinx", "migrate", "--configuration", "phinx.php"]
+    restart: "no"
+
+  # The scheduler exists from this phase so the deployment shape is settled.
+  # Its command is a placeholder that exits cleanly; reminders arrive later.
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: app
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DB_DRIVER: ${DB_DRIVER:-pgsql}
+      DB_HOST: database
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-renovo}
+      DB_USER: ${DB_USER:-renovo}
+      DB_PASSWORD: ${DB_PASSWORD:-renovo}
+      SESSION_KEY: ${SESSION_KEY:-unused-by-scheduler}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          php bin/console reminders:run || true
+          php bin/console maintenance:prune || true
+          sleep 86400
+        done
+
+  # Catches outbound mail in development. Web UI on http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+
+volumes:
+  database:
+  logos:
+  appvar:

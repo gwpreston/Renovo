@@ -1,0 +1,14 @@
+{% extends 'layout.twig' %}
+
+{% block title %}{{ title }} — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <section class="card narrow">
+        <h1>{{ title }}</h1>
+        <p class="muted">{{ message }}</p>
+        {% if trace %}
+            <pre class="trace">{{ trace }}</pre>
+        {% endif %}
+        <p><a class="button" href="/">Back to the dashboard</a></p>
+    </section>
+{% endblock %}

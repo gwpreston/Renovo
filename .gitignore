@@ -1,0 +1,82 @@
+# ---------------------------------------------------------------------------
+# Dependencies
+#
+# composer.lock is NOT ignored: it pins the exact versions the Docker image and
+# CI install, and the platform is pinned to PHP 8.2 so it resolves for the
+# minimum supported version rather than whatever a developer happens to run.
+# ---------------------------------------------------------------------------
+/vendor/
+/node_modules/
+composer.phar
+
+# ---------------------------------------------------------------------------
+# Secrets and local configuration
+#
+# .env holds the session key, database password and SMTP credentials. Only the
+# annotated template is committed.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# Compose reads this automatically if present; it is a personal local override.
+docker-compose.override.yml
+
+# ---------------------------------------------------------------------------
+# Generated at runtime
+#
+# var/ holds the Twig cache, the compiled DI container, PHPStan's scratch area
+# and the application log. All of it is rebuilt on demand.
+# ---------------------------------------------------------------------------
+/var/
+*.log
+
+# ---------------------------------------------------------------------------
+# User uploads
+#
+# Logos are written here by the application. The directory itself is tracked so
+# that the nginx container has a mount point for the shared volume; nothing
+# inside it is.
+# ---------------------------------------------------------------------------
+/public/assets/logos/*
+!/public/assets/logos/.gitkeep
+/public/uploads/
+
+# ---------------------------------------------------------------------------
+# Tooling caches
+#
+# public/assets/htmx.min.js is deliberately vendored and committed: the app has
+# no build step and must run without a CDN.
+# ---------------------------------------------------------------------------
+.phpunit.result.cache
+/.phpunit.cache/
+/.php-cs-fixer.cache
+/.phpcs-cache
+/phpstan.neon
+/phpcs.xml
+/phpunit.xml
+/phinx.local.php
+
+# ---------------------------------------------------------------------------
+# Editors
+# ---------------------------------------------------------------------------
+/.idea/
+/.vscode/
+/.fleet/
+/.zed/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# Operating systems
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+Desktop.ini
+.directory

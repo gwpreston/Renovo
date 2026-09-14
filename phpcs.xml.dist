@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<ruleset name="Renovo">
+    <description>PSR-12 coding standard.</description>
+
+    <file>src</file>
+    <file>config</file>
+    <file>public</file>
+    <file>tests</file>
+    <file>migrations</file>
+    <file>seeds</file>
+    <file>bin</file>
+
+    <arg name="basepath" value="."/>
+    <arg name="colors"/>
+    <arg name="parallel" value="4"/>
+    <arg value="sp"/>
+
+    <!-- Vendored third-party assets are not ours to restyle. -->
+    <exclude-pattern>public/assets/*</exclude-pattern>
+
+    <rule ref="PSR12"/>
+
+    <!--
+        Phinx loads migrations and seeds by file path and expects them in the
+        global namespace, so the namespace rule cannot apply to them.
+    -->
+    <rule ref="PSR1.Classes.ClassDeclaration.MissingNamespace">
+        <exclude-pattern>migrations/*</exclude-pattern>
+        <exclude-pattern>seeds/*</exclude-pattern>
+    </rule>
+
+    <rule ref="Generic.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="120"/>
+            <property name="absoluteLineLimit" value="140"/>
+        </properties>
+    </rule>
+</ruleset>

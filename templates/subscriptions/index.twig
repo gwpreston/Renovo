@@ -1,0 +1,100 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Subscriptions — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>Subscriptions</h1>
+        {% if can(scope, 'subscription.create') %}
+            <a class="button button-primary" href="/subscriptions/new">Add subscription</a>
+        {% endif %}
+    </div>
+
+    {#
+        The filter form drives the list through htmx: it replaces only the
+        table, and pushes the query string so the view is bookmarkable and the
+        back button works.
+    #}
+    <form class="card filters"
+          hx-get="/subscriptions"
+          hx-target="#subscription-list"
+          hx-select="#subscription-list"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+          hx-trigger="change, keyup delay:300ms from:#q, submit">
+
+        <div class="filter-row">
+            <div class="filter-field grow">
+                <label for="q">Search</label>
+                <input type="search" id="q" name="q" value="{{ filter.search }}"
+                       placeholder="Name or notes">
+            </div>
+
+            <div class="filter-field">
+                <label for="category">Category</label>
+                <select id="category" name="category">
+                    <option value="">All</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}"
+                                {{ filter.categoryId == category.id ? 'selected' : '' }}>{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="owner">Member</label>
+                <select id="owner" name="owner">
+                    <option value="">All</option>
+                    {% for member in members %}
+                        <option value="{{ member.id }}"
+                                {{ filter.ownerUserId == member.id ? 'selected' : '' }}>{{ member.display_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="currency">Currency</label>
+                <select id="currency" name="currency">
+                    <option value="">All</option>
+                    {% for code in currencies %}
+                        <option value="{{ code }}" {{ filter.currency == code ? 'selected' : '' }}>{{ code }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-field">
+                <label for="type">Type</label>
+                <select id="type" name="type">
+                    <option value="">All</option>
+                    {% for type in types %}
+                        <option value="{{ type.value }}"
+                                {{ filter.type and filter.type.value == type.value ? 'selected' : '' }}>
+                            {{ type_label(type.value) }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <label class="filter-field choice">
+                <input type="checkbox" name="inactive" value="1" {{ filter.includeInactive ? 'checked' : '' }}>
+                <span>Include paused</span>
+            </label>
+        </div>
+
+        {% if tags %}
+            <div class="filter-tags">
+                {% for tag in tags %}
+                    <label class="chip">
+                        <input type="checkbox" name="tag[]" value="{{ tag.id }}"
+                               {{ tag.id in filter.tagIds ? 'checked' : '' }}>
+                        <span>{{ tag.name }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <noscript><button type="submit" class="button">Apply filters</button></noscript>
+    </form>
+
+    {% include 'subscriptions/_list.twig' %}
+{% endblock %}

@@ -1,0 +1,46 @@
+# Excluded from the build context. Kept in step with .gitignore: anything that
+# is generated, secret, or belongs to one developer's machine has no business
+# being baked into an image.
+
+.git
+.github
+.gitignore
+.dockerignore
+
+# Dependencies are installed inside the image from composer.lock.
+vendor
+node_modules
+composer.phar
+
+# Secrets. Configuration reaches the container as environment variables.
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# Generated at runtime; the container makes its own.
+var
+*.log
+
+# Uploaded logos live in a volume. Copying a developer's uploads into the image
+# would both bloat it and ship somebody else's files.
+public/assets/logos/*
+!public/assets/logos/.gitkeep
+public/uploads
+
+# Tooling caches and local tool overrides.
+.phpunit.result.cache
+.phpunit.cache
+.php-cs-fixer.cache
+.phpcs-cache
+
+# Editors and operating systems.
+.idea
+.vscode
+.fleet
+.zed
+*.swp
+*~
+.DS_Store
+._*
+Thumbs.db

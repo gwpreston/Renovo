@@ -1,0 +1,12 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Link expired — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <section class="card narrow">
+        <h1>That link is no longer valid</h1>
+        <p class="muted">Confirmation links expire after two days and can only be used once. Sign in to
+            request a new one.</p>
+        <p><a class="button" href="/login">Back to sign in</a></p>
+    </section>
+{% endblock %}

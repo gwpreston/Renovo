@@ -1,0 +1,22 @@
+<header class="nav">
+    <div class="container nav-inner">
+        <a class="nav-brand" href="/">{{ instance_name }}</a>
+
+        <nav class="nav-links">
+            <a href="/" class="{{ current_path == '/' ? 'is-active' : '' }}">Dashboard</a>
+            <a href="/subscriptions"
+               class="{{ current_path starts with '/subscriptions' ? 'is-active' : '' }}">Subscriptions</a>
+            <a href="/categories"
+               class="{{ current_path starts with '/categories' ? 'is-active' : '' }}">Categories</a>
+            <a href="/settings" class="{{ current_path starts with '/settings' ? 'is-active' : '' }}">Settings</a>
+        </nav>
+
+        <div class="nav-user">
+            <span class="nav-name">{{ current_user.displayName }}</span>
+            <form method="post" action="/logout" class="inline">
+                {{ csrf_field() }}
+                <button type="submit" class="button button-quiet">Sign out</button>
+            </form>
+        </div>
+    </div>
+</header>

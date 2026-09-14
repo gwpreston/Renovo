@@ -1,0 +1,139 @@
+{#
+    The list fragment. Rendered on its own for htmx filter, sort and page
+    requests, and included by the full page for a normal load, so the two can
+    never drift apart.
+#}
+{% import _self as list %}
+
+<section id="subscription-list" class="card">
+    {% if subscriptions is empty %}
+        <p class="muted empty">
+            {% if filter.hasActiveFilters %}
+                Nothing matches those filters.
+            {% else %}
+                No subscriptions yet.
+                {% if can(scope, 'subscription.create') %}
+                    <a href="/subscriptions/new">Add the first one.</a>
+                {% endif %}
+            {% endif %}
+        </p>
+    {% else %}
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th scope="col">{{ list.sort_link('name', 'Name', filter) }}</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Member</th>
+                    <th scope="col">Cycle</th>
+                    <th scope="col">{{ list.sort_link('next_payment', 'Next payment', filter) }}</th>
+                    <th scope="col" class="numeric">{{ list.sort_link('price', 'Price', filter) }}</th>
+                    <th scope="col" class="numeric">Per month</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for subscription in subscriptions %}
+                    <tr class="{{ subscription.isActive ? '' : 'is-paused' }}">
+                        <td>
+                            <div class="cell-name">
+                                {% if subscription.logoPath %}
+                                    <img class="logo" src="/{{ subscription.logoPath }}" alt="" width="24" height="24">
+                                {% endif %}
+                                <div>
+                                    <a href="/subscriptions/{{ subscription.id }}/edit">{{ subscription.name }}</a>
+                                    {% if not subscription.isActive %}<span class="badge">Paused</span>{% endif %}
+                                    {% if subscription.tags %}
+                                        <div class="tag-list">
+                                            {% for tag in subscription.tags %}
+                                                <span class="chip chip-static">{{ tag.name }}</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ subscription.categoryName ?? '—' }}</td>
+                        <td>{{ subscription.ownerName ?? '—' }}</td>
+                        <td>
+                            {{ type_label(subscription.type.value) }}
+                            {% if subscription.billingCycle %}
+                                · {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays) }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if subscription.nextPaymentDate %}
+                                {{ subscription.nextPaymentDate|date('j M Y') }}
+                                {% set deadline = subscription.cancellationDeadline %}
+                                {% if deadline %}
+                                    <div class="hint">Cancel by {{ deadline|date('j M Y') }}</div>
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="numeric">{{ subscription.price.amountMinor|money(subscription.price.currency) }}</td>
+                        <td class="numeric">
+                            {% if subscription.monthlyMinor is not null %}
+                                {{ subscription.monthlyMinor|money(subscription.price.currency) }}
+                            {% else %}
+                                <span class="muted" title="One-off and lifetime entries are not amortised">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            {% if can(scope, 'subscription.update') %}
+                                <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="inline">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="button button-quiet">
+                                        {{ subscription.isActive ? 'Pause' : 'Resume' }}
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if can(scope, 'subscription.delete') %}
+                                <form method="post" action="/subscriptions/{{ subscription.id }}/delete" class="inline"
+                                      onsubmit="return confirm('Delete {{ subscription.name|e('js') }}?')">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="button button-danger">Delete</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if page_count > 1 %}
+            <nav class="pager" aria-label="Pagination">
+                {% if filter.page > 1 %}
+                    <a class="button button-quiet"
+                       href="/subscriptions?{{ filter.toQueryString({'page': filter.page - 1}) }}"
+                       hx-get="/subscriptions?{{ filter.toQueryString({'page': filter.page - 1}) }}"
+                       hx-target="#subscription-list" hx-select="#subscription-list"
+                       hx-swap="outerHTML" hx-push-url="true">Previous</a>
+                {% endif %}
+                <span class="muted">Page {{ filter.page }} of {{ page_count }} · {{ total }} total</span>
+                {% if filter.page < page_count %}
+                    <a class="button button-quiet"
+                       href="/subscriptions?{{ filter.toQueryString({'page': filter.page + 1}) }}"
+                       hx-get="/subscriptions?{{ filter.toQueryString({'page': filter.page + 1}) }}"
+                       hx-target="#subscription-list" hx-select="#subscription-list"
+                       hx-swap="outerHTML" hx-push-url="true">Next</a>
+                {% endif %}
+            </nav>
+        {% endif %}
+    {% endif %}
+</section>
+
+{% macro sort_link(key, label, filter) %}
+    {% set direction = (filter.sort == key and filter.direction == 'asc') ? 'desc' : 'asc' %}
+    {% set query = filter.toQueryString({'sort': key, 'dir': direction, 'page': null}) %}
+    <a href="/subscriptions?{{ query }}"
+       hx-get="/subscriptions?{{ query }}"
+       hx-target="#subscription-list"
+       hx-select="#subscription-list"
+       hx-swap="outerHTML"
+       hx-push-url="true">
+        {{ label }}{% if filter.sort == key %}<span aria-hidden="true">{{ filter.direction == 'asc' ? ' ↑' : ' ↓' }}</span>{% endif %}
+    </a>
+{% endmacro %}

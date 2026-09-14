@@ -1,0 +1,174 @@
+{% extends 'layout.twig' %}
+
+{% set is_edit = subscription_id is not null %}
+
+{% block title %}{{ is_edit ? 'Edit subscription' : 'Add subscription' }} — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>{{ is_edit ? 'Edit subscription' : 'Add subscription' }}</h1>
+        <a class="button button-quiet" href="/subscriptions">Back to list</a>
+    </div>
+
+    {% include 'partials/errors.twig' %}
+
+    <form class="card stack"
+          method="post"
+          enctype="multipart/form-data"
+          action="{{ is_edit ? '/subscriptions/' ~ subscription_id : '/subscriptions' }}">
+        {{ csrf_field() }}
+
+        <div class="grid-2">
+            <div class="stack">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" value="{{ values.name|default('') }}" required autofocus>
+                {% if errors.name is defined %}<p class="field-error">{{ errors.name }}</p>{% endif %}
+
+                <label for="price">Price</label>
+                <div class="input-group">
+                    <input type="text" id="price" name="price" inputmode="decimal"
+                           value="{{ values.price|default('') }}" placeholder="9.99" required>
+                    <select name="currency" aria-label="Currency">
+                        {% for code in currencies %}
+                            <option value="{{ code }}"
+                                    {{ values.currency|default(base_currency) == code ? 'selected' : '' }}>{{ code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if errors.price is defined %}<p class="field-error">{{ errors.price }}</p>{% endif %}
+                {% if errors.currency is defined %}<p class="field-error">{{ errors.currency }}</p>{% endif %}
+
+                <label for="subscription_type">Type</label>
+                <select id="subscription_type" name="subscription_type">
+                    {% for type in types %}
+                        <option value="{{ type.value }}"
+                                {{ values.subscription_type|default('recurring') == type.value ? 'selected' : '' }}>
+                            {{ type_label(type.value) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p class="hint">One-off and lifetime entries are tracked but left out of monthly totals.</p>
+
+                <label for="billing_cycle">Billing cycle</label>
+                <select id="billing_cycle" name="billing_cycle">
+                    {% for cycle in cycles %}
+                        <option value="{{ cycle.value }}"
+                                {{ values.billing_cycle|default('monthly') == cycle.value ? 'selected' : '' }}>
+                            {{ cycle_label(cycle.value) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                {% if errors.billing_cycle is defined %}<p class="field-error">{{ errors.billing_cycle }}</p>{% endif %}
+
+                <label for="cycle_days">Days between payments</label>
+                <input type="number" id="cycle_days" name="cycle_days" min="1" max="3650"
+                       value="{{ values.cycle_days|default('') }}">
+                <p class="hint">Only used when the cycle is “Custom”.</p>
+                {% if errors.cycle_days is defined %}<p class="field-error">{{ errors.cycle_days }}</p>{% endif %}
+            </div>
+
+            <div class="stack">
+                <label for="next_payment_date">Next payment date</label>
+                <input type="date" id="next_payment_date" name="next_payment_date"
+                       value="{{ values.next_payment_date|default('') }}">
+                {% if errors.next_payment_date is defined %}
+                    <p class="field-error">{{ errors.next_payment_date }}</p>
+                {% endif %}
+
+                <label for="start_date">Started on</label>
+                <input type="date" id="start_date" name="start_date" value="{{ values.start_date|default('') }}">
+
+                <label for="notice_period_amount">Notice period</label>
+                <div class="input-group">
+                    <input type="number" id="notice_period_amount" name="notice_period_amount" min="0" max="3650"
+                           value="{{ values.notice_period_amount|default('') }}" placeholder="0">
+                    <select name="notice_period_unit" aria-label="Notice period unit">
+                        {% for unit in notice_units %}
+                            <option value="{{ unit }}"
+                                    {{ values.notice_period_unit|default('days') == unit ? 'selected' : '' }}>{{ unit }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <p class="hint">Used to work out the last day you can cancel before the next charge.</p>
+                {% if errors.notice_period_amount is defined %}
+                    <p class="field-error">{{ errors.notice_period_amount }}</p>
+                {% endif %}
+
+                <label for="category_id">Category</label>
+                <select id="category_id" name="category_id">
+                    <option value="">None</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}"
+                                {{ values.category_id|default('') == category.id ? 'selected' : '' }}>{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+                {% if errors.category_id is defined %}<p class="field-error">{{ errors.category_id }}</p>{% endif %}
+
+                <label for="owner_user_id">Belongs to</label>
+                <select id="owner_user_id" name="owner_user_id" {{ scope.isOwnerRestricted ? 'disabled' : '' }}>
+                    {% for member in members %}
+                        <option value="{{ member.id }}"
+                                {{ values.owner_user_id|default(current_user.id) == member.id ? 'selected' : '' }}>
+                            {{ member.display_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                {% if scope.isOwnerRestricted %}
+                    <p class="hint">This instance keeps members' subscriptions separate, so new entries belong
+                        to you.</p>
+                {% endif %}
+                {% if errors.owner_user_id is defined %}<p class="field-error">{{ errors.owner_user_id }}</p>{% endif %}
+
+                <label for="payer_user_id">Paid by</label>
+                <select id="payer_user_id" name="payer_user_id">
+                    <option value="">Not recorded</option>
+                    {% for member in members %}
+                        <option value="{{ member.id }}"
+                                {{ values.payer_user_id|default('') == member.id ? 'selected' : '' }}>
+                            {{ member.display_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                {% if errors.payer_user_id is defined %}<p class="field-error">{{ errors.payer_user_id }}</p>{% endif %}
+
+                <label for="tags">Tags</label>
+                <input type="text" id="tags" name="tags" value="{{ values.tags|default('') }}"
+                       placeholder="streaming, shared">
+                <p class="hint">Comma separated. New tags are created automatically.</p>
+
+                <label for="logo">Logo</label>
+                <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/gif,image/webp">
+                {% if values.logo_path is defined and values.logo_path %}
+                    <p class="hint">
+                        <img class="logo" src="/{{ values.logo_path }}" alt="" width="32" height="32">
+                        Uploading a new file replaces it.
+                    </p>
+                {% endif %}
+                {% if errors.logo is defined %}<p class="field-error">{{ errors.logo }}</p>{% endif %}
+            </div>
+        </div>
+
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes" rows="3">{{ values.notes|default('') }}</textarea>
+        {% if errors.notes is defined %}<p class="field-error">{{ errors.notes }}</p>{% endif %}
+
+        {#
+            An unchecked checkbox submits nothing at all, so a hidden field
+            carries the "off" value first; when the box is ticked the later
+            value wins and the field reads 1.
+        #}
+        <input type="hidden" name="is_active" value="0">
+        <label class="choice">
+            <input type="checkbox" name="is_active" value="1"
+                   {{ values.is_active|default('1') == '1' ? 'checked' : '' }}>
+            <span>Active</span>
+        </label>
+
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">
+                {{ is_edit ? 'Save changes' : 'Add subscription' }}
+            </button>
+            <a class="button button-quiet" href="/subscriptions">Cancel</a>
+        </div>
+    </form>
+{% endblock %}

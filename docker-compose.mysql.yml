@@ -1,0 +1,44 @@
+# MySQL variant. Use with:
+#   docker compose -f docker-compose.yml -f docker-compose.mysql.yml up
+#
+# Set DB_DRIVER=mysql and DB_PORT=3306 in .env as well, so the CLI and the
+# containers agree about which engine is in use.
+
+services:
+  database:
+    image: mysql:8.4
+    # !override replaces the base file's port list instead of merging with it;
+    # merging would bind the same host port to both 5432 and 3306.
+    ports: !override
+      - "127.0.0.1:${DB_PORT_PUBLISHED:-3306}:3306"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-renovo}
+      MYSQL_USER: ${DB_USER:-renovo}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-renovo}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-renovo-root}
+    volumes:
+      - database_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${DB_ROOT_PASSWORD:-renovo-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    environment:
+      DB_DRIVER: mysql
+      DB_PORT: 3306
+
+  migrate:
+    environment:
+      DB_DRIVER: mysql
+      DB_PORT: 3306
+
+  scheduler:
+    environment:
+      DB_DRIVER: mysql
+      DB_PORT: 3306
+
+volumes:
+  database_mysql:

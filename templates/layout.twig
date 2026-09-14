@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{ current_user.theme|default('system') }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ instance_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="/assets/app.css">
+    <script src="/assets/htmx.min.js" defer></script>
+</head>
+{#
+    The CSRF token rides on every htmx request via hx-headers, so a fragment
+    swap does not need a hidden field of its own.
+#}
+<body hx-headers='{"X-CSRF-Token": "{{ csrf_token() }}"}'>
+{% if current_user %}
+    {% include 'partials/nav.twig' %}
+{% endif %}
+
+<main class="container">
+    {% include 'partials/flashes.twig' %}
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="container footer">
+    <span>{{ instance_name }}</span>
+</footer>
+</body>
+</html>

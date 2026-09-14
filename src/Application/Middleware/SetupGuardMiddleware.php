@@ -1,0 +1,55 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Application\Middleware;
+
+use App\Service\SetupService;
+use Psr\Http\Message\ResponseFactoryInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+
+/**
+ * Sends an un-configured instance to the first-run wizard, and a configured
+ * one away from it.
+ *
+ * The second direction matters as much as the first: leaving /setup reachable
+ * after the instance is live would let anybody create a second instance
+ * administrator.
+ */
+final class SetupGuardMiddleware implements MiddlewareInterface
+{
+    public function __construct(
+        private readonly SetupService $setup,
+        private readonly ResponseFactoryInterface $responseFactory,
+    ) {
+    }
+
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+    {
+        $path = $request->getUri()->getPath();
+        $isSetupRoute = str_starts_with($path, '/setup');
+        $isAsset = str_starts_with($path, '/assets');
+
+        if ($isAsset) {
+            return $handler->handle($request);
+        }
+
+        if ($this->setup->isRequired() && !$isSetupRoute) {
+            return $this->redirect('/setup');
+        }
+
+        if (!$this->setup->isRequired() && $isSetupRoute) {
+            return $this->redirect('/');
+        }
+
+        return $handler->handle($request);
+    }
+
+    private function redirect(string $location): ResponseInterface
+    {
+        return $this->responseFactory->createResponse(302)->withHeader('Location', $location);
+    }
+}

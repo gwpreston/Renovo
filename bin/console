@@ -1,0 +1,88 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * CLI entry point.
+ *
+ * Commands are resolved against the same container the web application uses,
+ * so a command and a controller can never be looking at different
+ * configuration.
+ *
+ * In this phase there is exactly one command, and it deliberately does
+ * nothing: the scheduler container needs something to run, but reminders are a
+ * later phase and stubbing them now would mean writing code that has to be
+ * thrown away. The seam is here; the work is not.
+ */
+
+use App\Persistence\PdoSessionHandler;
+use App\Repository\AuthAttemptRepository;
+use App\Repository\TokenRepository;
+use App\Support\Clock;
+use Psr\Container\ContainerInterface;
+use Slim\App;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+/** @var callable(bool): App $bootstrap */
+$bootstrap = require __DIR__ . '/../config/bootstrap.php';
+
+$app = $bootstrap(false);
+$container = $app->getContainer();
+
+if (!$container instanceof ContainerInterface) {
+    fwrite(STDERR, "The application has no container.\n");
+    exit(1);
+}
+
+$command = $argv[1] ?? 'list';
+
+/**
+ * @param non-empty-string $message
+ */
+$out = static function (string $message): void {
+    fwrite(STDOUT, $message . PHP_EOL);
+};
+
+switch ($command) {
+    case 'reminders:run':
+        // Placeholder. Reminders, budget re-evaluation and rate refresh all
+        // land in later phases; this exits cleanly so the scheduler container
+        // has a valid command and a working health signal today.
+        $out('reminders:run — no scheduled work in this phase.');
+        exit(0);
+
+    case 'maintenance:prune':
+        // Housekeeping that is genuinely needed now: expired sessions, spent
+        // tokens and stale throttle records accumulate from day one.
+        $clock = $container->get(Clock::class);
+
+        $sessions = $container->get(PdoSessionHandler::class)->gc(0);
+        $tokens = $container->get(TokenRepository::class)->purgeExpired();
+        $attempts = $container->get(AuthAttemptRepository::class)
+            ->purgeOlderThan($clock->now()->modify('-30 days'));
+
+        $out(sprintf(
+            'Pruned %d expired session(s), %d expired token(s), %d old auth attempt(s).',
+            is_int($sessions) ? $sessions : 0,
+            $tokens,
+            $attempts,
+        ));
+        exit(0);
+
+    case 'list':
+    case '--help':
+    case '-h':
+        $out('Renovo console');
+        $out('');
+        $out('Usage: php bin/console <command>');
+        $out('');
+        $out('  reminders:run        Scheduler entry point (no work in this phase)');
+        $out('  maintenance:prune    Delete expired sessions, tokens and throttle records');
+        exit(0);
+
+    default:
+        fwrite(STDERR, sprintf("Unknown command \"%s\". Run `php bin/console list`.\n", $command));
+        exit(1);
+}

@@ -1,0 +1,113 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Service;
+
+use Psr\Http\Message\UploadedFileInterface;
+use RuntimeException;
+
+/**
+ * Stores a logo that the user uploaded.
+ *
+ * Uploaded only — this phase never fetches a logo from a URL. Fetching one
+ * means making an outbound request to an address a user chose, which needs the
+ * SSRF protections that arrive with the phase that introduces it. The seam is
+ * here: a future fetcher writes into the same directory through this class.
+ *
+ * The stored file is renamed to a random name with an extension derived from
+ * the detected image type, never from what the client claimed, so an upload
+ * cannot choose its own path or masquerade as a script.
+ */
+final class LogoStorage
+{
+    /** @var array<int, string> */
+    private const ALLOWED_TYPES = [
+        IMAGETYPE_PNG => 'png',
+        IMAGETYPE_JPEG => 'jpg',
+        IMAGETYPE_GIF => 'gif',
+        IMAGETYPE_WEBP => 'webp',
+    ];
+
+    public function __construct(
+        private readonly string $directory,
+        private readonly int $maxBytes,
+    ) {
+    }
+
+    /**
+     * @return string|null The web-relative path to store on the subscription.
+     * @throws ValidationException
+     */
+    public function store(?UploadedFileInterface $file): ?string
+    {
+        if ($file === null || $file->getError() === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+
+        if ($file->getError() !== UPLOAD_ERR_OK) {
+            throw ValidationException::field('logo', 'The logo could not be uploaded. Try again.');
+        }
+
+        $size = $file->getSize();
+        if ($size !== null && $size > $this->maxBytes) {
+            throw ValidationException::field('logo', sprintf(
+                'The logo must be %d KB or smaller.',
+                intdiv($this->maxBytes, 1024),
+            ));
+        }
+
+        $temporary = tempnam(sys_get_temp_dir(), 'logo');
+        if ($temporary === false) {
+            throw new RuntimeException('Could not create a temporary file for the upload.');
+        }
+
+        $file->moveTo($temporary);
+
+        $info = @getimagesize($temporary);
+        $detectedType = is_array($info) ? $info[2] : 0;
+
+        if (!isset(self::ALLOWED_TYPES[$detectedType])) {
+            @unlink($temporary);
+
+            throw ValidationException::field('logo', 'Upload a PNG, JPEG, GIF or WebP image.');
+        }
+
+        if (!is_dir($this->directory) && !mkdir($this->directory, 0o775, true) && !is_dir($this->directory)) {
+            @unlink($temporary);
+
+            throw new RuntimeException(sprintf('Logo directory "%s" is not writable.', $this->directory));
+        }
+
+        $name = bin2hex(random_bytes(16)) . '.' . self::ALLOWED_TYPES[$detectedType];
+        $destination = rtrim($this->directory, '/') . '/' . $name;
+
+        if (!rename($temporary, $destination)) {
+            @unlink($temporary);
+
+            throw new RuntimeException('The logo could not be saved.');
+        }
+
+        @chmod($destination, 0o644);
+
+        return 'assets/logos/' . $name;
+    }
+
+    /**
+     * Remove a stored logo. Paths that did not come from `store()` are
+     * ignored rather than trusted.
+     */
+    public function delete(?string $storedPath): void
+    {
+        if ($storedPath === null || !str_starts_with($storedPath, 'assets/logos/')) {
+            return;
+        }
+
+        $name = basename($storedPath);
+        if (preg_match('/^[0-9a-f]{32}\.(png|jpg|gif|webp)$/', $name) !== 1) {
+            return;
+        }
+
+        @unlink(rtrim($this->directory, '/') . '/' . $name);
+    }
+}

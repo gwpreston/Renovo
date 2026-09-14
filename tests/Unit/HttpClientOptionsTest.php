@@ -1,0 +1,52 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit;
+
+use App\Http\HttpClientOptions;
+use PHPUnit\Framework\TestCase;
+
+final class HttpClientOptionsTest extends TestCase
+{
+    public function testNoProxyHonoursExactHostsAndSuffixes(): void
+    {
+        $options = new HttpClientOptions(
+            httpProxy: 'http://proxy.internal:3128',
+            httpsProxy: 'http://proxy.internal:3128',
+            noProxy: ['localhost', '.example.com', 'api.direct.test'],
+        );
+
+        self::assertNull($options->proxyFor('http', 'localhost'));
+        self::assertNull($options->proxyFor('https', 'api.direct.test'));
+        self::assertNull($options->proxyFor('https', 'anything.example.com'));
+        self::assertNull($options->proxyFor('https', 'example.com'));
+
+        self::assertSame('http://proxy.internal:3128', $options->proxyFor('https', 'rates.example.org'));
+    }
+
+    public function testWildcardBypassesEverything(): void
+    {
+        $options = new HttpClientOptions(httpsProxy: 'http://proxy:3128', noProxy: ['*']);
+
+        self::assertNull($options->proxyFor('https', 'anywhere.test'));
+    }
+
+    public function testSchemeSelectsTheProxy(): void
+    {
+        $options = new HttpClientOptions(
+            httpProxy: 'http://plain:3128',
+            httpsProxy: 'http://secure:3128',
+        );
+
+        self::assertSame('http://plain:3128', $options->proxyFor('http', 'host.test'));
+        self::assertSame('http://secure:3128', $options->proxyFor('https', 'host.test'));
+    }
+
+    public function testAbsentProxyMeansDirectConnection(): void
+    {
+        $options = new HttpClientOptions();
+
+        self::assertNull($options->proxyFor('https', 'host.test'));
+    }
+}

@@ -1,0 +1,59 @@
+{
+    "name": "renovo/renovo",
+    "description": "Self-hosted subscription and recurring-bill tracker.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "ext-json": "*",
+        "ext-pdo": "*",
+        "ext-curl": "*",
+        "ext-intl": "*",
+        "slim/slim": "^4.12",
+        "slim/psr7": "^1.6",
+        "php-di/php-di": "^7.0",
+        "slim/twig-view": "^3.4",
+        "twig/twig": "^3.8",
+        "vlucas/phpdotenv": "^5.6",
+        "monolog/monolog": "^3.5",
+        "symfony/mailer": "^6.4",
+        "psr/http-client": "^1.0",
+        "robmorgan/phinx": "^0.16"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^10.5",
+        "squizlabs/php_codesniffer": "^3.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "App\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "8.2.0"
+        },
+        "sort-packages": true,
+        "allow-plugins": {}
+    },
+    "scripts": {
+        "test": "phpunit",
+        "lint": "phpcs",
+        "lint:fix": "phpcbf",
+        "stan": "phpstan analyse --memory-limit=512M",
+        "migrate": "phinx migrate",
+        "rollback": "phinx rollback",
+        "seed": "phinx seed:run",
+        "check": [
+            "@lint",
+            "@stan",
+            "@test"
+        ]
+    }
+}

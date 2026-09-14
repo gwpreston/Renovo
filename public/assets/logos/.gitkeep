@@ -1,0 +1,3 @@
+Uploaded subscription logos are written here at runtime. The directory is
+tracked so that the nginx container has a mount point for the shared volume;
+its contents are not.

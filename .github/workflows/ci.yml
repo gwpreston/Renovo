@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Lint and static analysis need no database, so they fail fast and cheaply.
+  static:
+    name: Lint and static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, pdo_pgsql, pdo_mysql, curl, zip
+          coverage: none
+          tools: composer:v2
+
+      - uses: ramsey/composer-install@v3
+
+      - name: PHP_CodeSniffer (PSR-12)
+        run: vendor/bin/phpcs
+
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+  # The full suite runs against both engines: portable SQL is only portable if
+  # somebody checks.
+  tests:
+    name: Tests (${{ matrix.engine }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: postgres
+            driver: pgsql
+            port: 5432
+          - engine: mysql
+            driver: mysql
+            port: 3306
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: renovo_test
+          POSTGRES_USER: renovo
+          POSTGRES_PASSWORD: renovo
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U renovo -d renovo_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: renovo_test
+          MYSQL_USER: renovo
+          MYSQL_PASSWORD: renovo
+          MYSQL_ROOT_PASSWORD: renovo-root
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u root -prenovo-root"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    env:
+      APP_ENV: test
+      APP_DEBUG: 'true'
+      APP_URL: http://localhost:8080
+      DB_DRIVER: ${{ matrix.driver }}
+      DB_HOST: 127.0.0.1
+      DB_PORT: ${{ matrix.port }}
+      DB_NAME: renovo_test
+      DB_USER: renovo
+      DB_PASSWORD: renovo
+      SESSION_KEY: ci-session-key-not-a-secret-0000000000000000
+      SESSION_COOKIE_SECURE: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, pdo_pgsql, pdo_mysql, curl, zip
+          coverage: none
+          tools: composer:v2
+
+      - uses: ramsey/composer-install@v3
+
+      - name: Apply migrations
+        run: vendor/bin/phinx migrate --configuration phinx.php
+
+      - name: Verify migrations roll back cleanly
+        run: |
+          vendor/bin/phinx rollback --configuration phinx.php --target=0 --force
+          vendor/bin/phinx migrate --configuration phinx.php
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          target: app
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

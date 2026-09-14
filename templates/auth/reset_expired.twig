@@ -1,0 +1,11 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Link expired — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <section class="card narrow">
+        <h1>That reset link has expired</h1>
+        <p class="muted">Reset links last one hour and can only be used once.</p>
+        <p><a class="button" href="/forgot-password">Request a new link</a></p>
+    </section>
+{% endblock %}

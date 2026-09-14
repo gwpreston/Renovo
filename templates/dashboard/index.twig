@@ -1,0 +1,117 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Dashboard — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    {# Twig 3 requires macros in the same file to be imported before use. #}
+    {% import _self as ui %}
+
+    <div class="page-header">
+        <h1>Dashboard</h1>
+        {% if can(scope, 'subscription.create') %}
+            <a class="button button-primary" href="/subscriptions/new">Add subscription</a>
+        {% endif %}
+    </div>
+
+    {% if not scope.hasHousehold %}
+        <section class="card">
+            <h2>No household</h2>
+            <p class="muted">You are not a member of a household yet, so there is nothing to show. Instance
+                administration does not by itself grant access to anybody's subscriptions.</p>
+        </section>
+    {% else %}
+        <section class="stat-grid">
+            {% for total in stats.recurring %}
+                <article class="card stat">
+                    <h2 class="stat-label">Recurring · {{ total.currency }}</h2>
+                    <p class="stat-value">{{ total.monthly_minor|money(total.currency) }}<span class="stat-unit"> / month</span></p>
+                    <p class="muted">{{ total.yearly_minor|money(total.currency) }} per year · {{ total.count }}
+                        subscription{{ total.count == 1 ? '' : 's' }}</p>
+                </article>
+            {% else %}
+                <article class="card stat">
+                    <h2 class="stat-label">Recurring</h2>
+                    <p class="stat-value">—</p>
+                    <p class="muted">No active recurring subscriptions yet.</p>
+                </article>
+            {% endfor %}
+
+            {% for total in stats.one_off %}
+                <article class="card stat">
+                    <h2 class="stat-label">One-off &amp; lifetime · {{ total.currency }}</h2>
+                    <p class="stat-value">{{ total.total_minor|money(total.currency) }}</p>
+                    {#
+                        Kept out of the recurring figures on purpose: spreading a
+                        lifetime licence over an arbitrary period would make the
+                        monthly number mean nothing.
+                    #}
+                    <p class="muted">{{ total.count }} entr{{ total.count == 1 ? 'y' : 'ies' }}, not included
+                        in monthly totals</p>
+                </article>
+            {% endfor %}
+        </section>
+
+        {% if stats.recurring|length > 1 or stats.one_off|length > 1 %}
+            <p class="muted note">Totals are shown per currency. Converting between them needs exchange
+                rates, which this version does not have.</p>
+        {% endif %}
+
+        <div class="columns">
+            <section class="card">
+                <h2>Next 7 days</h2>
+                {{ ui.upcoming(stats.upcoming_7, stats.upcoming_7_totals) }}
+            </section>
+
+            <section class="card">
+                <h2>Next 30 days</h2>
+                {{ ui.upcoming(stats.upcoming_30, stats.upcoming_30_totals) }}
+            </section>
+        </div>
+
+        {% if stats.by_category %}
+            <section class="card">
+                <h2>By category</h2>
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th scope="col">Category</th>
+                        <th scope="col">Subscriptions</th>
+                        <th scope="col" class="numeric">Per month</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in stats.by_category %}
+                        <tr>
+                            <td>{{ row.name }}</td>
+                            <td>{{ row.count }}</td>
+                            <td class="numeric">{{ row.monthly_minor|money(row.currency) }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+        {% endif %}
+    {% endif %}
+{% endblock %}
+
+{% macro upcoming(items, totals) %}
+    {% if items is empty %}
+        <p class="muted">Nothing due.</p>
+    {% else %}
+        <ul class="renewals">
+            {% for item in items %}
+                <li>
+                    <span class="renewal-name">{{ item.name }}</span>
+                    <span class="renewal-date">{{ item.nextPaymentDate|date('j M') }}</span>
+                    <span class="renewal-amount">{{ item.price.amountMinor|money(item.price.currency) }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+        <p class="muted">
+            {% for total in totals %}
+                {{ total.total_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
+            {% endfor %}
+            due in total
+        </p>
+    {% endif %}
+{% endmacro %}

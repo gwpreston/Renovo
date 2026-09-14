@@ -1,0 +1,39 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Create an account — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <section class="card narrow">
+        <h1>Create an account</h1>
+
+        <form method="post" action="/register" class="stack">
+            {{ csrf_field() }}
+
+            <label for="display_name">Your name</label>
+            <input type="text" id="display_name" name="display_name"
+                   value="{{ values.display_name|default('') }}" required autofocus>
+            {% if errors.display_name is defined %}<p class="field-error">{{ errors.display_name }}</p>{% endif %}
+
+            <label for="email">Email address</label>
+            <input type="email" id="email" name="email" value="{{ values.email|default('') }}"
+                   autocomplete="username" required>
+            {% if errors.email is defined %}<p class="field-error">{{ errors.email }}</p>{% endif %}
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="new-password" required>
+            <p class="hint">At least 10 characters.</p>
+            {% if errors.password is defined %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+
+            <label for="password_confirm">Confirm password</label>
+            <input type="password" id="password_confirm" name="password_confirm"
+                   autocomplete="new-password" required>
+            {% if errors.password_confirm is defined %}
+                <p class="field-error">{{ errors.password_confirm }}</p>
+            {% endif %}
+
+            <button type="submit" class="button button-primary">Create account</button>
+        </form>
+
+        <p class="muted"><a href="/login">Already have an account?</a></p>
+    </section>
+{% endblock %}
