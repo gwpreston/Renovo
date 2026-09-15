@@ -49,6 +49,7 @@ final class Subscription
         public readonly ?int $usageRating,
         public readonly ?DateTimeImmutable $usageCountedSince,
         public readonly bool $isActive,
+        public readonly ?string $reminderDays,
         public readonly ?string $logoPath,
         public readonly ?int $categoryId,
         public readonly ?string $categoryName,
@@ -117,6 +118,35 @@ final class Subscription
         }
 
         return $this->noticePeriod->deadlineBefore($charge);
+    }
+
+    /**
+     * This subscription's own reminder lead times, or null to use the user's.
+     *
+     * An empty string is not the same as null and the difference is the point:
+     * null means "whatever my preference says", an empty list means "never
+     * remind me about this one". A single expensive annual policy and a £2
+     * monthly app want different answers, and neither wants the other's.
+     *
+     * @return list<int>|null
+     */
+    public function reminderDaysList(): ?array
+    {
+        if ($this->reminderDays === null) {
+            return null;
+        }
+
+        $days = [];
+        foreach (explode(',', $this->reminderDays) as $part) {
+            $part = trim($part);
+            if ($part !== '' && ctype_digit($part)) {
+                $days[] = (int) $part;
+            }
+        }
+
+        rsort($days);
+
+        return array_values(array_unique($days));
     }
 
     public function daysUntilNextPayment(DateTimeImmutable $today): ?int

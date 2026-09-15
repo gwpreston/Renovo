@@ -191,6 +191,61 @@ final class SubscriptionService
         ], []];
     }
 
+    /**
+     * The per-subscription reminder override.
+     *
+     * Three states, all of them meaningful: the field absent means "leave it
+     * as it is", the field present but empty means "use my preference", and
+     * the word "none" means "never remind me about this one". Collapsing the
+     * last two would make it impossible to silence a single subscription
+     * without silencing everything.
+     *
+     * @param array<string, mixed> $input
+     * @param array<string, string> $errors
+     */
+    private function reminderDays(array $input, array &$errors): ?string
+    {
+        if (!array_key_exists('reminder_days', $input)) {
+            return null;
+        }
+
+        $raw = strtolower(trim($this->str($input, 'reminder_days')));
+
+        if ($raw === '') {
+            return null;
+        }
+
+        if ($raw === 'none' || $raw === 'never') {
+            return '';
+        }
+
+        $days = [];
+        foreach (explode(',', $raw) as $part) {
+            $part = trim($part);
+            if ($part === '') {
+                continue;
+            }
+
+            if (!ctype_digit($part) || (int) $part > 365) {
+                $errors['reminder_days'] = 'Enter days as whole numbers, for example 30, 7, 1 — or "none".';
+
+                return null;
+            }
+
+            $days[] = (int) $part;
+        }
+
+        if (count($days) > 6) {
+            $errors['reminder_days'] = 'Use at most six reminders for one subscription.';
+
+            return null;
+        }
+
+        rsort($days);
+
+        return implode(',', array_unique($days));
+    }
+
     private function isSamePrice(Money $a, Money $b): bool
     {
         return $a->currency === $b->currency && $a->amountMinor === $b->amountMinor;
@@ -415,6 +470,11 @@ final class SubscriptionService
             $errors['notes'] = 'Notes must be 5000 characters or fewer.';
         }
 
+        // Null when the field was not submitted at all, which is what keeps a
+        // form that does not show it — a bulk edit, a later API — from wiping a
+        // per-subscription reminder schedule it never asked about.
+        $reminderDays = $this->reminderDays($input, $errors);
+
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
@@ -437,6 +497,7 @@ final class SubscriptionService
             'anchor_day' => $nextPaymentDate !== null ? (int) $nextPaymentDate->format('j') : null,
             'notice_period_amount' => $notice->amount,
             'notice_period_unit' => $notice->isSet() ? $notice->unit : null,
+            'reminder_days' => $reminderDays,
             'is_trial' => $trial['is_trial'],
             'trial_end_date' => $trial['trial_end_date'],
             'converts_to_price_minor' => $trial['converts_to_price_minor'],
@@ -448,6 +509,12 @@ final class SubscriptionService
             'payer_user_id' => $payerUserId,
             'logo_path' => $this->logoPath($scope, $input, $existingId),
         ];
+
+        if (!array_key_exists('reminder_days', $input)) {
+            // Absent rather than empty: a form that does not carry the field
+            // must not clear a schedule it never displayed.
+            unset($data['reminder_days']);
+        }
 
         return [$data, $tagIds];
     }

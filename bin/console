@@ -10,17 +10,20 @@ declare(strict_types=1);
  * so a command and a controller can never be looking at different
  * configuration.
  *
- * In this phase there is exactly one command, and it deliberately does
- * nothing: the scheduler container needs something to run, but reminders are a
- * later phase and stubbing them now would mean writing code that has to be
- * thrown away. The seam is here; the work is not.
+ * `reminders:run` is the scheduler's entry point and is the command the
+ * Docker scheduler container and a cron entry both call. It is safe to run more
+ * often than daily and safe to run twice at once: every dispatch is claimed in
+ * the notification ledger before it is sent, so a second run finds the work
+ * already done rather than doing it again.
  */
 
 use App\Persistence\PdoSessionHandler;
 use App\Repository\AuthAttemptRepository;
+use App\Repository\NotificationLogRepository;
 use App\Repository\TokenRepository;
 use App\Service\ExchangeRate\RateProviderException;
 use App\Service\ExchangeRateService;
+use App\Service\Notification\ReminderRunner;
 use App\Support\Clock;
 use Psr\Container\ContainerInterface;
 use Slim\App;
@@ -49,17 +52,31 @@ $out = static function (string $message): void {
 
 switch ($command) {
     case 'reminders:run':
-        // Still a placeholder: reminders and budget alerts are Phase 3. Rate
-        // refreshing, which used to be described here as future work, now has
-        // its own command above and is real.
-        $out('reminders:run — no reminder work in this phase. See rates:refresh.');
+        // The scheduler's daily work: catch up each household's dates, find
+        // what is due, dispatch it once, and re-evaluate every budget.
+        $totals = $container->get(ReminderRunner::class)->run();
+
+        $out(sprintf(
+            'Checked %d user(s); %d alert(s) found, %d message(s) sent.',
+            $totals['users'],
+            $totals['alerts'],
+            $totals['sent'],
+        ));
+
+        if ($totals['failures'] > 0) {
+            // Non-zero so a scheduler can tell a run that partly failed from a
+            // clean one, without the failure stopping the users who were fine.
+            fwrite(STDERR, sprintf("%d user(s) could not be processed; see the log.\n", $totals['failures']));
+            exit(1);
+        }
+
         exit(0);
 
     case 'rates:refresh':
-        // Real work, and the only scheduled work this phase has. Reminders
-        // remain a later phase; this command exists because an instance should
-        // be able to keep its rates current without depending on somebody
-        // loading a page.
+        // Kept as its own command rather than folded into the reminder run:
+        // an instance should be able to keep its rates current without
+        // depending on somebody loading a page, and a provider outage should
+        // not be able to fail the reminder run.
         $rates = $container->get(ExchangeRateService::class);
 
         try {
@@ -84,11 +101,21 @@ switch ($command) {
         $attempts = $container->get(AuthAttemptRepository::class)
             ->purgeOlderThan($clock->now()->modify('-30 days'));
 
+        // The notification ledger only has to remember long enough to suppress
+        // a re-send, and an occurrence key in the past can never come round
+        // again. Pruning it keeps the table from growing without limit on an
+        // instance that has been running for years.
+        $retention = (int) $container->get('settings')['notifications']['log_retention_days'];
+        $notifications = $container->get(NotificationLogRepository::class)
+            ->purgeOlderThan($clock->now()->modify(sprintf('-%d days', max(1, $retention))));
+
         $out(sprintf(
-            'Pruned %d expired session(s), %d expired token(s), %d old auth attempt(s).',
+            'Pruned %d expired session(s), %d expired token(s), %d old auth attempt(s), '
+            . '%d notification record(s).',
             is_int($sessions) ? $sessions : 0,
             $tokens,
             $attempts,
+            $notifications,
         ));
         exit(0);
 
@@ -99,9 +126,9 @@ switch ($command) {
         $out('');
         $out('Usage: php bin/console <command>');
         $out('');
-        $out('  reminders:run        Scheduler entry point (no reminder work in this phase)');
+        $out('  reminders:run        Send due reminders, trial, cancel-by and budget alerts');
         $out('  rates:refresh        Fetch and cache exchange rates from the configured provider');
-        $out('  maintenance:prune    Delete expired sessions, tokens and throttle records');
+        $out('  maintenance:prune    Delete expired sessions, tokens, throttle and notification records');
         exit(0);
 
     default:

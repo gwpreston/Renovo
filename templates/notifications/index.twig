@@ -1,0 +1,235 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Notifications — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h1>Notifications</h1>
+    </div>
+
+    <p class="muted note">
+        Reminders are sent by the scheduler once a day. Each one is recorded when it goes out, so a run that
+        happens twice — or a scheduler that catches up after being offline — never sends you the same thing
+        again.
+    </p>
+
+    <section class="card">
+        <h2>When to tell me</h2>
+
+        <form method="post" action="/settings/notifications/preferences" class="stack">
+            {{ csrf_field() }}
+
+            <label for="lead_days">Remind me this many days before a charge</label>
+            <input type="text" id="lead_days" name="lead_days"
+                   value="{{ submitted.lead_days is defined ? submitted.lead_days : preferences.leadDaysAsString }}"
+                   aria-describedby="lead_days_hint">
+            <p class="hint" id="lead_days_hint">
+                Separate with commas, for example <code>30, 7, 1</code>. Each one is a separate reminder.
+                Leave blank for no advance reminders. A single subscription can override this on its own page.
+            </p>
+            {% if errors.lead_days is defined %}<p class="field-error">{{ errors.lead_days }}</p>{% endif %}
+
+            <label for="digest_mode">Delivery</label>
+            <select id="digest_mode" name="digest_mode">
+                {% for mode in digest_modes %}
+                    <option value="{{ mode.value }}"
+                            {{ preferences.digestMode.value == mode.value ? 'selected' : '' }}>
+                        {{ mode.label }}
+                    </option>
+                {% endfor %}
+            </select>
+            <p class="hint">
+                A summary collects everything coming up into one message instead of sending them separately.
+                Lead times do not apply to a summary — each thing is mentioned once, shortly before it happens.
+            </p>
+
+            <label for="digest_day">Summary day</label>
+            <input type="number" id="digest_day" name="digest_day" min="1" max="28"
+                   value="{{ preferences.digestDay }}">
+            <p class="hint">
+                For a weekly summary, 1 is Monday. For a monthly one it is the day of the month, up to 28 —
+                a summary set for the 30th would skip February.
+            </p>
+            {% if errors.digest_day is defined %}<p class="field-error">{{ errors.digest_day }}</p>{% endif %}
+
+            {% if channels is not empty %}
+                <h3>Where each alert goes</h3>
+                <p class="hint">
+                    Leave every box ticked — or every box clear — to send everything to every channel.
+                </p>
+
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th scope="col">Channel</th>
+                            {% for type in alert_types %}
+                                <th scope="col">{{ type.label }}</th>
+                            {% endfor %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for channel in channels %}
+                            {% set configured = routes[channel.id] is defined %}
+                            <tr>
+                                <th scope="row">{{ channel.label }}</th>
+                                {% for type in alert_types %}
+                                    <td>
+                                        <input type="checkbox"
+                                               name="routes[{{ channel.id }}][]"
+                                               value="{{ type.value }}"
+                                               aria-label="{{ channel.label }}: {{ type.label }}"
+                                               {{ (not configured or type.value in routes[channel.id])
+                                                   ? 'checked' : '' }}>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+            <button type="submit" class="button button-primary">Save preferences</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Channels</h2>
+
+        {% if channels is empty %}
+            <p class="muted empty">No channels yet. Add one below and send yourself a test message.</p>
+        {% else %}
+            <ul class="channel-list">
+                {% for channel in channels %}
+                    <li class="channel">
+                        <div>
+                            <strong>{{ channel.label }}</strong>
+                            <span class="muted">{{ channel_description(channel) }}</span>
+                            {% if not channel.isActive %}<span class="badge">Paused</span>{% endif %}
+                            {% if channel.lastError %}
+                                <p class="field-error">Last attempt failed: {{ channel.lastError }}</p>
+                            {% elseif channel.lastSuccessAt %}
+                                <p class="hint">Last delivered {{ channel.lastSuccessAt|date('j M Y, H:i') }}.</p>
+                            {% endif %}
+
+                            <details>
+                                <summary>Edit</summary>
+                                <form method="post" action="/settings/notifications/channels/{{ channel.id }}"
+                                      class="stack">
+                                    {{ csrf_field() }}
+
+                                    <label for="edit_{{ channel.id }}_label">Name</label>
+                                    <input type="text" id="edit_{{ channel.id }}_label" name="label"
+                                           value="{{ channel.label }}">
+
+                                    {% for field in channel_fields(channel) %}
+                                        <label for="edit_{{ channel.id }}_{{ field.name }}">{{ field.label }}</label>
+                                        <input type="{{ field.type }}"
+                                               id="edit_{{ channel.id }}_{{ field.name }}"
+                                               name="{{ field.name }}"
+                                               autocomplete="off"
+                                               {% if field.isSecret %}
+                                                   placeholder="Leave blank to keep the stored value"
+                                               {% else %}
+                                                   value="{{ channel.config[field.name]|default('') }}"
+                                               {% endif %}>
+                                        {% if field.hint %}<p class="hint">{{ field.hint }}</p>{% endif %}
+                                    {% endfor %}
+
+                                    <input type="hidden" name="is_active" value="0">
+                                    <label class="choice">
+                                        <input type="checkbox" name="is_active" value="1"
+                                               {{ channel.isActive ? 'checked' : '' }}>
+                                        <span>Send notifications to this channel</span>
+                                    </label>
+
+                                    <button type="submit" class="button">Save channel</button>
+                                </form>
+                            </details>
+                        </div>
+
+                        <div class="channel-actions">
+                            <form method="post" action="/settings/notifications/channels/{{ channel.id }}/test"
+                                  class="inline">
+                                {{ csrf_field() }}
+                                <button type="submit" class="button button-quiet">Send test</button>
+                            </form>
+                            <form method="post" action="/settings/notifications/channels/{{ channel.id }}/delete"
+                                  class="inline">
+                                {{ csrf_field() }}
+                                <button type="submit" class="button button-quiet">Remove</button>
+                            </form>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Add a channel</h2>
+
+        {% for notifier in notifiers %}
+            <details class="channel-form" {{ submitted.channel_type is defined
+                and submitted.channel_type == notifier.key ? 'open' : '' }}>
+                <summary>{{ notifier.label }}</summary>
+
+                <form method="post" action="/settings/notifications/channels" class="stack">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="channel_type" value="{{ notifier.key }}">
+
+                    <label for="{{ notifier.key }}_label">Name</label>
+                    <input type="text" id="{{ notifier.key }}_label" name="label"
+                           placeholder="{{ notifier.label }}">
+
+                    {% for field in notifier.fields %}
+                        <label for="{{ notifier.key }}_{{ field.name }}">{{ field.label }}</label>
+                        <input type="{{ field.type }}"
+                               id="{{ notifier.key }}_{{ field.name }}"
+                               name="{{ field.name }}"
+                               {{ field.required ? 'required' : '' }}
+                               autocomplete="off">
+                        {% if field.hint %}<p class="hint">{{ field.hint }}</p>{% endif %}
+                        {% if errors[field.name] is defined %}
+                            <p class="field-error">{{ errors[field.name] }}</p>
+                        {% endif %}
+                    {% endfor %}
+
+                    <button type="submit" class="button button-primary">Add {{ notifier.label }}</button>
+                </form>
+            </details>
+        {% endfor %}
+    </section>
+
+    {% if recent is not empty %}
+        <section class="card">
+            <h2>Recently sent</h2>
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th scope="col">When</th>
+                        <th scope="col">Alert</th>
+                        <th scope="col">Channel</th>
+                        <th scope="col">Result</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for entry in recent %}
+                        <tr>
+                            <td>{{ entry.created_at|date('j M Y, H:i') }}</td>
+                            <td>{{ alert_type_label(entry.alert_type) }}</td>
+                            <td>{{ entry.channel_label }}</td>
+                            <td>
+                                {{ entry.status }}
+                                {% if entry.last_error %}<span class="muted">— {{ entry.last_error }}</span>{% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% endif %}
+{% endblock %}

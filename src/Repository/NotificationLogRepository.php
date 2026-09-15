@@ -1,0 +1,229 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Repository;
+
+use App\Domain\AlertType;
+use App\Persistence\Database;
+use App\Support\Clock;
+use DateTimeImmutable;
+use PDOException;
+
+/**
+ * The record of what has been sent, and the thing that stops it being sent
+ * twice.
+ *
+ * The important method is `claim()`, and the important detail is that it claims
+ * by *inserting*. Checking whether a notification has been sent and then
+ * sending it is two steps with a gap in between, and two scheduler runs — a
+ * cron that overlaps its predecessor, an operator running the command by hand
+ * while the container is doing the same — will both find nothing and both send.
+ * Inserting first turns the question over to the unique index, where the answer
+ * is decided by the database rather than by timing.
+ *
+ * A claim that collides is not necessarily a refusal. The existing row is read
+ * and its status decides:
+ *
+ *  - `sent` — nothing to do, and nothing will ever be done again for this
+ *    occurrence. This is the idempotency guarantee.
+ *  - `failed` — the channel was down. Retried, up to a limit, because a webhook
+ *    that was unreachable for an hour should not cost the user the alert.
+ *  - `pending` — a previous run claimed it and did not finish, which means it
+ *    crashed mid-send. Treated as a failure and retried: a duplicate is a
+ *    nuisance, a silently dropped cancellation deadline is not.
+ */
+final class NotificationLogRepository extends AbstractRepository
+{
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_SENT = 'sent';
+    public const STATUS_FAILED = 'failed';
+
+    public function __construct(Database $db, private readonly Clock $clock)
+    {
+        parent::__construct($db);
+    }
+
+    protected function table(): string
+    {
+        return 'notification_log';
+    }
+
+    protected function filterableColumns(): array
+    {
+        return ['id', 'user_id', 'channel_id', 'alert_type', 'subject_type', 'subject_id', 'status', 'created_at'];
+    }
+
+    /**
+     * Claim the right to send one notification.
+     *
+     * Must not be called inside a transaction: the colliding insert is expected,
+     * and on PostgreSQL a failed statement aborts the transaction it is in.
+     *
+     * @return int|null The log row to report against, or null when this
+     *         notification must not be sent.
+     */
+    public function claim(
+        int $userId,
+        int $channelId,
+        AlertType $type,
+        string $subjectType,
+        int $subjectId,
+        string $occurrenceKey,
+        int $maxAttempts = 3,
+    ): ?int {
+        $now = $this->clock->now()->format('Y-m-d H:i:s');
+
+        try {
+            return $this->db->insert($this->table(), [
+                'user_id' => $userId,
+                'channel_id' => $channelId,
+                'alert_type' => $type->value,
+                'subject_type' => $subjectType,
+                'subject_id' => $subjectId,
+                'occurrence_key' => mb_substr($occurrenceKey, 0, 64),
+                'status' => self::STATUS_PENDING,
+                'attempts' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        } catch (PDOException $exception) {
+            if (!Database::isUniqueViolation($exception)) {
+                throw $exception;
+            }
+        }
+
+        $row = $this->db->fetchOne(
+            'SELECT ' . $this->quote('id') . ', ' . $this->quote('status') . ', ' . $this->quote('attempts')
+            . ' FROM ' . $this->quote($this->table())
+            . ' WHERE ' . $this->quote('user_id') . ' = :user'
+            . ' AND ' . $this->quote('channel_id') . ' = :channel'
+            . ' AND ' . $this->quote('alert_type') . ' = :type'
+            . ' AND ' . $this->quote('subject_type') . ' = :subject_type'
+            . ' AND ' . $this->quote('subject_id') . ' = :subject_id'
+            . ' AND ' . $this->quote('occurrence_key') . ' = :occurrence',
+            [
+                'user' => $userId,
+                'channel' => $channelId,
+                'type' => $type->value,
+                'subject_type' => $subjectType,
+                'subject_id' => $subjectId,
+                'occurrence' => mb_substr($occurrenceKey, 0, 64),
+            ],
+        );
+
+        if ($row === null) {
+            // The colliding row has been deleted between the insert and the
+            // read. Vanishingly unlikely, and silence is the safe answer.
+            return null;
+        }
+
+        $status = (string) $row['status'];
+        $attempts = (int) $row['attempts'];
+
+        if ($status === self::STATUS_SENT || $attempts >= $maxAttempts) {
+            return null;
+        }
+
+        $id = (int) $row['id'];
+
+        $this->db->execute(
+            'UPDATE ' . $this->quote($this->table())
+            . ' SET ' . $this->quote('attempts') . ' = ' . $this->quote('attempts') . ' + 1,'
+            . ' ' . $this->quote('status') . ' = :status,'
+            . ' ' . $this->quote('updated_at') . ' = :now'
+            . ' WHERE ' . $this->quote('id') . ' = :id'
+            . ' AND ' . $this->quote('status') . ' <> :sent',
+            ['status' => self::STATUS_PENDING, 'now' => $now, 'id' => $id, 'sent' => self::STATUS_SENT],
+        );
+
+        return $id;
+    }
+
+    public function markSent(int $id): void
+    {
+        $now = $this->clock->now()->format('Y-m-d H:i:s');
+
+        $this->db->execute(
+            'UPDATE ' . $this->quote($this->table())
+            . ' SET ' . $this->quote('status') . ' = :status,'
+            . ' ' . $this->quote('last_error') . ' = NULL,'
+            . ' ' . $this->quote('sent_at') . ' = :now,'
+            . ' ' . $this->quote('updated_at') . ' = :updated'
+            . ' WHERE ' . $this->quote('id') . ' = :id',
+            ['status' => self::STATUS_SENT, 'now' => $now, 'updated' => $now, 'id' => $id],
+        );
+    }
+
+    public function markFailed(int $id, string $error): void
+    {
+        $now = $this->clock->now()->format('Y-m-d H:i:s');
+
+        $this->db->execute(
+            'UPDATE ' . $this->quote($this->table())
+            . ' SET ' . $this->quote('status') . ' = :status,'
+            . ' ' . $this->quote('last_error') . ' = :error,'
+            . ' ' . $this->quote('updated_at') . ' = :now'
+            . ' WHERE ' . $this->quote('id') . ' = :id',
+            [
+                'status' => self::STATUS_FAILED,
+                'error' => mb_substr($error, 0, 500),
+                'now' => $now,
+                'id' => $id,
+            ],
+        );
+    }
+
+    /**
+     * How many notifications a user has been sent since a moment, for the
+     * outbound rate limit.
+     */
+    public function countSince(int $userId, DateTimeImmutable $since, ?int $subjectId = null): int
+    {
+        $sql = 'SELECT COUNT(*) FROM ' . $this->quote($this->table())
+            . ' WHERE ' . $this->quote('user_id') . ' = :user'
+            . ' AND ' . $this->quote('created_at') . ' >= :since';
+
+        $params = ['user' => $userId, 'since' => $since->format('Y-m-d H:i:s')];
+
+        if ($subjectId !== null) {
+            $sql .= ' AND ' . $this->quote('subject_id') . ' = :subject';
+            $params['subject'] = $subjectId;
+        }
+
+        return (int) $this->db->fetchValue($sql, $params);
+    }
+
+    /**
+     * The most recent entries for a user, newest first, for the settings page.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findRecentForUser(int $userId, int $limit = 20): array
+    {
+        return $this->db->fetchAll(
+            'SELECT ' . $this->quote($this->table()) . '.*,'
+            . ' ch.' . $this->quote('label') . ' AS channel_label'
+            . ' FROM ' . $this->quote($this->table())
+            . ' LEFT JOIN ' . $this->quote('notification_channels') . ' ch'
+            . ' ON ch.' . $this->quote('id') . ' = ' . $this->qualify('channel_id')
+            . ' WHERE ' . $this->qualify('user_id') . ' = :user'
+            . ' ORDER BY ' . $this->qualify('created_at') . ' DESC, ' . $this->qualify('id') . ' DESC'
+            . ' LIMIT :limit',
+            ['user' => $userId, 'limit' => max(1, $limit)],
+        );
+    }
+
+    /**
+     * Housekeeping: the ledger only has to remember long enough to stop a
+     * re-send, and an occurrence key that has passed can never recur.
+     */
+    public function purgeOlderThan(DateTimeImmutable $cutoff): int
+    {
+        return $this->db->execute(
+            'DELETE FROM ' . $this->quote($this->table())
+            . ' WHERE ' . $this->quote('created_at') . ' < :cutoff',
+            ['cutoff' => $cutoff->format('Y-m-d H:i:s')],
+        );
+    }
+}

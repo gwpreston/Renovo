@@ -34,8 +34,11 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_ENCRYPTION: ${SMTP_ENCRYPTION:-none}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-renovo@localhost}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Renovo}
     volumes:
       - logos:/var/www/html/public/assets/logos
       - appvar:/var/www/html/var
@@ -92,8 +95,14 @@ services:
     command: ["vendor/bin/phinx", "migrate", "--configuration", "phinx.php"]
     restart: "no"
 
-  # The scheduler exists from this phase so the deployment shape is settled.
-  # Its command is a placeholder that exits cleanly; reminders arrive later.
+  # Runs the reminder sweep and the housekeeping once a day.
+  #
+  # A sleep loop rather than cron, so the deployment needs no cron daemon in the
+  # image and no second place to configure a schedule. Running it more often
+  # than daily is harmless — every dispatch is claimed in the notification
+  # ledger before it is sent, so a repeated run sends nothing twice. Operators
+  # who would rather use the host's cron can run the same command directly; the
+  # README has the entry.
   scheduler:
     build:
       context: .
@@ -111,6 +120,17 @@ services:
       DB_USER: ${DB_USER:-renovo}
       DB_PASSWORD: ${DB_PASSWORD:-renovo}
       SESSION_KEY: ${SESSION_KEY:-unused-by-scheduler}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      # The scheduler is what actually sends the reminders, so it needs the
+      # whole relay configuration rather than the subset the app needs for
+      # verification and reset mail.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_ENCRYPTION: ${SMTP_ENCRYPTION:-none}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-renovo@localhost}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Renovo}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |

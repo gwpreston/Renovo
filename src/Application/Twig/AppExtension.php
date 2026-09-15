@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Twig;
 
+use App\Domain\AlertType;
 use App\Domain\BillingCycle;
 use App\Domain\IsolationMode;
 use App\Domain\BudgetPeriod;
@@ -13,6 +14,8 @@ use App\Domain\PriceChangeSource;
 use App\Domain\Role;
 use App\Domain\SplitMode;
 use App\Domain\SubscriptionType;
+use App\Domain\Entity\NotificationChannel;
+use App\Notification\NotifierRegistry;
 use App\Security\CsrfTokenManager;
 use App\Security\PermissionService;
 use App\Security\Scope;
@@ -34,6 +37,7 @@ final class AppExtension extends AbstractExtension
         private readonly MoneyFormatter $money,
         private readonly PermissionService $permissions,
         private readonly CsrfTokenManager $csrf,
+        private readonly NotifierRegistry $notifiers,
     ) {
     }
 
@@ -51,6 +55,9 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('price_change_label', $this->priceChangeLabel(...)),
             new TwigFunction('split_label', $this->splitLabel(...)),
             new TwigFunction('budget_period_label', $this->budgetPeriodLabel(...)),
+            new TwigFunction('alert_type_label', $this->alertTypeLabel(...)),
+            new TwigFunction('channel_description', $this->channelDescription(...)),
+            new TwigFunction('channel_fields', $this->channelFields(...)),
         ];
     }
 
@@ -64,6 +71,36 @@ final class AppExtension extends AbstractExtension
     public function formatMoney(?int $amountMinor, string $currency): string
     {
         return $this->money->formatMinor($amountMinor ?? 0, $currency);
+    }
+
+    public function alertTypeLabel(?string $value): string
+    {
+        return AlertType::tryFromString($value)?->label() ?? (string) $value;
+    }
+
+    /**
+     * A channel's destination, as its own notifier chooses to describe it.
+     *
+     * Asked of the notifier rather than formatted here, because only the
+     * notifier knows which of its configuration fields are safe to show. A
+     * template that reached into the config itself would eventually print a
+     * token.
+     */
+    public function channelDescription(NotificationChannel $channel): string
+    {
+        return $this->notifiers->find($channel->type)?->describe($channel->config) ?? '';
+    }
+
+    /**
+     * The configuration fields a stored channel's type declares, so the edit
+     * form can be rendered without the template knowing what a Gotify or a
+     * Slack channel needs.
+     *
+     * @return list<\App\Notification\ChannelField>
+     */
+    public function channelFields(NotificationChannel $channel): array
+    {
+        return $this->notifiers->find($channel->type)?->fields() ?? [];
     }
 
     public function csrfField(): string

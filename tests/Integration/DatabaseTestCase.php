@@ -93,8 +93,14 @@ abstract class DatabaseTestCase extends TestCase
     {
         foreach (
             [
+            'notification_log',
+            'notification_routes',
+            'notification_channels',
+            'notification_preferences',
+            'trusted_hosts',
             'subscription_tags',
             'subscription_splits',
+            'budget_alert_state',
             'budgets',
             'subscription_price_history',
             'subscriptions',

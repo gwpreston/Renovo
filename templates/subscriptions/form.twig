@@ -143,6 +143,17 @@
                     <p class="field-error">{{ errors.notice_period_amount }}</p>
                 {% endif %}
 
+                <label for="reminder_days">Reminders</label>
+                <input type="text" id="reminder_days" name="reminder_days"
+                       value="{{ values.reminder_days|default('') }}"
+                       placeholder="Use my usual reminders">
+                <p class="hint">
+                    Days before the charge, for example <code>60, 14</code> — or <code>none</code> to never be
+                    reminded about this one. Leave blank to use the schedule from
+                    <a href="/settings/notifications">your notification settings</a>.
+                </p>
+                {% if errors.reminder_days is defined %}<p class="field-error">{{ errors.reminder_days }}</p>{% endif %}
+
                 <label for="category_id">Category</label>
                 <select id="category_id" name="category_id">
                     <option value="">None</option>

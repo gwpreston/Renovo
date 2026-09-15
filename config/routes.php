@@ -23,6 +23,7 @@ use App\Controller\CancellationController;
 use App\Controller\CategoryController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
+use App\Controller\NotificationController;
 use App\Controller\SettingsController;
 use App\Controller\SetupController;
 use App\Controller\StatsController;
@@ -192,5 +193,56 @@ return static function (App $app): void {
 
         $group->post('/settings/instance', [SettingsController::class, 'updateInstance'])
             ->add($requires(Permission::ManageInstance));
+
+        // ------------------------------------------------------------------
+        // Phase 3: notifications
+        //
+        // Your own channels and preferences need no permission beyond being
+        // signed in — every one of these routes acts on the authenticated
+        // user's own id and cannot be pointed at anybody else's. A Viewer may
+        // configure their own reminders: not being allowed to change household
+        // data is not a reason to be unable to hear about it.
+        //
+        // The trusted-host list is the opposite. It decides what this server
+        // may be made to connect to, which is a property of the network the
+        // instance sits on, so it takes instance administration.
+        // ------------------------------------------------------------------
+        $group->get('/settings/notifications', [NotificationController::class, 'index'])
+            ->setName('notifications');
+
+        $group->post('/settings/notifications/preferences', [NotificationController::class, 'updatePreferences']);
+
+        $group->post('/settings/notifications/channels', [NotificationController::class, 'createChannel']);
+
+        $group->post(
+            '/settings/notifications/channels/{id:[0-9]+}',
+            [NotificationController::class, 'updateChannel'],
+        );
+
+        $group->post(
+            '/settings/notifications/channels/{id:[0-9]+}/delete',
+            [NotificationController::class, 'deleteChannel'],
+        );
+
+        $group->post(
+            '/settings/notifications/channels/{id:[0-9]+}/test',
+            [NotificationController::class, 'test'],
+        );
+
+        $group->post('/settings/trusted-hosts', [SettingsController::class, 'addTrustedHost'])
+            ->add($requires(Permission::ManageInstance));
+
+        $group->post('/settings/trusted-hosts/{id:[0-9]+}/delete', [SettingsController::class, 'deleteTrustedHost'])
+            ->add($requires(Permission::ManageInstance));
+
+        // The wizard's second step. Inside the authenticated group because it
+        // runs after the administrator account exists — see
+        // SetupGuardMiddleware for why this one /setup path stays open.
+        $group->get('/setup/notifications', [SetupController::class, 'showNotifications'])
+            ->setName('setup-notifications');
+
+        $group->post('/setup/notifications/channels', [SetupController::class, 'addNotificationChannel']);
+
+        $group->post('/setup/notifications/finish', [SetupController::class, 'finishNotifications']);
     })->add(AuthenticationMiddleware::class);
 };

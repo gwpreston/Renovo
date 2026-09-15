@@ -5,168 +5,152 @@ build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
 ## Current phase
-**Phase 2 — Money: currency, trials, price history, budgets, forecasting.**
+**Phase 3 — Notifications, reminders & the hardened HTTP client.**
 
-Goal: turn tracking into budgeting and financial insight. Everything here is
-data + in-UI surfacing; actual outbound alerts are wired in Phase 3.
+Goal: proactive, idempotent notifications across multiple channels, on a real
+scheduler, for every alert type the app now understands.
 
 ## Depends on
-Phase 1 — subscription model, central scoping layer, notice-period field, shared
-HTTP client, first-run wizard.
+Phases 1–2 — the events to notify about (renewals, trials, cancel-by, budgets),
+the shared HTTP client, per-user settings surfaces.
 
 ## In scope this phase (build ONLY these)
-- Exchange rates: pluggable provider behind an interface. Free default
-  (Frankfurter or ECB feed); exchangerate.host optional; **Fixer optional, never
-  default**. Fetch via the shared HTTP client. Cache rates; combined
-  multi-currency totals; degrade to per-currency subtotals if unavailable.
-- Extend the first-run wizard: choose rate provider + enter a key if needed.
-- Price-change history: immutable rows with effective dates (never overwrite);
-  current price = latest row; support scheduled future price changes. Price-trend
-  view per subscription.
-- Free-trial tracking: trial end date + converts-to price/cycle; surface upcoming
-  conversions on the dashboard.
-- Budgets: overall and per-category; monthly and annual amounts; scoped to the
-  isolation mode. Trigger is **projected spend**. Show per-budget progress and
-  over-budget indicators in the UI (firing alerts is Phase 3). Optional warn
-  threshold (e.g. 90%).
-- 12-month forecast: renewals + trial conversions + scheduled price changes.
-- Stats: cost per day/week/month/year; year-over-year comparison.
-- Usage / "worth it?" signal: usage count or manual rating; surface high-cost/
-  low-use subscriptions.
-- Cancellation dashboard: list by cancel-by date (from notice-period), sortable
-  by urgency.
-- Shared-cost splitting: equal or custom shares across household members; always
-  visible to participants regardless of isolation; each member's budget counts
-  their share.
-- Bulk actions: multi-select change of category, tag, member/payer, currency
-  (permission-scoped).
+- Harden the shared HTTP client for user-supplied URLs: https-only where
+  applicable; reject private/loopback/link-local/reserved IPs (v4 + v6); pin the
+  resolved IP against DNS-rebinding; enforce timeouts, max response size, no
+  redirects to disallowed targets; per-user/subscription outbound rate limit.
+- Admin-configurable trusted-host/CIDR **allowlist** overriding the private-IP
+  block (fixes Tailscale-IP Gotify/OIDC); opt-in and logged.
+- Notifier interface + registry (a new channel = one class + registration).
+- Channels built now, fully working: **Email (SMTP), Gotify, Slack (post message to channel or user),
+  generic Webhook**. Gotify/Slack/Webhook go through the hardened
+  client; SMTP is exempt (not a URL fetch).
+- Alert types, all reusing one dispatcher: upcoming renewal · trial about to
+  convert · cancel-by deadline (from notice-period) · budget projected to exceed
+  (reuse Phase 2 projection; at most one alert per budget per period per
+  crossing; re-arm only after projection drops back under).
+- Timing/prefs: multiple reminders per subscription (e.g. 30/7/1 days); digest
+  mode (weekly/monthly summary); per-user preferences (channels, per-channel
+  config, lead times, which alert types route where).
+- Scheduler command (e.g. `bin/console reminders:run`): finds due items,
+  dispatches idempotently (records what was sent), re-evaluates budgets. Wire the
+  Docker scheduler container to run it daily; document a cron entry.
+- Extend the first-run wizard: configure at least one channel + SMTP, with a
+  "send test message" step.
 
 ## Explicitly OUT of scope until a later phase (leave seams, do NOT stub)
-- Outbound notifications / scheduler (this phase only shows state in the UI) → **Phase 3**
-- JSON API / OpenAPI → **Phase 5**
-- Advanced auth (passkeys/OIDC/audit) → **Phase 4**
+- Apprise bridge / extra channels beyond the four above → later extension
+- JSON API / OpenAPI / import-export → **Phase 5**
+- Passkeys / OIDC / audit log → **Phase 4**
 - i18n / calendar view / metrics → **Phase 6**
 
 ## Status
-- [x] Exchange-rate providers + interface + cache; combined totals + graceful degrade
-- [x] Wizard extended (rate provider + key)
-- [x] Price history (immutable) + scheduled changes + trend view
-- [x] Trials + upcoming-conversion surfacing
-- [x] Budgets (projected) + UI progress/over-budget indicators
-- [x] 12-month forecast
-- [x] Stats: per-period costs + YoY
-- [x] Usage scoring
-- [x] Cancellation dashboard
-- [x] Shared-cost splitting (respects isolation visibility)
-- [x] Bulk actions
-- [x] Tests: trial timing, price-history current-price + scheduled changes,
-      budget projection per scope/isolation, forecast, splits, rate conversion +
-      degrade — all passing (601 tests, green on PostgreSQL and MySQL)
+- [x] HTTP client hardened (SSRF: range checks, DNS-rebind pinning, redirects)
+- [x] Admin trusted-host/CIDR allowlist (opt-in, logged)
+- [x] Notifier interface + registry
+- [x] Channels: Email, Gotify, Slack, Webhook (tested)
+- [x] Alert types: renewal, trial-convert, cancel-by, budget-exceeded
+- [x] Multiple lead times + digest mode
+- [x] Per-user notification preferences
+- [x] Scheduler command (idempotent) + Docker wiring + cron docs
+- [x] Wizard: channel + SMTP + test-send
+- [x] Tests: idempotency (no double-send), each alert fires correctly + routing,
+      budget de-dup/re-arm, SSRF rejects private + honours allowlist + proxy,
+      digest aggregation — all passing
+- [x] Readme: Update "Built in phases" section with current phase
 
 ## Decisions & deviations made during the build
 
-**Exchange rates**
-- Default provider is **Frankfurter** — free, no account, ECB daily rates. A new
-  instance converts currencies without its operator signing up to anything.
-  exchangerate.host and Fixer are offered; Fixer is never first.
-- Rates stored as integers scaled by **10^8**, against the instance's base
-  currency only. Other pairs are cross-rated through the base, so a refresh is
-  one row per currency rather than one per pair.
-- Cache TTL **12 hours**; failed refreshes are not retried for **1 hour**, so a
-  provider outage cannot make every page view a failing network call. Both are
-  env-configurable.
-- **API key: the environment wins.** `EXCHANGE_RATE_API_KEY` takes precedence
-  over a key entered in the wizard or settings page, per the standing rule that
-  secrets come from env vars.
-- Provider endpoints are constants in their own classes. **No URL is ever read
-  from the database**, so this phase still accepts no user-supplied URL and the
-  SSRF hardening of the shared client remains a clean seam for the phase that
-  first does (webhooks, Phase 3).
+**Mailer.** No new library. `symfony/mailer` was already wired for verification
+and reset mail in Phase 1, and `MailerService` is reused unchanged; the email
+channel is a `Notifier` wrapping it. SMTP stays exempt from the SSRF client, and
+the reason is worth stating rather than inferring: the guard exists because a
+user can type a URL and make the server fetch it, and nobody types the SMTP
+host.
 
-**Price history**
-- Append-only. `subscriptions.price_minor` is kept as a denormalised "current
-  price" because the list view sorts, filters and totals on it; every write that
-  changes which row is current updates it in the same transaction.
-- The current row is the greatest `effective_from`, ties broken by greatest id —
-  deliberately *not* MAX(id), since a change scheduled for next month is
-  recorded before a correction applied today.
+**Allowlist format.** One text column, four accepted shapes: a host
+(`gotify.lan`), a dotted suffix (`.lan`, matching subdomains), a bare address,
+or a CIDR block (`100.64.0.0/10`). Host entries match names, address entries
+match resolved addresses; the two never cross. A pattern the guard could not
+parse is refused at the form rather than stored and silently ignored — a rule an
+operator believes is in force but is not is worse than no rule. An allowlisted
+host may also be reached over plain `http`, because a LAN service usually has no
+certificate; `httpsOnly` (which Slack passes) overrides even that.
 
-**Trials**
-- The trial's **last day is the day the conversion charge falls**. Conversion is
-  dated to that day even if it is applied weeks later.
+**Idempotency ledger.** `notification_log`, claimed by INSERT rather than by
+SELECT-then-INSERT, with a unique index on
+`(user_id, alert_type, subject_type, subject_id, occurrence_key, channel_id)`.
+Two overlapping scheduler runs both attempt the insert and the database decides;
+one gets the row and the other gets a collision. The occurrence key is the
+**charge date plus the lead time** (`2026-10-01:7`), which makes a re-run silent,
+a rescheduled payment a genuinely new alert, and 30/7/1 three reminders rather
+than one. `subject_id` is `0` rather than null when an alert has no single
+subject, because PostgreSQL treats nulls in a unique index as distinct and a
+nullable column would permit duplicates on one engine only. Status is
+`pending → sent | failed`: only `sent` suppresses a later attempt, so a
+transient failure stays retryable up to `NOTIFY_MAX_ATTEMPTS`.
 
-**Splits**
-- Integer **weights** are stored; amounts are derived from the current price each
-  time, allocated by largest remainder so the shares always sum exactly.
-- Participant visibility is applied by a **read-only** widening in the scoping
-  layer (`readVisibilityPredicate`, composed into `scopedWhere` alone). Writes
-  use the unwidened predicate, and queries that feed writes use `writableWhere`.
-- The widening has to reach **everything that decorates a widened row**, not just
-  the query that finds it. Tags are loaded by a second query and price history
-  lives in its own table; both were narrower than the row they describe, so a
-  participant saw an untagged subscription whose price had, it claimed, never
-  been recorded. Both now use the read predicate.
-- Conversely, a service that reads with `find()` and then writes has already lost
-  the distinction, because `find()` is widened. `SubscriptionRepository::findForWrite()`
-  exists for those callers. **Scheduling a price change was reachable**: the route
-  requires `ManagePrices`, which any Editor holds, and `PriceHistoryService::schedule()`
-  gated on `find()` and then appended to a *different* table — so it never touched
-  the subscription's write predicate at all. An Editor named on a split could
-  schedule a rise on another member's subscription in ISOLATED mode, and the
-  catch-up promoted it to the current price when its date arrived. It now gates on
-  `findForWrite()`.
-- Widening the price history is not only a display change: `ForecastService` prices
-  each charge from the history row effective on that date and falls back to the
-  denormalised current price when it can see none, so a participant's forecast and
-  budget had previously quoted every future month at today's price and hidden any
-  scheduled rise from the person paying half of it.
-- Bulk actions changed behaviour with this: the two loops that fetch each row
-  before writing now use `findForWrite()`, so a participant's selection of a split
-  row is skipped like any other unwritable row instead of aborting the whole batch.
+**Lead-time matching is "at most this many days left", not "exactly".** The
+tightest configured lead that still covers the remaining days is the one that
+fires. A scheduler that misses a day — a reboot, a full disk — therefore still
+sends the seven-day warning when it next runs, instead of skipping it silently
+for ever. Tested.
 
-**Budgets**
-- Owned by a member, measuring **that member's share**. Visible household-wide in
-  SHARED, own-only in ISOLATED.
-- Projection comes from `ForecastService`, not a run-rate, so a budget cannot
-  disagree with the forecast shown beneath it.
-- Periods are **rolling windows from today**, not calendar periods — there is no
-  payment ledger, so a calendar month would have to omit what was already
-  charged in it.
+**Per-subscription reminder override.** `subscriptions.reminder_days`, null
+meaning "use my preference" and an empty string meaning "never remind me about
+this one". The two are deliberately different values; collapsing them would make
+it impossible to silence one subscription without silencing everything.
 
-**Year over year**
-- **Reconstructed** from start dates, cycles and price history; no ledger was
-  built. A subscription with no start date contributes to neither year, and the
-  page says how many were excluded.
+**Per-user channel secrets live in the database.** Non-negotiable 7 is read as
+governing *instance* secrets: those stay in the environment, SMTP included, and
+the wizard does not collect them. A Gotify or Slack token belongs to a person,
+not to the instance, so it has nowhere else to live — the precedent is
+`KEY_RATE_PROVIDER_KEY` from Phase 2. Such a value is never rendered back into a
+form (blank means unchanged) and never written to a log.
 
-**Bulk currency change**
-- **Converts** at today's rate and records a price-history row, and **refuses**
-  when no rate is available. Re-labelling £9.99 as €9.99 would be a silent 20%
-  price change.
+**The wizard does not collect SMTP.** "Configure at least one channel + SMTP" is
+implemented as: step two *reports* the relay the instance will use, with the
+environment variables that set it, and offers a test send that proves it works.
+Collecting a host and password into the database would contradict the rule
+above.
 
-**Catch-up ordering**
-- One entry point (`CatchUpService`), ordered: apply due price changes → convert
-  ended trials → advance overdue payment dates. Advancing first would roll a
-  payment at a stale price. It is a no-op for any scope that cannot write, so a
-  Viewer's GET never writes. This is also the seam Phase 3's scheduler calls —
-  no stub was needed.
+**Budget alerts are a crossing, not a threshold.** `BudgetPeriod` windows roll
+from today, so there is no calendar boundary for "one alert per period" to reset
+on; `budget_alert_state` is the state machine instead — fire on the transition
+to over, re-arm only on the transition back under. A projection of `null`
+(spend in a currency with no rate to the budget's) is neither: treating it as
+"under" would re-arm a budget that may well still be over. The warning threshold
+does **not** alert; the phase asks for "projected to exceed".
 
-**Known limitations, stated rather than fixed**
-- `CatchUpService` runs on GET, and its reads happen outside the transaction that
-  writes. Two simultaneous page loads can both see the same unconverted trial and
-  both append a conversion row. The resulting price is identical either way, so no
-  money is wrong — the trend shows a duplicate step. Concurrency hardening is not
-  in this phase's scope; the scheduler seam in Phase 3 is where a single writer
-  belongs.
+**For digest users the budget state machine runs on digest days only.** A
+narrowing of "the scheduler re-evaluates budgets", and deliberate: evaluating
+daily would flip the state to breached on a silent day, and the crossing would
+then never be reported at all. Nothing is queued between digests, so there is
+nothing to lose.
 
-**Portability fixes found by running against both engines**
-- MySQL's native prepared statements reject a named placeholder used twice; the
-  one query that did so now binds the value under two names.
-- MySQL's affected-row count is "rows changed", PostgreSQL's is "rows matched",
-  so a no-op UPDATE reported zero and raised a spurious scope violation. The two
-  places that inferred existence from that count now ask explicitly, via a new
-  `Platform::reportsMatchedRowsOnUpdate()`. This was a latent Phase 1 bug that
-  Phase 2's repeated writes exposed.
+**Two client types, not one interface.** `GuardedClient` is a different type
+from PSR-18's `ClientInterface`, and `HttpClient` does not implement it. Had the
+guarded path been a `ClientInterface`, a container definition could have handed
+a notifier the unguarded client with nothing looking wrong. This way the
+substitution cannot be expressed.
+
+**The outbound rate limit is enforced at the dispatcher, not inside the HTTP
+client.** The limit is per user and per subscription, and the HTTP client has no
+idea what a user is. It counts ledger rows, which already record one row per
+delivery attempt, rather than keeping a second tally that could drift. It
+applies to the **Send test** button as well as to scheduled alerts: that is the
+one path where a person rather than the scheduler decides when a request leaves
+the server, and its ledger key is deliberately loose so that testing twice
+works.
+
+## Known limitations
+- A digest whose day is missed entirely — the scheduler down for that whole day
+  — is skipped rather than deferred, because its ledger key is the ISO week or
+  month. The immediate path has no such gap. Left as-is deliberately: deferring
+  would mean storing a pending-digest state that nothing else needs.
+- Reminders fire on UTC dates. Per-user time zones are not part of this phase.
 
 ## Definition of done
-App runs, all Phase 2 tests green, CI green, no Phase 3+ features stubbed. Then
-copy PHASE-3.md over PHASE.md and commit.
+App runs, scheduler dispatches once per due item, all Phase 3 tests green, CI
+green, no Phase 4+ features stubbed. Then copy PHASE-4.md over PHASE.md and
+commit.

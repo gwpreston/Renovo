@@ -100,6 +100,20 @@ return [
         'api_key' => $env('EXCHANGE_RATE_API_KEY', ''),
     ],
 
+    'notifications' => [
+        // How many times a failed delivery is retried before the ledger gives
+        // up on that occurrence. Three covers a relay that is briefly down
+        // without hammering an endpoint that has gone for good.
+        'max_attempts' => (int) $env('NOTIFY_MAX_ATTEMPTS', '3'),
+        // The outbound ceiling. Not a user-facing setting: it is the limit that
+        // stops a bug in an alert rule, or a webhook pointed somewhere
+        // unfortunate, from turning this instance into a traffic source.
+        'max_per_user_per_hour' => (int) $env('NOTIFY_MAX_PER_USER_PER_HOUR', '60'),
+        'max_per_subject_per_day' => (int) $env('NOTIFY_MAX_PER_SUBJECT_PER_DAY', '20'),
+        // The ledger only has to outlive the occurrences it suppresses.
+        'log_retention_days' => (int) $env('NOTIFY_LOG_RETENTION_DAYS', '180'),
+    ],
+
     'auth' => [
         'max_attempts_per_account' => (int) $env('AUTH_MAX_ATTEMPTS_PER_ACCOUNT', '5'),
         'max_attempts_per_ip' => (int) $env('AUTH_MAX_ATTEMPTS_PER_IP', '20'),

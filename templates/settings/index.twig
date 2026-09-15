@@ -161,5 +161,70 @@
                 <button type="submit" class="button button-primary">Save instance settings</button>
             </form>
         </section>
+
+        <section class="card">
+            <h2>Trusted hosts</h2>
+
+            <p class="muted note">
+                Notifications and webhooks may only be sent to addresses on the public internet. That is what
+                stops somebody using a webhook URL to make this server fetch something on your private network
+                — including, on a cloud host, the metadata service holding its credentials.
+            </p>
+
+            <p class="muted note">
+                A self-hosted Gotify on your LAN or on a Tailscale address is on the wrong side of that rule,
+                so add it here. Each entry is an exception you have chosen, and every use of one is written to
+                the log. A trusted host may also be reached over plain <code>http</code>.
+            </p>
+
+            {% if trusted_hosts is empty %}
+                <p class="muted empty">Nothing is trusted. Only public addresses can be reached.</p>
+            {% else %}
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th scope="col">Host or range</th>
+                            <th scope="col">Note</th>
+                            <th scope="col">Added</th>
+                            <th scope="col"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for host in trusted_hosts %}
+                            <tr>
+                                <td><code>{{ host.pattern }}</code></td>
+                                <td>{{ host.note }}</td>
+                                <td>
+                                    {{ host.created_at|date('j M Y') }}
+                                    {% if host.created_by %}<span class="muted">by {{ host.created_by }}</span>{% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="/settings/trusted-hosts/{{ host.id }}/delete"
+                                          class="inline">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-quiet">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+            <form method="post" action="/settings/trusted-hosts" class="stack">
+                {{ csrf_field() }}
+
+                <label for="trusted_pattern">Host, address or range</label>
+                <input type="text" id="trusted_pattern" name="pattern"
+                       placeholder="gotify.lan, .lan, 192.168.1.10 or 100.64.0.0/10" required>
+
+                <label for="trusted_note">Note</label>
+                <input type="text" id="trusted_note" name="note" placeholder="What this is, for later">
+
+                <button type="submit" class="button">Trust this host</button>
+            </form>
+        </section>
     {% endif %}
 {% endblock %}

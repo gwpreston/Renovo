@@ -16,9 +16,16 @@ Built in phases:
   budgets that trigger on projected spend, a twelve-month forecast, per-period
   and year-over-year figures, a usage signal, a cancel-by dashboard,
   shared-cost splitting and bulk actions. See [Money features](#money-features).
+- **Phase 3 — notifications and the scheduler — complete.** Reminders before a
+  renewal, a trial conversion or a cancellation deadline, and an alert when a
+  budget is projected to be exceeded; email, Gotify, Slack and generic webhook
+  channels; per-user lead times, routing and digests; a daily scheduler that
+  dispatches each alert exactly once; and an SSRF-hardened HTTP client with an
+  administrator's trusted-host allowlist. See
+  [Notifications](#notifications).
 
-Still to come: outbound notifications and the scheduler, advanced auth (OIDC,
-2FA), a versioned JSON API, and internationalisation.
+Still to come: advanced auth (OIDC, 2FA), a versioned JSON API, and
+internationalisation.
 
 See `PHASE.md` for what is in scope now and `SPEC.md` for the whole plan.
 
@@ -174,16 +181,45 @@ vendor/bin/phinx seed:run    # a few starter categories (run after setup)
 
 # Console
 php bin/console list
-php bin/console reminders:run       # scheduler entry point; no reminder work yet
+php bin/console reminders:run       # send due reminders and budget alerts
 php bin/console rates:refresh       # fetch and cache exchange rates
-php bin/console maintenance:prune   # expired sessions, tokens, throttle records
+php bin/console maintenance:prune   # expired sessions, tokens, throttle and notification records
 ```
 
-The `scheduler` container runs `reminders:run` and `maintenance:prune` daily. It
-does **not** yet run `rates:refresh` — rates are refreshed lazily on page views
-instead, and are cached for 12 hours, so an instance nobody visits will serve
-stale rates. If that matters to you, add it to your own cron until the Phase 3
-scheduler takes it over.
+The `scheduler` container runs `reminders:run` and `maintenance:prune` once a
+day. It does **not** run `rates:refresh` — rates are refreshed lazily on page
+views and cached for 12 hours, so an instance nobody visits will serve stale
+rates. Add it to the schedule if that matters to you.
+
+`reminders:run` is **safe to run as often as you like, and safe to run twice at
+once**. Every message is claimed in the notification ledger before it is sent,
+so a second run finds the work already done rather than doing it again. It
+exits non-zero if some users could not be processed, while still processing the
+rest.
+
+### Running the scheduler from cron instead
+
+If you would rather not run the `scheduler` container — on a host that already
+has cron, say — disable it and add an entry of your own. Once a day, early, is
+the intended cadence:
+
+```cron
+# m  h  dom mon dow  command
+  15 7  *   *   *    docker compose -f /srv/renovo/docker-compose.yml run --rm app php bin/console reminders:run
+  45 7  *   *   *    docker compose -f /srv/renovo/docker-compose.yml run --rm app php bin/console maintenance:prune
+```
+
+Or, on a bare-metal install:
+
+```cron
+  15 7  *   *   *    cd /srv/renovo && php bin/console reminders:run
+  45 7  *   *   *    cd /srv/renovo && php bin/console maintenance:prune
+```
+
+Whatever runs it needs the same environment the application has — in
+particular `DB_*`, `APP_URL` (notifications contain links, and a link needs to
+know its own host) and the `SMTP_*` settings, since the scheduler is what
+actually sends the mail.
 
 ### Tests
 
@@ -227,7 +263,10 @@ src/
   Security/   Scope, permissions, password hashing, CSRF, sessions.
   Persistence/ PDO wrapper and the PostgreSQL/MySQL differences.
   Service/ExchangeRate/  Rate providers behind one interface.
-  Http/       The single shared outbound HTTP client.
+  Service/Notification/  Scanning for alerts, dispatching them once.
+  Notification/ The Notifier interface, the registry, and one class per channel.
+  Http/       The shared outbound HTTP client, and the SSRF guard for
+              user-supplied URLs.
   Domain/     Money, cycles, roles, entities. No I/O.
 templates/    Twig. No logic.
 config/       Settings, container, middleware, routes.
@@ -247,7 +286,9 @@ Four rules hold the design together:
    controls a user cannot use, but that is cosmetic; the 403 comes from
    middleware.
 4. **All outbound HTTP goes through one client**, so a limit added there applies
-   everywhere.
+   everywhere — and a URL that came from a *user* additionally goes through the
+   guard, which is a different type the plain client cannot satisfy, so the two
+   cannot be confused for one another by accident.
 
 ### Roles and data isolation
 
@@ -372,6 +413,84 @@ spending that may never have happened. The page says how many were excluded.
 
 ---
 
+## Notifications
+
+Renovo tells you before money moves, not after. Four things are worth an
+interruption and nothing else is:
+
+| Alert | Fires when |
+| --- | --- |
+| **Upcoming renewal** | A payment is coming up, at each of your lead times. |
+| **Trial about to convert** | A free trial is about to start charging, quoting what it will cost. |
+| **Cancellation deadline** | The last day to give notice and avoid the next charge — only when a subscription has a notice period, since otherwise the deadline *is* the renewal date. |
+| **Budget projected to be exceeded** | A budget's projection crosses its limit. |
+
+Everything is configured per user under **Settings → Alerts**; each member of a
+household sets their own. You are notified about the subscriptions you own and
+the ones you pay for, not about everything in the household — a household of
+four would otherwise quadruple everybody's notifications.
+
+### Channels
+
+**Email** (through the instance's SMTP relay), **Gotify**, **Slack** (a channel
+or a direct message, via a bot token) and a **generic webhook** that posts a
+documented JSON payload, optionally signed with HMAC-SHA256 in an
+`X-Renovo-Signature` header.
+
+Add as many as you like, name them, route each alert type to whichever you
+want, and **send a test message** — a token that looks right and is not is
+better discovered now than during the renewal you missed. A channel that fails
+shows the reason next to it.
+
+### When they arrive
+
+The scheduler runs once a day. Lead times are a list — `30, 7, 1` means three
+separate reminders — and a subscription can override the list with its own, or
+opt out entirely by setting its reminders to `none`.
+
+Nothing is ever sent twice. Each message is recorded before it goes out, keyed
+to the charge date and the lead time, so running the scheduler repeatedly sends
+nothing extra. The same record is what makes a *missed* run harmless: if the
+scheduler is down on the seventh day before a charge and next runs on the
+fifth, the seven-day reminder is still owed and is still sent.
+
+Switch to a **weekly or monthly summary** if individual messages are too much.
+A summary collects everything coming up into one message on the day you choose;
+lead times stop applying, and each thing is mentioned once. (A summary whose
+day is missed entirely — the scheduler down for that whole day — is skipped
+rather than deferred.)
+
+A budget alert fires on the crossing, not on the state: a budget that stays
+over its limit for three weeks says so once, and only speaks again if it drops
+back under and then goes over afresh.
+
+### Where notifications may be sent
+
+**Any URL you configure is fetched by the server, not by your browser**, which
+means an unchecked URL would let anybody who can add a webhook reach whatever
+the server can reach — your router, a NAS, or on a cloud host the metadata
+service holding the machine's credentials. So:
+
+- Only `https` is allowed by default, and only to public addresses.
+- Private, loopback, link-local, carrier-grade-NAT and reserved ranges are
+  refused, in both IPv4 and IPv6, including addresses that disguise one as the
+  other.
+- The address checked is the address dialled, so a name that resolves
+  differently a moment later gains nothing.
+- Redirects are followed only within the same host, and never from `https` to
+  `http` — a redirect elsewhere would hand your Gotify or Slack token to
+  whoever asked for it.
+
+That default refuses the most common self-hosted setup there is: a Gotify on
+your LAN, or one reachable only over a Tailscale address. **Settings → Trusted
+hosts** is how you allow it, and it needs instance administration. Add a host
+(`gotify.lan`), a suffix (`.lan`), an address, or a range (`100.64.0.0/10` for
+Tailscale), and that destination becomes reachable — over plain `http` as well,
+since a LAN service usually has no certificate. Each entry is an exception you
+chose, and every use of one is written to the log.
+
+---
+
 ## Security
 
 - Passwords hashed with **argon2id**, falling back to bcrypt only where the PHP
@@ -391,6 +510,16 @@ spending that may never have happened. The page says how many were excluded.
 - Logos are **uploaded, never fetched**: the image type is detected from the
   file itself, the name is replaced with a random one, and nginx refuses to
   execute anything in the upload directory.
+- Every outbound request goes through **one HTTP client** with enforced
+  timeouts, a response-size cap and proxy support; requests to URLs a *user*
+  supplied additionally go through an **SSRF guard** that refuses private and
+  reserved addresses, pins the address it checked against DNS rebinding, and
+  will not follow a redirect to another host. See
+  [Where notifications may be sent](#where-notifications-may-be-sent).
+- Outbound notifications are **rate-limited per user and per subscription**, so
+  a mistake in an alert rule cannot turn the instance into a traffic source.
+- Channel credentials are **never rendered back into a form** and never written
+  to a log: a stored token shows as configured and can be replaced.
 - Templates escape all output.
 
 ---

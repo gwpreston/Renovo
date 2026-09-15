@@ -179,6 +179,10 @@ final class SubscriptionController extends Controller
             'converts_to_cycle_days' => $subscription->convertsToCycleDays,
             'notice_period_amount' => $subscription->noticePeriod->amount,
             'notice_period_unit' => $subscription->noticePeriod->unit,
+            // An empty override is a real setting — "never remind me about this
+            // one" — so it renders as the word rather than as a blank box that
+            // would read as "use my usual schedule".
+            'reminder_days' => $subscription->reminderDays === '' ? 'none' : $subscription->reminderDays,
             'category_id' => $subscription->categoryId,
             'owner_user_id' => $subscription->ownerUserId,
             'payer_user_id' => $subscription->payerUserId,

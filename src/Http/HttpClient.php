@@ -16,17 +16,22 @@ use Psr\Http\Message\StreamFactoryInterface;
  *
  * Nothing else may call curl, file_get_contents or a vendored HTTP client
  * directly. Centralising it means a limit added here — a timeout, a size cap,
- * later a check on where a URL actually resolves to — applies everywhere at
- * once, including to code written long after it.
+ * a pinned address — applies everywhere at once, including to code written long
+ * after it.
  *
- * This phase enforces: http/https only, connect and total timeouts, a maximum
- * response size checked while the body streams in (not after), a redirect cap
- * with the same scheme restriction applied to each hop, and proxy settings.
+ * This class enforces the limits that apply to *every* request whatever its
+ * origin: http/https only, connect and total timeouts, a maximum response size
+ * checked while the body streams in rather than after it has all arrived, a
+ * redirect cap with the same scheme restriction on each hop, and proxy
+ * settings.
  *
- * Validation of user-supplied destinations — rejecting private and
- * link-local addresses, pinning the resolved IP against DNS rebinding — is the
- * concern of the phase that first accepts a URL from a user. Nothing in this
- * phase passes one in.
+ * Deciding *where a request is allowed to go* is a separate job, and it is not
+ * done here. A URL that came from configuration — an exchange-rate provider the
+ * operator chose — needs no such decision; a URL a user typed needs a great
+ * deal of it. That asymmetry is why the two paths are distinct classes:
+ * `GuardedHttpClient` vets the destination, then calls `send()` with the
+ * address it vetted. This class's part of the bargain is to dial exactly that
+ * address.
  */
 final class HttpClient implements ClientInterface
 {
@@ -39,8 +44,30 @@ final class HttpClient implements ClientInterface
     ) {
     }
 
+    /**
+     * PSR-18 entry point: an unpinned request that follows redirects within the
+     * configured cap. Used for destinations that come from configuration.
+     */
     public function sendRequest(RequestInterface $request): ResponseInterface
     {
+        return $this->send($request);
+    }
+
+    /**
+     * @param ResolvedTarget|null $pin The address a guard has already cleared.
+     *        When given, curl connects to that address for this host rather
+     *        than resolving the name again — which is what makes a DNS answer
+     *        that changes between the check and the connection harmless.
+     * @param bool|null $followRedirects Null keeps the configured behaviour.
+     *        False hands redirect handling to the caller, which is what a
+     *        guarded request needs: each hop has to be vetted before it is
+     *        followed, and curl would follow it first and tell us after.
+     */
+    public function send(
+        RequestInterface $request,
+        ?ResolvedTarget $pin = null,
+        ?bool $followRedirects = null,
+    ): ResponseInterface {
         $uri = $request->getUri();
         $scheme = strtolower($uri->getScheme());
 
@@ -60,6 +87,7 @@ final class HttpClient implements ClientInterface
         $exceeded = false;
 
         $requestBody = (string) $request->getBody();
+        $follow = $followRedirects ?? true;
 
         curl_setopt_array($handle, [
             CURLOPT_URL => (string) $uri,
@@ -68,7 +96,7 @@ final class HttpClient implements ClientInterface
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_CONNECTTIMEOUT => $this->options->connectTimeoutSeconds,
             CURLOPT_TIMEOUT => $this->options->timeoutSeconds,
-            CURLOPT_FOLLOWLOCATION => $this->options->maxRedirects > 0,
+            CURLOPT_FOLLOWLOCATION => $follow && $this->options->maxRedirects > 0,
             CURLOPT_MAXREDIRS => $this->options->maxRedirects,
             // A redirect may not escape into another protocol.
             CURLOPT_REDIR_PROTOCOLS_STR => 'http,https',
@@ -117,6 +145,14 @@ final class HttpClient implements ClientInterface
                 return strlen($chunk);
             },
         ]);
+
+        // The host name stays in the URL: it is what TLS verifies the
+        // certificate against and what the server needs in the Host header.
+        // Only the address behind it is fixed.
+        $resolve = $pin?->curlResolveEntry();
+        if ($resolve !== null) {
+            curl_setopt($handle, CURLOPT_RESOLVE, [$resolve]);
+        }
 
         if ($requestBody !== '') {
             curl_setopt($handle, CURLOPT_POSTFIELDS, $requestBody);

@@ -18,9 +18,16 @@ use Psr\Http\Server\RequestHandlerInterface;
  * The second direction matters as much as the first: leaving /setup reachable
  * after the instance is live would let anybody create a second instance
  * administrator.
+ *
+ * `/setup/notifications` is the exception, and deliberately so. It is the
+ * wizard's second step, it runs *after* the administrator account exists, and
+ * it sits inside the authenticated group — it creates no account and grants no
+ * access, so the reason the rest of /setup is closed does not apply to it.
  */
 final class SetupGuardMiddleware implements MiddlewareInterface
 {
+    public const POST_SETUP_STEP = '/setup/notifications';
+
     public function __construct(
         private readonly SetupService $setup,
         private readonly ResponseFactoryInterface $responseFactory,
@@ -30,7 +37,14 @@ final class SetupGuardMiddleware implements MiddlewareInterface
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         $path = $request->getUri()->getPath();
-        $isSetupRoute = str_starts_with($path, '/setup');
+        // The whole subtree, not just the page: the step has a form that posts
+        // to /setup/notifications/channels and a finish button that posts to
+        // /setup/notifications/finish, and a guard that let the page through
+        // but bounced its own forms would leave a step that cannot be
+        // completed.
+        $isPostSetupStep = $path === self::POST_SETUP_STEP
+            || str_starts_with($path, self::POST_SETUP_STEP . '/');
+        $isSetupRoute = str_starts_with($path, '/setup') && !$isPostSetupStep;
         $isAsset = str_starts_with($path, '/assets');
 
         if ($isAsset) {

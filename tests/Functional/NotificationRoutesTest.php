@@ -1,0 +1,335 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Functional;
+
+use App\Application\Middleware\AuthenticationMiddleware;
+use App\Domain\IsolationMode;
+use App\Domain\Role;
+use App\Repository\HouseholdRepository;
+use App\Repository\MembershipRepository;
+use App\Domain\AlertType;
+use App\Repository\NotificationChannelRepository;
+use App\Repository\NotificationLogRepository;
+use App\Repository\TrustedHostRepository;
+use App\Repository\UserRepository;
+use App\Security\CsrfTokenManager;
+use App\Security\SessionInterface;
+use App\Service\InstanceSettingsService;
+use App\Support\SystemClock;
+use App\Tests\Integration\DatabaseTestCase;
+use App\Tests\Support\ArraySession;
+use App\Tests\Support\RecordingMailer;
+use DateTimeImmutable;
+use DateTimeZone;
+use Psr\Container\ContainerInterface;
+use Psr\Http\Message\ResponseInterface;
+use Slim\App;
+use Slim\Psr7\Factory\ServerRequestFactory;
+use Symfony\Component\Mailer\MailerInterface;
+
+/**
+ * The notification routes through the real middleware stack.
+ *
+ * Two rules are being asserted, and they pull in opposite directions on
+ * purpose. A Viewer may configure their own notifications — every one of those
+ * routes acts on the signed-in user's own id and cannot be aimed at anybody
+ * else — but nobody except an instance administrator may change what this
+ * server is allowed to connect to.
+ */
+final class NotificationRoutesTest extends DatabaseTestCase
+{
+    /** @var App<ContainerInterface> */
+    private App $app;
+    private ArraySession $session;
+    private int $viewerId;
+    private int $adminId;
+    private int $householdId;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->session = new ArraySession();
+
+        $bootstrap = require dirname(__DIR__, 2) . '/config/bootstrap.php';
+        $this->app = $bootstrap(true, [
+            SessionInterface::class => $this->session,
+            MailerInterface::class => new RecordingMailer(),
+        ]);
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+
+        $settings = $container->get(InstanceSettingsService::class);
+        $settings->setIsolationMode(IsolationMode::Shared);
+        $settings->markSetupComplete('2026-01-01 00:00:00');
+
+        $users = new UserRepository($this->db);
+        $households = new HouseholdRepository($this->db);
+        $memberships = new MembershipRepository($this->db);
+
+        $this->adminId = $users->create('admin@example.test', 'Admin', 'hash', true, new DateTimeImmutable());
+        $this->viewerId = $users->create('viewer@example.test', 'Viewer', 'hash', false, new DateTimeImmutable());
+
+        $this->householdId = $households->create('Test household', $this->adminId);
+        $memberships->create($this->householdId, $this->adminId, Role::OwnerAdmin);
+        $memberships->create($this->householdId, $this->viewerId, Role::Viewer);
+    }
+
+    public function testAViewerMayConfigureTheirOwnNotifications(): void
+    {
+        $this->signIn($this->viewerId);
+
+        self::assertSame(200, $this->request('GET', '/settings/notifications')->getStatusCode());
+
+        $response = $this->request('POST', '/settings/notifications/preferences', [
+            'lead_days' => '14,3',
+            'digest_mode' => 'immediate',
+            'digest_day' => '1',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+    }
+
+    public function testTheSettingsPageRendersWithChannelsAndHistory(): void
+    {
+        // The empty page is the easy case. This one exercises the parts that
+        // only appear once something is configured: the per-channel
+        // description, the routing grid and the recent-deliveries table.
+        $clock = new SystemClock(new DateTimeZone('UTC'));
+        $channels = new NotificationChannelRepository($this->db, $clock);
+        $id = $channels->create($this->viewerId, 'gotify', 'Phone', [
+            'url' => 'https://gotify.example.com',
+            'token' => 'AsecretToken1',
+        ]);
+
+        $log = new NotificationLogRepository($this->db, $clock);
+        $logId = $log->claim($this->viewerId, $id, AlertType::Renewal, 'subscription', 1, '2026-10-01:7');
+        self::assertNotNull($logId);
+        $log->markSent($logId);
+
+        $this->signIn($this->viewerId);
+        $response = $this->request('GET', '/settings/notifications');
+        $body = (string) $response->getBody();
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('https://gotify.example.com', $body);
+        self::assertStringContainsString('Upcoming renewal', $body);
+        // The stored token is never rendered back into the page.
+        self::assertStringNotContainsString('AsecretToken1', $body);
+    }
+
+    public function testAViewerMayAddAChannelOfTheirOwn(): void
+    {
+        $this->signIn($this->viewerId);
+
+        $response = $this->request('POST', '/settings/notifications/channels', [
+            'channel_type' => 'webhook',
+            'label' => 'My webhook',
+            'url' => 'https://hooks.example/renovo',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+
+        $channels = new NotificationChannelRepository($this->db, new SystemClock(new DateTimeZone('UTC')));
+        self::assertCount(1, $channels->findAllForUser($this->viewerId));
+    }
+
+    public function testEditingAChannelKeepsASecretTheFormNeverShowed(): void
+    {
+        // The form cannot render a stored token, so it cannot ask the user to
+        // retype it — which means a blank secret has to mean "unchanged". If it
+        // meant "clear it", pausing a channel would silently break it.
+        $clock = new SystemClock(new DateTimeZone('UTC'));
+        $channels = new NotificationChannelRepository($this->db, $clock);
+        $id = $channels->create($this->viewerId, 'gotify', 'Phone', [
+            'url' => 'https://gotify.example.com',
+            'token' => 'AsecretToken1',
+            'priority' => '5',
+        ]);
+
+        $this->signIn($this->viewerId);
+
+        $response = $this->request('POST', '/settings/notifications/channels/' . $id, [
+            'label' => 'Phone (paused)',
+            'url' => 'https://gotify.example.com',
+            'token' => '',
+            'priority' => '5',
+            'is_active' => '0',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+
+        $channel = $channels->find($this->viewerId, $id);
+        self::assertNotNull($channel);
+        self::assertSame('Phone (paused)', $channel->label);
+        self::assertSame('AsecretToken1', $channel->config('token'));
+        self::assertFalse($channel->isActive);
+    }
+
+    public function testOneUserCannotTouchAnothersChannel(): void
+    {
+        $channels = new NotificationChannelRepository($this->db, new SystemClock(new DateTimeZone('UTC')));
+        $id = $channels->create($this->adminId, 'webhook', 'Admin hook', ['url' => 'https://hooks.example/a']);
+
+        $this->signIn($this->viewerId);
+
+        // The route takes an id from the URL, so this is the case that matters:
+        // every repository call is filtered by the signed-in user's id, and a
+        // delete aimed at somebody else's row simply matches nothing.
+        $this->request('POST', '/settings/notifications/channels/' . $id . '/delete');
+
+        self::assertNotNull($channels->find($this->adminId, $id), "another user's channel must survive");
+    }
+
+    public function testATestSendAgainstSomebodyElsesChannelIsNotFound(): void
+    {
+        $channels = new NotificationChannelRepository($this->db, new SystemClock(new DateTimeZone('UTC')));
+        $id = $channels->create($this->adminId, 'webhook', 'Admin hook', ['url' => 'https://hooks.example/a']);
+
+        $this->signIn($this->viewerId);
+
+        self::assertSame(
+            404,
+            $this->request('POST', '/settings/notifications/channels/' . $id . '/test')->getStatusCode(),
+        );
+    }
+
+    public function testOnlyAnInstanceAdministratorMayChangeTheTrustedHostList(): void
+    {
+        $this->signIn($this->viewerId);
+
+        self::assertSame(
+            403,
+            $this->request('POST', '/settings/trusted-hosts', ['pattern' => 'evil.example'])->getStatusCode(),
+        );
+        self::assertSame(403, $this->request('POST', '/settings/trusted-hosts/1/delete')->getStatusCode());
+
+        $hosts = new TrustedHostRepository($this->db, new SystemClock(new DateTimeZone('UTC')));
+        self::assertSame([], $hosts->patterns());
+    }
+
+    public function testAnInstanceAdministratorMayAddATrustedHost(): void
+    {
+        $this->signIn($this->adminId);
+
+        $response = $this->request('POST', '/settings/trusted-hosts', [
+            'pattern' => '100.64.0.0/10',
+            'note' => 'Tailscale',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+
+        $hosts = new TrustedHostRepository($this->db, new SystemClock(new DateTimeZone('UTC')));
+        self::assertSame(['100.64.0.0/10'], $hosts->patterns());
+    }
+
+    public function testAMalformedTrustedHostIsRejected(): void
+    {
+        $this->signIn($this->adminId);
+
+        $this->request('POST', '/settings/trusted-hosts', ['pattern' => 'not a host at all']);
+
+        $hosts = new TrustedHostRepository($this->db, new SystemClock(new DateTimeZone('UTC')));
+        self::assertSame([], $hosts->patterns(), 'a pattern the guard could not parse must not be stored');
+    }
+
+    // ------------------------------------------------------------------
+    // The wizard's second step
+    // ------------------------------------------------------------------
+
+    public function testTheWizardsNotificationStepStaysOpenAfterTheInstanceExists(): void
+    {
+        // The setup guard closes /setup once an administrator exists, which is
+        // what stops a second one being created. This step runs after that
+        // point and creates nothing, so it has to remain reachable.
+        $this->signIn($this->adminId);
+
+        self::assertSame(200, $this->request('GET', '/setup/notifications')->getStatusCode());
+    }
+
+    public function testTheWizardsNotificationStepIsClosedOnceFinished(): void
+    {
+        $this->signIn($this->adminId);
+
+        self::assertSame(302, $this->request('POST', '/setup/notifications/finish')->getStatusCode());
+        self::assertSame(302, $this->request('GET', '/setup/notifications')->getStatusCode());
+    }
+
+    public function testTheWizardsNotificationStepIsNotForOrdinaryMembers(): void
+    {
+        $this->signIn($this->viewerId);
+
+        self::assertSame(302, $this->request('GET', '/setup/notifications')->getStatusCode());
+    }
+
+    public function testAChannelAddedThroughTheWizardIsSaved(): void
+    {
+        $this->signIn($this->adminId);
+
+        $response = $this->request('POST', '/setup/notifications/channels', [
+            'channel_type' => 'gotify',
+            'label' => 'Phone',
+            'url' => 'https://gotify.example.com',
+            'token' => 'AsecretToken1',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+
+        $channels = new NotificationChannelRepository($this->db, new SystemClock(new DateTimeZone('UTC')));
+        $saved = $channels->findAllForUser($this->adminId);
+        self::assertCount(1, $saved);
+        self::assertSame('gotify', $saved[0]->type);
+    }
+
+    public function testStateChangingNotificationRoutesRequireACsrfToken(): void
+    {
+        $this->signIn($this->viewerId);
+
+        $response = $this->request(
+            'POST',
+            '/settings/notifications/channels',
+            ['channel_type' => 'webhook', 'url' => 'https://hooks.example/renovo'],
+            false,
+        );
+
+        // The CSRF middleware answers 400, as it does for every other form in
+        // the application; the point here is that these routes are behind it at
+        // all rather than what the refusal is numbered.
+        self::assertSame(400, $response->getStatusCode());
+    }
+
+    private function signIn(int $userId): void
+    {
+        $this->session->clear();
+        $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $userId);
+        $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $this->householdId);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function request(string $method, string $path, array $body = [], bool $withCsrf = true): ResponseInterface
+    {
+        $request = (new ServerRequestFactory())->createServerRequest(
+            $method,
+            'http://localhost' . $path,
+            ['REMOTE_ADDR' => '127.0.0.1'],
+        );
+
+        if ($method !== 'GET') {
+            $request = $request->withParsedBody($body);
+
+            if ($withCsrf) {
+                $container = $this->app->getContainer();
+                self::assertNotNull($container);
+                $token = $container->get(CsrfTokenManager::class)->token();
+                $request = $request->withHeader(CsrfTokenManager::HEADER_NAME, $token);
+            }
+        }
+
+        return $this->app->handle($request);
+    }
+}

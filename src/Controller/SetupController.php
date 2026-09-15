@@ -9,9 +9,13 @@ use App\Domain\Currency;
 use App\Domain\IsolationMode;
 use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
+use App\Notification\NotifierRegistry;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
+use App\Service\InstanceSettingsService;
+use App\Service\Notification\NotificationSettingsService;
 use App\Service\SetupService;
 use App\Service\ValidationException;
+use App\Support\Clock;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
@@ -28,6 +32,12 @@ final class SetupController extends Controller
         private readonly SetupService $setup,
         private readonly MembershipRepository $memberships,
         private readonly ExchangeRateProviderRegistry $rateProviders,
+        private readonly NotificationSettingsService $notifications,
+        private readonly NotifierRegistry $notifiers,
+        private readonly InstanceSettingsService $instance,
+        private readonly Clock $clock,
+        private readonly string $smtpHost = '',
+        private readonly string $mailFrom = '',
     ) {
         parent::__construct($view, $session);
     }
@@ -63,9 +73,95 @@ final class SetupController extends Controller
             $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $memberships[0]->householdId);
         }
 
-        $this->flash('success', 'Your instance is ready. Add your first subscription to get started.');
+        $this->flash('success', 'Your instance is ready. One more step: where should reminders go?');
 
-        return $this->redirect($response, '/');
+        // Straight into step two rather than to the dashboard. Notifications
+        // are the one part of this application that is worthless if nobody ever
+        // configures it, and the moment somebody is already setting the
+        // instance up is the moment they are most willing to.
+        return $this->redirect($response, '/setup/notifications');
+    }
+
+    /**
+     * Step two: a channel, and a test message to prove it works.
+     *
+     * Sending a real message is the only part of this that matters. A form that
+     * accepts a Gotify token and says "saved" has verified nothing; the first
+     * time the operator learns the token was wrong would otherwise be the
+     * renewal they missed.
+     */
+    public function showNotifications(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $user = $this->user($request);
+
+        if (!$user->isInstanceAdmin || $this->instance->isNotificationSetupComplete()) {
+            return $this->redirect($response, '/');
+        }
+
+        return $this->render($request, $response, 'setup/notifications.twig', $this->notificationStepData($user->id));
+    }
+
+    public function addNotificationChannel(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $user = $this->user($request);
+        $body = $this->body($request);
+
+        $strings = [];
+        foreach ($body as $key => $value) {
+            if (is_string($key) && is_scalar($value)) {
+                $strings[$key] = (string) $value;
+            }
+        }
+
+        try {
+            $this->notifications->createChannel($user->id, $strings);
+        } catch (ValidationException $exception) {
+            return $this->render(
+                $request,
+                $response->withStatus(422),
+                'setup/notifications.twig',
+                $this->notificationStepData($user->id, $exception->errors(), $body),
+            );
+        }
+
+        $this->flash('success', 'Channel added. Send yourself a test message to confirm it arrives.');
+
+        return $this->redirectAfterWrite($request, $response, '/setup/notifications');
+    }
+
+    public function finishNotifications(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $this->instance->markNotificationSetupComplete($this->clock->now()->format('Y-m-d H:i:s'));
+
+        $this->flash('success', 'All set. Add your first subscription to get started.');
+
+        return $this->redirectAfterWrite($request, $response, '/');
+    }
+
+    /**
+     * @param array<string, string> $errors
+     * @param array<string, mixed> $submitted
+     * @return array<string, mixed>
+     */
+    private function notificationStepData(int $userId, array $errors = [], array $submitted = []): array
+    {
+        return [
+            'notifiers' => $this->notifiers->all(),
+            'channels' => $this->notifications->channels($userId),
+            // Shown rather than described. The step's job is to make the mail
+            // relay visible, and "if one is configured" leaves the operator to
+            // work out for themselves whether it is.
+            'smtp_host' => $this->smtpHost,
+            'mail_from' => $this->mailFrom,
+            'errors' => $errors,
+            'submitted' => $submitted,
+        ];
     }
 
     /**

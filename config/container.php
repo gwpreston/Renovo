@@ -11,14 +11,21 @@
 declare(strict_types=1);
 
 use App\Application\Twig\AppExtension;
+use App\Controller\SetupController;
+use App\Http\DnsResolver;
+use App\Http\GuardedClient;
+use App\Http\GuardedHttpClient;
 use App\Http\HttpClient;
 use App\Http\HttpClientOptions;
+use App\Http\SystemDnsResolver;
+use App\Http\TrustedTargets;
 use App\Persistence\Database;
 use App\Persistence\PdoSessionHandler;
 use App\Persistence\Platform;
 use App\Persistence\PlatformFactory;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\ExchangeRateRepository;
+use App\Repository\NotificationLogRepository;
 use App\Security\CsrfTokenManager;
 use App\Security\Session;
 use App\Security\SessionInterface;
@@ -27,8 +34,18 @@ use App\Service\ExchangeRate\ExchangeRateHostProvider;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\ExchangeRate\FixerProvider;
 use App\Service\ExchangeRate\FrankfurterProvider;
+use App\Notification\Channel\EmailNotifier;
+use App\Notification\Channel\GotifyNotifier;
+use App\Notification\Channel\SlackNotifier;
+use App\Notification\Channel\WebhookNotifier;
+use App\Notification\NotifierRegistry;
 use App\Service\ExchangeRateService;
 use App\Service\InstanceSettingsService;
+use App\Service\Notification\AlertScanner;
+use App\Service\Notification\NotificationDispatcher;
+use App\Service\Notification\NotificationRateLimiter;
+use App\Service\Notification\ReminderRunner;
+use App\Service\TrustedHostService;
 use App\Service\LogoStorage;
 use App\Service\SetupService;
 use App\Service\MailerService;
@@ -46,10 +63,12 @@ use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Psr\Http\Message\UriFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Psr7\Factory\RequestFactory;
 use Slim\Psr7\Factory\ResponseFactory;
 use Slim\Psr7\Factory\StreamFactory;
+use Slim\Psr7\Factory\UriFactory;
 use Slim\Views\Twig;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
@@ -85,7 +104,6 @@ return static function (ContainerBuilder $builder, array $settings): void {
         // ------------------------------------------------------------------
         RequestFactoryInterface::class => autowire(RequestFactory::class),
         ResponseFactoryInterface::class => autowire(ResponseFactory::class),
-        StreamFactoryInterface::class => autowire(StreamFactory::class),
 
         HttpClientOptions::class => static function (ContainerInterface $c): HttpClientOptions {
             $http = $c->get('settings')['http'];
@@ -102,8 +120,28 @@ return static function (ContainerBuilder $builder, array $settings): void {
             );
         },
 
+        StreamFactoryInterface::class => autowire(StreamFactory::class),
+        UriFactoryInterface::class => autowire(UriFactory::class),
+
         // Every outbound call in the application resolves to this one client.
+        //
+        // Two clients, and which one a class asks for is a security decision
+        // rather than a preference. `ClientInterface` is the plain one, for
+        // destinations that come from configuration — the exchange-rate
+        // providers. `GuardedHttpClient` is named explicitly by anything
+        // fetching a URL a user typed, and it cannot be substituted for the
+        // plain one by a container definition, because nothing binds it to an
+        // interface the plain one also satisfies.
         ClientInterface::class => autowire(HttpClient::class),
+
+        DnsResolver::class => autowire(SystemDnsResolver::class),
+
+        // The type the notifiers ask for. Bound to the guarding implementation
+        // and to nothing else; `HttpClient` does not implement it.
+        GuardedClient::class => get(GuardedHttpClient::class),
+
+        // The allowlist the SSRF guard consults is the administrator's table.
+        TrustedTargets::class => get(TrustedHostService::class),
 
         // ------------------------------------------------------------------
         // Exchange rates
@@ -133,6 +171,47 @@ return static function (ContainerBuilder $builder, array $settings): void {
                 $rates['api_key'],
             );
         },
+
+        // ------------------------------------------------------------------
+        // Notifications
+        // ------------------------------------------------------------------
+        // The registry is the only list of channel types in the application.
+        // Adding one means adding a class and a line here; nothing else in the
+        // codebase names a channel.
+        NotifierRegistry::class => static fn (ContainerInterface $c): NotifierRegistry => new NotifierRegistry([
+            $c->get(EmailNotifier::class),
+            $c->get(GotifyNotifier::class),
+            $c->get(SlackNotifier::class),
+            $c->get(WebhookNotifier::class),
+        ]),
+
+        NotificationRateLimiter::class => static function (ContainerInterface $c): NotificationRateLimiter {
+            $limits = $c->get('settings')['notifications'];
+
+            return new NotificationRateLimiter(
+                $c->get(NotificationLogRepository::class),
+                $c->get(Clock::class),
+                $limits['max_per_user_per_hour'],
+                $limits['max_per_subject_per_day'],
+            );
+        },
+
+        NotificationDispatcher::class => autowire()->constructorParameter(
+            'maxAttempts',
+            factory(static fn (ContainerInterface $c): int => $c->get('settings')['notifications']['max_attempts']),
+        ),
+
+        // The links in a notification have to be absolute: the message is read
+        // somewhere that has no idea what host the application is on.
+        AlertScanner::class => autowire()->constructorParameter(
+            'appUrl',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
+
+        ReminderRunner::class => autowire()->constructorParameter(
+            'appUrl',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
 
         // ------------------------------------------------------------------
         // Session & security
@@ -213,6 +292,22 @@ return static function (ContainerBuilder $builder, array $settings): void {
             'appUrl',
             factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
         ),
+
+        // The wizard's second step reports the mail relay the instance will
+        // actually use, rather than asking the operator to go and check.
+        SetupController::class => autowire()
+            ->constructorParameter(
+                'smtpHost',
+                factory(static function (ContainerInterface $c): string {
+                    $mail = $c->get('settings')['mail'];
+
+                    return sprintf('%s:%d', $mail['host'], $mail['port']);
+                }),
+            )
+            ->constructorParameter(
+                'mailFrom',
+                factory(static fn (ContainerInterface $c): string => $c->get('settings')['mail']['from_address']),
+            ),
 
         // The wizard needs to know whether an environment key is already
         // present, so that it does not demand one the operator has supplied.

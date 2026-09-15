@@ -14,6 +14,8 @@ use App\Security\SessionInterface;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\ExchangeRateService;
 use App\Service\InstanceSettingsService;
+use App\Service\TrustedHostService;
+use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
@@ -38,6 +40,7 @@ final class SettingsController extends Controller
         private readonly MembershipRepository $memberships,
         private readonly ExchangeRateService $rates,
         private readonly ExchangeRateProviderRegistry $rateProviders,
+        private readonly TrustedHostService $trustedHosts,
     ) {
         parent::__construct($view, $session);
     }
@@ -47,6 +50,11 @@ final class SettingsController extends Controller
         $scope = $this->scope($request);
 
         return $this->render($request, $response, 'settings/index.twig', [
+            // Only an instance administrator can act on this list, and the
+            // template hides it from everybody else — but the list is also the
+            // instance's network exceptions, so it is not handed to a page that
+            // has no business rendering it either.
+            'trusted_hosts' => $this->user($request)->isInstanceAdmin ? $this->trustedHosts->all() : [],
             'household' => $scope->hasHousehold() ? $this->households->findById((int) $scope->householdId) : null,
             'members' => $scope->hasHousehold()
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
@@ -141,6 +149,43 @@ final class SettingsController extends Controller
         $this->settings->setRegistrationAllowed(($body['allow_registration'] ?? '0') === '1');
 
         $this->flash('success', 'Instance settings saved.');
+
+        return $this->redirectAfterWrite($request, $response, '/settings');
+    }
+
+    /**
+     * Add a destination the SSRF guard will permit despite it being private.
+     *
+     * Guarded by instance administration at the route, which is the level this
+     * belongs at: the answer to "may this server connect to 192.168.1.0/24" is
+     * a fact about the network the instance sits on, not a preference of
+     * whoever happens to be configuring a webhook.
+     */
+    public function addTrustedHost(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body = $this->body($request);
+
+        try {
+            $this->trustedHosts->add(
+                is_scalar($body['pattern'] ?? null) ? (string) $body['pattern'] : '',
+                is_scalar($body['note'] ?? null) ? (string) $body['note'] : null,
+                $this->user($request)->id,
+            );
+            $this->flash('success', 'Trusted host added. Notifications may now reach it.');
+        } catch (ValidationException $exception) {
+            $this->flash('error', implode(' ', $exception->errors()));
+        }
+
+        return $this->redirectAfterWrite($request, $response, '/settings');
+    }
+
+    public function deleteTrustedHost(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $this->trustedHosts->remove((int) $id, $this->user($request)->id);
+        $this->flash('success', 'Trusted host removed.');
 
         return $this->redirectAfterWrite($request, $response, '/settings');
     }

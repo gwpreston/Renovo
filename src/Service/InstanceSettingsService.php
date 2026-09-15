@@ -26,6 +26,7 @@ final class InstanceSettingsService
     public const KEY_RATE_PROVIDER = 'rate_provider';
     public const KEY_RATE_PROVIDER_KEY = 'rate_provider_key';
     public const KEY_RATES_LAST_ATTEMPT_AT = 'rates_last_attempt_at';
+    public const KEY_NOTIFICATIONS_SETUP_AT = 'notifications_setup_at';
 
     /** @var array<string, string>|null */
     private ?array $cache = null;
@@ -136,6 +137,25 @@ final class InstanceSettingsService
     public function markSetupComplete(string $timestamp): void
     {
         $this->set(self::KEY_SETUP_COMPLETED_AT, $timestamp);
+    }
+
+    /**
+     * Whether the first-run wizard's notification step has been dealt with.
+     *
+     * Separate from the main setup flag because it is reached *after* the
+     * instance exists: the account, the household and the isolation mode are
+     * settled before anything can be configured to notify anybody. It is a
+     * one-time prompt rather than a gate — an operator who skips it has an
+     * instance that works and no notifications, which is a legitimate choice.
+     */
+    public function isNotificationSetupComplete(): bool
+    {
+        return $this->get(self::KEY_NOTIFICATIONS_SETUP_AT, '') !== '';
+    }
+
+    public function markNotificationSetupComplete(string $timestamp): void
+    {
+        $this->set(self::KEY_NOTIFICATIONS_SETUP_AT, $timestamp);
     }
 
     private function get(string $key, string $default): string

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Persistence;
 
 use PDO;
+use PDOException;
 use PDOStatement;
 use Throwable;
 
@@ -141,6 +142,25 @@ final class Database
         return (int) $this->connection()->lastInsertId(
             $this->platform->insertIdSequence($table, $idColumn),
         );
+    }
+
+    /**
+     * Whether a failed statement failed because it collided with a unique
+     * index.
+     *
+     * Asked by the code that claims an idempotency row: the claim is an INSERT
+     * that is *expected* to fail when the same notification has already been
+     * claimed, and the collision is the answer rather than an error. Both
+     * engines report it in SQLSTATE class 23 — PostgreSQL as 23505, MySQL as
+     * the less specific 23000 — so the check covers both rather than the one
+     * the developer happened to be running.
+     *
+     * Note for callers: on PostgreSQL a failed statement poisons an open
+     * transaction, so a claim must be made outside one.
+     */
+    public static function isUniqueViolation(PDOException $exception): bool
+    {
+        return in_array((string) $exception->getCode(), ['23505', '23000'], true);
     }
 
     /**

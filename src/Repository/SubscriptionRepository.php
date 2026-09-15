@@ -722,6 +722,9 @@ final class SubscriptionRepository extends AbstractScopedRepository
             usageRating: $this->nullableInt($row['usage_rating'] ?? null),
             usageCountedSince: $this->nullableDate($row['usage_counted_since'] ?? null),
             isActive: $this->db->platform()->toBoolean($row['is_active']),
+            reminderDays: array_key_exists('reminder_days', $row) && $row['reminder_days'] !== null
+                ? (string) $row['reminder_days']
+                : null,
             logoPath: $this->nullableString($row['logo_path'] ?? null),
             categoryId: $this->nullableInt($row['category_id'] ?? null),
             categoryName: $this->nullableString($row['category_name'] ?? null),
