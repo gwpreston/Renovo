@@ -18,8 +18,13 @@
                class="{{ current_path starts with '/categories' ? 'is-active' : '' }}">Categories</a>
             <a href="/settings/notifications"
                class="{{ current_path starts with '/settings/notifications' ? 'is-active' : '' }}">Alerts</a>
+            {% if can(scope, 'audit.view') %}
+                <a href="/audit"
+                   class="{{ current_path starts with '/audit' ? 'is-active' : '' }}">Audit</a>
+            {% endif %}
             <a href="/settings"
-               class="{{ current_path == '/settings' ? 'is-active' : '' }}">Settings</a>
+               class="{{ current_path starts with '/settings' and current_path != '/settings/notifications'
+                   ? 'is-active' : '' }}">Settings</a>
         </nav>
 
         <div class="nav-user">

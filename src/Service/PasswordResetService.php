@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\AuditAction;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
 use App\Security\PasswordHasher;
+use App\Security\SessionInterface;
+use App\Service\Auth\SessionDirectoryService;
 use App\Support\Clock;
 
 /**
@@ -30,6 +33,9 @@ final class PasswordResetService
         private readonly MailerService $mailer,
         private readonly AuthService $auth,
         private readonly InstanceSettingsService $settings,
+        private readonly AuditLogService $audit,
+        private readonly SessionDirectoryService $sessions,
+        private readonly SessionInterface $session,
         private readonly Clock $clock,
         private readonly string $appUrl,
     ) {
@@ -62,8 +68,16 @@ final class PasswordResetService
 
         $user = $this->users->findByEmail($email);
         if ($user === null) {
+            // Still recorded: a run of reset requests for addresses that do not
+            // exist is exactly the pattern an administrator wants to see.
+            $this->audit->recordAnonymous(AuditAction::PasswordResetRequested, $email, null, [
+                'account_exists' => false,
+            ]);
+
             return;
         }
+
+        $this->audit->recordAnonymous(AuditAction::PasswordResetRequested, $email, $user);
 
         $token = $this->tokens->issue(
             $user->id,
@@ -120,6 +134,16 @@ final class PasswordResetService
             // control, and leaving them locked out would be the wrong outcome.
             $this->attempts->clearForAccount(AuthAttemptRepository::KIND_RESET, $user->email);
             $this->attempts->clearForAccount(AuthAttemptRepository::KIND_LOGIN, $user->email);
+
+            // Every session this account had is now suspect: the reset may well
+            // have been prompted by somebody else having one. The request doing
+            // the reset is not signed in, so nothing is spared.
+            $revoked = $this->sessions->revokeAllOthersSilently($user->id, $this->session->id());
+
+            $this->audit->record(AuditAction::PasswordChanged, $user, [
+                'via' => 'reset_link',
+                'sessions_revoked' => $revoked,
+            ]);
 
             $this->mailer->send(
                 $user->email,

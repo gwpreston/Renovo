@@ -1,0 +1,54 @@
+{#
+    The entries table, rendered on its own for htmx filter and page swaps.
+#}
+<table class="table">
+    <thead>
+    <tr>
+        <th>When</th>
+        <th>Event</th>
+        <th>Who</th>
+        <th>Detail</th>
+        <th>Address</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for entry in entries %}
+        <tr class="{{ entry.action.isFailure ? 'row-warning' : '' }}">
+            <td>{{ entry.occurredAt|date('j M Y H:i') }}</td>
+            <td>{{ entry.action.label }}</td>
+            <td>
+                {{ entry.actorName }}
+                {% if entry.targetLabel and entry.targetUserId != entry.actorUserId %}
+                    <span class="muted">→ {{ entry.targetLabel }}</span>
+                {% endif %}
+            </td>
+            <td class="muted">{{ entry.summary }}</td>
+            <td class="muted">{{ entry.ipAddress|default('—') }}</td>
+        </tr>
+    {% else %}
+        <tr>
+            <td colspan="5" class="muted">No events recorded.</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% if pages > 1 %}
+    <nav class="pagination">
+        {% if page > 1 %}
+            <a class="button button-quiet"
+               href="/audit?page={{ page - 1 }}{{ selected_action ? '&action=' ~ selected_action : '' }}"
+               hx-get="/audit?page={{ page - 1 }}{{ selected_action ? '&action=' ~ selected_action : '' }}"
+               hx-target="#audit-entries" hx-push-url="true">Newer</a>
+        {% endif %}
+
+        <span class="muted">Page {{ page }} of {{ pages }} · {{ total }} entr{{ total == 1 ? 'y' : 'ies' }}</span>
+
+        {% if page < pages %}
+            <a class="button button-quiet"
+               href="/audit?page={{ page + 1 }}{{ selected_action ? '&action=' ~ selected_action : '' }}"
+               hx-get="/audit?page={{ page + 1 }}{{ selected_action ? '&action=' ~ selected_action : '' }}"
+               hx-target="#audit-entries" hx-push-url="true">Older</a>
+        {% endif %}
+    </nav>
+{% endif %}

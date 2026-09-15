@@ -114,11 +114,25 @@ return [
         'log_retention_days' => (int) $env('NOTIFY_LOG_RETENTION_DAYS', '180'),
     ],
 
+    'audit' => [
+        // A year, because that is the span an operator is realistically asked
+        // about ("who changed this, and when?") and long enough to cover an
+        // annual review. The log is evidence, not an archive: keeping sign-ins
+        // for ever is a liability of its own.
+        'retention_days' => (int) $env('AUDIT_LOG_RETENTION_DAYS', '365'),
+    ],
+
     'auth' => [
         'max_attempts_per_account' => (int) $env('AUTH_MAX_ATTEMPTS_PER_ACCOUNT', '5'),
         'max_attempts_per_ip' => (int) $env('AUTH_MAX_ATTEMPTS_PER_IP', '20'),
         'throttle_window' => (int) $env('AUTH_THROTTLE_WINDOW_SECONDS', '900'),
         'lockout_seconds' => (int) $env('AUTH_LOCKOUT_SECONDS', '900'),
+        // Encrypts stored TOTP secrets. Optional: it falls back to SESSION_KEY,
+        // which is already required. Set it when the two should be rotatable
+        // independently — changing whichever key is in use makes every enrolled
+        // authenticator unreadable, and the accounts using it fall back to
+        // recovery codes.
+        'totp_encryption_key' => $env('TOTP_ENCRYPTION_KEY', ''),
     ],
 
     'uploads' => [

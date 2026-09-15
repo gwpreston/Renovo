@@ -23,6 +23,10 @@ final class AuthAttemptRepository extends AbstractRepository
 {
     public const KIND_LOGIN = 'login';
     public const KIND_RESET = 'reset';
+    // The second-factor step has its own budget. Sharing the login one would
+    // mean a user who mistyped their password twice had fewer tries left for a
+    // six-digit code than the code's own guessing odds assume.
+    public const KIND_TWO_FACTOR = '2fa';
 
     public function __construct(Database $db, private readonly Clock $clock)
     {

@@ -23,9 +23,13 @@ Built in phases:
   dispatches each alert exactly once; and an SSRF-hardened HTTP client with an
   administrator's trusted-host allowlist. See
   [Notifications](#notifications).
+- **Phase 4 — advanced auth and the security surface — complete.** TOTP
+  two-factor, passkeys and security keys (both as a way to sign in and as a
+  second factor), an audit log an administrator or household Owner can read, and
+  a list of active sessions you can revoke one at a time or all at once. See
+  [Signing in](#signing-in).
 
-Still to come: advanced auth (OIDC, 2FA), a versioned JSON API, and
-internationalisation.
+Still to come: OIDC/SSO, a versioned JSON API, and internationalisation.
 
 See `PHASE.md` for what is in scope now and `SPEC.md` for the whole plan.
 
@@ -34,8 +38,10 @@ See `PHASE.md` for what is in scope now and `SPEC.md` for the whole plan.
 ## Requirements
 
 - **Docker** and the Compose plugin (the supported way to run it), or
-- **PHP 8.2+** with `pdo_pgsql` or `pdo_mysql`, `intl`, `curl`, `zip`, plus
-  Composer and a **PostgreSQL 14+** or **MySQL 8 / MariaDB 10.6+** server.
+- **PHP 8.2+** with `pdo_pgsql` or `pdo_mysql`, `intl`, `curl`, `zip`, `openssl`
+  and `sodium` (the last two are bundled with most builds; they encrypt stored
+  two-factor secrets and verify passkeys), plus Composer and a
+  **PostgreSQL 14+** or **MySQL 8 / MariaDB 10.6+** server.
 
 SQLite is not supported. Development and production run the same engine, so a
 query that works locally works in production.
@@ -153,12 +159,14 @@ list. `.env` is never committed. The ones that matter most:
 
 | Variable                    | Notes                                                         |
 |-----------------------------|---------------------------------------------------------------|
-| `SESSION_KEY`               | Required. `openssl rand -hex 32`. Rotating it signs everybody out. |
+| `SESSION_KEY`               | Required. `openssl rand -hex 32`. Rotating it signs everybody out — and, unless `TOTP_ENCRYPTION_KEY` is set, makes every enrolled authenticator app unreadable (recovery codes still work). |
 | `DB_DRIVER`                 | `pgsql` or `mysql`.                                           |
 | `DB_HOST`                   | Host-side value for CLI tools; containers always use `database`. |
 | `APP_URL`                   | Used to build links in emails — set it to the real URL.       |
 | `SESSION_COOKIE_SECURE`     | Leave `true` unless you are serving plain HTTP on a trusted network. |
-| `AUTH_MAX_ATTEMPTS_PER_*`   | Login and reset throttling, per account and per IP.           |
+| `AUTH_MAX_ATTEMPTS_PER_*`   | Login, reset and second-factor throttling, per account and per IP. |
+| `TOTP_ENCRYPTION_KEY`       | Optional. Encrypts stored two-factor secrets; falls back to `SESSION_KEY`. |
+| `AUDIT_LOG_RETENTION_DAYS`  | How long audit entries are kept. 365 by default.              |
 | `EXCHANGE_RATE_API_KEY`     | Only for providers that need one. Takes precedence over a key entered in the UI. |
 | `EXCHANGE_RATE_TTL_SECONDS` | How long a cached rate table stays current. 12 hours by default. |
 
@@ -183,7 +191,7 @@ vendor/bin/phinx seed:run    # a few starter categories (run after setup)
 php bin/console list
 php bin/console reminders:run       # send due reminders and budget alerts
 php bin/console rates:refresh       # fetch and cache exchange rates
-php bin/console maintenance:prune   # expired sessions, tokens, throttle and notification records
+php bin/console maintenance:prune   # expired sessions, tokens, throttle, notification and audit records
 ```
 
 The `scheduler` container runs `reminders:run` and `maintenance:prune` once a
@@ -491,6 +499,77 @@ chose, and every use of one is written to the log.
 
 ---
 
+## Signing in
+
+Three ways in, and they interlock rather than sitting side by side.
+
+**Password.** Always available, argon2id-hashed, throttled per account and per
+IP.
+
+**Authenticator app (TOTP).** Turn it on from **Settings → Account security**:
+scan the QR code and type the six-digit code it shows, to prove the app received
+the key. Turning two-step verification off requires your password, so a stolen
+but still-signed-in session cannot quietly remove it.
+
+The secret is stored encrypted (see `TOTP_ENCRYPTION_KEY`), which is the best
+available: the server has to reproduce codes from it, so it cannot be hashed.
+What that protects is a database dump or a stray backup, not an attacker who
+already owns the running application. A submitted code is also refused if its
+thirty-second step has already been used, so a code captured in transit cannot
+be replayed inside its own window.
+
+**Passkeys and security keys.** Register as many as you like — a phone, a
+laptop, a hardware key — and name them so a lost one can be revoked without
+touching the others. A passkey signs you in on its own, and satisfies the second
+factor when you sign in with a password.
+
+Passkeys are bound to the host in `APP_URL`, which is the relying-party id.
+Changing that host invalidates every registered passkey; that is the mechanism
+working, not a fault.
+
+**Recovery codes.** Ten of them, issued the first time you set up *either*
+factor — an authenticator app or a passkey — and shown once. Each works once.
+They are hashed like passwords, so nobody can read them back to you; regenerate
+a set from **Settings → Account security** (it invalidates the old one) and
+store them somewhere other than the device they are protecting. Removing your
+last second factor clears them, because there is then nothing to recover into.
+
+**The order of a sign-in.** Once *either* second factor is set up, a correct
+password alone is not a sign-in: it parks the browser on a two-step verification
+page with a ten-minute window, and until the factor is presented the session
+holds no user at all — every authenticated page treats that browser as
+anonymous. Second-factor attempts have their own throttle, separate from the
+password one.
+
+**If you lose everything.** Use a recovery code — they work whichever factor you
+lost. If those are gone too, an operator with database access is the only way
+back; there is no email-based bypass of a second factor, because one would make
+the second factor optional for anybody who can read your mailbox.
+
+### Audit log
+
+Every sign-in, failed sign-in, sign-out, password reset, second-factor change,
+passkey change, session revocation, role change and instance-setting change is
+recorded with who did it, to whom, when, and from which address and browser.
+
+Who sees what is decided in the repository layer, not by the route: an instance
+administrator sees the whole instance at **/audit**, a household Owner sees their
+own household's events, and everybody else gets a 403. Entries keep the address
+and name as they were at the time, so deleting an account does not blank out its
+history. `maintenance:prune` removes entries older than
+`AUDIT_LOG_RETENTION_DAYS`.
+
+### Active sessions
+
+**Settings → Account security** lists every browser signed in as you — device,
+address, when it started and when it was last seen — with the current one
+marked. Revoking one deletes its session row, so that browser is anonymous on
+its very next request; there is no window in which a revoked session still
+works. A completed password reset revokes every session on the account, since
+the reset may well have been prompted by somebody else having one.
+
+---
+
 ## Security
 
 - Passwords hashed with **argon2id**, falling back to bcrypt only where the PHP
@@ -500,9 +579,30 @@ chose, and every use of one is written to the log.
   token in a header set once on the page body.
 - Sessions are **server-side, in the database**, with secure, http-only,
   same-site cookies and a fresh id on sign-in.
-- Login and password reset are **throttled per account and per IP**, so neither
-  brute-forcing one account from many addresses nor spraying many accounts from
-  one address gets far.
+- Login, password reset and the **second-factor step** are throttled per account
+  and per IP, so neither brute-forcing one account from many addresses nor
+  spraying many accounts from one address gets far. The second factor has its own
+  budget rather than sharing the password's.
+- A user who has proved their password but not their second factor is **not
+  signed in**: the pending state lives under its own session key and expires, so
+  no authenticated route can mistake it for a session.
+- **TOTP secrets are encrypted at rest** and a used time-step is remembered, so a
+  code cannot be replayed within its validity window. A secret that no longer
+  decrypts — a rotated key — fails the sign-in closed and says so in the log,
+  rather than throwing an error at somebody holding a correct code.
+- **Recovery codes are hashed** like passwords, each works once, and they are
+  issued for whichever second factor an account has — a passkey earns them just
+  as an authenticator app does, because losing your only passkey locks you out
+  exactly as hard.
+- **WebAuthn credentials** are verified with a maintained library
+  (`web-auth/webauthn-lib`) running its full ceremony: origin, challenge,
+  relying-party hash, signature and a sign counter that may not go backwards. The
+  user handle stored in an authenticator is random, never the account's id.
+- **Revoking a session takes effect immediately** — the row is deleted, and the
+  session handler is what every request consults.
+- **An audit log** records authentication and administrative events with actor,
+  target, address and user agent; reads are scope-checked in the repository, so a
+  route cannot widen them.
 - Sign-in and password-reset responses are **identical whether or not the
   address exists**, so neither form can be used to enumerate accounts.
 - Verification and reset tokens are stored only as SHA-256 hashes, are

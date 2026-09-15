@@ -1,0 +1,186 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Account security — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <h1>Account security</h1>
+
+    {% if recovery_codes is not empty %}
+        <section class="card callout">
+            <h2>Your recovery codes</h2>
+            <p>
+                Save these now — they are shown once and each works a single time. They are the
+                way back in if you lose your authenticator.
+            </p>
+            <ul class="code-list">
+                {% for code in recovery_codes %}
+                    <li><code>{{ code }}</code></li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    <section class="card">
+        <h2>Authenticator app</h2>
+
+        {% if totp.enabled %}
+            <p>On. Codes from your authenticator app are required when you sign in.</p>
+
+            <form method="post" action="/settings/security/totp/disable" class="stack">
+                {{ csrf_field() }}
+                <label for="disable-password">Confirm your password to turn two-step verification off</label>
+                <input type="password" id="disable-password" name="password"
+                       autocomplete="current-password" required>
+                <button type="submit" class="button button-danger">Turn off</button>
+            </form>
+        {% else %}
+            <p class="muted">
+                Off. Add an authenticator app to require a six-digit code as well as your password.
+            </p>
+
+            <form method="post" action="/settings/security/totp" class="inline">
+                {{ csrf_field() }}
+                <button type="submit" class="button button-primary">Set up an authenticator app</button>
+            </form>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Passkeys and security keys</h2>
+        <p class="muted">
+            A passkey signs you in without a password, and counts as your second factor when you
+            do use one. You can register more than one — a phone and a hardware key, say — so
+            losing one device is not losing access.
+        </p>
+
+        {% if passkeys is empty %}
+            <p class="muted">None registered.</p>
+        {% else %}
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Added</th>
+                    <th>Last used</th>
+                    <th>Transports</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for passkey in passkeys %}
+                    <tr>
+                        <td>
+                            <form method="post" action="/settings/security/passkeys/{{ passkey.id }}/rename"
+                                  class="inline">
+                                {{ csrf_field() }}
+                                <input type="text" name="name" value="{{ passkey.name }}" maxlength="100"
+                                       aria-label="Passkey name">
+                                <button type="submit" class="button button-quiet">Rename</button>
+                            </form>
+                        </td>
+                        <td>{{ passkey.createdAt|date('j M Y') }}</td>
+                        <td>{{ passkey.lastUsedAt ? passkey.lastUsedAt|date('j M Y H:i') : 'Never' }}</td>
+                        <td class="muted">{{ passkey.transportSummary }}</td>
+                        <td>
+                            <form method="post" action="/settings/security/passkeys/{{ passkey.id }}/delete"
+                                  class="inline">
+                                {{ csrf_field() }}
+                                <button type="submit" class="button button-danger">Revoke</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        <div class="stack">
+            <label for="passkey-name">Name for the new passkey</label>
+            <input type="text" id="passkey-name" maxlength="100" placeholder="Phone, YubiKey, laptop…">
+            <button type="button" class="button button-primary" id="passkey-register">Add a passkey</button>
+            <p class="field-error" id="passkey-register-error" hidden></p>
+        </div>
+    </section>
+
+    {#
+        Recovery codes sit outside both factors, because they cover either one:
+        an account whose only second factor is a passkey needs them just as much.
+    #}
+    {% if recovery.applicable %}
+        <section class="card">
+            <h2>Recovery codes</h2>
+            <p class="muted">
+                {{ recovery.remaining }} unused code(s). Each works once, and they are the way back in
+                if you lose your authenticator or every passkey you have registered.
+            </p>
+
+            <form method="post" action="/settings/security/recovery-codes" class="stack">
+                {{ csrf_field() }}
+                <label for="recovery-password">Confirm your password to issue a new set</label>
+                <input type="password" id="recovery-password" name="password"
+                       autocomplete="current-password" required>
+                <button type="submit" class="button">Regenerate recovery codes</button>
+            </form>
+        </section>
+    {% endif %}
+
+    <section class="card">
+        <h2>Active sessions</h2>
+        <p class="muted">
+            Every browser currently signed in as you. Revoking one signs it out on its next request.
+        </p>
+
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Device</th>
+                <th>Address</th>
+                <th>Started</th>
+                <th>Last seen</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in sessions %}
+                <tr>
+                    <td>
+                        {{ item.deviceLabel }}
+                        {% if item.isCurrent %}<span class="badge">This device</span>{% endif %}
+                    </td>
+                    <td class="muted">{{ item.ipAddress|default('Unknown') }}</td>
+                    <td>{{ item.createdAt ? item.createdAt|date('j M Y H:i') : '—' }}</td>
+                    <td>{{ item.lastActivity|date('j M Y H:i') }}</td>
+                    <td>
+                        {% if not item.isCurrent %}
+                            <form method="post" action="/settings/security/sessions/revoke" class="inline">
+                                {{ csrf_field() }}
+                                <input type="hidden" name="handle" value="{{ item.handle }}">
+                                <button type="submit" class="button button-danger">Revoke</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if sessions|length > 1 %}
+            <form method="post" action="/settings/security/sessions/revoke-others" class="inline">
+                {{ csrf_field() }}
+                <button type="submit" class="button button-danger">Sign out everywhere else</button>
+            </form>
+        {% endif %}
+    </section>
+
+    <script src="/assets/webauthn.js" defer></script>
+    <script type="module">
+        window.renovoWebAuthn.bindRegistration({
+            button: document.getElementById('passkey-register'),
+            error: document.getElementById('passkey-register-error'),
+            nameInput: document.getElementById('passkey-name'),
+            optionsUrl: '/settings/security/passkeys/options',
+            registerUrl: '/settings/security/passkeys',
+            csrf: '{{ csrf_token() }}',
+        });
+    </script>
+{% endblock %}

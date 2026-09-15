@@ -29,10 +29,15 @@ enum Permission: string
 
     case ManageHousehold = 'household.manage';
 
+    // Reading the audit log. Not a household-data permission: what it grants is
+    // sight of who did what, which an instance administrator has instance-wide
+    // and a household Owner has for their own household.
+    case ViewAuditLog = 'audit.view';
+
     case ManageInstance = 'instance.manage';
 
     public function isMutating(): bool
     {
-        return $this !== self::ViewSubscriptions;
+        return !in_array($this, [self::ViewSubscriptions, self::ViewAuditLog], true);
     }
 }

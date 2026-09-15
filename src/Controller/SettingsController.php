@@ -13,6 +13,8 @@ use App\Repository\UserRepository;
 use App\Security\SessionInterface;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\ExchangeRateService;
+use App\Service\HouseholdSettingsService;
+use App\Service\InstanceAdminService;
 use App\Service\InstanceSettingsService;
 use App\Service\TrustedHostService;
 use App\Service\ValidationException;
@@ -41,6 +43,8 @@ final class SettingsController extends Controller
         private readonly ExchangeRateService $rates,
         private readonly ExchangeRateProviderRegistry $rateProviders,
         private readonly TrustedHostService $trustedHosts,
+        private readonly HouseholdSettingsService $householdSettings,
+        private readonly InstanceAdminService $instanceAdmin,
     ) {
         parent::__construct($view, $session);
     }
@@ -101,12 +105,17 @@ final class SettingsController extends Controller
         $body = $this->body($request);
 
         if ($scope->hasHousehold()) {
-            $name = trim(is_scalar($body['name'] ?? null) ? (string) $body['name'] : '');
-            if ($name !== '') {
-                $this->households->rename((int) $scope->householdId, mb_substr($name, 0, 100));
-            }
+            $user = $this->user($request);
+            $householdId = (int) $scope->householdId;
+            $roles = $body['roles'] ?? null;
 
-            $this->applyRoleChanges($scope->householdId, $scope->userId, $body);
+            $this->householdSettings->rename(
+                $user,
+                $householdId,
+                is_scalar($body['name'] ?? null) ? (string) $body['name'] : '',
+            );
+
+            $this->householdSettings->changeRoles($user, $householdId, is_array($roles) ? $roles : []);
         }
 
         $this->flash('success', 'Household settings saved.');
@@ -118,35 +127,17 @@ final class SettingsController extends Controller
     {
         $body = $this->body($request);
 
-        $name = trim(is_scalar($body['instance_name'] ?? null) ? (string) $body['instance_name'] : '');
-        if ($name !== '') {
-            $this->settings->setInstanceName(mb_substr($name, 0, 100));
-        }
-
-        $rawCurrency = is_scalar($body['base_currency'] ?? null) ? (string) $body['base_currency'] : '';
-        $currency = Currency::normalise($rawCurrency);
-        $baseCurrencyChanged = Currency::isValidCode($currency) && $currency !== $this->settings->baseCurrency();
-        if (Currency::isValidCode($currency)) {
-            $this->settings->setBaseCurrency($currency);
-        }
-
-        $providerChanged = $this->applyRateProviderChange($body);
-
-        // Cached rates are stored against one base and sourced from one
-        // provider. Changing either makes every cached row answer a question
-        // nobody asked, so they are dropped rather than left to expire.
-        if ($baseCurrencyChanged || $providerChanged) {
-            $this->rates->invalidate();
-        }
-
-        $isolation = IsolationMode::tryFrom(
-            is_scalar($body['isolation_mode'] ?? null) ? (string) $body['isolation_mode'] : '',
-        );
-        if ($isolation !== null) {
-            $this->settings->setIsolationMode($isolation);
-        }
-
-        $this->settings->setRegistrationAllowed(($body['allow_registration'] ?? '0') === '1');
+        $this->instanceAdmin->apply($this->user($request), [
+            'instance_name' => is_scalar($body['instance_name'] ?? null) ? (string) $body['instance_name'] : '',
+            'base_currency' => is_scalar($body['base_currency'] ?? null) ? (string) $body['base_currency'] : '',
+            'isolation_mode' => is_scalar($body['isolation_mode'] ?? null) ? (string) $body['isolation_mode'] : '',
+            'allow_registration' => ($body['allow_registration'] ?? '0') === '1',
+            'rate_provider' => is_scalar($body['rate_provider'] ?? null) ? (string) $body['rate_provider'] : '',
+            'rate_provider_key' => is_scalar($body['rate_provider_key'] ?? null)
+                ? (string) $body['rate_provider_key']
+                : '',
+            'clear_rate_provider_key' => ($body['clear_rate_provider_key'] ?? '') === '1',
+        ]);
 
         $this->flash('success', 'Instance settings saved.');
 
@@ -169,7 +160,7 @@ final class SettingsController extends Controller
             $this->trustedHosts->add(
                 is_scalar($body['pattern'] ?? null) ? (string) $body['pattern'] : '',
                 is_scalar($body['note'] ?? null) ? (string) $body['note'] : null,
-                $this->user($request)->id,
+                $this->user($request),
             );
             $this->flash('success', 'Trusted host added. Notifications may now reach it.');
         } catch (ValidationException $exception) {
@@ -184,64 +175,9 @@ final class SettingsController extends Controller
         ResponseInterface $response,
         string $id,
     ): ResponseInterface {
-        $this->trustedHosts->remove((int) $id, $this->user($request)->id);
+        $this->trustedHosts->remove((int) $id, $this->user($request));
         $this->flash('success', 'Trusted host removed.');
 
         return $this->redirectAfterWrite($request, $response, '/settings');
-    }
-
-    /**
-     * @param array<string, mixed> $body
-     * @return bool Whether the provider actually changed.
-     */
-    private function applyRateProviderChange(array $body): bool
-    {
-        $requested = is_scalar($body['rate_provider'] ?? null) ? (string) $body['rate_provider'] : '';
-        $changed = false;
-
-        if ($this->rateProviders->has($requested) && $requested !== $this->rates->provider()->key()) {
-            $this->settings->setRateProvider($requested);
-            $changed = true;
-        }
-
-        // An empty field leaves the stored key alone: the input is rendered
-        // blank every time (it is a secret and is never echoed back), so
-        // treating blank as "clear it" would wipe the key on every save.
-        $key = trim(is_scalar($body['rate_provider_key'] ?? null) ? (string) $body['rate_provider_key'] : '');
-        if ($key !== '') {
-            $this->settings->setRateProviderKey($key);
-        } elseif (($body['clear_rate_provider_key'] ?? '') === '1') {
-            $this->settings->setRateProviderKey('');
-        }
-
-        return $changed;
-    }
-
-    /**
-     * @param array<string, mixed> $body
-     */
-    private function applyRoleChanges(?int $householdId, int $actingUserId, array $body): void
-    {
-        if ($householdId === null) {
-            return;
-        }
-
-        $roles = $body['roles'] ?? null;
-        if (!is_array($roles)) {
-            return;
-        }
-
-        foreach ($roles as $userId => $roleValue) {
-            $userId = (int) $userId;
-            $role = Role::tryFrom(is_scalar($roleValue) ? (string) $roleValue : '');
-
-            // An owner may not demote themselves: doing so could leave the
-            // household with nobody able to administer it.
-            if ($role === null || $userId <= 0 || $userId === $actingUserId) {
-                continue;
-            }
-
-            $this->memberships->updateRole($householdId, $userId, $role);
-        }
     }
 }

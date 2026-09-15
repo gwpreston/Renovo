@@ -27,8 +27,10 @@ use App\Repository\AuthAttemptRepository;
 use App\Repository\ExchangeRateRepository;
 use App\Repository\NotificationLogRepository;
 use App\Security\CsrfTokenManager;
+use App\Security\SecretCipher;
 use App\Security\Session;
 use App\Security\SessionInterface;
+use App\Service\Auth\WebAuthnService;
 use App\Service\AuthService;
 use App\Service\ExchangeRate\ExchangeRateHostProvider;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
@@ -230,6 +232,34 @@ return static function (ContainerBuilder $builder, array $settings): void {
         },
 
         CsrfTokenManager::class => autowire()->constructorParameter('session', get(SessionInterface::class)),
+
+        // Two-factor secrets have to be stored recoverably, so they are stored
+        // encrypted. The key defaults to SESSION_KEY rather than adding a
+        // required variable: an instance already cannot run without one, and an
+        // operator who wants the two separated can set TOTP_ENCRYPTION_KEY.
+        SecretCipher::class => static function (ContainerInterface $c): SecretCipher {
+            $settings = $c->get('settings');
+
+            return new SecretCipher(
+                $settings['auth']['totp_encryption_key'] !== ''
+                    ? $settings['auth']['totp_encryption_key']
+                    : $settings['session']['key'],
+            );
+        },
+
+        // The relying party is this deployment. Both values come from
+        // configuration: the name is what the authenticator shows the user, and
+        // the id is derived from APP_URL, which is the address the credential is
+        // bound to.
+        WebAuthnService::class => autowire()
+            ->constructorParameter(
+                'appUrl',
+                factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+            )
+            ->constructorParameter(
+                'relyingPartyName',
+                factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['name']),
+            ),
 
         // Everything in the application reads "now" through this one clock,
         // in UTC, so stored timestamps do not depend on the server's locale.

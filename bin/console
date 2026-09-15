@@ -18,6 +18,7 @@ declare(strict_types=1);
  */
 
 use App\Persistence\PdoSessionHandler;
+use App\Repository\AuditLogRepository;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\NotificationLogRepository;
 use App\Repository\TokenRepository;
@@ -109,13 +110,21 @@ switch ($command) {
         $notifications = $container->get(NotificationLogRepository::class)
             ->purgeOlderThan($clock->now()->modify(sprintf('-%d days', max(1, $retention))));
 
+        // The audit log is evidence with a shelf life. Kept far longer than the
+        // notification ledger — an operator is asked "who changed this?" months
+        // after the fact — but not for ever.
+        $auditRetention = (int) $container->get('settings')['audit']['retention_days'];
+        $auditEntries = $container->get(AuditLogRepository::class)
+            ->purgeOlderThan($clock->now()->modify(sprintf('-%d days', max(1, $auditRetention))));
+
         $out(sprintf(
             'Pruned %d expired session(s), %d expired token(s), %d old auth attempt(s), '
-            . '%d notification record(s).',
+            . '%d notification record(s), %d audit entr(ies).',
             is_int($sessions) ? $sessions : 0,
             $tokens,
             $attempts,
             $notifications,
+            $auditEntries,
         ));
         exit(0);
 
@@ -128,7 +137,7 @@ switch ($command) {
         $out('');
         $out('  reminders:run        Send due reminders, trial, cancel-by and budget alerts');
         $out('  rates:refresh        Fetch and cache exchange rates from the configured provider');
-        $out('  maintenance:prune    Delete expired sessions, tokens, throttle and notification records');
+        $out('  maintenance:prune    Delete expired sessions, tokens, throttle, notification and audit records');
         exit(0);
 
     default:

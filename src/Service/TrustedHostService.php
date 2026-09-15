@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\AuditAction;
+use App\Domain\Entity\User;
 use App\Http\IpAddress;
 use App\Http\TrustedTargets;
 use App\Repository\TrustedHostRepository;
@@ -30,6 +32,7 @@ final class TrustedHostService implements TrustedTargets
 
     public function __construct(
         private readonly TrustedHostRepository $repository,
+        private readonly AuditLogService $audit,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -51,7 +54,7 @@ final class TrustedHostService implements TrustedTargets
     /**
      * @throws ValidationException
      */
-    public function add(string $pattern, ?string $note, ?int $userId): void
+    public function add(string $pattern, ?string $note, ?User $actor): void
     {
         $pattern = strtolower(trim($pattern));
 
@@ -77,24 +80,28 @@ final class TrustedHostService implements TrustedTargets
 
         $note = $note === null || trim($note) === '' ? null : mb_substr(trim($note), 0, 255);
 
-        $this->repository->add($pattern, $note, $userId);
+        $this->repository->add($pattern, $note, $actor?->id);
         $this->cache = null;
+
+        $this->audit->record(AuditAction::TrustedHostAdded, $actor, ['pattern' => $pattern]);
 
         // Logged because this widens what the server can be made to connect to.
         // The record of who opened it, and when, is the only thing that makes
         // the exception reviewable afterwards.
         $this->logger->notice('Trusted host added', [
             'pattern' => $pattern,
-            'user_id' => $userId,
+            'user_id' => $actor?->id,
         ]);
     }
 
-    public function remove(int $id, ?int $userId): void
+    public function remove(int $id, ?User $actor): void
     {
         $this->repository->delete($id);
         $this->cache = null;
 
-        $this->logger->notice('Trusted host removed', ['id' => $id, 'user_id' => $userId]);
+        $this->audit->record(AuditAction::TrustedHostRemoved, $actor, ['id' => $id]);
+
+        $this->logger->notice('Trusted host removed', ['id' => $id, 'user_id' => $actor?->id]);
     }
 
     private function isValidPattern(string $pattern): bool

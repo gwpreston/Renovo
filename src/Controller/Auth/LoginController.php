@@ -6,9 +6,10 @@ namespace App\Controller\Auth;
 
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Controller\Controller;
-use App\Repository\MembershipRepository;
-use App\Security\CsrfTokenManager;
+use App\Domain\Entity\User;
 use App\Security\SessionInterface;
+use App\Service\Auth\SignInService;
+use App\Service\Auth\TwoFactorService;
 use App\Service\AuthService;
 use App\Service\InstanceSettingsService;
 use App\Service\ValidationException;
@@ -22,9 +23,9 @@ final class LoginController extends Controller
         Twig $view,
         SessionInterface $session,
         private readonly AuthService $auth,
-        private readonly MembershipRepository $memberships,
         private readonly InstanceSettingsService $settings,
-        private readonly CsrfTokenManager $csrf,
+        private readonly SignInService $signIn,
+        private readonly TwoFactorService $twoFactor,
     ) {
         parent::__construct($view, $session);
     }
@@ -60,27 +61,40 @@ final class LoginController extends Controller
             ]);
         }
 
-        // A new privilege level gets a new session id and a new CSRF token, so
-        // a token captured before login cannot be replayed after it.
-        $this->session->regenerate();
-        $this->csrf->rotate();
+        $next = $this->safeRedirectTarget($this->nextTarget($request));
 
-        $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $user->id);
+        // The password is only half the answer when a second factor is set up.
+        // Note what does NOT happen here: the session's user id is not written,
+        // so as far as every authenticated route is concerned this browser is
+        // still anonymous until the factor is presented.
+        if ($this->twoFactor->isRequiredFor($user->id)) {
+            // Still a privilege change — a fixed session id must not survive
+            // into the challenge, where it could be waiting for the sign-in it
+            // is about to be granted.
+            $this->session->regenerate();
+            $this->twoFactor->beginChallenge($user, $next);
 
-        $memberships = $this->memberships->findAllForUser($user->id);
-        if ($memberships !== []) {
-            $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $memberships[0]->householdId);
+            return $this->redirect($response, '/login/two-factor');
         }
+
+        $this->signIn->establish($user, SignInService::METHOD_PASSWORD);
 
         $this->flash('success', sprintf('Welcome back, %s.', $user->displayName));
 
-        return $this->redirect($response, $this->safeRedirectTarget($this->nextTarget($request)));
+        return $this->redirect($response, $next);
     }
 
     public function logout(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $this->session->clear();
-        $this->session->regenerate();
+        $user = $request->getAttribute(AuthenticationMiddleware::ATTRIBUTE_USER);
+
+        if ($user instanceof User) {
+            $this->signIn->signOut($user);
+        } else {
+            $this->session->clear();
+            $this->session->regenerate();
+        }
+
         $this->flash('success', 'You have been signed out.');
 
         return $this->redirect($response, '/login');

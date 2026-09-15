@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Repository\AuditLogRepository;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
+use App\Repository\SessionRepository;
 use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
 use App\Security\PasswordHasher;
+use App\Security\RequestContext;
+use App\Security\RequestContextHolder;
+use App\Service\AuditLogService;
+use App\Service\Auth\SessionDirectoryService;
 use App\Service\AuthService;
 use App\Service\InstanceSettingsService;
 use App\Repository\InstanceSettingsRepository;
@@ -18,6 +24,7 @@ use App\Service\PasswordResetService;
 use App\Service\RateLimiter;
 use App\Service\ValidationException;
 use App\Support\FrozenClock;
+use App\Tests\Support\ArraySession;
 use App\Tests\Support\RecordingMailer;
 use Psr\Log\NullLogger;
 
@@ -34,6 +41,7 @@ final class AuthFlowTest extends DatabaseTestCase
     private RecordingMailer $mailer;
     private FrozenClock $clock;
     private AuthAttemptRepository $attempts;
+    private AuditLogRepository $auditLog;
 
     protected function setUp(): void
     {
@@ -51,15 +59,26 @@ final class AuthFlowTest extends DatabaseTestCase
 
         $limiter = new RateLimiter($this->attempts, $this->clock, 3, 10, 900, 900);
 
+        $memberships = new MembershipRepository($this->db);
+        $this->auditLog = new AuditLogRepository($this->db);
+        $audit = new AuditLogService(
+            $this->auditLog,
+            $memberships,
+            new RequestContextHolder(RequestContext::of('198.51.100.9', 'PHPUnit')),
+            $this->clock,
+            new NullLogger(),
+        );
+
         $this->auth = new AuthService(
             $this->users,
             new HouseholdRepository($this->db),
-            new MembershipRepository($this->db),
+            $memberships,
             $tokens,
             $hasher,
             $limiter,
             $mailService,
             $settings,
+            $audit,
             $this->clock,
             'https://renovo.test',
         );
@@ -73,6 +92,9 @@ final class AuthFlowTest extends DatabaseTestCase
             $mailService,
             $this->auth,
             $settings,
+            $audit,
+            new SessionDirectoryService(new SessionRepository($this->db), $audit, $this->clock),
+            new ArraySession(),
             $this->clock,
             'https://renovo.test',
         );
@@ -312,8 +334,22 @@ final class AuthFlowTest extends DatabaseTestCase
             new MailerService($this->mailer, new NullLogger(), 'noreply@example.test', 'Test'),
             $this->auth,
             new InstanceSettingsService(new InstanceSettingsRepository($this->db)),
+            $this->audit(),
+            new SessionDirectoryService(new SessionRepository($this->db), $this->audit(), $this->clock),
+            new ArraySession(),
             $this->clock,
             'https://renovo.test',
+        );
+    }
+
+    private function audit(): AuditLogService
+    {
+        return new AuditLogService(
+            $this->auditLog,
+            new MembershipRepository($this->db),
+            new RequestContextHolder(RequestContext::of('198.51.100.9', 'PHPUnit')),
+            $this->clock,
+            new NullLogger(),
         );
     }
 

@@ -5,152 +5,137 @@ build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
 ## Current phase
-**Phase 3 — Notifications, reminders & the hardened HTTP client.**
+**Phase 4 — Advanced auth & security surface.**
 
-Goal: proactive, idempotent notifications across multiple channels, on a real
-scheduler, for every alert type the app now understands.
+Goal: strengthen and modernise authentication; give admins and users visibility
+and control over access.
 
 ## Depends on
-Phases 1–2 — the events to notify about (renewals, trials, cancel-by, budgets),
-the shared HTTP client, per-user settings surfaces.
+Phases 1–3 — base auth, roles, the hardened HTTP client (for OIDC discovery),
+sessions table.
 
 ## In scope this phase (build ONLY these)
-- Harden the shared HTTP client for user-supplied URLs: https-only where
-  applicable; reject private/loopback/link-local/reserved IPs (v4 + v6); pin the
-  resolved IP against DNS-rebinding; enforce timeouts, max response size, no
-  redirects to disallowed targets; per-user/subscription outbound rate limit.
-- Admin-configurable trusted-host/CIDR **allowlist** overriding the private-IP
-  block (fixes Tailscale-IP Gotify/OIDC); opt-in and logged.
-- Notifier interface + registry (a new channel = one class + registration).
-- Channels built now, fully working: **Email (SMTP), Gotify, Slack (post message to channel or user),
-  generic Webhook**. Gotify/Slack/Webhook go through the hardened
-  client; SMTP is exempt (not a URL fetch).
-- Alert types, all reusing one dispatcher: upcoming renewal · trial about to
-  convert · cancel-by deadline (from notice-period) · budget projected to exceed
-  (reuse Phase 2 projection; at most one alert per budget per period per
-  crossing; re-arm only after projection drops back under).
-- Timing/prefs: multiple reminders per subscription (e.g. 30/7/1 days); digest
-  mode (weekly/monthly summary); per-user preferences (channels, per-channel
-  config, lead times, which alert types route where).
-- Scheduler command (e.g. `bin/console reminders:run`): finds due items,
-  dispatches idempotently (records what was sent), re-evaluates budgets. Wire the
-  Docker scheduler container to run it daily; document a cron entry.
-- Extend the first-run wizard: configure at least one channel + SMTP, with a
-  "send test message" step.
+- TOTP two-factor as an option on password accounts.
+- Passkeys / WebAuthn as a first-class login method AND as a second factor,
+  alongside TOTP (use a maintained library, e.g. web-auth/webauthn-lib). Multiple
+  passkeys per user; name/revoke them.
+- OIDC / SSO login **[include only if wanted — otherwise omit]**: `.well-known`
+  discovery + JWKS **through the hardened SSRF client**, respecting the
+  trusted-host allowlist; map/link OIDC identities to local users.
+- Audit log: login success/fail, logout, password/passkey/TOTP changes, role
+  changes, user enable/disable, instance-setting changes. Store actor, target,
+  action, timestamp, IP/UA. Viewable by instance admin (household Owner sees
+  household-scoped events).
+- Session management UI: list active sessions (device/UA, IP, last seen); revoke
+  individual sessions or all-but-current.
 
 ## Explicitly OUT of scope until a later phase (leave seams, do NOT stub)
-- Apprise bridge / extra channels beyond the four above → later extension
-- JSON API / OpenAPI / import-export → **Phase 5**
-- Passkeys / OIDC / audit log → **Phase 4**
-- i18n / calendar view / metrics → **Phase 6**
+- JSON API / OpenAPI / import-export / iCal / attachments → **Phase 5**
+- i18n / calendar view / metrics / demo mode → **Phase 6**
 
 ## Status
-- [x] HTTP client hardened (SSRF: range checks, DNS-rebind pinning, redirects)
-- [x] Admin trusted-host/CIDR allowlist (opt-in, logged)
-- [x] Notifier interface + registry
-- [x] Channels: Email, Gotify, Slack, Webhook (tested)
-- [x] Alert types: renewal, trial-convert, cancel-by, budget-exceeded
-- [x] Multiple lead times + digest mode
-- [x] Per-user notification preferences
-- [x] Scheduler command (idempotent) + Docker wiring + cron docs
-- [x] Wizard: channel + SMTP + test-send
-- [x] Tests: idempotency (no double-send), each alert fires correctly + routing,
-      budget de-dup/re-arm, SSRF rejects private + honours allowlist + proxy,
-      digest aggregation — all passing
+- [x] TOTP enrol/verify
+- [x] Passkeys/WebAuthn (login + 2FA, multiple, revoke)
+- [n/a] OIDC/SSO — omitted by decision; see below
+- [x] Audit log (write on all covered events) + admin view
+- [x] Session management UI (list + revoke)
+- [x] Login flow updated to insert the 2FA step
+- [x] Tests: passkey register/auth/revoke, TOTP enrol/verify + enforced when on,
+      audit entries per event, session revoke invalidates immediately — all
+      passing (789 tests, green on PostgreSQL and MySQL)
 - [x] Readme: Update "Built in phases" section with current phase
 
 ## Decisions & deviations made during the build
 
-**Mailer.** No new library. `symfony/mailer` was already wired for verification
-and reset mail in Phase 1, and `MailerService` is reused unchanged; the email
-channel is a `Notifier` wrapping it. SMTP stays exempt from the SSRF client, and
-the reason is worth stating rather than inferring: the guard exists because a
-user can type a URL and make the server fetch it, and nobody types the SMTP
-host.
+- **WebAuthn library: `web-auth/webauthn-lib` 5.3.9.** Its full ceremony runs on
+  every registration and assertion — origin, challenge, RP-id hash, signature,
+  sign-counter regression. Attestation support is "none" only: a self-hosted
+  instance has no policy about which vendor made a key, only that the same key
+  comes back each time, and anything else would mean shipping metadata-service
+  plumbing to validate certificate chains nobody here reasons about.
+  `bacon/bacon-qr-code` 3.1.1 renders the TOTP QR as inline SVG (no ext-gd).
 
-**Allowlist format.** One text column, four accepted shapes: a host
-(`gotify.lan`), a dotted suffix (`.lan`, matching subdomains), a bare address,
-or a CIDR block (`100.64.0.0/10`). Host entries match names, address entries
-match resolved addresses; the two never cross. A pattern the guard could not
-parse is refused at the form rather than stored and silently ignored — a rule an
-operator believes is in force but is not is worse than no rule. An allowlisted
-host may also be reached over plain `http`, because a LAN service usually has no
-certificate; `httpsOnly` (which Slack passes) overrides even that.
+- **OIDC/SSO: omitted**, as the phase brief allows. No stub, no table, no route
+  and no dead configuration; the seam it would use — the hardened HTTP client
+  with the trusted-host allowlist — already exists and is unchanged.
 
-**Idempotency ledger.** `notification_log`, claimed by INSERT rather than by
-SELECT-then-INSERT, with a unique index on
-`(user_id, alert_type, subject_type, subject_id, occurrence_key, channel_id)`.
-Two overlapping scheduler runs both attempt the insert and the database decides;
-one gets the row and the other gets a collision. The occurrence key is the
-**charge date plus the lead time** (`2026-10-01:7`), which makes a re-run silent,
-a rescheduled payment a genuinely new alert, and 30/7/1 three reminders rather
-than one. `subject_id` is `0` rather than null when an alert has no single
-subject, because PostgreSQL treats nulls in a unique index as distinct and a
-nullable column would permit duplicates on one engine only. Status is
-`pending → sent | failed`: only `sent` suppresses a later attempt, so a
-transient failure stays retryable up to `NOTIFY_MAX_ATTEMPTS`.
+- **TOTP implemented in-house** (`src/Security/Totp.php`) rather than as a
+  dependency. RFC 6238 is eighty lines and frozen, and the implementation is
+  pinned to the RFC's own published test vectors, which is a stronger guarantee
+  than a library version bump.
 
-**Lead-time matching is "at most this many days left", not "exactly".** The
-tightest configured lead that still covers the remaining days is the one that
-fires. A scheduler that misses a day — a reboot, a full disk — therefore still
-sends the seven-day warning when it next runs, instead of skipping it silently
-for ever. Tested.
+- **Audit-log retention: 365 days**, `AUDIT_LOG_RETENTION_DAYS`, pruned by
+  `maintenance:prune`. A year covers the questions an operator actually gets
+  asked; keeping sign-ins for ever is a liability rather than an asset.
 
-**Per-subscription reminder override.** `subscriptions.reminder_days`, null
-meaning "use my preference" and an empty string meaning "never remind me about
-this one". The two are deliberately different values; collapsing them would make
-it impossible to silence one subscription without silencing everything.
+- **TOTP secrets are encrypted at rest** with XChaCha20-Poly1305, key derived by
+  HKDF from `TOTP_ENCRYPTION_KEY` or, unset, from `SESSION_KEY` — so no new
+  required variable. This defends a database dump or a backup, not an attacker
+  who owns the running application, and the code says so rather than implying
+  more.
 
-**Per-user channel secrets live in the database.** Non-negotiable 7 is read as
-governing *instance* secrets: those stay in the environment, SMTP included, and
-the wizard does not collect them. A Gotify or Slack token belongs to a person,
-not to the instance, so it has nowhere else to live — the precedent is
-`KEY_RATE_PROVIDER_KEY` from Phase 2. Such a value is never rendered back into a
-form (blank means unchanged) and never written to a log.
+- **Recovery codes were added** beyond the phase's literal bullet list. A second
+  factor with no recovery path is a way to lose a self-hosted account
+  permanently; ten hashed, single-use codes are the standard answer. They belong
+  to the *account's second factor* rather than to TOTP — registering a first
+  passkey issues them too, since losing your only passkey locks you out exactly
+  as hard — which is why the table is `recovery_codes` and the logic sits in
+  `RecoveryCodeService` with `TwoFactorService` owning the policy.
 
-**The wizard does not collect SMTP.** "Configure at least one channel + SMTP" is
-implemented as: step two *reports* the relay the instance will use, with the
-environment variables that set it, and offers a test send that proves it works.
-Collecting a host and password into the database would contradict the rule
-above.
+- **"Role changes" are audited; "user enable/disable" is not.** The brief lists
+  both. Role changes existed (in a controller) and moved into
+  `HouseholdSettingsService`, where they are now recorded. Nothing in the
+  application can disable an account — the users table has no such column and
+  there is no user-administration UI — so no `user.disabled` action was added:
+  a filter that can never match would imply a guarantee nothing enforces. It
+  arrives with the feature it describes.
 
-**Budget alerts are a crossing, not a threshold.** `BudgetPeriod` windows roll
-from today, so there is no calendar boundary for "one alert per period" to reset
-on; `budget_alert_state` is the state machine instead — fire on the transition
-to over, re-arm only on the transition back under. A projection of `null`
-(spend in a currency with no rate to the budget's) is neither: treating it as
-"under" would re-arm a budget that may well still be over. The warning threshold
-does **not** alert; the phase asks for "projected to exceed".
+- **`sessions.user_id` was never populated before this phase.** `PdoSessionHandler`
+  had an `attachUser()` nobody called, so the session list would have been
+  permanently empty. The column is now written by the handler itself on every
+  session write, driven by the session's own contents — there is no sign-in path
+  that can forget to do it. The unused `attachUser()`/`deleteForUser()` methods
+  were removed; `SessionRepository` owns listing and revocation.
 
-**For digest users the budget state machine runs on digest days only.** A
-narrowing of "the scheduler re-evaluates budgets", and deliberate: evaluating
-daily would flip the state to breached on a silent day, and the crossing would
-then never be reported at all. Nothing is queued between digests, so there is
-nothing to lose.
+- **`/logout` moved inside the authenticated route group** so the audit entry has
+  an actor to attribute it to.
 
-**Two client types, not one interface.** `GuardedClient` is a different type
-from PSR-18's `ClientInterface`, and `HttpClient` does not implement it. Had the
-guarded path been a `ClientInterface`, a container definition could have handed
-a notifier the unguarded client with nothing looking wrong. This way the
-substitution cannot be expressed.
+- **The CSRF token is now minted when the session starts**, not lazily by the
+  first template that asks. With the write-close moved into a `finally`, a token
+  first created while rendering an error page would be embedded in that page and
+  never stored, so the form it decorated would be rejected.
 
-**The outbound rate limit is enforced at the dispatcher, not inside the HTTP
-client.** The limit is per user and per subscription, and the HTTP client has no
-idea what a user is. It counts ledger rows, which already record one row per
-delivery attempt, rather than keeping a second tally that could drift. It
-applies to the **Send test** button as well as to scheduled alerts: that is the
-one path where a person rather than the scheduler decides when a request leaves
-the server, and its ledger key is deliberately loose so that testing twice
-works.
+- **A pre-existing MySQL bug in the session handler was fixed.** Its
+  UPDATE-then-INSERT inferred "no row" from zero affected rows, but MySQL counts
+  rows *changed*: re-writing a session with identical contents inside the same
+  second looked like a missing row and attempted an INSERT onto the primary key.
+  It now uses the same `reportsMatchedRowsOnUpdate()` check
+  `InstanceSettingsRepository` already used. Surfaced by running the new session
+  test against MySQL.
 
-## Known limitations
-- A digest whose day is missed entirely — the scheduler down for that whole day
-  — is skipped rather than deferred, because its ledger key is the ISO week or
-  month. The immediate path has no such gap. Left as-is deliberately: deferring
-  would mean storing a pending-digest state that nothing else needs.
-- Reminders fire on UTC dates. Per-user time zones are not part of this phase.
+- **The session association is written in a `finally`.** The error middleware
+  sits outside the session middleware, so a 403 or 404 unwinds past it; writing
+  the association after the handler meant PHP's shutdown handler rewrote the row
+  with no user id, silently detaching a live session from its account and
+  putting it beyond both the security page and a password reset's
+  revoke-everything. Found after the suite was green, reproduced against the
+  running app, and now covered by a test that drives the real handler (the
+  functional tests swap the session out, so nothing else could catch it).
+
+- **`SettingsController` lost its business logic** to `InstanceAdminService` and
+  `HouseholdSettingsService`. The audit entries had to be written where the
+  change happens, and the change was happening in a controller.
 
 ## Definition of done
-App runs, scheduler dispatches once per due item, all Phase 3 tests green, CI
-green, no Phase 4+ features stubbed. Then copy PHASE-4.md over PHASE.md and
+App runs, all Phase 4 tests green, CI green, no Phase 5+ features stubbed. Then
+copy PHASE-5.md over PHASE.md and commit.
+
+**State at the end of the phase:** the app runs (verified in a browser: TOTP
+enrolment, the two-step challenge, session list, audit view); 789 tests, PHPCS
+and PHPStan level 6 all green; migrations apply and roll back on both PostgreSQL
+and MySQL, and the whole suite passes on both; the Docker image builds. Nothing
+from Phase 5 or 6 is stubbed.
+
+`PHASE-5.md` does not exist in the repository, so the last step of this
+definition is not actionable here — the phase is otherwise complete and ready to
 commit.

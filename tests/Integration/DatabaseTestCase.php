@@ -93,6 +93,10 @@ abstract class DatabaseTestCase extends TestCase
     {
         foreach (
             [
+            'audit_log',
+            'webauthn_credentials',
+            'recovery_codes',
+            'user_totp',
             'notification_log',
             'notification_routes',
             'notification_channels',

@@ -14,9 +14,12 @@ declare(strict_types=1);
 
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Application\Middleware\RequirePermissionMiddleware;
+use App\Controller\AuditLogController;
 use App\Controller\Auth\LoginController;
+use App\Controller\Auth\PasskeyLoginController;
 use App\Controller\Auth\PasswordResetController;
 use App\Controller\Auth\RegisterController;
+use App\Controller\Auth\TwoFactorController;
 use App\Controller\Auth\VerifyEmailController;
 use App\Controller\BudgetController;
 use App\Controller\CancellationController;
@@ -24,6 +27,7 @@ use App\Controller\CategoryController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
 use App\Controller\NotificationController;
+use App\Controller\SecurityController;
 use App\Controller\SettingsController;
 use App\Controller\SetupController;
 use App\Controller\StatsController;
@@ -57,7 +61,19 @@ return static function (App $app): void {
     // ----------------------------------------------------------------------
     $app->get('/login', [LoginController::class, 'showForm'])->setName('login');
     $app->post('/login', [LoginController::class, 'submit']);
-    $app->post('/logout', [LoginController::class, 'logout'])->setName('logout');
+
+    // The second-factor step and the usernameless passkey login are public by
+    // necessity: nobody is signed in yet. What identifies the account is the
+    // short-lived pending challenge in the session (for the second factor) or
+    // the credential itself (for a passkey), never a parameter on the request.
+    $app->get('/login/two-factor', [TwoFactorController::class, 'showChallenge'])->setName('two-factor');
+    $app->post('/login/two-factor', [TwoFactorController::class, 'submit']);
+    $app->post('/login/two-factor/cancel', [TwoFactorController::class, 'cancel']);
+    $app->post('/login/two-factor/passkey/options', [TwoFactorController::class, 'passkeyOptions']);
+    $app->post('/login/two-factor/passkey', [TwoFactorController::class, 'passkeyVerify']);
+
+    $app->post('/login/passkey/options', [PasskeyLoginController::class, 'options']);
+    $app->post('/login/passkey', [PasskeyLoginController::class, 'verify']);
 
     $app->get('/register', [RegisterController::class, 'showForm'])->setName('register');
     $app->post('/register', [RegisterController::class, 'submit']);
@@ -76,6 +92,11 @@ return static function (App $app): void {
     // and a static closure cannot be bound.
     $app->group('', function (RouteCollectorProxy $group) use ($requires): void {
         $group->get('/', [DashboardController::class, 'index'])->setName('dashboard');
+
+        // Inside the authenticated group, unlike the login routes: signing out
+        // is something a signed-in user does, and the audit entry needs to know
+        // who did it.
+        $group->post('/logout', [LoginController::class, 'logout'])->setName('logout');
 
         $group->get('/subscriptions', [SubscriptionController::class, 'index'])
             ->setName('subscriptions')
@@ -228,6 +249,40 @@ return static function (App $app): void {
             '/settings/notifications/channels/{id:[0-9]+}/test',
             [NotificationController::class, 'test'],
         );
+
+        // ------------------------------------------------------------------
+        // Phase 4: account security
+        //
+        // Every route here acts on the signed-in user's own account, so none of
+        // them names a permission: the id comes from the session and cannot be
+        // pointed at anybody else. A Viewer may harden their own sign-in for
+        // the same reason they may configure their own reminders.
+        // ------------------------------------------------------------------
+        $group->get('/settings/security', [SecurityController::class, 'index'])->setName('security');
+
+        $group->post('/settings/security/totp', [SecurityController::class, 'startTotp']);
+        $group->post('/settings/security/totp/confirm', [SecurityController::class, 'confirmTotp']);
+        $group->post('/settings/security/totp/cancel', [SecurityController::class, 'cancelTotp']);
+        $group->post('/settings/security/totp/disable', [SecurityController::class, 'disableTotp']);
+        // Not under /totp: recovery codes cover whichever second factor the
+        // account has, including a passkey with no authenticator app.
+        $group->post('/settings/security/recovery-codes', [SecurityController::class, 'regenerateRecoveryCodes']);
+
+        $group->post('/settings/security/passkeys/options', [SecurityController::class, 'passkeyOptions']);
+        $group->post('/settings/security/passkeys', [SecurityController::class, 'registerPasskey']);
+        $group->post('/settings/security/passkeys/{id:[0-9]+}/rename', [SecurityController::class, 'renamePasskey']);
+        $group->post('/settings/security/passkeys/{id:[0-9]+}/delete', [SecurityController::class, 'revokePasskey']);
+
+        $group->post('/settings/security/sessions/revoke', [SecurityController::class, 'revokeSession']);
+        $group->post('/settings/security/sessions/revoke-others', [SecurityController::class, 'revokeOtherSessions']);
+
+        // The log is a read, but not one every member may make: an instance
+        // administrator sees the instance, a household Owner sees their
+        // household, and everybody else gets a 403 here rather than an empty
+        // page that implies there was nothing to see.
+        $group->get('/audit', [AuditLogController::class, 'index'])
+            ->setName('audit-log')
+            ->add($requires(Permission::ViewAuditLog));
 
         $group->post('/settings/trusted-hosts', [SettingsController::class, 'addTrustedHost'])
             ->add($requires(Permission::ManageInstance));

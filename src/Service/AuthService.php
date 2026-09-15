@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\AuditAction;
 use App\Domain\Entity\User;
 use App\Domain\Role;
 use App\Repository\AuthAttemptRepository;
@@ -37,6 +38,7 @@ final class AuthService
         private readonly RateLimiter $rateLimiter,
         private readonly MailerService $mailer,
         private readonly InstanceSettingsService $settings,
+        private readonly AuditLogService $audit,
         private readonly Clock $clock,
         private readonly string $appUrl,
     ) {
@@ -130,6 +132,11 @@ final class AuthService
 
         $this->users->markEmailVerified($userId, $this->clock->now());
 
+        $user = $this->users->findById($userId);
+        if ($user !== null) {
+            $this->audit->record(AuditAction::EmailVerified, $user);
+        }
+
         return true;
     }
 
@@ -155,6 +162,10 @@ final class AuthService
         );
 
         if ($remaining > 0) {
+            $this->audit->recordAnonymous(AuditAction::LoginBlocked, $email, null, [
+                'retry_in_seconds' => $remaining,
+            ]);
+
             throw ValidationException::field('email', sprintf(
                 'Too many attempts. Try again in %d minutes.',
                 max(1, (int) ceil($remaining / 60)),
@@ -172,11 +183,17 @@ final class AuthService
 
             $this->rateLimiter->recordFailure(AuthAttemptRepository::KIND_LOGIN, $email, $ipAddress);
 
+            $this->audit->recordAnonymous(AuditAction::LoginFailed, $email, $user, [
+                'reason' => $user === null ? 'unknown_account' : 'bad_password',
+            ]);
+
             throw ValidationException::field('email', 'Those credentials are not correct.');
         }
 
         if (!$user->isVerified()) {
             $this->rateLimiter->recordFailure(AuthAttemptRepository::KIND_LOGIN, $email, $ipAddress);
+
+            $this->audit->recordAnonymous(AuditAction::LoginFailed, $email, $user, ['reason' => 'unverified']);
 
             throw ValidationException::field(
                 'email',

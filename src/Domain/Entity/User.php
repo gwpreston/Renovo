@@ -17,6 +17,7 @@ final class User
         public readonly ?DateTimeImmutable $emailVerifiedAt,
         public readonly string $theme,
         public readonly DateTimeImmutable $createdAt,
+        public readonly ?string $webauthnHandle = null,
     ) {
     }
 

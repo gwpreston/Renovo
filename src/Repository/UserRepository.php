@@ -21,7 +21,7 @@ final class UserRepository extends AbstractRepository
 
     protected function filterableColumns(): array
     {
-        return ['id', 'email', 'display_name', 'is_instance_admin', 'created_at'];
+        return ['id', 'email', 'display_name', 'is_instance_admin', 'webauthn_handle', 'created_at'];
     }
 
     public function findById(int $id): ?User
@@ -104,6 +104,41 @@ final class UserRepository extends AbstractRepository
         );
     }
 
+    public function webauthnHandle(int $userId): ?string
+    {
+        $value = $this->db->fetchValue(
+            'SELECT ' . $this->quote('webauthn_handle') . ' FROM ' . $this->quote('users')
+            . ' WHERE ' . $this->quote('id') . ' = :id',
+            ['id' => $userId],
+        );
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Written once, when the account registers its first credential. Every
+     * credential that account holds is bound to it, so it is never rewritten
+     * while any of them exist.
+     */
+    public function setWebauthnHandle(int $userId, string $handle): void
+    {
+        $this->db->execute(
+            'UPDATE ' . $this->quote('users') . ' SET ' . $this->quote('webauthn_handle') . ' = :handle, '
+            . $this->quote('updated_at') . ' = :now WHERE ' . $this->quote('id') . ' = :id',
+            ['handle' => $handle, 'now' => (new DateTimeImmutable())->format('Y-m-d H:i:s'), 'id' => $userId],
+        );
+    }
+
+    public function findByWebauthnHandle(string $handle): ?User
+    {
+        $row = $this->db->fetchOne(
+            'SELECT * FROM ' . $this->quote('users') . ' WHERE ' . $this->quote('webauthn_handle') . ' = :handle',
+            ['handle' => $handle],
+        );
+
+        return $row === null ? null : $this->hydrate($row);
+    }
+
     public function countAll(): int
     {
         return (int) $this->db->fetchValue('SELECT COUNT(*) FROM ' . $this->quote('users'));
@@ -144,6 +179,9 @@ final class UserRepository extends AbstractRepository
                 : null,
             theme: (string) ($row['theme'] ?? 'system'),
             createdAt: new DateTimeImmutable((string) $row['created_at']),
+            webauthnHandle: isset($row['webauthn_handle']) && $row['webauthn_handle'] !== ''
+                ? (string) $row['webauthn_handle']
+                : null,
         );
     }
 }

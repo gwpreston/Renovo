@@ -22,6 +22,17 @@
             <button type="submit" class="button button-primary">Sign in</button>
         </form>
 
+        {#
+            Offered beside the password form rather than behind it: a passkey is
+            a way of signing in, not a fallback for one.
+        #}
+        <hr class="divider">
+
+        <div class="stack">
+            <button type="button" class="button" id="passkey-button">Sign in with a passkey</button>
+            <p class="field-error" id="passkey-error" hidden></p>
+        </div>
+
         <p class="muted">
             <a href="/forgot-password">Forgotten your password?</a>
             {% if registration_allowed %}
@@ -29,4 +40,15 @@
             {% endif %}
         </p>
     </section>
+
+    <script src="/assets/webauthn.js" defer></script>
+    <script type="module">
+        window.renovoWebAuthn.bindAuthentication({
+            button: document.getElementById('passkey-button'),
+            error: document.getElementById('passkey-error'),
+            optionsUrl: '/login/passkey/options',
+            verifyUrl: '/login/passkey?next={{ next|url_encode }}',
+            csrf: '{{ csrf_token() }}',
+        });
+    </script>
 {% endblock %}

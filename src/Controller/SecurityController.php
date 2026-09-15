@@ -1,0 +1,322 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controller;
+
+use App\Security\SessionInterface;
+use App\Security\Totp;
+use App\Service\Auth\SessionDirectoryService;
+use App\Service\Auth\TotpService;
+use App\Service\Auth\TwoFactorService;
+use App\Service\Auth\WebAuthnService;
+use App\Service\InstanceSettingsService;
+use App\Service\ValidationException;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Slim\Views\Twig;
+
+/**
+ * The account-security page: authenticator app, passkeys, active sessions.
+ *
+ * Every route here acts on the signed-in user's own id, taken from the session
+ * and never from the request, so there is no permission to check beyond being
+ * signed in — and no way to point any of it at somebody else's account. A
+ * Viewer securing their own login is not a household write.
+ *
+ * The recovery codes are shown once, through a flash-like session key that is
+ * consumed by the render. They are not stored anywhere readable, so a page
+ * refresh that lost them would mean the user cannot get back in if their phone
+ * goes missing — and keeping them retrievable would defeat hashing them.
+ */
+final class SecurityController extends Controller
+{
+    private const ENROLMENT_SECRET_KEY = 'totp_enrolment_secret';
+    private const RECOVERY_CODES_KEY = 'recovery_codes_once';
+    private const REGISTRATION_OPTIONS_KEY = 'passkey_registration_options';
+
+    public function __construct(
+        Twig $view,
+        SessionInterface $session,
+        private readonly TotpService $totp,
+        private readonly TwoFactorService $twoFactor,
+        private readonly WebAuthnService $webAuthn,
+        private readonly SessionDirectoryService $sessions,
+        private readonly InstanceSettingsService $settings,
+    ) {
+        parent::__construct($view, $session);
+    }
+
+    public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->user($request);
+
+        $codes = $this->session->get(self::RECOVERY_CODES_KEY);
+        $this->session->remove(self::RECOVERY_CODES_KEY);
+
+        return $this->render($request, $response, 'security/index.twig', [
+            'totp' => [
+                'enabled' => $this->totp->isEnabled($user->id),
+            ],
+            'recovery' => [
+                'remaining' => $this->twoFactor->unusedRecoveryCodeCount($user->id),
+                'applicable' => $this->twoFactor->isRequiredFor($user->id),
+            ],
+            'recovery_codes' => is_array($codes) ? $codes : [],
+            'passkeys' => $this->webAuthn->credentialsFor($user->id),
+            'sessions' => $this->sessions->listFor($user, $this->session->id()),
+            'errors' => [],
+        ]);
+    }
+
+    /**
+     * Step one of enrolment: show the QR code and wait for a code back.
+     */
+    public function startTotp(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->user($request);
+
+        if ($this->totp->isEnabled($user->id)) {
+            $this->flash('error', 'An authenticator app is already set up for this account.');
+
+            return $this->redirectAfterWrite($request, $response, '/settings/security');
+        }
+
+        $enrolment = $this->totp->beginEnrolment($user, $this->settings->instanceName());
+        $this->session->set(self::ENROLMENT_SECRET_KEY, $enrolment['secret']);
+
+        return $this->render($request, $response, 'security/totp_setup.twig', [
+            'secret' => $enrolment['formatted_secret'],
+            'uri' => $enrolment['uri'],
+            'qr_code' => $this->qrCode($enrolment['uri']),
+            'errors' => [],
+        ]);
+    }
+
+    public function confirmTotp(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->user($request);
+        $body = $this->body($request);
+
+        try {
+            $codes = $this->totp->confirmEnrolment(
+                $user,
+                is_scalar($body['code'] ?? null) ? (string) $body['code'] : '',
+            );
+        } catch (ValidationException $exception) {
+            $secret = $this->session->get(self::ENROLMENT_SECRET_KEY);
+            $uri = is_string($secret) && $secret !== ''
+                ? Totp::provisioningUri($secret, $user->email, $this->settings->instanceName())
+                : '';
+
+            return $this->render($request, $response->withStatus(422), 'security/totp_setup.twig', [
+                'secret' => is_string($secret) ? Totp::formatSecret($secret) : '',
+                'uri' => $uri,
+                'qr_code' => $uri === '' ? '' : $this->qrCode($uri),
+                'errors' => $exception->errors(),
+            ]);
+        }
+
+        $this->session->remove(self::ENROLMENT_SECRET_KEY);
+        $this->session->set(self::RECOVERY_CODES_KEY, $codes);
+
+        $this->flash('success', 'Two-factor authentication is on. Save your recovery codes now.');
+
+        return $this->redirectAfterWrite($request, $response, '/settings/security');
+    }
+
+    public function cancelTotp(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->totp->cancelEnrolment($this->user($request)->id);
+        $this->session->remove(self::ENROLMENT_SECRET_KEY);
+
+        return $this->redirectAfterWrite($request, $response, '/settings/security');
+    }
+
+    public function disableTotp(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body = $this->body($request);
+
+        try {
+            $this->totp->disable(
+                $this->user($request),
+                is_scalar($body['password'] ?? null) ? (string) $body['password'] : '',
+            );
+            $this->flash('success', 'Two-factor authentication is off.');
+        } catch (ValidationException $exception) {
+            $this->flash('error', implode(' ', $exception->errors()));
+        }
+
+        return $this->redirectAfterWrite($request, $response, '/settings/security');
+    }
+
+    public function regenerateRecoveryCodes(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $body = $this->body($request);
+
+        try {
+            $codes = $this->twoFactor->regenerateRecoveryCodes(
+                $this->user($request),
+                is_scalar($body['password'] ?? null) ? (string) $body['password'] : '',
+            );
+
+            $this->session->set(self::RECOVERY_CODES_KEY, $codes);
+            $this->flash('success', 'New recovery codes issued. The old ones no longer work.');
+        } catch (ValidationException $exception) {
+            $this->flash('error', implode(' ', $exception->errors()));
+        }
+
+        return $this->redirectAfterWrite($request, $response, '/settings/security');
+    }
+
+    /**
+     * Options for registering a new passkey.
+     */
+    public function passkeyOptions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $options = $this->webAuthn->serializeOptions(
+            $this->webAuthn->registrationOptions($this->user($request)),
+        );
+
+        $this->session->set(self::REGISTRATION_OPTIONS_KEY, $options);
+
+        return $this->jsonRaw($response, $options);
+    }
+
+    public function registerPasskey(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $stored = $this->session->get(self::REGISTRATION_OPTIONS_KEY);
+        if (!is_string($stored) || $stored === '') {
+            return $this->json($response->withStatus(400), ['error' => 'Start again — that challenge has expired.']);
+        }
+
+        $payload = json_decode((string) $request->getBody(), true);
+        if (!is_array($payload) || !isset($payload['credential'])) {
+            return $this->json($response->withStatus(400), ['error' => 'The browser sent an unexpected response.']);
+        }
+
+        $name = is_scalar($payload['name'] ?? null) ? (string) $payload['name'] : '';
+        $discoverable = ($payload['discoverable'] ?? null) === true;
+
+        try {
+            $credential = $this->webAuthn->completeRegistration(
+                $this->user($request),
+                json_encode($payload['credential'], JSON_THROW_ON_ERROR),
+                $this->webAuthn->deserializeCreationOptions($stored),
+                $name,
+                $discoverable,
+            );
+        } catch (ValidationException $exception) {
+            return $this->json($response->withStatus(422), ['error' => implode(' ', $exception->errors())]);
+        } finally {
+            $this->session->remove(self::REGISTRATION_OPTIONS_KEY);
+        }
+
+        // A passkey is a second factor too: registering the first one has just
+        // made this account's password login depend on a device, so it gets the
+        // same way back in that enrolling an authenticator does.
+        $codes = $this->twoFactor->ensureRecoveryCodes($this->user($request));
+        if ($codes !== []) {
+            $this->session->set(self::RECOVERY_CODES_KEY, $codes);
+        }
+
+        $this->flash('success', sprintf('Passkey "%s" added.', $credential->name));
+
+        return $this->json($response, ['redirect' => '/settings/security']);
+    }
+
+    public function renamePasskey(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $body = $this->body($request);
+
+        try {
+            $this->webAuthn->rename(
+                $this->user($request),
+                (int) $id,
+                is_scalar($body['name'] ?? null) ? (string) $body['name'] : '',
+            );
+            $this->flash('success', 'Passkey renamed.');
+        } catch (ValidationException $exception) {
+            $this->flash('error', implode(' ', $exception->errors()));
+        }
+
+        return $this->redirectAfterWrite($request, $response, '/settings/security');
+    }
+
+    public function revokePasskey(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        try {
+            $this->webAuthn->revoke($this->user($request), (int) $id);
+            $this->flash('success', 'Passkey revoked.');
+        } catch (ValidationException $exception) {
+            $this->flash('error', implode(' ', $exception->errors()));
+        }
+
+        return $this->redirectAfterWrite($request, $response, '/settings/security');
+    }
+
+    public function revokeSession(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body = $this->body($request);
+        $handle = is_scalar($body['handle'] ?? null) ? (string) $body['handle'] : '';
+
+        $revoked = $this->sessions->revoke($this->user($request), $handle, $this->session->id());
+
+        $this->flash(
+            $revoked ? 'success' : 'error',
+            $revoked ? 'That session was signed out.' : 'That session is no longer active.',
+        );
+
+        return $this->redirectAfterWrite($request, $response, '/settings/security');
+    }
+
+    public function revokeOtherSessions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $count = $this->sessions->revokeAllOthers($this->user($request), $this->session->id());
+
+        $this->flash('success', sprintf('%d other session(s) signed out.', $count));
+
+        return $this->redirectAfterWrite($request, $response, '/settings/security');
+    }
+
+    /**
+     * An inline SVG QR code.
+     *
+     * SVG rather than a raster image so there is no dependency on ext-gd, and
+     * inline rather than a URL so the secret is never fetched as a separate
+     * request that could end up in a proxy log.
+     */
+    private function qrCode(string $uri): string
+    {
+        $writer = new Writer(new ImageRenderer(new RendererStyle(220, 1), new SvgImageBackEnd()));
+
+        return $writer->writeString($uri);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function json(ResponseInterface $response, array $payload): ResponseInterface
+    {
+        return $this->jsonRaw($response, json_encode($payload, JSON_THROW_ON_ERROR));
+    }
+
+    private function jsonRaw(ResponseInterface $response, string $json): ResponseInterface
+    {
+        $response->getBody()->write($json);
+
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+}

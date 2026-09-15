@@ -36,6 +36,11 @@ final class PermissionService
 
             Permission::ManageHousehold => $scope->canManageHousehold(),
 
+            // Two independent routes to the log, and the repository decides
+            // which rows each one gets: instance-wide for an administrator,
+            // household-scoped for an Owner. Neither implies the other.
+            Permission::ViewAuditLog => $scope->isInstanceAdmin || $scope->canManageHousehold(),
+
             // Instance administration is the one permission the household role
             // has no say in — and equally, it grants no household data access.
             Permission::ManageInstance => $scope->isInstanceAdmin,
