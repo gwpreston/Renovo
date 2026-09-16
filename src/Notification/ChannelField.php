@@ -16,6 +16,11 @@ namespace App\Notification;
  */
 final class ChannelField
 {
+    /**
+     * `label` and `hint` are translation keys, not words: the settings form
+     * resolves them, so a channel type describes its configuration once and
+     * every locale renders it.
+     */
     public function __construct(
         public readonly string $name,
         public readonly string $label,

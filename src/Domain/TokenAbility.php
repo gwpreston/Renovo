@@ -25,12 +25,9 @@ enum TokenAbility: string
         return $this === self::Write;
     }
 
-    public function label(): string
+    public function labelKey(): string
     {
-        return match ($this) {
-            self::Read => 'Read-only',
-            self::Write => 'Read and write',
-        };
+        return 'token_ability.' . $this->value;
     }
 
     public static function fromString(string $value): self

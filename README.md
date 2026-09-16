@@ -4,7 +4,9 @@ A self-hosted tracker for subscriptions and recurring bills. Multi-user,
 permission-scoped, with multi-currency totals, budgets, a twelve-month forecast,
 price history, free-trial tracking, shared-cost splitting, upcoming-renewal
 windows, notice periods, a versioned JSON API, CSV/JSON import, whole-household
-backups, a calendar feed, attached invoices and a light/dark interface.
+backups, a calendar feed and a calendar view, attached invoices, saved views,
+keyboard shortcuts, and a light/dark interface in whichever language you have a
+catalogue for.
 
 Built in phases:
 
@@ -41,11 +43,24 @@ Built in phases:
   [Importing](#importing), [Backup and restore](#backup-and-restore),
   [Calendar feed](#calendar-feed) and
   [Invoices and receipts](#invoices-and-receipts).
+- **Phase 6 — language, the calendar, polish and operations — complete.** Every
+  string the application shows now comes from a catalogue, so adding a language
+  is adding one file and running one check; a month view of what is coming; list
+  filters you can name and come back to; comfortable or compact lists, a
+  dashboard you can rearrange, a quick-add dialog and keyboard shortcuts; icons
+  fetched from a subscription's own website through the guarded HTTP client and
+  cached per domain; liveness and readiness endpoints and a Prometheus
+  `/metrics`; and a read-only demonstration mode. See
+  [Language](#language), [Calendar](#calendar),
+  [Making it yours](#making-it-yours),
+  [Health and metrics](#health-and-metrics) and
+  [Demonstration mode](#demonstration-mode).
 
-Still to come: OIDC/SSO, internationalisation, a calendar *view*, and UX
-polish.
+That is the v1 feature set. Deliberately not in it: OIDC/SSO, and bank or
+transaction sync — see the end of `PHASE.md` for what was deferred and why.
 
-See `PHASE.md` for what is in scope now and `SPEC.md` for the whole plan.
+See `PHASE.md` for what was in scope for the last phase and `SPEC.md` for the
+conventions every phase followed.
 
 ---
 
@@ -183,6 +198,9 @@ list. `.env` is never committed. The ones that matter most:
 | `AUDIT_LOG_RETENTION_DAYS`  | How long audit entries are kept. 365 by default.              |
 | `EXCHANGE_RATE_API_KEY`     | Only for providers that need one. Takes precedence over a key entered in the UI. |
 | `EXCHANGE_RATE_TTL_SECONDS` | How long a cached rate table stays current. 12 hours by default. |
+| `APP_LOCALE`                | The language and formatting an account gets before choosing its own. Any ICU locale with a catalogue in `translations/`. |
+| `METRICS_TOKEN`             | Unset means `/metrics` does not exist. Set it to expose Prometheus metrics to a scrape job carrying the same bearer token. |
+| `LOGO_CACHE_DIRECTORY`      | Where fetched site icons are cached, one file per domain. Under `var/` by default. |
 
 ---
 
@@ -207,6 +225,8 @@ php bin/console reminders:run       # send due reminders and budget alerts
 php bin/console rates:refresh       # fetch and cache exchange rates
 php bin/console maintenance:prune   # expired sessions, tokens, throttle, notification and audit
                                     # records, plus abandoned import uploads
+php bin/console i18n:check          # every locale against the base catalogue; non-zero on drift
+php bin/console demo:seed           # the demonstration household, for read-only demo mode
 ```
 
 The `scheduler` container runs `reminders:run` and `maintenance:prune` once a
@@ -294,14 +314,18 @@ src/
   Notification/ The Notifier interface, the registry, and one class per channel.
   Http/       The shared outbound HTTP client, and the SSRF guard for
               user-supplied URLs.
+  I18n/       The translator, the catalogue loader and the completeness check.
   Domain/     Money, cycles, roles, entities. No I/O.
 templates/    Twig. No logic.
+translations/ One flat catalogue per locale. Adding a language is adding a
+              file here; see Language.
 config/       Settings, container, middleware, routes.
 migrations/   Phinx migrations and seeds.
 openapi/      The API contract. Hand-written, served as-is, checked against
               the route table in CI.
-var/          Not web-accessible. Caches, logs, attached invoices, and
-              in-progress imports. Back this up alongside the database.
+var/          Not web-accessible. Caches, logs, attached invoices, cached site
+              icons, and in-progress imports. Back this up alongside the
+              database.
 ```
 
 Four rules hold the design together:
@@ -773,6 +797,184 @@ Set the ceiling with `UPLOAD_MAX_ATTACHMENT_BYTES` (10 MB by default) and the
 location with `ATTACHMENT_DIRECTORY`.
 
 ---
+
+## Language
+
+Every string the application shows — pages, validation messages, flash
+messages, reminder emails, the calendar feed, even the handful of messages its
+JavaScript can produce — comes from a catalogue keyed by name. `en` is the base
+and the only one that ships.
+
+Each account chooses its own language under **Settings → Appearance**, or
+follows the instance (`APP_LOCALE`). Somebody who is not signed in gets the best
+match for their browser's `Accept-Language`, and the instance default when there
+is no match. Dates and money follow the same choice: they are formatted by ICU,
+so a French reader gets `4 sept. 2026` and `12,99 £` without a second setting.
+
+### Adding a language
+
+1. Copy `translations/en.php` to `translations/<locale>.php` — `fr`, `de`,
+   `pt_BR`, any ICU locale code.
+2. Translate the right-hand side of each entry. Leave the keys alone.
+3. Run the check:
+
+   ```bash
+   php bin/console i18n:check
+   ```
+
+   It compares every catalogue with the base in both directions and exits
+   non-zero on any difference. A missing key is the obvious one; an *extra* key
+   is the one worth catching, because it means either a message nothing renders
+   any more or a typo that has left a page quietly falling back to English. CI
+   runs the same command.
+
+Two things to know while translating:
+
+- **Messages are ICU MessageFormat.** Anything in braces is an argument, and a
+  count that reads differently in the singular takes a `plural` block. Your
+  language's rules are yours: Polish has three forms and Arabic six, and the
+  catalogue is where you say so.
+
+  ```php
+  'notice.days' => '{count, plural, one {# day} other {# days}}',
+  ```
+
+- **A regional catalogue may be partial.** `fr_CA.php` needs only what Canadian
+  French says differently; anything it does not define falls back to `fr`, and
+  then to `en`. Only `en` has to be complete.
+
+Nothing else needs changing. The language list on the settings page is the set
+of files in `translations/`.
+
+## Calendar
+
+**Calendar** shows the month: every renewal on the day it falls, and the day
+each free trial starts charging. The figures come from the same forecast the
+budgets and the twelve-month view use, so a scheduled price rise shows the
+amount that will actually be taken rather than today's price.
+
+It pages forward as far as the forecast goes and no further back than this
+month — this application tracks what is due, not a ledger of what was paid, so
+a calendar of last year would be an invention.
+
+Weeks start on Monday or Sunday, per account, under **Settings → Appearance**.
+It is a preference rather than a property of the locale on purpose: `en_GB` and
+`en_US` disagree, and plenty of people read a Monday-first calendar in an
+American locale because that is how their working week runs.
+
+## Making it yours
+
+All of this is per account, under **Settings → Appearance**, and none of it
+needs any permission: it changes what one person sees and nothing that anybody
+else does.
+
+- **Theme** — system, light or dark.
+- **Language** — see [Language](#language).
+- **Week start** — used by the calendar.
+- **List density** — comfortable or compact. Compact is for the account with
+  ninety subscriptions; it is the same markup with less padding, so a screen
+  reader sees no difference.
+- **Open on** — the page you land on when you open Renovo. The dashboard,
+  the subscriptions list, the calendar, budgets, the forecast or the statistics.
+- **Dashboard cards** — reorder them by number and untick the ones you do not
+  want. A card added by a later version appears in its default place rather
+  than silently going missing.
+
+### Saved views
+
+Filter the subscriptions list however you like, give the result a name, and it
+appears above the list as a link. What is stored is the query string the list
+itself produced, re-parsed through the same value object that reads a URL — so
+a saved view is a bookmark the instance keeps for you, and a tampered one can
+no more reach the database than a tampered link can.
+
+### Keyboard shortcuts
+
+Press **?** anywhere for the list. In short: **n** opens the quick-add dialog,
+**/** jumps to the search box, and **g** then a letter goes somewhere — `g d`
+for the dashboard, `g s` for subscriptions, `g c` for the calendar.
+
+The quick-add dialog loads the real subscription form rather than a shortened
+copy of it, so there is one definition of what a subscription needs. Everything
+a shortcut does is also a link or a button on the page: a browser with
+JavaScript off loses the convenience and none of the function.
+
+### Logos
+
+Upload one on the subscription form, or give the subscription its **Website**
+and Renovo will ask that site for its own icon — `/apple-touch-icon.png`,
+`/favicon.ico` and the two other conventional paths, in that order.
+
+It asks the site, never a logo service: every icon service works by being told
+which brands you are interested in, and a household's list of subscriptions is
+the thing this application exists to keep. The request goes through the same
+guarded HTTP client as notifications and webhooks, https only, so a `Website`
+pointing at a private address is refused rather than fetched.
+
+Results are cached per domain for thirty days, failures for seven. Twenty
+households with the same streaming service cost one request between them, and a
+site with no icon is not asked again on every save. Each subscription still
+gets its own copy of the image, so removing one subscription's logo can never
+blank another's.
+
+## Health and metrics
+
+Three endpoints, outside every login and exempt from the first-run wizard, so
+they answer honestly on a container that has never been configured.
+
+| Endpoint | Answers | Open? |
+| --- | --- | --- |
+| `/healthz` | Is this process alive? Touches nothing else. | Yes |
+| `/readyz` | Should it be sent traffic? Database, schema, scheduler. | Yes |
+| `/metrics` | Prometheus exposition. | No — see below |
+
+**Liveness deliberately does not touch the database.** An orchestrator restarts
+what fails a liveness probe, so a probe that queried the database would turn a
+thirty-second blip into a restart loop. Readiness is the one that asks: it
+answers 503 when the database is unreachable, when no migration has been
+applied or one did not finish, or when the scheduler has not completed a run in
+two days — a scheduler container that died stops every reminder and changes
+nothing else a page would show.
+
+The compose file points nginx's healthcheck at `/readyz`.
+
+`/metrics` carries counts of accounts, households, subscriptions, notification
+outcomes, rate freshness and requests by status class. Those are not secrets,
+but they describe an instance, so it is closed by default: set `METRICS_TOKEN`
+and give the same value to the scrape job as a bearer credential. An instance
+administrator signed in to a browser can also read it. Anybody else gets 404 —
+there is nothing to be gained by confirming that the endpoint exists.
+
+Setting a token also starts counting requests by status class, which costs one
+small `UPDATE` per request. Leave it unset if nothing scrapes this instance and
+nothing is written at all.
+
+## Demonstration mode
+
+**Settings → Instance → Read-only demonstration** closes the whole instance to
+writes: every form, every API endpoint, for everybody. It is a single switch
+because a demo is what the whole server is for while it is on.
+
+Seed something worth showing first:
+
+```bash
+php bin/console demo:seed
+```
+
+That creates a `demo@renovo.local` account in its own household with six
+invented subscriptions, one of them a trial about to convert, and prints a
+random password once. The subscriptions are written through the ordinary
+services, so the dashboard's figures are computed exactly as they would be for
+a real household.
+
+Two things are still allowed while demo mode is on: signing in and out, and an
+instance administrator saving the instance settings form — otherwise the switch
+could not be turned off again without database access.
+
+Nothing special happens to reads. The demo account is an ordinary member of its
+own household, so the scoping layer shows it the seeded data and nothing else,
+exactly as it would for anybody. An instance that also hosts real accounts
+keeps them private, and there is a test that says so.
 
 ## Security
 

@@ -114,6 +114,14 @@ return [
         'log_retention_days' => (int) $env('NOTIFY_LOG_RETENTION_DAYS', '180'),
     ],
 
+    'metrics' => [
+        // Unset means the endpoint does not exist. An operator who wants
+        // Prometheus to scrape this instance sets a token and configures the
+        // same one in the scrape job; an instance administrator can also read
+        // it in a browser. There is no third way in.
+        'token' => $env('METRICS_TOKEN', ''),
+    ],
+
     'audit' => [
         // A year, because that is the span an operator is realistically asked
         // about ("who changed this, and when?") and long enough to cover an
@@ -137,6 +145,10 @@ return [
 
     'uploads' => [
         'logo_directory' => dirname(__DIR__) . '/public/assets/logos',
+        // Icons as fetched, one file per domain, shared by every household on
+        // the instance. Under var/ because nothing serves these directly: each
+        // subscription gets its own copy in the public logo directory.
+        'logo_cache_directory' => $env('LOGO_CACHE_DIRECTORY', dirname(__DIR__) . '/var/logo-cache'),
         'logo_max_bytes' => (int) $env('UPLOAD_MAX_LOGO_BYTES', '1048576'),
         // Under var/, not public/. A logo is a public-ish image; an invoice has
         // an address and a card number on it, so nothing serves these directly
@@ -158,5 +170,8 @@ return [
         // The API's contract, served as-is and validated against the routes
         // in CI.
         'openapi' => dirname(__DIR__) . '/openapi/openapi.yaml',
+        // One flat catalogue per locale. Adding a language is adding a file
+        // here; nothing else has to be told about it.
+        'translations' => dirname(__DIR__) . '/translations',
     ],
 ];

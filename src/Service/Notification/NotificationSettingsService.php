@@ -12,6 +12,7 @@ use App\Notification\NotifierRegistry;
 use App\Repository\NotificationChannelRepository;
 use App\Repository\NotificationPreferenceRepository;
 use App\Repository\NotificationRouteRepository;
+use App\Service\ValidationError;
 use App\Service\ValidationException;
 
 /**
@@ -65,7 +66,7 @@ final class NotificationSettingsService
         $notifier = $this->notifiers->find($type);
 
         if ($notifier === null) {
-            throw ValidationException::field('channel_type', 'Choose a channel type.');
+            throw ValidationException::field('channel_type', 'error.channel.type_required');
         }
 
         $label = $this->label($input, $notifier->label());
@@ -82,12 +83,12 @@ final class NotificationSettingsService
     {
         $existing = $this->channels->find($userId, $id);
         if ($existing === null) {
-            throw ValidationException::field('channel_type', 'That channel no longer exists.');
+            throw ValidationException::field('channel_type', 'error.channel.missing');
         }
 
         $notifier = $this->notifiers->find($existing->type);
         if ($notifier === null) {
-            throw ValidationException::field('channel_type', 'That channel type is no longer available.');
+            throw ValidationException::field('channel_type', 'error.channel.type_unavailable');
         }
 
         $config = $notifier->normaliseConfig($input, $existing->config);
@@ -127,14 +128,14 @@ final class NotificationSettingsService
         $day = $dayRaw === '' ? 1 : (int) $dayRaw;
 
         if ($mode === DigestMode::Weekly && ($day < 1 || $day > 7)) {
-            $errors['digest_day'] = 'Choose a day of the week.';
+            $errors['digest_day'] = 'error.digest.weekday';
         }
 
         // Capped at 28 rather than 31: a monthly digest set for the 30th would
         // never be sent in February, and a notification feature that silently
         // skips a month is worse than one that is a few days early.
         if ($mode === DigestMode::Monthly && ($day < 1 || $day > 28)) {
-            $errors['digest_day'] = 'Choose a day of the month between 1 and 28.';
+            $errors['digest_day'] = 'error.digest.monthday';
         }
 
         if ($errors !== []) {
@@ -222,7 +223,7 @@ final class NotificationSettingsService
     }
 
     /**
-     * @param array<string, string> $errors
+     * @param array<string, ValidationError|string> $errors
      * @return list<int>
      */
     private function parseLeadDays(string $value, array &$errors): array
@@ -242,7 +243,7 @@ final class NotificationSettingsService
             }
 
             if (!ctype_digit($part) || (int) $part > self::MAX_LEAD_DAYS) {
-                $errors['lead_days'] = 'Enter whole numbers of days, separated by commas — for example 30, 7, 1.';
+                $errors['lead_days'] = 'error.lead_days.invalid';
 
                 return [];
             }
@@ -251,7 +252,7 @@ final class NotificationSettingsService
         }
 
         if (count($days) > self::MAX_LEAD_TIMES) {
-            $errors['lead_days'] = sprintf('Use at most %d reminders per subscription.', self::MAX_LEAD_TIMES);
+            $errors['lead_days'] = new ValidationError('error.lead_days.too_many', ['max' => self::MAX_LEAD_TIMES]);
 
             return [];
         }

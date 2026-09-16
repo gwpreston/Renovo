@@ -7,7 +7,10 @@ namespace App\Controller;
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Domain\Entity\User;
 use App\Security\Scope;
+use App\I18n\Translator;
 use App\Security\SessionInterface;
+use App\Service\ValidationError;
+use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Exception\HttpNotFoundException;
@@ -25,6 +28,7 @@ abstract class Controller
     public function __construct(
         protected readonly Twig $view,
         protected readonly SessionInterface $session,
+        protected readonly Translator $translator,
     ) {
     }
 
@@ -133,9 +137,45 @@ abstract class Controller
         return is_array($body) ? $body : [];
     }
 
-    protected function flash(string $type, string $message): void
+    /**
+     * Queue a message for the page the user lands on next.
+     *
+     * The argument is a translation key, not a sentence: see
+     * SessionInterface::flash().
+     *
+     * @param array<string, string|int|float> $parameters
+     */
+    protected function flash(string $type, string $key, array $parameters = []): void
     {
-        $this->session->flash($type, $message);
+        $this->session->flash($type, $key, $parameters);
+    }
+
+    /**
+     * Queue every message from a validation failure.
+     *
+     * One flash per field rather than one line with them all run together:
+     * they are separate sentences about separate fields, and a reader picking
+     * their way through "Enter a name. Choose a currency." has to do the
+     * splitting themselves.
+     */
+    protected function flashErrors(ValidationException $exception): void
+    {
+        foreach ($exception->errors() as $error) {
+            $this->flash('error', $error->key, $error->parameters);
+        }
+    }
+
+    /**
+     * A validation failure as one sentence, for the handful of routes that
+     * answer a `fetch()` with JSON rather than re-rendering a form — the
+     * passkey ceremonies, which have no form to re-render.
+     */
+    protected function errorSentence(ValidationException $exception): string
+    {
+        return implode(' ', array_map(
+            fn (ValidationError $error): string => $this->translator->trans($error->key, $error->parameters),
+            $exception->errors(),
+        ));
     }
 
     protected function notFound(ServerRequestInterface $request): HttpNotFoundException

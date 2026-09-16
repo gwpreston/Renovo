@@ -1,16 +1,16 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Two-step verification — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('auth_two_factor.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <section class="card narrow">
-        <h1>Two-step verification</h1>
-        <p class="muted">Hello {{ display_name }} — one more step to finish signing in.</p>
+        <h1>{{ t('auth_two_factor.title') }}</h1>
+        <p class="muted">{{ t('auth_two_factor.greeting', {'name': display_name}) }}</p>
 
         {% if methods.passkey %}
             <div class="stack" id="passkey-block">
                 <button type="button" class="button button-primary" id="passkey-button">
-                    Use a passkey or security key
+                    {{ t('auth_two_factor.passkey') }}
                 </button>
                 <p class="field-error" id="passkey-error" hidden></p>
             </div>
@@ -22,17 +22,17 @@
             <form method="post" action="/login/two-factor" class="stack">
                 {{ csrf_field() }}
 
-                <label for="code">Code from your authenticator app</label>
+                <label for="code">{{ t('auth_two_factor.code_label') }}</label>
                 <input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code"
                        pattern="[0-9]{6}" maxlength="6" required autofocus>
-                {% if errors.code is defined %}<p class="field-error">{{ errors.code }}</p>{% endif %}
+                {% if errors.code is defined %}<p class="field-error">{{ error_message(errors.code) }}</p>{% endif %}
 
-                <button type="submit" class="button button-primary">Verify</button>
+                <button type="submit" class="button button-primary">{{ t('auth_two_factor.verify') }}</button>
             </form>
 
         {% elseif not methods.passkey %}
             <p class="field-error">
-                This account has no second factor available. Ask an administrator for help.
+                {{ t('auth_two_factor.no_factor') }}
             </p>
         {% endif %}
 
@@ -42,23 +42,23 @@
         #}
         {% if methods.recovery %}
             <details class="stack">
-                <summary>Lost your device? Use a recovery code</summary>
+                <summary>{{ t('auth_two_factor.recovery_toggle') }}</summary>
 
                 <form method="post" action="/login/two-factor" class="stack">
                     {{ csrf_field() }}
                     <input type="hidden" name="mode" value="recovery">
 
-                    <label for="recovery-code">Recovery code</label>
+                    <label for="recovery-code">{{ t('auth_two_factor.recovery_code') }}</label>
                     <input type="text" id="recovery-code" name="code" autocomplete="off" required>
 
-                    <button type="submit" class="button">Use recovery code</button>
+                    <button type="submit" class="button">{{ t('auth_two_factor.use_recovery_code') }}</button>
                 </form>
             </details>
         {% endif %}
 
         <form method="post" action="/login/two-factor/cancel" class="inline">
             {{ csrf_field() }}
-            <button type="submit" class="button button-quiet">Cancel and sign in as someone else</button>
+            <button type="submit" class="button button-quiet">{{ t('auth_two_factor.cancel') }}</button>
         </form>
     </section>
 

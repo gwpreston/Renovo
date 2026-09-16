@@ -16,11 +16,11 @@
     {% if subscriptions is empty %}
         <p class="muted empty">
             {% if filter.hasActiveFilters %}
-                Nothing matches those filters.
+                {{ t('subscriptions_list.no_matches') }}
             {% else %}
-                No subscriptions yet.
+                {{ t('subscriptions_list.empty') }}
                 {% if can(scope, 'subscription.create') %}
-                    <a href="/subscriptions/new">Add the first one.</a>
+                    <a href="/subscriptions/new">{{ t('subscriptions_list.add_the_first_one') }}</a>
                 {% endif %}
             {% endif %}
         </p>
@@ -30,16 +30,16 @@
                 <thead>
                 <tr>
                     {% if can_bulk %}
-                        <th scope="col" class="select-column"><span class="visually-hidden">Select</span></th>
+                        <th scope="col" class="select-column"><span class="visually-hidden">{{ t('subscriptions_list.select') }}</span></th>
                     {% endif %}
-                    <th scope="col">{{ list.sort_link('name', 'Name', filter) }}</th>
-                    <th scope="col">Category</th>
-                    <th scope="col">Member</th>
-                    <th scope="col">Cycle</th>
-                    <th scope="col">{{ list.sort_link('next_payment', 'Next charge', filter) }}</th>
-                    <th scope="col" class="numeric">{{ list.sort_link('price', 'Price', filter) }}</th>
-                    <th scope="col" class="numeric">Per month</th>
-                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    <th scope="col">{{ list.sort_link('name', t('field.name'), filter) }}</th>
+                    <th scope="col">{{ t('field.category') }}</th>
+                    <th scope="col">{{ t('field.member') }}</th>
+                    <th scope="col">{{ t('field.cycle') }}</th>
+                    <th scope="col">{{ list.sort_link('next_payment', t('field.next_charge'), filter) }}</th>
+                    <th scope="col" class="numeric">{{ list.sort_link('price', t('field.price'), filter) }}</th>
+                    <th scope="col" class="numeric">{{ t('field.per_month') }}</th>
+                    <th scope="col"><span class="visually-hidden">{{ t('field.actions') }}</span></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -58,13 +58,13 @@
                                 {% endif %}
                                 <div>
                                     <a href="/subscriptions/{{ subscription.id }}/edit">{{ subscription.name }}</a>
-                                    {% if not subscription.isActive %}<span class="badge">Paused</span>{% endif %}
+                                    {% if not subscription.isActive %}<span class="badge">{{ t('state.paused') }}</span>{% endif %}
                                     {% if subscription.isTrial %}
-                                        <span class="badge badge-warning">Trial</span>
+                                        <span class="badge badge-warning">{{ t('state.trial') }}</span>
                                     {% endif %}
                                     {% if subscription.splitMode.isSplit %}
                                         <span class="badge"
-                                              title="{{ split_label(subscription.splitMode.value) }}">Shared</span>
+                                              title="{{ split_label(subscription.splitMode.value) }}">{{ t('state.shared') }}</span>
                                     {% endif %}
                                     {% if subscription.tags %}
                                         <div class="tag-list">
@@ -87,13 +87,15 @@
                         <td>
                             {# For a trial this is the conversion, not the stale payment date. #}
                             {% if subscription.nextChargeDate %}
-                                {{ subscription.nextChargeDate|date('j M Y') }}
+                                {{ subscription.nextChargeDate|local_date('d MMM y') }}
                                 {% if subscription.isTrial %}
-                                    <div class="hint">Trial converts</div>
+                                    <div class="hint">{{ t('state.trial_converts') }}</div>
                                 {% endif %}
                                 {% set deadline = subscription.cancellationDeadline %}
                                 {% if deadline %}
-                                    <div class="hint">Cancel by {{ deadline|date('j M Y') }}</div>
+                                    <div class="hint">{{ t('subscriptions_list.cancel_by', {
+                                        'date': deadline|local_date('d MMM y'),
+                                    }) }}</div>
                                 {% endif %}
                             {% else %}
                                 —
@@ -104,12 +106,12 @@
                             {% if subscription.monthlyMinor is not null %}
                                 {{ subscription.monthlyMinor|money(subscription.price.currency) }}
                             {% else %}
-                                <span class="muted" title="One-off and lifetime entries are not amortised">—</span>
+                                <span class="muted" title="{{ t('subscriptions_list.not_amortised') }}">—</span>
                             {% endif %}
                         </td>
                         <td class="actions">
                             <a class="button button-quiet"
-                               href="/subscriptions/{{ subscription.id }}/money">Cost</a>
+                               href="/subscriptions/{{ subscription.id }}/money">{{ t('subscriptions_list.cost') }}</a>
                             {% if can(scope, 'subscription.update') %}
                                 <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="inline">
                                     {{ csrf_field() }}
@@ -122,7 +124,7 @@
                                 <form method="post" action="/subscriptions/{{ subscription.id }}/delete" class="inline"
                                       onsubmit="return confirm('Delete {{ subscription.name|e('js') }}?')">
                                     {{ csrf_field() }}
-                                    <button type="submit" class="button button-danger">Delete</button>
+                                    <button type="submit" class="button button-danger">{{ t('action.delete') }}</button>
                                 </form>
                             {% endif %}
                         </td>
@@ -134,63 +136,65 @@
 
         {% if can_bulk %}
             <div class="bulk-bar">
-                <label for="bulk-action">With selected</label>
+                <label for="bulk-action">{{ t('subscriptions_list.with_selected') }}</label>
                 <select id="bulk-action" name="action">
-                    <option value="category">Set category</option>
-                    <option value="add_tag">Add tag</option>
-                    <option value="remove_tag">Remove tag</option>
-                    <option value="owner">Set member</option>
-                    <option value="payer">Set payer</option>
-                    <option value="currency">Convert currency</option>
-                    <option value="activate">Resume</option>
-                    <option value="deactivate">Pause</option>
+                    <option value="category">{{ t('subscriptions_list.set_category') }}</option>
+                    <option value="add_tag">{{ t('subscriptions_list.add_tag') }}</option>
+                    <option value="remove_tag">{{ t('subscriptions_list.remove_tag') }}</option>
+                    <option value="owner">{{ t('subscriptions_list.set_member') }}</option>
+                    <option value="payer">{{ t('subscriptions_list.set_payer') }}</option>
+                    <option value="currency">{{ t('subscriptions_list.convert_currency') }}</option>
+                    <option value="activate">{{ t('subscriptions_list.resume') }}</option>
+                    <option value="deactivate">{{ t('subscriptions_list.pause') }}</option>
                 </select>
 
-                <select name="category_id" aria-label="Category">
-                    <option value="">No category</option>
+                <select name="category_id" aria-label="{{ t('field.category') }}">
+                    <option value="">{{ t('subscriptions_list.no_category') }}</option>
                     {% for category in categories %}
                         <option value="{{ category.id }}">{{ category.name }}</option>
                     {% endfor %}
                 </select>
 
-                <input type="text" name="tag" placeholder="Tag" aria-label="Tag">
+                <input type="text" name="tag" placeholder="{{ t('field.tag') }}" aria-label="{{ t('field.tag') }}">
 
-                <select name="user_id" aria-label="Member">
-                    <option value="">Nobody</option>
+                <select name="user_id" aria-label="{{ t('field.member') }}">
+                    <option value="">{{ t('subscriptions_list.nobody') }}</option>
                     {% for member in members %}
                         <option value="{{ member.id }}">{{ member.display_name }}</option>
                     {% endfor %}
                 </select>
 
-                <select name="currency" aria-label="Currency">
+                <select name="currency" aria-label="{{ t('field.currency') }}">
                     {% for code in all_currencies %}
                         <option value="{{ code }}">{{ code }}</option>
                     {% endfor %}
                 </select>
 
-                <button type="submit" class="button">Apply</button>
+                <button type="submit" class="button">{{ t('action.apply') }}</button>
             </div>
-            <p class="hint">Converting currency uses today's exchange rate and records the result in each
-                subscription's price history. If a rate is unavailable the whole action is refused rather than
-                re-labelling the amount, which would be a silent price change.</p>
+            <p class="hint">{{ t('subscriptions_list.convert_note') }}</p>
         {% endif %}
 
         {% if page_count > 1 %}
-            <nav class="pager" aria-label="Pagination">
+            <nav class="pager" aria-label="{{ t('subscriptions_list.pagination') }}">
                 {% if filter.page > 1 %}
                     <a class="button button-quiet"
                        href="/subscriptions?{{ filter.toQueryString({'page': filter.page - 1}) }}"
                        hx-get="/subscriptions?{{ filter.toQueryString({'page': filter.page - 1}) }}"
                        hx-target="#subscription-list" hx-select="#subscription-list"
-                       hx-swap="outerHTML" hx-push-url="true">Previous</a>
+                       hx-swap="outerHTML" hx-push-url="true">{{ t('action.previous') }}</a>
                 {% endif %}
-                <span class="muted">Page {{ filter.page }} of {{ page_count }} · {{ total }} total</span>
+                <span class="muted">{{ t('subscriptions_list.pager', {
+                    'page': filter.page,
+                    'pages': page_count,
+                    'total': total,
+                }) }}</span>
                 {% if filter.page < page_count %}
                     <a class="button button-quiet"
                        href="/subscriptions?{{ filter.toQueryString({'page': filter.page + 1}) }}"
                        hx-get="/subscriptions?{{ filter.toQueryString({'page': filter.page + 1}) }}"
                        hx-target="#subscription-list" hx-select="#subscription-list"
-                       hx-swap="outerHTML" hx-push-url="true">Next</a>
+                       hx-swap="outerHTML" hx-push-url="true">{{ t('action.next') }}</a>
                 {% endif %}
             </nav>
         {% endif %}

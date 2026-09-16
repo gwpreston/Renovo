@@ -178,6 +178,31 @@ final class NotificationLogRepository extends AbstractRepository
      * How many notifications a user has been sent since a moment, for the
      * outbound rate limit.
      */
+    /**
+     * Instance-wide delivery counts for the metrics endpoint. Integers only —
+     * no user, no channel, no subject.
+     *
+     * @return array{sent: int, failed: int, pending: int}
+     */
+    public function instanceTotals(): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT ' . $this->quote('status') . ' AS status, COUNT(*) AS total'
+            . ' FROM ' . $this->quote('notification_log')
+            . ' GROUP BY ' . $this->quote('status'),
+        );
+
+        $totals = ['sent' => 0, 'failed' => 0, 'pending' => 0];
+        foreach ($rows as $row) {
+            $status = (string) ($row['status'] ?? '');
+            if (array_key_exists($status, $totals)) {
+                $totals[$status] = (int) ($row['total'] ?? 0);
+            }
+        }
+
+        return $totals;
+    }
+
     public function countSince(int $userId, DateTimeImmutable $since, ?int $subjectId = null): int
     {
         $sql = 'SELECT COUNT(*) FROM ' . $this->quote($this->table())

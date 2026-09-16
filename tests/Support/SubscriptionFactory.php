@@ -85,6 +85,7 @@ final class SubscriptionFactory
             isActive: $isActive,
             reminderDays: $reminderDays,
             logoPath: null,
+            websiteUrl: null,
             categoryId: $categoryId,
             categoryName: $categoryName,
             ownerName: null,

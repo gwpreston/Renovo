@@ -1,12 +1,12 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Confirm your email — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('auth_register_sent.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <section class="card narrow">
-        <h1>Check your inbox</h1>
-        <p>We have sent a confirmation link to <strong>{{ email }}</strong>. Follow it to finish setting up
-            your account. The link is valid for two days.</p>
-        <p><a class="button" href="/login">Back to sign in</a></p>
+        <h1>{{ t('auth_register_sent.title') }}</h1>
+        <p>{{ t('auth_register_sent.sent_to') }} <strong>{{ email }}</strong></p>
+        <p>{{ t('auth_register_sent.follow_it') }}</p>
+        <p><a class="button" href="/login">{{ t('action.back_to_sign_in') }}</a></p>
     </section>
 {% endblock %}

@@ -1,0 +1,61 @@
+{#
+    What the household spends, per currency, plus the combined figure when
+    every currency in play can be converted.
+#}
+<section class="stat-grid">
+    {% for total in stats.recurring %}
+        <article class="card stat">
+            <h2 class="stat-label">{{ t('dashboard.recurring_in', {'currency': total.currency}) }}</h2>
+            <p class="stat-value">
+                {{ total.monthly_minor|money(total.currency) }}
+                <span class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
+            </p>
+            <p class="muted">{{ t('dashboard.per_year_and_count', {
+                'amount': total.yearly_minor|money(total.currency),
+                'count': total.count,
+            }) }}</p>
+        </article>
+    {% else %}
+        <article class="card stat">
+            <h2 class="stat-label">{{ t('dashboard.recurring') }}</h2>
+            <p class="stat-value">—</p>
+            <p class="muted">{{ t('dashboard.recurring_empty') }}</p>
+        </article>
+    {% endfor %}
+
+    {% for total in stats.one_off %}
+        <article class="card stat">
+            <h2 class="stat-label">{{ t('dashboard.one_off_in', {'currency': total.currency}) }}</h2>
+            <p class="stat-value">{{ total.total_minor|money(total.currency) }}</p>
+            {#
+                Kept out of the recurring figures on purpose: spreading a
+                lifetime licence over an arbitrary period would make the
+                monthly number mean nothing.
+            #}
+            <p class="muted">{{ t('dashboard.one_off_note', {'count': total.count}) }}</p>
+        </article>
+    {% endfor %}
+</section>
+
+{% if stats.combined_monthly.amount_minor is not null and stats.recurring|length > 1 %}
+    <section class="card stat">
+        <h2 class="stat-label">{{ t('dashboard.combined_in', {
+            'currency': stats.combined_monthly.currency,
+        }) }}</h2>
+        <p class="stat-value">
+            {{ stats.combined_monthly.amount_minor|money(stats.combined_monthly.currency) }}
+            <span class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
+        </p>
+        <p class="muted">
+            {{ t('dashboard.combined_note', {
+                'amount': stats.combined_yearly.amount_minor|money(stats.combined_yearly.currency),
+            }) }}
+        </p>
+    </section>
+{% elseif stats.combined_monthly.unconvertible is not empty %}
+    <p class="muted note">
+        {{ t('dashboard.unconvertible', {
+            'currencies': stats.combined_monthly.unconvertible|join(', '),
+        }) }}
+    </p>
+{% endif %}

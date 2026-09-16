@@ -31,7 +31,11 @@ interface ExchangeRateProvider
     /**
      * A sentence for the wizard and the settings page.
      */
-    public function description(): string;
+    /**
+     * A translation key for the one-line description shown beside the
+     * provider's name when an operator chooses between them.
+     */
+    public function descriptionKey(): string;
 
     public function requiresApiKey(): bool;
 

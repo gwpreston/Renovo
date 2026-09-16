@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\I18n\Locales;
+use App\I18n\Translator;
 use App\Domain\AuditAction;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\TokenRepository;
@@ -33,6 +35,8 @@ final class PasswordResetService
         private readonly MailerService $mailer,
         private readonly AuthService $auth,
         private readonly InstanceSettingsService $settings,
+        private readonly Translator $translator,
+        private readonly Locales $locales,
         private readonly AuditLogService $audit,
         private readonly SessionDirectoryService $sessions,
         private readonly SessionInterface $session,
@@ -55,10 +59,11 @@ final class PasswordResetService
         );
 
         if ($remaining > 0) {
-            throw ValidationException::field('email', sprintf(
-                'Too many reset requests. Try again in %d minutes.',
-                max(1, (int) ceil($remaining / 60)),
-            ));
+            throw ValidationException::field(
+                'email',
+                'error.reset.throttled',
+                ['minutes' => max(1, (int) ceil($remaining / 60))],
+            );
         }
 
         // Every request counts against the limit, successful or not: counting
@@ -87,21 +92,13 @@ final class PasswordResetService
 
         $link = rtrim($this->appUrl, '/') . '/reset-password?token=' . urlencode($token);
 
+        $locale = $this->locales->resolve($user->locale);
+
         $this->mailer->send(
             $user->email,
             $user->displayName,
-            sprintf('Reset your %s password', $this->settings->instanceName()),
-            <<<TEXT
-            Hello {$user->displayName},
-
-            Someone asked to reset the password for this account. If it was
-            you, follow this link within the next hour:
-
-            {$link}
-
-            If it was not you, no action is needed — the password has not
-            changed.
-            TEXT,
+            $this->translator->trans('mail.reset.subject', ['instance' => $this->settings->instanceName()], $locale),
+            $this->translator->trans('mail.reset.body', ['name' => $user->displayName, 'link' => $link], $locale),
         );
     }
 
@@ -122,7 +119,7 @@ final class PasswordResetService
 
         $userId = $this->tokens->findValidUserId($token, TokenRepository::PURPOSE_RESET_PASSWORD);
         if ($userId === null || !$this->tokens->consume($token, TokenRepository::PURPOSE_RESET_PASSWORD)) {
-            throw ValidationException::field('token', 'That reset link has expired or has already been used.');
+            throw ValidationException::field('token', 'error.reset.invalid_token');
         }
 
         $this->users->updatePasswordHash($userId, $this->hasher->hash($password));
@@ -145,16 +142,21 @@ final class PasswordResetService
                 'sessions_revoked' => $revoked,
             ]);
 
+            $locale = $this->locales->resolve($user->locale);
+
             $this->mailer->send(
                 $user->email,
                 $user->displayName,
-                sprintf('Your %s password was changed', $this->settings->instanceName()),
-                <<<TEXT
-                Hello {$user->displayName},
-
-                Your password has just been changed. If this was not you,
-                contact the administrator of this instance immediately.
-                TEXT,
+                $this->translator->trans(
+                    'mail.password_changed.subject',
+                    ['instance' => $this->settings->instanceName()],
+                    $locale,
+                ),
+                $this->translator->trans(
+                    'mail.password_changed.body',
+                    ['name' => $user->displayName],
+                    $locale,
+                ),
             );
         }
     }

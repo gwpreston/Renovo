@@ -6,6 +6,7 @@ namespace App\Application\Handler;
 
 use App\Application\Api\ApiPath;
 use App\Security\ScopeViolationException;
+use App\I18n\Translator;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -40,6 +41,7 @@ final class HttpErrorHandler extends ErrorHandler
         \Slim\Interfaces\CallableResolverInterface $callableResolver,
         \Psr\Http\Message\ResponseFactoryInterface $responseFactory,
         private readonly Twig $view,
+        private readonly Translator $translator,
         private readonly bool $debug,
         ?LoggerInterface $logger = null,
     ) {
@@ -50,37 +52,44 @@ final class HttpErrorHandler extends ErrorHandler
     {
         $exception = $this->exception;
         $status = 500;
-        $title = 'Something went wrong';
-        $message = 'An unexpected error occurred. The details have been logged.';
+        $title = $this->translator->trans('error.page.unexpected_title');
+        $message = $this->translator->trans('error.page.unexpected_message');
         /** @var array<string, string> $fieldErrors */
         $fieldErrors = [];
 
         if ($exception instanceof ValidationException) {
             // Reached only from the API: a web controller catches this and
             // re-renders the form with the messages against their fields.
+            //
+            // The keys are resolved here rather than at the throw site, which
+            // is what lets one service answer a browser and an API client in
+            // whichever language each of them is being read in.
             $status = 422;
-            $title = 'Validation failed';
-            $message = $exception->getMessage();
-            $fieldErrors = $exception->errors();
+            $title = $this->translator->trans('error.page.validation_title');
+            $message = $this->translator->trans('error.page.validation_message');
+
+            foreach ($exception->errors() as $field => $error) {
+                $fieldErrors[$field] = $this->translator->trans($error->key, $error->parameters);
+            }
         } elseif ($exception instanceof ScopeViolationException) {
             // Indistinguishable from "no such row" on purpose.
             $status = 404;
-            $title = 'Not found';
-            $message = 'That page does not exist, or you do not have access to it.';
+            $title = $this->translator->trans('error.page.not_found_title');
+            $message = $this->translator->trans('error.page.not_found_or_forbidden');
         } elseif ($exception instanceof HttpNotFoundException) {
             $status = 404;
-            $title = 'Not found';
-            $message = 'That page does not exist.';
+            $title = $this->translator->trans('error.page.not_found_title');
+            $message = $this->translator->trans('error.page.not_found_message');
         } elseif ($exception instanceof HttpForbiddenException) {
             $status = 403;
-            $title = 'Not allowed';
+            $title = $this->translator->trans('error.page.forbidden_title');
             $message = $exception->getMessage() !== ''
                 ? $exception->getMessage()
-                : 'Your role does not permit that action.';
+                : $this->translator->trans('error.page.forbidden_message');
         } elseif ($exception instanceof HttpMethodNotAllowedException) {
             $status = 405;
-            $title = 'Method not allowed';
-            $message = 'That address does not accept this kind of request.';
+            $title = $this->translator->trans('error.page.method_title');
+            $message = $this->translator->trans('error.page.method_message');
         } elseif ($exception instanceof HttpException) {
             $status = $exception->getCode() >= 400 && $exception->getCode() < 600
                 ? (int) $exception->getCode()

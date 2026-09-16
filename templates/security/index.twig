@@ -1,16 +1,15 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Account security — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('security.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
-    <h1>Account security</h1>
+    <h1>{{ t('security.title') }}</h1>
 
     {% if recovery_codes is not empty %}
         <section class="card callout">
-            <h2>Your recovery codes</h2>
+            <h2>{{ t('security.your_recovery_codes') }}</h2>
             <p>
-                Save these now — they are shown once and each works a single time. They are the
-                way back in if you lose your authenticator.
+                {{ t('security.recovery_codes_note') }}
             </p>
             <ul class="code-list">
                 {% for code in recovery_codes %}
@@ -21,49 +20,47 @@
     {% endif %}
 
     <section class="card">
-        <h2>Authenticator app</h2>
+        <h2>{{ t('security.authenticator_app') }}</h2>
 
         {% if totp.enabled %}
-            <p>On. Codes from your authenticator app are required when you sign in.</p>
+            <p>{{ t('security.totp_on') }}</p>
 
             <form method="post" action="/settings/security/totp/disable" class="stack">
                 {{ csrf_field() }}
-                <label for="disable-password">Confirm your password to turn two-step verification off</label>
+                <label for="disable-password">{{ t('security.totp_off_password_label') }}</label>
                 <input type="password" id="disable-password" name="password"
                        autocomplete="current-password" required>
-                <button type="submit" class="button button-danger">Turn off</button>
+                <button type="submit" class="button button-danger">{{ t('security.turn_off') }}</button>
             </form>
         {% else %}
             <p class="muted">
-                Off. Add an authenticator app to require a six-digit code as well as your password.
+                {{ t('security.totp_off') }}
             </p>
 
             <form method="post" action="/settings/security/totp" class="inline">
                 {{ csrf_field() }}
-                <button type="submit" class="button button-primary">Set up an authenticator app</button>
+                <button type="submit" class="button button-primary">{{ t('security.totp_setup_action') }}</button>
             </form>
         {% endif %}
     </section>
 
     <section class="card">
-        <h2>Passkeys and security keys</h2>
+        <h2>{{ t('security.passkeys_and_security_keys') }}</h2>
         <p class="muted">
-            A passkey signs you in without a password, and counts as your second factor when you
-            do use one. You can register more than one — a phone and a hardware key, say — so
-            losing one device is not losing access.
+            {{ t('security.passkeys_intro') }}
         </p>
 
         {% if passkeys is empty %}
-            <p class="muted">None registered.</p>
+            <p class="muted">{{ t('security.none_registered') }}</p>
         {% else %}
             <table class="table">
                 <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>Added</th>
-                    <th>Last used</th>
-                    <th>Transports</th>
-                    <th></th>
+                    <th scope="col">{{ t('field.name') }}</th>
+                    <th scope="col">{{ t('field.added') }}</th>
+                    <th scope="col">{{ t('field.last_used') }}</th>
+                    <th scope="col">{{ t('security.transports') }}</th>
+                    <th scope="col"></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -74,18 +71,18 @@
                                   class="inline">
                                 {{ csrf_field() }}
                                 <input type="text" name="name" value="{{ passkey.name }}" maxlength="100"
-                                       aria-label="Passkey name">
-                                <button type="submit" class="button button-quiet">Rename</button>
+                                       aria-label="{{ t('security.passkey_name') }}">
+                                <button type="submit" class="button button-quiet">{{ t('action.rename') }}</button>
                             </form>
                         </td>
-                        <td>{{ passkey.createdAt|date('j M Y') }}</td>
-                        <td>{{ passkey.lastUsedAt ? passkey.lastUsedAt|date('j M Y H:i') : 'Never' }}</td>
+                        <td>{{ passkey.createdAt|local_date('d MMM y') }}</td>
+                        <td>{{ passkey.lastUsedAt ? passkey.lastUsedAt|local_date('d MMM y HH:mm') : 'Never' }}</td>
                         <td class="muted">{{ passkey.transportSummary }}</td>
                         <td>
                             <form method="post" action="/settings/security/passkeys/{{ passkey.id }}/delete"
                                   class="inline">
                                 {{ csrf_field() }}
-                                <button type="submit" class="button button-danger">Revoke</button>
+                                <button type="submit" class="button button-danger">{{ t('action.revoke') }}</button>
                             </form>
                         </td>
                     </tr>
@@ -95,9 +92,9 @@
         {% endif %}
 
         <div class="stack">
-            <label for="passkey-name">Name for the new passkey</label>
-            <input type="text" id="passkey-name" maxlength="100" placeholder="Phone, YubiKey, laptop…">
-            <button type="button" class="button button-primary" id="passkey-register">Add a passkey</button>
+            <label for="passkey-name">{{ t('security.passkey_name_label') }}</label>
+            <input type="text" id="passkey-name" maxlength="100" placeholder="{{ t('security.phone_yubikey_laptop') }}">
+            <button type="button" class="button button-primary" id="passkey-register">{{ t('security.add_a_passkey') }}</button>
             <p class="field-error" id="passkey-register-error" hidden></p>
         </div>
     </section>
@@ -108,36 +105,35 @@
     #}
     {% if recovery.applicable %}
         <section class="card">
-            <h2>Recovery codes</h2>
+            <h2>{{ t('security.recovery_codes') }}</h2>
             <p class="muted">
-                {{ recovery.remaining }} unused code(s). Each works once, and they are the way back in
-                if you lose your authenticator or every passkey you have registered.
+                {{ t('security.recovery_remaining', {'count': recovery.remaining}) }}
             </p>
 
             <form method="post" action="/settings/security/recovery-codes" class="stack">
                 {{ csrf_field() }}
-                <label for="recovery-password">Confirm your password to issue a new set</label>
+                <label for="recovery-password">{{ t('security.recovery_password_label') }}</label>
                 <input type="password" id="recovery-password" name="password"
                        autocomplete="current-password" required>
-                <button type="submit" class="button">Regenerate recovery codes</button>
+                <button type="submit" class="button">{{ t('security.regenerate_recovery_codes') }}</button>
             </form>
         </section>
     {% endif %}
 
     <section class="card">
-        <h2>Active sessions</h2>
+        <h2>{{ t('security.active_sessions') }}</h2>
         <p class="muted">
-            Every browser currently signed in as you. Revoking one signs it out on its next request.
+            {{ t('security.sessions_intro') }}
         </p>
 
         <table class="table">
             <thead>
             <tr>
-                <th>Device</th>
-                <th>Address</th>
-                <th>Started</th>
-                <th>Last seen</th>
-                <th></th>
+                <th scope="col">{{ t('field.device') }}</th>
+                <th scope="col">{{ t('field.address') }}</th>
+                <th scope="col">{{ t('field.started') }}</th>
+                <th scope="col">{{ t('field.last_seen') }}</th>
+                <th scope="col"></th>
             </tr>
             </thead>
             <tbody>
@@ -145,17 +141,17 @@
                 <tr>
                     <td>
                         {{ item.deviceLabel }}
-                        {% if item.isCurrent %}<span class="badge">This device</span>{% endif %}
+                        {% if item.isCurrent %}<span class="badge">{{ t('security.this_device') }}</span>{% endif %}
                     </td>
                     <td class="muted">{{ item.ipAddress|default('Unknown') }}</td>
-                    <td>{{ item.createdAt ? item.createdAt|date('j M Y H:i') : '—' }}</td>
-                    <td>{{ item.lastActivity|date('j M Y H:i') }}</td>
+                    <td>{{ item.createdAt ? item.createdAt|local_date('d MMM y HH:mm') : '—' }}</td>
+                    <td>{{ item.lastActivity|local_date('d MMM y HH:mm') }}</td>
                     <td>
                         {% if not item.isCurrent %}
                             <form method="post" action="/settings/security/sessions/revoke" class="inline">
                                 {{ csrf_field() }}
                                 <input type="hidden" name="handle" value="{{ item.handle }}">
-                                <button type="submit" class="button button-danger">Revoke</button>
+                                <button type="submit" class="button button-danger">{{ t('action.revoke') }}</button>
                             </form>
                         {% endif %}
                     </td>
@@ -167,7 +163,7 @@
         {% if sessions|length > 1 %}
             <form method="post" action="/settings/security/sessions/revoke-others" class="inline">
                 {{ csrf_field() }}
-                <button type="submit" class="button button-danger">Sign out everywhere else</button>
+                <button type="submit" class="button button-danger">{{ t('security.sign_out_everywhere_else') }}</button>
             </form>
         {% endif %}
     </section>

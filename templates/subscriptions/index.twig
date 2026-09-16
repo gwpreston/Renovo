@@ -1,12 +1,12 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Subscriptions — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('nav.subscriptions') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <div class="page-header">
-        <h1>Subscriptions</h1>
+        <h1>{{ t('field.subscriptions') }}</h1>
         {% if can(scope, 'subscription.create') %}
-            <a class="button button-primary" href="/subscriptions/new">Add subscription</a>
+            <a class="button button-primary" href="/subscriptions/new">{{ t('subscriptions.add_subscription') }}</a>
         {% endif %}
     </div>
 
@@ -25,15 +25,15 @@
 
         <div class="filter-row">
             <div class="filter-field grow">
-                <label for="q">Search</label>
+                <label for="q">{{ t('subscriptions.search') }}</label>
                 <input type="search" id="q" name="q" value="{{ filter.search }}"
-                       placeholder="Name or notes">
+                       placeholder="{{ t('subscriptions.name_or_notes') }}">
             </div>
 
             <div class="filter-field">
-                <label for="category">Category</label>
+                <label for="category">{{ t('field.category') }}</label>
                 <select id="category" name="category">
-                    <option value="">All</option>
+                    <option value="">{{ t('state.all') }}</option>
                     {% for category in categories %}
                         <option value="{{ category.id }}"
                                 {{ filter.categoryId == category.id ? 'selected' : '' }}>{{ category.name }}</option>
@@ -42,9 +42,9 @@
             </div>
 
             <div class="filter-field">
-                <label for="owner">Member</label>
+                <label for="owner">{{ t('field.member') }}</label>
                 <select id="owner" name="owner">
-                    <option value="">All</option>
+                    <option value="">{{ t('state.all') }}</option>
                     {% for member in members %}
                         <option value="{{ member.id }}"
                                 {{ filter.ownerUserId == member.id ? 'selected' : '' }}>{{ member.display_name }}</option>
@@ -53,9 +53,9 @@
             </div>
 
             <div class="filter-field">
-                <label for="currency">Currency</label>
+                <label for="currency">{{ t('field.currency') }}</label>
                 <select id="currency" name="currency">
-                    <option value="">All</option>
+                    <option value="">{{ t('state.all') }}</option>
                     {% for code in currencies %}
                         <option value="{{ code }}" {{ filter.currency == code ? 'selected' : '' }}>{{ code }}</option>
                     {% endfor %}
@@ -63,9 +63,9 @@
             </div>
 
             <div class="filter-field">
-                <label for="type">Type</label>
+                <label for="type">{{ t('field.type') }}</label>
                 <select id="type" name="type">
-                    <option value="">All</option>
+                    <option value="">{{ t('state.all') }}</option>
                     {% for type in types %}
                         <option value="{{ type.value }}"
                                 {{ filter.type and filter.type.value == type.value ? 'selected' : '' }}>
@@ -77,7 +77,7 @@
 
             <label class="filter-field choice">
                 <input type="checkbox" name="inactive" value="1" {{ filter.includeInactive ? 'checked' : '' }}>
-                <span>Include paused</span>
+                <span>{{ t('subscriptions.include_paused') }}</span>
             </label>
         </div>
 
@@ -93,8 +93,43 @@
             </div>
         {% endif %}
 
-        <noscript><button type="submit" class="button">Apply filters</button></noscript>
+        <noscript><button type="submit" class="button">{{ t('subscriptions.apply_filters') }}</button></noscript>
     </form>
+
+    {#
+        Saved views. Ordinary links, not an htmx swap: applying one is a change
+        of view, and the address bar should say so — a saved view that cannot
+        be bookmarked or shared is barely saved at all.
+    #}
+    <section class="card saved-views" aria-labelledby="saved-views-heading">
+        <h2 id="saved-views-heading" class="stat-label">{{ t('saved_views.heading') }}</h2>
+
+        {% if saved_views is empty %}
+            <p class="muted">{{ t('saved_views.empty') }}</p>
+        {% else %}
+            <ul class="saved-view-list">
+                {% for view in saved_views %}
+                    <li class="chip chip-static">
+                        <a href="{{ view.path }}">{{ view.name }}</a>
+                        <form method="post" action="/saved-views/{{ view.id }}/delete" class="inline">
+                            {{ csrf_field() }}
+                            <button type="submit" class="button-icon"
+                                    aria-label="{{ t('saved_views.forget', {'name': view.name}) }}">×</button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form method="post" action="/saved-views" class="inline-form">
+            {{ csrf_field() }}
+            <input type="hidden" name="query" value="{{ current_query }}">
+            <label for="saved-view-name" class="visually-hidden">{{ t('saved_views.name_label') }}</label>
+            <input type="text" id="saved-view-name" name="name" maxlength="60"
+                   placeholder="{{ t('saved_views.name_placeholder') }}">
+            <button type="submit" class="button">{{ t('saved_views.save_current') }}</button>
+        </form>
+    </section>
 
     {% include 'subscriptions/_list.twig' %}
 {% endblock %}

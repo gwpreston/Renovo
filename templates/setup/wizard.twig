@@ -1,43 +1,42 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Set up {{ instance_name }}{% endblock %}
+{% block title %}{{ t('setup_wizard.title', {'instance': instance_name}) }}{% endblock %}
 
 {% block content %}
     <section class="card narrow">
-        <h1>Welcome</h1>
-        <p class="muted">This instance has no accounts yet. The account you create here is the instance
-            administrator.</p>
+        <h1>{{ t('setup_wizard.welcome') }}</h1>
+        <p class="muted">{{ t('setup_wizard.intro') }}</p>
 
         {% include 'partials/errors.twig' %}
 
         <form method="post" action="/setup" class="stack">
             {{ csrf_field() }}
 
-            <h2>Your account</h2>
+            <h2>{{ t('setup_wizard.your_account') }}</h2>
 
-            <label for="display_name">Your name</label>
+            <label for="display_name">{{ t('field.your_name') }}</label>
             <input type="text" id="display_name" name="display_name"
                    value="{{ values.display_name|default('') }}" required autofocus>
-            {% if errors.display_name is defined %}<p class="field-error">{{ errors.display_name }}</p>{% endif %}
+            {% if errors.display_name is defined %}<p class="field-error">{{ error_message(errors.display_name) }}</p>{% endif %}
 
-            <label for="email">Email address</label>
+            <label for="email">{{ t('field.email') }}</label>
             <input type="email" id="email" name="email" value="{{ values.email|default('') }}"
                    autocomplete="username" required>
-            {% if errors.email is defined %}<p class="field-error">{{ errors.email }}</p>{% endif %}
+            {% if errors.email is defined %}<p class="field-error">{{ error_message(errors.email) }}</p>{% endif %}
 
-            <label for="password">Password</label>
+            <label for="password">{{ t('field.password') }}</label>
             <input type="password" id="password" name="password" autocomplete="new-password" required>
-            <p class="hint">At least 10 characters.</p>
-            {% if errors.password is defined %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+            <p class="hint">{{ t('hint.password_length') }}</p>
+            {% if errors.password is defined %}<p class="field-error">{{ error_message(errors.password) }}</p>{% endif %}
 
-            <label for="password_confirm">Confirm password</label>
+            <label for="password_confirm">{{ t('field.confirm_password') }}</label>
             <input type="password" id="password_confirm" name="password_confirm"
                    autocomplete="new-password" required>
             {% if errors.password_confirm is defined %}
-                <p class="field-error">{{ errors.password_confirm }}</p>
+                <p class="field-error">{{ error_message(errors.password_confirm) }}</p>
             {% endif %}
 
-            <button type="submit" class="button button-primary">Finish setup</button>
+            <button type="submit" class="button button-primary">{{ t('setup_wizard.finish_setup') }}</button>
         </form>
     </section>
 {% endblock %}

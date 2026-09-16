@@ -74,6 +74,8 @@ bug, even if the code "works".
 src/          Controllers (thin), Services (logic), Repositories (persistence),
               the scoping layer, and the shared HTTP client.
 templates/    Twig templates. No logic here.
+translations/ One flat catalogue per locale; `en` is the base every other is
+              measured against.
 public/       Web root (index.php, assets). Nothing else is web-accessible.
 migrations/   Phinx migrations + seeds.
 bin/          CLI entry points (e.g. the scheduler command).

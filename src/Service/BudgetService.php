@@ -215,14 +215,14 @@ final class BudgetService
 
         $name = trim($this->str($input, 'name'));
         if ($name === '') {
-            $errors['name'] = 'Give the budget a name.';
+            $errors['name'] = 'error.budget.name_required';
         } elseif (mb_strlen($name) > 100) {
-            $errors['name'] = 'Name must be 100 characters or fewer.';
+            $errors['name'] = 'error.name.too_long_100';
         }
 
         $currency = Currency::normalise($this->str($input, 'currency'));
         if (!Currency::isValidCode($currency)) {
-            $errors['currency'] = 'Choose a currency.';
+            $errors['currency'] = 'error.currency.required';
             $currency = 'GBP';
         }
 
@@ -230,26 +230,26 @@ final class BudgetService
         try {
             $amount = Money::fromUserInput($this->str($input, 'amount'), $currency);
             if ($amount->isNegative()) {
-                $errors['amount'] = 'Enter an amount of zero or more.';
+                $errors['amount'] = 'error.amount.negative';
             }
         } catch (InvalidArgumentException) {
-            $errors['amount'] = 'Enter an amount, for example 150.00.';
+            $errors['amount'] = 'error.amount.invalid';
         }
 
         $period = BudgetPeriod::tryFromString($this->str($input, 'period'));
         if ($period === null) {
-            $errors['period'] = 'Choose monthly or annual.';
+            $errors['period'] = 'error.budget.period';
         }
 
         $categoryId = $this->positiveInt($input['category_id'] ?? null);
         if ($categoryId !== null && $this->categories->find($scope, $categoryId) === null) {
-            $errors['category_id'] = 'That category does not exist.';
+            $errors['category_id'] = 'error.category.not_found';
         }
 
         $thresholdRaw = trim($this->str($input, 'warn_threshold_percent'));
         $threshold = $thresholdRaw === '' ? null : (int) $thresholdRaw;
         if ($threshold !== null && ($threshold < 1 || $threshold > self::MAX_WARN_THRESHOLD)) {
-            $errors['warn_threshold_percent'] = 'Enter a warning threshold between 1 and 100 percent.';
+            $errors['warn_threshold_percent'] = 'error.budget.threshold_range';
         }
 
         $ownerUserId = $this->resolveOwner($scope, $input, $errors);
@@ -300,7 +300,7 @@ final class BudgetService
             : [];
 
         if (!in_array($requested, $memberIds, true)) {
-            $errors['owner_user_id'] = 'Choose a member of this household.';
+            $errors['owner_user_id'] = 'error.member.not_in_household';
 
             return $scope->userId;
         }

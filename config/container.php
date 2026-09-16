@@ -19,12 +19,20 @@ use App\Http\HttpClient;
 use App\Http\HttpClientOptions;
 use App\Http\SystemDnsResolver;
 use App\Http\TrustedTargets;
+use App\I18n\CatalogLoader;
+use App\I18n\LocaleContext;
+use App\I18n\Locales;
+use App\I18n\Translator;
 use App\Persistence\Database;
 use App\Persistence\PdoSessionHandler;
 use App\Persistence\Platform;
 use App\Persistence\PlatformFactory;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\ExchangeRateRepository;
+use App\Controller\Ops\MetricsController;
+use App\Repository\LogoCacheRepository;
+use App\Repository\UserRepository;
+use App\Service\MetricsService;
 use App\Repository\NotificationLogRepository;
 use App\Security\CsrfTokenManager;
 use App\Security\SecretCipher;
@@ -32,6 +40,7 @@ use App\Security\Session;
 use App\Security\SessionInterface;
 use App\Service\Auth\WebAuthnService;
 use App\Service\AuthService;
+use App\Service\LogoFetcher;
 use App\Service\ExchangeRate\ExchangeRateHostProvider;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\ExchangeRate\FixerProvider;
@@ -382,8 +391,63 @@ return static function (ContainerBuilder $builder, array $settings): void {
             $c->get('settings')['paths']['openapi'],
         ),
 
-        MoneyFormatter::class => static fn (ContainerInterface $c): MoneyFormatter => new MoneyFormatter(
+        MoneyFormatter::class => autowire(MoneyFormatter::class),
+
+        // The logo fetcher takes the *guarded* client, never the plain one:
+        // the address comes from a form, which is the whole reason the guard
+        // exists. The type makes the substitution impossible rather than
+        // merely discouraged — see GuardedClient.
+        LogoFetcher::class => static function (ContainerInterface $c): LogoFetcher {
+            $settings = $c->get('settings');
+
+            return new LogoFetcher(
+                $c->get(GuardedClient::class),
+                $c->get(RequestFactoryInterface::class),
+                $c->get(LogoCacheRepository::class),
+                $c->get(LogoStorage::class),
+                $c->get(Clock::class),
+                $c->get(LoggerInterface::class),
+                $settings['uploads']['logo_cache_directory'],
+            );
+        },
+
+        // ------------------------------------------------------------------
+        // Translation
+        //
+        // The locale context is a single mutable object for the life of the
+        // request, like the audit layer's RequestContextHolder: the middleware
+        // writes it, everything that renders a sentence or formats a number
+        // reads it.
+        //
+        // Strict mode is on under APP_ENV=test and nowhere else. In a test a
+        // key with no message is a bug worth failing over; in production it is
+        // a blemish, and taking a page down over a missing string would turn
+        // a typo into an outage.
+        // ------------------------------------------------------------------
+        CatalogLoader::class => static fn (ContainerInterface $c): CatalogLoader => new CatalogLoader(
+            $c->get('settings')['paths']['translations'],
+        ),
+
+        LocaleContext::class => static fn (ContainerInterface $c): LocaleContext => new LocaleContext(
             $c->get('settings')['app']['locale'],
+        ),
+
+        Locales::class => static fn (ContainerInterface $c): Locales => new Locales(
+            $c->get(CatalogLoader::class),
+            $c->get('settings')['app']['locale'],
+        ),
+
+        Translator::class => static fn (ContainerInterface $c): Translator => new Translator(
+            $c->get(CatalogLoader::class),
+            $c->get(LocaleContext::class),
+            strict: $c->get('settings')['app']['env'] === 'test',
+        ),
+
+        MetricsController::class => static fn (ContainerInterface $c): MetricsController => new MetricsController(
+            $c->get(MetricsService::class),
+            $c->get(SessionInterface::class),
+            $c->get(UserRepository::class),
+            $c->get('settings')['metrics']['token'],
         ),
 
         // ------------------------------------------------------------------

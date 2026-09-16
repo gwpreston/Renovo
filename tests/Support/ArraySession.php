@@ -73,14 +73,14 @@ final class ArraySession implements SessionInterface
         return $this->id;
     }
 
-    public function flash(string $type, string $message): void
+    public function flash(string $type, string $key, array $parameters = []): void
     {
-        $this->data['_flashes'][] = ['type' => $type, 'message' => $message];
+        $this->data['_flashes'][] = ['type' => $type, 'message' => $key, 'parameters' => $parameters];
     }
 
     public function consumeFlashes(): array
     {
-        /** @var list<array{type: string, message: string}> $flashes */
+        /** @var list<array{type: string, message: string, parameters: array<string, string|int|float>}> $flashes */
         $flashes = $this->data['_flashes'] ?? [];
         unset($this->data['_flashes']);
 

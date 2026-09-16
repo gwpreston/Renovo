@@ -6,6 +6,7 @@ namespace App\Service\Notification;
 
 use App\Domain\AlertType;
 use App\Domain\DigestMode;
+use App\I18n\Translator;
 use App\Notification\Alert;
 use DateTimeImmutable;
 
@@ -24,6 +25,10 @@ use DateTimeImmutable;
  */
 final class DigestBuilder
 {
+    public function __construct(private readonly Translator $translator)
+    {
+    }
+
     /**
      * @param list<Alert> $alerts
      */
@@ -49,17 +54,17 @@ final class DigestBuilder
                 $lines[] = '';
             }
 
-            $lines[] = $type->label() . ':';
+            $lines[] = $this->translator->trans('digest.section', [
+                'label' => $this->translator->trans($type->labelKey()),
+            ]);
             foreach ($ofType as $alert) {
                 $lines[] = '- ' . $alert->summaryLine();
             }
         }
 
-        $title = sprintf(
-            '%s subscription summary: %d %s',
-            $mode === DigestMode::Weekly ? 'Weekly' : 'Monthly',
-            count($alerts),
-            count($alerts) === 1 ? 'thing to know' : 'things to know',
+        $title = $this->translator->trans(
+            $mode === DigestMode::Weekly ? 'digest.title.weekly' : 'digest.title.monthly',
+            ['count' => count($alerts)],
         );
 
         return new Alert(

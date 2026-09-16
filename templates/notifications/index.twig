@@ -1,70 +1,65 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Notifications — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('notifications.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <div class="page-header">
-        <h1>Notifications</h1>
+        <h1>{{ t('notifications.title') }}</h1>
     </div>
 
     <p class="muted note">
-        Reminders are sent by the scheduler once a day. Each one is recorded when it goes out, so a run that
-        happens twice — or a scheduler that catches up after being offline — never sends you the same thing
-        again.
+        {{ t('notifications.intro') }}
     </p>
 
     <section class="card">
-        <h2>When to tell me</h2>
+        <h2>{{ t('notifications.when_to_tell_me') }}</h2>
 
         <form method="post" action="/settings/notifications/preferences" class="stack">
             {{ csrf_field() }}
 
-            <label for="lead_days">Remind me this many days before a charge</label>
+            <label for="lead_days">{{ t('notifications.lead_days_label') }}</label>
             <input type="text" id="lead_days" name="lead_days"
                    value="{{ submitted.lead_days is defined ? submitted.lead_days : preferences.leadDaysAsString }}"
                    aria-describedby="lead_days_hint">
             <p class="hint" id="lead_days_hint">
-                Separate with commas, for example <code>30, 7, 1</code>. Each one is a separate reminder.
-                Leave blank for no advance reminders. A single subscription can override this on its own page.
+                {{ t('notifications.lead_days_hint', {'example': '30, 7, 1'}) }}
             </p>
-            {% if errors.lead_days is defined %}<p class="field-error">{{ errors.lead_days }}</p>{% endif %}
+            {% if errors.lead_days is defined %}<p class="field-error">{{ error_message(errors.lead_days) }}</p>{% endif %}
 
-            <label for="digest_mode">Delivery</label>
+            <label for="digest_mode">{{ t('notifications.delivery') }}</label>
             <select id="digest_mode" name="digest_mode">
                 {% for mode in digest_modes %}
                     <option value="{{ mode.value }}"
                             {{ preferences.digestMode.value == mode.value ? 'selected' : '' }}>
-                        {{ mode.label }}
+                        {{ t(mode.labelKey()) }}
                     </option>
                 {% endfor %}
             </select>
             <p class="hint">
-                A summary collects everything coming up into one message instead of sending them separately.
-                Lead times do not apply to a summary — each thing is mentioned once, shortly before it happens.
+                {{ t('notifications.digest_hint') }}
             </p>
 
-            <label for="digest_day">Summary day</label>
+            <label for="digest_day">{{ t('notifications.summary_day') }}</label>
             <input type="number" id="digest_day" name="digest_day" min="1" max="28"
                    value="{{ preferences.digestDay }}">
             <p class="hint">
-                For a weekly summary, 1 is Monday. For a monthly one it is the day of the month, up to 28 —
-                a summary set for the 30th would skip February.
+                {{ t('notifications.digest_day_hint') }}
             </p>
-            {% if errors.digest_day is defined %}<p class="field-error">{{ errors.digest_day }}</p>{% endif %}
+            {% if errors.digest_day is defined %}<p class="field-error">{{ error_message(errors.digest_day) }}</p>{% endif %}
 
             {% if channels is not empty %}
-                <h3>Where each alert goes</h3>
+                <h3>{{ t('notifications.where_each_alert_goes') }}</h3>
                 <p class="hint">
-                    Leave every box ticked — or every box clear — to send everything to every channel.
+                    {{ t('notifications.routing_hint') }}
                 </p>
 
                 <div class="table-scroll">
                     <table class="table">
                         <thead>
                         <tr>
-                            <th scope="col">Channel</th>
+                            <th scope="col">{{ t('field.channel') }}</th>
                             {% for type in alert_types %}
-                                <th scope="col">{{ type.label }}</th>
+                                <th scope="col">{{ t(type.labelKey()) }}</th>
                             {% endfor %}
                         </tr>
                         </thead>
@@ -78,7 +73,7 @@
                                         <input type="checkbox"
                                                name="routes[{{ channel.id }}][]"
                                                value="{{ type.value }}"
-                                               aria-label="{{ channel.label }}: {{ type.label }}"
+                                               aria-label="{{ channel.label }}: {{ t(type.labelKey()) }}"
                                                {{ (not configured or type.value in routes[channel.id])
                                                    ? 'checked' : '' }}>
                                     </td>
@@ -90,15 +85,15 @@
                 </div>
             {% endif %}
 
-            <button type="submit" class="button button-primary">Save preferences</button>
+            <button type="submit" class="button button-primary">{{ t('notifications.save_preferences') }}</button>
         </form>
     </section>
 
     <section class="card">
-        <h2>Channels</h2>
+        <h2>{{ t('notifications.channels') }}</h2>
 
         {% if channels is empty %}
-            <p class="muted empty">No channels yet. Add one below and send yourself a test message.</p>
+            <p class="muted empty">{{ t('notifications.channels_empty') }}</p>
         {% else %}
             <ul class="channel-list">
                 {% for channel in channels %}
@@ -106,45 +101,47 @@
                         <div>
                             <strong>{{ channel.label }}</strong>
                             <span class="muted">{{ channel_description(channel) }}</span>
-                            {% if not channel.isActive %}<span class="badge">Paused</span>{% endif %}
+                            {% if not channel.isActive %}<span class="badge">{{ t('state.paused') }}</span>{% endif %}
                             {% if channel.lastError %}
-                                <p class="field-error">Last attempt failed: {{ channel.lastError }}</p>
+                                <p class="field-error">{{ t('notifications.last_error', {'reason': channel.lastError}) }}</p>
                             {% elseif channel.lastSuccessAt %}
-                                <p class="hint">Last delivered {{ channel.lastSuccessAt|date('j M Y, H:i') }}.</p>
+                                <p class="hint">{{ t('notifications.last_delivered', {
+                                    'when': channel.lastSuccessAt|local_date('d MMM y, HH:mm'),
+                                }) }}</p>
                             {% endif %}
 
                             <details>
-                                <summary>Edit</summary>
+                                <summary>{{ t('action.edit') }}</summary>
                                 <form method="post" action="/settings/notifications/channels/{{ channel.id }}"
                                       class="stack">
                                     {{ csrf_field() }}
 
-                                    <label for="edit_{{ channel.id }}_label">Name</label>
+                                    <label for="edit_{{ channel.id }}_label">{{ t('field.name') }}</label>
                                     <input type="text" id="edit_{{ channel.id }}_label" name="label"
                                            value="{{ channel.label }}">
 
                                     {% for field in channel_fields(channel) %}
-                                        <label for="edit_{{ channel.id }}_{{ field.name }}">{{ field.label }}</label>
+                                        <label for="edit_{{ channel.id }}_{{ field.name }}">{{ t(field.label) }}</label>
                                         <input type="{{ field.type }}"
                                                id="edit_{{ channel.id }}_{{ field.name }}"
                                                name="{{ field.name }}"
                                                autocomplete="off"
                                                {% if field.isSecret %}
-                                                   placeholder="Leave blank to keep the stored value"
+                                                   placeholder="{{ t('notifications.secret_placeholder') }}"
                                                {% else %}
                                                    value="{{ channel.config[field.name]|default('') }}"
                                                {% endif %}>
-                                        {% if field.hint %}<p class="hint">{{ field.hint }}</p>{% endif %}
+                                        {% if field.hint %}<p class="hint">{{ t(field.hint) }}</p>{% endif %}
                                     {% endfor %}
 
                                     <input type="hidden" name="is_active" value="0">
                                     <label class="choice">
                                         <input type="checkbox" name="is_active" value="1"
                                                {{ channel.isActive ? 'checked' : '' }}>
-                                        <span>Send notifications to this channel</span>
+                                        <span>{{ t('notifications.channel_enabled') }}</span>
                                     </label>
 
-                                    <button type="submit" class="button">Save channel</button>
+                                    <button type="submit" class="button">{{ t('notifications.save_channel') }}</button>
                                 </form>
                             </details>
                         </div>
@@ -153,12 +150,12 @@
                             <form method="post" action="/settings/notifications/channels/{{ channel.id }}/test"
                                   class="inline">
                                 {{ csrf_field() }}
-                                <button type="submit" class="button button-quiet">Send test</button>
+                                <button type="submit" class="button button-quiet">{{ t('action.send_test') }}</button>
                             </form>
                             <form method="post" action="/settings/notifications/channels/{{ channel.id }}/delete"
                                   class="inline">
                                 {{ csrf_field() }}
-                                <button type="submit" class="button button-quiet">Remove</button>
+                                <button type="submit" class="button button-quiet">{{ t('action.remove') }}</button>
                             </form>
                         </div>
                     </li>
@@ -168,7 +165,7 @@
     </section>
 
     <section class="card">
-        <h2>Add a channel</h2>
+        <h2>{{ t('notifications.add_a_channel') }}</h2>
 
         {% for notifier in notifiers %}
             <details class="channel-form" {{ submitted.channel_type is defined
@@ -179,24 +176,26 @@
                     {{ csrf_field() }}
                     <input type="hidden" name="channel_type" value="{{ notifier.key }}">
 
-                    <label for="{{ notifier.key }}_label">Name</label>
+                    <label for="{{ notifier.key }}_label">{{ t('field.name') }}</label>
                     <input type="text" id="{{ notifier.key }}_label" name="label"
                            placeholder="{{ notifier.label }}">
 
                     {% for field in notifier.fields %}
-                        <label for="{{ notifier.key }}_{{ field.name }}">{{ field.label }}</label>
+                        <label for="{{ notifier.key }}_{{ field.name }}">{{ t(field.label) }}</label>
                         <input type="{{ field.type }}"
                                id="{{ notifier.key }}_{{ field.name }}"
                                name="{{ field.name }}"
                                {{ field.required ? 'required' : '' }}
                                autocomplete="off">
-                        {% if field.hint %}<p class="hint">{{ field.hint }}</p>{% endif %}
+                        {% if field.hint %}<p class="hint">{{ t(field.hint) }}</p>{% endif %}
                         {% if errors[field.name] is defined %}
                             <p class="field-error">{{ errors[field.name] }}</p>
                         {% endif %}
                     {% endfor %}
 
-                    <button type="submit" class="button button-primary">Add {{ notifier.label }}</button>
+                    <button type="submit" class="button button-primary">
+                        {{ t('notifications.add_channel_of_type', {'type': notifier.label}) }}
+                    </button>
                 </form>
             </details>
         {% endfor %}
@@ -204,21 +203,21 @@
 
     {% if recent is not empty %}
         <section class="card">
-            <h2>Recently sent</h2>
+            <h2>{{ t('notifications.recently_sent') }}</h2>
             <div class="table-scroll">
                 <table class="table">
                     <thead>
                     <tr>
-                        <th scope="col">When</th>
-                        <th scope="col">Alert</th>
-                        <th scope="col">Channel</th>
-                        <th scope="col">Result</th>
+                        <th scope="col">{{ t('field.when') }}</th>
+                        <th scope="col">{{ t('field.alert') }}</th>
+                        <th scope="col">{{ t('field.channel') }}</th>
+                        <th scope="col">{{ t('field.result') }}</th>
                     </tr>
                     </thead>
                     <tbody>
                     {% for entry in recent %}
                         <tr>
-                            <td>{{ entry.created_at|date('j M Y, H:i') }}</td>
+                            <td>{{ entry.created_at|local_date('d MMM y, HH:mm') }}</td>
                             <td>{{ alert_type_label(entry.alert_type) }}</td>
                             <td>{{ entry.channel_label }}</td>
                             <td>

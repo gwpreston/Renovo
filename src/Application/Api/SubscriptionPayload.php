@@ -52,6 +52,7 @@ final class SubscriptionPayload
         $input = [
             'name' => self::string($json, 'name') ?? '',
             'notes' => self::string($json, 'notes') ?? '',
+            'website_url' => self::string($json, 'website_url') ?? '',
             'currency' => $currency,
             'price' => self::money($json, 'price_minor', $currency),
             'subscription_type' => self::string($json, 'subscription_type') ?? '',

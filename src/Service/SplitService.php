@@ -159,7 +159,7 @@ final class SplitService
         // check that actually matters is the next one.
         $subscription = $this->subscriptions->find($scope, $subscriptionId);
         if ($subscription === null) {
-            throw new ValidationException(['subscription' => 'That subscription does not exist.']);
+            throw new ValidationException(['subscription' => 'error.subscription.not_found']);
         }
 
         // Refuse a participant deliberately rather than letting the write
@@ -170,7 +170,7 @@ final class SplitService
         // should mean something.
         if (!$this->canEdit($scope, $subscription)) {
             throw new ValidationException([
-                'split_mode' => 'Only the member who owns this subscription can change how it is split.',
+                'split_mode' => 'error.split.owner_only',
             ]);
         }
 
@@ -274,7 +274,7 @@ final class SplitService
 
             $units = $mode === SplitMode::Equal ? 1 : (int) (is_scalar($units) ? $units : 0);
             if ($units < 0 || $units > 10000) {
-                $errors['shares'] = 'Shares must be between 0 and 10000.';
+                $errors['shares'] = 'error.split.share_range';
                 continue;
             }
             if ($units === 0) {
@@ -286,7 +286,7 @@ final class SplitService
         }
 
         if ($participants === [] && $errors === []) {
-            $errors['shares'] = 'Choose at least one member to share the cost.';
+            $errors['shares'] = 'error.split.no_members';
         }
 
         return [$participants, $errors];

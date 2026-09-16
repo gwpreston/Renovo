@@ -83,7 +83,7 @@ final class BulkActionService
     {
         $ids = $this->ids($input);
         if ($ids === []) {
-            throw new ValidationException(['ids' => 'Choose at least one subscription.']);
+            throw new ValidationException(['ids' => 'error.bulk.no_subscriptions']);
         }
 
         $action = is_scalar($input['action'] ?? null) ? (string) $input['action'] : '';
@@ -97,7 +97,7 @@ final class BulkActionService
             self::ACTION_CURRENCY => $this->convertCurrency($scope, $ids, $input),
             self::ACTION_ACTIVATE => $this->subscriptions->updateMany($scope, $ids, ['is_active' => true]),
             self::ACTION_DEACTIVATE => $this->subscriptions->updateMany($scope, $ids, ['is_active' => false]),
-            default => throw new ValidationException(['action' => 'Choose an action to apply.']),
+            default => throw new ValidationException(['action' => 'error.bulk.no_action']),
         };
     }
 
@@ -112,7 +112,7 @@ final class BulkActionService
         // Zero or blank means "remove the category", which is a legitimate
         // bulk action and not a validation failure.
         if ($categoryId !== null && $this->categories->find($scope, $categoryId) === null) {
-            throw new ValidationException(['category_id' => 'That category does not exist.']);
+            throw new ValidationException(['category_id' => 'error.category.not_found']);
         }
 
         return $this->subscriptions->updateMany($scope, $ids, ['category_id' => $categoryId]);
@@ -126,7 +126,7 @@ final class BulkActionService
     {
         $name = trim(is_scalar($input['tag'] ?? null) ? (string) $input['tag'] : '');
         if ($name === '') {
-            throw new ValidationException(['tag' => 'Enter a tag.']);
+            throw new ValidationException(['tag' => 'error.tag.required']);
         }
 
         return $this->db->transactional(function () use ($scope, $ids, $name, $add): int {
@@ -184,7 +184,7 @@ final class BulkActionService
 
         if ($column === 'owner_user_id') {
             if ($userId === null) {
-                throw new ValidationException(['user_id' => 'Choose a member.']);
+                throw new ValidationException(['user_id' => 'error.member.required']);
             }
 
             // Reassigning ownership in ISOLATED mode would hand somebody a row
@@ -193,13 +193,13 @@ final class BulkActionService
             // reason.
             if ($scope->isOwnerRestricted()) {
                 throw new ValidationException([
-                    'user_id' => 'Ownership cannot be reassigned while the instance keeps members\' data separate.',
+                    'user_id' => 'error.bulk.isolated_reassign',
                 ]);
             }
         }
 
         if ($userId !== null && !in_array($userId, $this->memberIds($scope), true)) {
-            throw new ValidationException(['user_id' => 'Choose a member of this household.']);
+            throw new ValidationException(['user_id' => 'error.member.not_in_household']);
         }
 
         return $this->subscriptions->updateMany($scope, $ids, [$column => $userId]);
@@ -213,7 +213,7 @@ final class BulkActionService
     {
         $currency = Currency::normalise(is_scalar($input['currency'] ?? null) ? (string) $input['currency'] : '');
         if (!Currency::isValidCode($currency)) {
-            throw new ValidationException(['currency' => 'Choose a currency.']);
+            throw new ValidationException(['currency' => 'error.currency.required']);
         }
 
         return $this->db->transactional(function () use ($scope, $ids, $currency): int {
@@ -233,12 +233,11 @@ final class BulkActionService
                     // because no rate was available would be a silent 20% price
                     // change, and the user would have no way of knowing.
                     throw new ValidationException([
-                        'currency' => sprintf(
-                            'No exchange rate is available between %s and %s, so "%s" cannot be converted.',
-                            $subscription->price->currency,
-                            $currency,
-                            $subscription->name,
-                        ),
+                        'currency' => new ValidationError('error.bulk.no_rate', [
+                            'from' => $subscription->price->currency,
+                            'to' => $currency,
+                            'name' => $subscription->name,
+                        ]),
                     ]);
                 }
 

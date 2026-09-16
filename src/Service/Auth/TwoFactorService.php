@@ -126,13 +126,13 @@ final class TwoFactorService
     public function regenerateRecoveryCodes(User $user, string $password): array
     {
         if (!$this->hasher->verify($password, $user->passwordHash)) {
-            throw ValidationException::field('password', 'That password is not correct.');
+            throw ValidationException::field('password', 'error.password.incorrect');
         }
 
         if (!$this->isRequiredFor($user->id)) {
             throw ValidationException::field(
                 'password',
-                'There is no second factor set up for this account, so there is nothing to recover.',
+                'error.two_factor.none_set_up',
             );
         }
 

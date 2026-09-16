@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Auth;
 
+use App\I18n\Translator;
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Controller\Controller;
 use App\Domain\Entity\User;
@@ -22,12 +23,13 @@ final class LoginController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly AuthService $auth,
         private readonly InstanceSettingsService $settings,
         private readonly SignInService $signIn,
         private readonly TwoFactorService $twoFactor,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function showForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -79,7 +81,7 @@ final class LoginController extends Controller
 
         $this->signIn->establish($user, SignInService::METHOD_PASSWORD);
 
-        $this->flash('success', sprintf('Welcome back, %s.', $user->displayName));
+        $this->flash('success', 'flash.welcome_back', ['name' => $user->displayName]);
 
         return $this->redirect($response, $next);
     }
@@ -95,7 +97,7 @@ final class LoginController extends Controller
             $this->session->regenerate();
         }
 
-        $this->flash('success', 'You have been signed out.');
+        $this->flash('success', 'flash.signed_out');
 
         return $this->redirect($response, '/login');
     }

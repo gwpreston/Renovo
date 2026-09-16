@@ -35,6 +35,16 @@ jobs:
       - name: PHPStan
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
 
+      # Every locale against the base catalogue, both directions: a key with no
+      # translation fails, and so does a translation for a key the base no
+      # longer has — the second being the one that would otherwise sit there
+      # for years while a page silently falls back to English. No database
+      # needed, so it belongs in this job.
+      - name: Locales match the base catalogue
+        env:
+          SESSION_KEY: ci-session-key-not-a-secret-0000000000000000
+        run: php bin/console i18n:check
+
       # The OpenAPI document is the API's contract, so it is checked against the
       # application's own route table in both directions: an endpoint that is
       # not described fails here, and so does a description with no endpoint

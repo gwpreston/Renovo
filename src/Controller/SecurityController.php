@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Security\SessionInterface;
 use App\Security\Totp;
 use App\Service\Auth\SessionDirectoryService;
@@ -42,13 +43,14 @@ final class SecurityController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly TotpService $totp,
         private readonly TwoFactorService $twoFactor,
         private readonly WebAuthnService $webAuthn,
         private readonly SessionDirectoryService $sessions,
         private readonly InstanceSettingsService $settings,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -81,7 +83,7 @@ final class SecurityController extends Controller
         $user = $this->user($request);
 
         if ($this->totp->isEnabled($user->id)) {
-            $this->flash('error', 'An authenticator app is already set up for this account.');
+            $this->flash('error', 'error.totp.already_set_up');
 
             return $this->redirectAfterWrite($request, $response, '/settings/security');
         }
@@ -124,7 +126,7 @@ final class SecurityController extends Controller
         $this->session->remove(self::ENROLMENT_SECRET_KEY);
         $this->session->set(self::RECOVERY_CODES_KEY, $codes);
 
-        $this->flash('success', 'Two-factor authentication is on. Save your recovery codes now.');
+        $this->flash('success', 'flash.totp_enabled');
 
         return $this->redirectAfterWrite($request, $response, '/settings/security');
     }
@@ -146,9 +148,9 @@ final class SecurityController extends Controller
                 $this->user($request),
                 is_scalar($body['password'] ?? null) ? (string) $body['password'] : '',
             );
-            $this->flash('success', 'Two-factor authentication is off.');
+            $this->flash('success', 'flash.totp_disabled');
         } catch (ValidationException $exception) {
-            $this->flash('error', implode(' ', $exception->errors()));
+            $this->flashErrors($exception);
         }
 
         return $this->redirectAfterWrite($request, $response, '/settings/security');
@@ -167,9 +169,9 @@ final class SecurityController extends Controller
             );
 
             $this->session->set(self::RECOVERY_CODES_KEY, $codes);
-            $this->flash('success', 'New recovery codes issued. The old ones no longer work.');
+            $this->flash('success', 'flash.recovery_codes_issued');
         } catch (ValidationException $exception) {
-            $this->flash('error', implode(' ', $exception->errors()));
+            $this->flashErrors($exception);
         }
 
         return $this->redirectAfterWrite($request, $response, '/settings/security');
@@ -198,7 +200,10 @@ final class SecurityController extends Controller
 
         $payload = json_decode((string) $request->getBody(), true);
         if (!is_array($payload) || !isset($payload['credential'])) {
-            return $this->json($response->withStatus(400), ['error' => 'The browser sent an unexpected response.']);
+            return $this->json(
+                $response->withStatus(400),
+                ['error' => $this->translator->trans('error.passkey.unexpected_response')],
+            );
         }
 
         $name = is_scalar($payload['name'] ?? null) ? (string) $payload['name'] : '';
@@ -213,7 +218,7 @@ final class SecurityController extends Controller
                 $discoverable,
             );
         } catch (ValidationException $exception) {
-            return $this->json($response->withStatus(422), ['error' => implode(' ', $exception->errors())]);
+            return $this->json($response->withStatus(422), ['error' => $this->errorSentence($exception)]);
         } finally {
             $this->session->remove(self::REGISTRATION_OPTIONS_KEY);
         }
@@ -226,7 +231,7 @@ final class SecurityController extends Controller
             $this->session->set(self::RECOVERY_CODES_KEY, $codes);
         }
 
-        $this->flash('success', sprintf('Passkey "%s" added.', $credential->name));
+        $this->flash('success', 'flash.passkey_added', ['name' => $credential->name]);
 
         return $this->json($response, ['redirect' => '/settings/security']);
     }
@@ -244,9 +249,9 @@ final class SecurityController extends Controller
                 (int) $id,
                 is_scalar($body['name'] ?? null) ? (string) $body['name'] : '',
             );
-            $this->flash('success', 'Passkey renamed.');
+            $this->flash('success', 'flash.passkey_renamed');
         } catch (ValidationException $exception) {
-            $this->flash('error', implode(' ', $exception->errors()));
+            $this->flashErrors($exception);
         }
 
         return $this->redirectAfterWrite($request, $response, '/settings/security');
@@ -259,9 +264,9 @@ final class SecurityController extends Controller
     ): ResponseInterface {
         try {
             $this->webAuthn->revoke($this->user($request), (int) $id);
-            $this->flash('success', 'Passkey revoked.');
+            $this->flash('success', 'flash.passkey_revoked');
         } catch (ValidationException $exception) {
-            $this->flash('error', implode(' ', $exception->errors()));
+            $this->flashErrors($exception);
         }
 
         return $this->redirectAfterWrite($request, $response, '/settings/security');
@@ -276,7 +281,7 @@ final class SecurityController extends Controller
 
         $this->flash(
             $revoked ? 'success' : 'error',
-            $revoked ? 'That session was signed out.' : 'That session is no longer active.',
+            $revoked ? 'flash.session_revoked' : 'flash.session_already_gone',
         );
 
         return $this->redirectAfterWrite($request, $response, '/settings/security');
@@ -286,7 +291,7 @@ final class SecurityController extends Controller
     {
         $count = $this->sessions->revokeAllOthers($this->user($request), $this->session->id());
 
-        $this->flash('success', sprintf('%d other session(s) signed out.', $count));
+        $this->flash('success', 'flash.other_sessions_revoked', ['count' => $count]);
 
         return $this->redirectAfterWrite($request, $response, '/settings/security');
     }

@@ -126,6 +126,39 @@ final class SubscriptionRepository extends AbstractScopedRepository
         return $this->hydrateAll($scope, $rows);
     }
 
+    /**
+     * Instance-wide counts for the metrics endpoint.
+     *
+     * The one query in this class that takes no Scope, and it is allowed to
+     * because it returns nothing but integers: how many subscriptions exist,
+     * not what any of them is. Nothing user-facing may call it — /metrics is
+     * an operator's endpoint, behind its own credential.
+     *
+     * @return array{active: int, inactive: int, trials: int}
+     */
+    public function instanceTotals(): array
+    {
+        $row = $this->db->fetchOne(
+            'SELECT COUNT(*) AS total,'
+            . ' SUM(CASE WHEN ' . $this->quote('is_active') . ' = :active THEN 1 ELSE 0 END) AS active,'
+            . ' SUM(CASE WHEN ' . $this->quote('is_trial') . ' = :trial THEN 1 ELSE 0 END) AS trials'
+            . ' FROM ' . $this->quote('subscriptions'),
+            [
+                'active' => $this->db->platform()->booleanParameter(true),
+                'trial' => $this->db->platform()->booleanParameter(true),
+            ],
+        );
+
+        $total = (int) ($row['total'] ?? 0);
+        $active = (int) ($row['active'] ?? 0);
+
+        return [
+            'active' => $active,
+            'inactive' => max(0, $total - $active),
+            'trials' => (int) ($row['trials'] ?? 0),
+        ];
+    }
+
     public function countForList(Scope $scope, SubscriptionFilter $filter): int
     {
         $params = [];
@@ -744,6 +777,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
                 ? (string) $row['reminder_days']
                 : null,
             logoPath: $this->nullableString($row['logo_path'] ?? null),
+            websiteUrl: $this->nullableString($row['website_url'] ?? null),
             categoryId: $this->nullableInt($row['category_id'] ?? null),
             categoryName: $this->nullableString($row['category_name'] ?? null),
             ownerName: $this->nullableString($row['owner_name'] ?? null),

@@ -80,11 +80,19 @@ abstract class AbstractRepository
         }
 
         foreach ($criteria->searches() as $search) {
-            $name = sprintf('%s_%d', $prefix, $index++);
-            $params[$name] = '%' . $this->escapeLike(mb_strtolower($search['term'])) . '%';
+            $term = '%' . $this->escapeLike(mb_strtolower($search['term'])) . '%';
 
             $parts = [];
             foreach ($search['columns'] as $column) {
+                // A placeholder per column, not one reused across them. With
+                // native prepared statements MySQL refuses a named parameter
+                // that appears twice in the same statement — "Invalid
+                // parameter number" — while PostgreSQL rewrites it happily,
+                // which is exactly the kind of difference that only shows up
+                // when the suite is run against both.
+                $name = sprintf('%s_%d', $prefix, $index++);
+                $params[$name] = $term;
+
                 $parts[] = $this->db->platform()->caseInsensitiveLike(
                     $this->qualify($this->assertColumn($column)),
                     ':' . $name,

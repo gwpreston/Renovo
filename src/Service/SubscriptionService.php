@@ -38,6 +38,7 @@ final class SubscriptionService
         private readonly SubscriptionRepository $subscriptions,
         private readonly CategoryRepository $categories,
         private readonly TagRepository $tags,
+        private readonly LogoFetcher $logoFetcher,
         private readonly MembershipRepository $memberships,
         private readonly PriceHistoryService $priceHistory,
         private readonly Database $db,
@@ -132,15 +133,18 @@ final class SubscriptionService
      * offered here with its result caught.
      *
      * @param array<string, mixed> $input
-     * @return array<string, string> Field errors; empty when the row is valid.
+     * @return array<string, ValidationError> Field errors; empty when the row
+     *         is valid. Keys, not sentences — the preview renders them.
      */
     public function validationErrors(Scope $scope, array $input): array
     {
         try {
-            // Tags are not resolved on a dry run. `validate()` creates any tag
-            // it does not recognise, and a preview that invented forty tags the
-            // user then decided not to import would leave them behind.
-            $this->validate($scope, $input, resolveTags: false);
+            // Nothing is written on a dry run. `validate()` creates any tag it
+            // does not recognise and fetches a logo for any website it is
+            // given; a preview that invented forty tags — or made four hundred
+            // outbound requests — for rows the user then decided not to import
+            // would be a page load with consequences.
+            $this->validate($scope, $input, commits: false);
         } catch (ValidationException $exception) {
             return $exception->errors();
         }
@@ -176,7 +180,7 @@ final class SubscriptionService
 
         $endDate = $this->date($this->str($input, 'trial_end_date'));
         if ($endDate === null) {
-            $errors['trial_end_date'] = 'Enter the date the trial ends.';
+            $errors['trial_end_date'] = 'error.trial.end_date_required';
         }
 
         // The converts-to price is optional: plenty of trials convert to
@@ -188,12 +192,12 @@ final class SubscriptionService
             try {
                 $converts = Money::fromUserInput($convertsToRaw, Currency::isValidCode($currency) ? $currency : 'GBP');
                 if ($converts->isNegative()) {
-                    $errors['converts_to_price'] = 'Enter a price of zero or more.';
+                    $errors['converts_to_price'] = 'error.price.negative';
                 } else {
                     $convertsToMinor = $converts->amountMinor;
                 }
             } catch (InvalidArgumentException) {
-                $errors['converts_to_price'] = 'Enter the price it converts to, for example 9.99.';
+                $errors['converts_to_price'] = 'error.trial.converts_to_invalid';
             }
         }
 
@@ -202,7 +206,7 @@ final class SubscriptionService
         if ($convertsToCycle !== null && $convertsToCycle->requiresCycleDays()) {
             $convertsToCycleDays = (int) $this->str($input, 'converts_to_cycle_days');
             if ($convertsToCycleDays < 1 || $convertsToCycleDays > 3650) {
-                $errors['converts_to_cycle_days'] = 'Enter the number of days between payments (1-3650).';
+                $errors['converts_to_cycle_days'] = 'error.cycle_days.range';
             }
         }
 
@@ -255,7 +259,7 @@ final class SubscriptionService
             }
 
             if (!ctype_digit($part) || (int) $part > 365) {
-                $errors['reminder_days'] = 'Enter days as whole numbers, for example 30, 7, 1 — or "none".';
+                $errors['reminder_days'] = 'error.reminder_days.invalid';
 
                 return null;
             }
@@ -264,7 +268,7 @@ final class SubscriptionService
         }
 
         if (count($days) > 6) {
-            $errors['reminder_days'] = 'Use at most six reminders for one subscription.';
+            $errors['reminder_days'] = 'error.reminder_days.too_many';
 
             return null;
         }
@@ -403,6 +407,13 @@ final class SubscriptionService
     /**
      * Turn submitted form data into validated column values.
      *
+     * `$commits` is false on a dry run — the importer's preview calls this on
+     * every row of a file to find out which of them would fail. Nothing that
+     * *writes* may happen on that path: no tag is created, and no logo is
+     * fetched. A preview of four hundred rows must not be four hundred
+     * outbound requests for subscriptions the user has not yet agreed to
+     * import.
+     *
      * @param array<string, mixed> $input
      * @return array{0: array<string, mixed>, 1: list<int>}
      * @throws ValidationException
@@ -411,20 +422,20 @@ final class SubscriptionService
         Scope $scope,
         array $input,
         ?int $existingId = null,
-        bool $resolveTags = true,
+        bool $commits = true,
     ): array {
         $errors = [];
 
         $name = trim($this->str($input, 'name'));
         if ($name === '') {
-            $errors['name'] = 'Enter a name.';
+            $errors['name'] = 'error.name.required';
         } elseif (mb_strlen($name) > 150) {
-            $errors['name'] = 'Name must be 150 characters or fewer.';
+            $errors['name'] = 'error.name.too_long_150';
         }
 
         $currency = Currency::normalise($this->str($input, 'currency'));
         if (!Currency::isValidCode($currency)) {
-            $errors['currency'] = 'Choose a currency.';
+            $errors['currency'] = 'error.currency.required';
             $currency = 'GBP';
         }
 
@@ -432,10 +443,10 @@ final class SubscriptionService
         try {
             $price = Money::fromUserInput($this->str($input, 'price'), $currency);
             if ($price->isNegative()) {
-                $errors['price'] = 'Enter a price of zero or more.';
+                $errors['price'] = 'error.price.negative';
             }
         } catch (InvalidArgumentException) {
-            $errors['price'] = 'Enter a price, for example 9.99.';
+            $errors['price'] = 'error.price.invalid';
         }
 
         $type = SubscriptionType::tryFrom($this->str($input, 'subscription_type'))
@@ -446,11 +457,11 @@ final class SubscriptionService
         if ($type->hasBillingCycle()) {
             $cycle = BillingCycle::tryFromString($this->str($input, 'billing_cycle'));
             if ($cycle === null) {
-                $errors['billing_cycle'] = 'Choose a billing cycle.';
+                $errors['billing_cycle'] = 'error.cycle.required';
             } elseif ($cycle->requiresCycleDays()) {
                 $cycleDays = (int) $this->str($input, 'cycle_days');
                 if ($cycleDays < 1 || $cycleDays > 3650) {
-                    $errors['cycle_days'] = 'Enter the number of days between payments (1–3650).';
+                    $errors['cycle_days'] = 'error.cycle_days.range';
                 }
             }
         }
@@ -460,10 +471,10 @@ final class SubscriptionService
         if ($type->hasBillingCycle() && $nextPaymentDate === null && !$isTrial) {
             // A trial has no payment date yet — that is the point of it. The
             // conversion sets one when the trial ends.
-            $errors['next_payment_date'] = 'Enter the next payment date.';
+            $errors['next_payment_date'] = 'error.next_payment.required';
         }
         if ($this->str($input, 'next_payment_date') !== '' && $nextPaymentDate === null) {
-            $errors['next_payment_date'] = 'Enter a valid date.';
+            $errors['next_payment_date'] = 'error.date.invalid';
         }
 
         $startDate = $this->date($this->str($input, 'start_date'));
@@ -475,10 +486,10 @@ final class SubscriptionService
         $noticeAmount = $noticeAmountRaw === '' ? null : (int) $noticeAmountRaw;
         $noticeUnit = $this->str($input, 'notice_period_unit');
         if ($noticeAmount !== null && ($noticeAmount < 0 || $noticeAmount > 3650)) {
-            $errors['notice_period_amount'] = 'Enter a notice period between 0 and 3650.';
+            $errors['notice_period_amount'] = 'error.notice.range';
         }
         if ($noticeUnit !== '' && !in_array($noticeUnit, NoticePeriod::units(), true)) {
-            $errors['notice_period_unit'] = 'Choose a notice period unit.';
+            $errors['notice_period_unit'] = 'error.notice.unit_required';
         }
         $notice = NoticePeriod::of(
             isset($errors['notice_period_amount']) ? null : $noticeAmount,
@@ -487,7 +498,7 @@ final class SubscriptionService
 
         $categoryId = $this->positiveInt($input['category_id'] ?? null);
         if ($categoryId !== null && $this->categories->find($scope, $categoryId) === null) {
-            $errors['category_id'] = 'That category does not exist.';
+            $errors['category_id'] = 'error.category.not_found';
         }
 
         $memberIds = array_map(
@@ -500,19 +511,21 @@ final class SubscriptionService
             // In ISOLATED mode a user may only ever own their own rows.
             $ownerUserId = $scope->userId;
         } elseif (!in_array($ownerUserId, $memberIds, true)) {
-            $errors['owner_user_id'] = 'Choose a member of this household.';
+            $errors['owner_user_id'] = 'error.member.not_in_household';
             $ownerUserId = $scope->userId;
         }
 
         $payerUserId = $this->positiveInt($input['payer_user_id'] ?? null);
         if ($payerUserId !== null && !in_array($payerUserId, $memberIds, true)) {
-            $errors['payer_user_id'] = 'Choose a member of this household.';
+            $errors['payer_user_id'] = 'error.member.not_in_household';
             $payerUserId = null;
         }
 
+        $website = $this->website($input, $errors);
+
         $notes = trim($this->str($input, 'notes'));
         if (mb_strlen($notes) > 5000) {
-            $errors['notes'] = 'Notes must be 5000 characters or fewer.';
+            $errors['notes'] = 'error.notes.too_long_5000';
         }
 
         // Null when the field was not submitted at all, which is what keeps a
@@ -525,11 +538,12 @@ final class SubscriptionService
         }
 
         /** @var Money $price */
-        $tagIds = $resolveTags ? $this->tags->resolveOrCreate($scope, $this->tagNames($input)) : [];
+        $tagIds = $commits ? $this->tags->resolveOrCreate($scope, $this->tagNames($input)) : [];
 
         $data = [
             'name' => $name,
             'notes' => $notes === '' ? null : $notes,
+            'website_url' => $website,
             'price_minor' => $price->amountMinor,
             'currency' => $currency,
             'subscription_type' => $type->value,
@@ -552,7 +566,7 @@ final class SubscriptionService
             'category_id' => $categoryId,
             'owner_user_id' => $ownerUserId,
             'payer_user_id' => $payerUserId,
-            'logo_path' => $this->logoPath($scope, $input, $existingId),
+            'logo_path' => $this->logoPath($scope, $input, $existingId, $commits ? $website : null),
         ];
 
         if (!array_key_exists('reminder_days', $input)) {
@@ -565,22 +579,66 @@ final class SubscriptionService
     }
 
     /**
+     * The subscription's own web address.
+     *
+     * Only the scheme and a host are checked here. What it resolves to is not
+     * this layer's business — the guarded HTTP client decides that at the
+     * moment of a request, which is the only moment at which an answer is
+     * true.
+     *
+     * @param array<string, mixed> $input
+     * @param array<string, ValidationError|string> $errors
+     */
+    private function website(array $input, array &$errors): ?string
+    {
+        $url = trim($this->str($input, 'website_url'));
+        if ($url === '') {
+            return null;
+        }
+
+        if (!str_contains($url, '://')) {
+            $url = 'https://' . $url;
+        }
+
+        if (mb_strlen($url) > 300) {
+            $errors['website_url'] = 'error.website.too_long';
+
+            return null;
+        }
+
+        $parts = parse_url($url);
+        $scheme = is_array($parts) ? ($parts['scheme'] ?? '') : '';
+
+        if (!is_array($parts) || !in_array($scheme, ['http', 'https'], true) || ($parts['host'] ?? '') === '') {
+            $errors['website_url'] = 'error.url.invalid';
+
+            return null;
+        }
+
+        return $url;
+    }
+
+    /**
      * @param array<string, mixed> $input
      */
-    private function logoPath(Scope $scope, array $input, ?int $existingId): ?string
+    private function logoPath(Scope $scope, array $input, ?int $existingId, ?string $website): ?string
     {
-        // Logos are stored, never fetched: the value here only ever comes from
-        // an upload this application wrote itself, or from the existing row.
+        // An upload always wins: somebody who chose a file meant it.
         $uploaded = $this->str($input, 'logo_path');
         if ($uploaded !== '') {
             return $uploaded;
         }
 
-        if ($existingId === null) {
-            return null;
+        $existing = $existingId === null ? null : $this->subscriptions->find($scope, $existingId)?->logoPath;
+        if ($existing !== null) {
+            return $existing;
         }
 
-        return $this->subscriptions->find($scope, $existingId)?->logoPath;
+        // Nothing stored and a website given: ask the site for its icon. The
+        // fetcher answers from its per-domain cache where it can, never throws,
+        // and returns null when there is nothing to be had — so a save is never
+        // held up by a site being slow to say no.
+        return $this->logoFetcher->fetchFor($website);
     }
 
     /**

@@ -147,7 +147,7 @@ final class MoneyPagesTest extends DatabaseTestCase
     public static function pages(): array
     {
         return [['/'], ['/subscriptions'], ['/budgets'], ['/budgets/new'], ['/forecast'], ['/forecast?mine=1'],
-            ['/cancellations'], ['/stats'], ['/settings']];
+            ['/cancellations'], ['/stats'], ['/settings'], ['/calendar'], ['/calendar?mine=1']];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('pages')]

@@ -1,19 +1,17 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Forecast — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('nav.forecast') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <div class="page-header">
-        <h1>Next 12 months</h1>
+        <h1>{{ t('forecast.next_12_months') }}</h1>
         <a class="button button-quiet" href="/forecast{{ mine_only ? '' : '?mine=1' }}">
             {{ mine_only ? 'Show the whole household' : 'Show only my share' }}
         </a>
     </div>
 
     <p class="muted note">
-        Each renewal is shown in the month it actually falls, rather than spread evenly — a yearly bill is a
-        bill in one month. Scheduled price changes and trial conversions are applied from their own dates, so
-        a figure here does not move when the change eventually happens.
+        {{ t('forecast.intro') }}
     </p>
 
     <section class="card">
@@ -21,9 +19,9 @@
             <table class="table">
                 <thead>
                 <tr>
-                    <th scope="col">Month</th>
-                    <th scope="col">Due</th>
-                    <th scope="col" class="numeric">Total</th>
+                    <th scope="col">{{ t('field.month') }}</th>
+                    <th scope="col">{{ t('field.due') }}</th>
+                    <th scope="col" class="numeric">{{ t('field.total') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -32,18 +30,18 @@
                         <th scope="row">{{ month.label }}</th>
                         <td>
                             {% if month.events is empty %}
-                                <span class="muted">Nothing due</span>
+                                <span class="muted">{{ t('forecast.nothing_due') }}</span>
                             {% else %}
                                 <ul class="plain forecast-events">
                                     {% for event in month.events %}
                                         <li>
                                             <a href="/subscriptions/{{ event.subscription.id }}/money">{{
                                                 event.subscription.name }}</a>
-                                            <span class="muted">{{ event.date|date('j M') }}</span>
+                                            <span class="muted">{{ event.date|local_date('d MMM') }}</span>
                                             {% if event.reason == 'trial_conversion' %}
-                                                <span class="badge badge-warning">Trial converts</span>
+                                                <span class="badge badge-warning">{{ t('state.trial_converts') }}</span>
                                             {% elseif event.reason == 'one_off' %}
-                                                <span class="badge">One-off</span>
+                                                <span class="badge">{{ t('type.one_off') }}</span>
                                             {% endif %}
                                             <span class="renewal-amount">{{
                                                 event.amount.amountMinor|money(event.amount.currency) }}</span>
@@ -65,7 +63,7 @@
                                 {% for currency, amount in month.by_currency %}
                                     <div>{{ amount|money(currency) }}</div>
                                 {% endfor %}
-                                <div class="hint">No rate to combine these.</div>
+                                <div class="hint">{{ t('forecast.no_rate') }}</div>
                             {% endif %}
                         </td>
                     </tr>

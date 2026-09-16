@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Middleware;
 
 use App\Application\Api\ApiPath;
+use App\I18n\Translator;
 use App\Security\CsrfTokenManager;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -35,8 +36,10 @@ final class CsrfMiddleware implements MiddlewareInterface
 {
     private const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
-    public function __construct(private readonly CsrfTokenManager $csrf)
-    {
+    public function __construct(
+        private readonly CsrfTokenManager $csrf,
+        private readonly Translator $translator,
+    ) {
     }
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -60,7 +63,7 @@ final class CsrfMiddleware implements MiddlewareInterface
         if (!$this->csrf->isValid($fromBody) && !$this->csrf->isValid($fromHeader === '' ? null : $fromHeader)) {
             throw new HttpBadRequestException(
                 $request,
-                'The form has expired. Reload the page and try again.',
+                $this->translator->trans('error.csrf.expired'),
             );
         }
 

@@ -1,22 +1,19 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Cancel by — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('nav.cancellations') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <div class="page-header">
-        <h1>Cancel by</h1>
+        <h1>{{ t('nav.cancellations') }}</h1>
     </div>
 
     <p class="muted note">
-        The date that matters is not the renewal — it is the last day you can still give notice and avoid the
-        next charge. Only subscriptions with a notice period appear here; everything else can be cancelled
-        right up to its renewal date, which the subscriptions list already shows.
+        {{ t('cancellations.intro') }}
     </p>
 
     {% if deadlines is empty %}
         <section class="card">
-            <p class="muted empty">Nothing with a notice period. Add one to a subscription and it will appear
-                here.</p>
+            <p class="muted empty">{{ t('cancellations.empty') }}</p>
         </section>
     {% else %}
         <section class="card">
@@ -24,11 +21,11 @@
                 <table class="table">
                     <thead>
                     <tr>
-                        <th scope="col">Subscription</th>
-                        <th scope="col">Cancel by</th>
-                        <th scope="col">Next charge</th>
-                        <th scope="col">Notice</th>
-                        <th scope="col" class="numeric">Price</th>
+                        <th scope="col">{{ t('field.subscription') }}</th>
+                        <th scope="col">{{ t('nav.cancellations') }}</th>
+                        <th scope="col">{{ t('field.next_charge') }}</th>
+                        <th scope="col">{{ t('cancellations.notice') }}</th>
+                        <th scope="col" class="numeric">{{ t('field.price') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -42,24 +39,23 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <strong>{{ row.deadline|date('j M Y') }}</strong>
+                                <strong>{{ row.deadline|local_date('d MMM y') }}</strong>
                                 <div class="hint">
                                     {% if row.is_passed %}
-                                        <span class="badge badge-danger">Deadline passed</span>
-                                        {{ (row.days_remaining * -1) }} day{{ row.days_remaining == -1 ? '' : 's' }}
-                                        ago — this renewal is already committed.
+                                        <span class="badge badge-danger">{{ t('cancellations.deadline_passed') }}</span>
+                                        {{ t('cancellations.passed_days', {'days': row.days_remaining * -1}) }}
                                     {% elseif row.days_remaining == 0 %}
-                                        <span class="badge badge-warning">Today</span>
+                                        <span class="badge badge-warning">{{ t('state.today') }}</span>
                                     {% else %}
-                                        {{ row.days_remaining }} day{{ row.days_remaining == 1 ? '' : 's' }} left
+                                        {{ t('cancellations.days_left', {'days': row.days_remaining}) }}
                                     {% endif %}
                                 </div>
                             </td>
                             <td>
                                 {{ row.subscription.nextChargeDate
-                                    ? row.subscription.nextChargeDate|date('j M Y') : '—' }}
+                                    ? row.subscription.nextChargeDate|local_date('d MMM y') : '—' }}
                                 {% if row.subscription.isTrial %}
-                                    <div class="hint">Trial converts</div>
+                                    <div class="hint">{{ t('state.trial_converts') }}</div>
                                 {% endif %}
                             </td>
                             <td>{{ notice_label(row.subscription.noticePeriod.amount,
@@ -74,8 +70,7 @@
         </section>
 
         <p class="muted note">
-            Deadlines within {{ urgent_days }} days are highlighted. Anything already passed is kept on the
-            list rather than hidden — you have been committed to another period, and that is worth knowing.
+            {{ t('cancellations.note', {'days': urgent_days}) }}
         </p>
     {% endif %}
 {% endblock %}

@@ -7,6 +7,7 @@ namespace App\Tests\Integration;
 use App\Application\Api\Resource;
 use App\Domain\IsolationMode;
 use App\Domain\Role;
+use App\Http\GuardedClient;
 use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\TagRepository;
@@ -18,6 +19,7 @@ use App\Service\SubscriptionService;
 use App\Service\ValidationException;
 use App\Support\Clock;
 use App\Support\FrozenClock;
+use App\Tests\Support\FakeGuardedClient;
 use App\Tests\Support\FakeUpload;
 use DateTimeImmutable;
 use DI\ContainerBuilder;
@@ -42,11 +44,13 @@ final class ImportTest extends DatabaseTestCase
     private \App\Domain\Entity\User $user;
     private string $directory;
     private FrozenClock $clock;
+    private FakeGuardedClient $logoRequests;
 
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->logoRequests = FakeGuardedClient::returning('', 404);
         $this->directory = sys_get_temp_dir() . '/renovo-imports-' . bin2hex(random_bytes(6));
         $this->clock = new FrozenClock(new DateTimeImmutable('2026-06-01 09:00:00'));
 
@@ -91,6 +95,9 @@ final class ImportTest extends DatabaseTestCase
 
         $builder->addDefinitions([
             Clock::class => $this->clock,
+            // The network stands still for this test, and one of the tests
+            // below asserts that nothing reached for it.
+            GuardedClient::class => factory(fn (): GuardedClient => $this->logoRequests),
             ImportService::class => autowire(ImportService::class)
                 ->constructorParameter('directory', factory(fn (): string => $this->directory)),
         ]);
@@ -333,5 +340,44 @@ final class ImportTest extends DatabaseTestCase
         }
 
         @rmdir($directory);
+    }
+
+    /**
+     * A preview is a dry run, and a dry run must not reach for the network.
+     *
+     * `validate()` is shared by the real write and by the preview that tells a
+     * user which of four hundred rows would fail. It creates tags and fetches
+     * logos on the way through, and doing either for a row nobody has agreed
+     * to import yet would be a page load with consequences — four hundred
+     * outbound requests among them.
+     */
+    public function testAPreviewFetchesNoLogosAndCreatesNoTags(): void
+    {
+        $tagsBefore = (int) $this->db->fetchValue('SELECT COUNT(*) FROM tags');
+
+        $errors = $this->subscriptions->validationErrors($this->scope, [
+            'name' => 'Something',
+            'price' => '9.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'website_url' => 'https://example.com',
+            'tags' => 'a-tag-that-did-not-exist',
+        ]);
+
+        self::assertSame([], $errors, 'The row itself is valid.');
+
+        self::assertSame(
+            [],
+            $this->logoRequests->requests,
+            'A preview must make no outbound request, however many websites the file names.',
+        );
+
+        self::assertSame(
+            $tagsBefore,
+            (int) $this->db->fetchValue('SELECT COUNT(*) FROM tags'),
+            'And must invent no tags.',
+        );
     }
 }

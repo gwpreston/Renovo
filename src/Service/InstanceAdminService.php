@@ -76,6 +76,15 @@ final class InstanceAdminService
             $changes[] = 'allow_registration';
         }
 
+        // Turning demo mode on makes the instance read-only, including this
+        // form. The middleware keeps this one route open to an instance
+        // administrator so that the switch can be flipped back.
+        $demoMode = $input['demo_mode'] ?? false;
+        if ($demoMode !== $this->settings->isDemoMode()) {
+            $this->settings->setDemoMode($demoMode);
+            $changes[] = 'demo_mode';
+        }
+
         if ($changes !== []) {
             $this->audit->record(AuditAction::InstanceSettingsChanged, $actor, ['changed' => $changes]);
         }

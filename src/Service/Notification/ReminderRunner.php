@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Notification;
 
+use App\I18n\LocaleContext;
+use App\I18n\Locales;
 use App\Domain\AlertType;
 use App\Domain\Entity\User;
 use App\Notification\Alert;
@@ -40,6 +42,8 @@ final class ReminderRunner
 {
     public function __construct(
         private readonly UserRepository $users,
+        private readonly LocaleContext $locale,
+        private readonly Locales $locales,
         private readonly MembershipRepository $memberships,
         private readonly ScopeFactory $scopes,
         private readonly CatchUpService $catchUp,
@@ -85,6 +89,21 @@ final class ReminderRunner
      * @return array{alerts: int, sent: int}
      */
     public function runForUser(User $user): array
+    {
+        // Everything this method builds is read by one person, so it is all
+        // built in that person's language: the alert titles, the money
+        // formatting and the digest around them. The context is restored
+        // afterwards, because the next user in the loop may read another.
+        return $this->locale->using(
+            $this->locales->resolve($user->locale),
+            fn (): array => $this->runForUserInLocale($user),
+        );
+    }
+
+    /**
+     * @return array{alerts: int, sent: int}
+     */
+    private function runForUserInLocale(User $user): array
     {
         $preferences = $this->settings->preferences($user->id);
         $today = $this->clock->today();

@@ -148,7 +148,7 @@ final class PriceHistoryService
         // reprice a subscription they are only entitled to look at.
         $subscription = $this->subscriptions->findForWrite($scope, $subscriptionId);
         if ($subscription === null) {
-            throw new ValidationException(['subscription' => 'That subscription does not exist.']);
+            throw new ValidationException(['subscription' => 'error.subscription.not_found']);
         }
 
         $errors = [];
@@ -165,25 +165,25 @@ final class PriceHistoryService
         try {
             $price = Money::fromUserInput($this->str($input, 'price'), $currency);
             if ($price->isNegative()) {
-                $errors['price'] = 'Enter a price of zero or more.';
+                $errors['price'] = 'error.price.negative';
             }
         } catch (InvalidArgumentException) {
-            $errors['price'] = 'Enter a price, for example 12.99.';
+            $errors['price'] = 'error.price.invalid';
         }
 
         $effectiveFrom = $this->date($this->str($input, 'effective_from'));
         if ($effectiveFrom === null) {
-            $errors['effective_from'] = 'Enter the date the new price starts.';
+            $errors['effective_from'] = 'error.price_change.date_required';
         } elseif ($effectiveFrom <= $today) {
             // A change dated today or earlier is not a schedule, it is an edit.
             // Refusing here keeps the two paths distinguishable rather than
             // letting a "scheduled" row silently become the current price.
-            $errors['effective_from'] = 'Choose a future date. To change the price now, edit the subscription.';
+            $errors['effective_from'] = 'error.price_change.date_past';
         }
 
         $note = trim($this->str($input, 'note'));
         if (mb_strlen($note) > 255) {
-            $errors['note'] = 'Note must be 255 characters or fewer.';
+            $errors['note'] = 'error.note.too_long_255';
         }
 
         if ($errors !== [] || $price === null || $effectiveFrom === null) {

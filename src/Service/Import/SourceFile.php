@@ -50,7 +50,7 @@ final class SourceFile
     {
         $contents = @file_get_contents($path);
         if ($contents === false || trim($contents) === '') {
-            throw ValidationException::field('file', 'That file is empty.');
+            throw ValidationException::field('file', 'error.import.empty');
         }
 
         return str_ends_with(strtolower($originalName), '.json') || str_starts_with(ltrim($contents), '[')
@@ -66,7 +66,7 @@ final class SourceFile
     {
         $handle = @fopen($path, 'rb');
         if ($handle === false) {
-            throw ValidationException::field('file', 'That file could not be read.');
+            throw ValidationException::field('file', 'error.import.unreadable');
         }
 
         try {
@@ -74,7 +74,7 @@ final class SourceFile
 
             $headerRow = fgetcsv($handle, 0, $delimiter, '"', self::NO_ESCAPE);
             if (!is_array($headerRow)) {
-                throw ValidationException::field('file', 'That file has no header row.');
+                throw ValidationException::field('file', 'error.import.no_header');
             }
 
             $headers = self::cleanHeaders($headerRow);
@@ -99,10 +99,11 @@ final class SourceFile
                 $rows[] = $row;
 
                 if (count($rows) > self::MAX_ROWS) {
-                    throw ValidationException::field('file', sprintf(
-                        'That file has more than %d rows. Split it and import the parts separately.',
-                        self::MAX_ROWS,
-                    ));
+                    throw ValidationException::field(
+                        'file',
+                        'error.import.too_many_rows',
+                        ['max' => self::MAX_ROWS],
+                    );
                 }
             }
         } finally {
@@ -120,7 +121,7 @@ final class SourceFile
         $decoded = json_decode($contents, true);
 
         if (!is_array($decoded)) {
-            throw ValidationException::field('file', 'That file is not valid JSON.');
+            throw ValidationException::field('file', 'error.import.invalid_json');
         }
 
         // A bare list, or an object wrapping one under a name this application
@@ -157,15 +158,16 @@ final class SourceFile
             }
 
             if (count($rows) > self::MAX_ROWS) {
-                throw ValidationException::field('file', sprintf(
-                    'That file has more than %d entries. Split it and import the parts separately.',
-                    self::MAX_ROWS,
-                ));
+                throw ValidationException::field(
+                    'file',
+                    'error.import.too_many_entries',
+                    ['max' => self::MAX_ROWS],
+                );
             }
         }
 
         if ($rows === []) {
-            throw ValidationException::field('file', 'That file contains no subscriptions.');
+            throw ValidationException::field('file', 'error.import.no_subscriptions');
         }
 
         return new self($headers, $rows);

@@ -1,30 +1,26 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Audit log — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('audit.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
-    <h1>Audit log</h1>
+    <h1>{{ t('audit.title') }}</h1>
     <p class="muted">
-        {% if is_instance_view %}
-            Every security-relevant event on this instance.
-        {% else %}
-            Security-relevant events in your household.
-        {% endif %}
-        Entries older than the configured retention period are removed by the nightly prune.
+        {{ is_instance_view ? t('audit.scope_instance') : t('audit.scope_household') }}
+        {{ t('audit.retention_note') }}
     </p>
 
     <form method="get" action="/audit" class="filters"
           hx-get="/audit" hx-target="#audit-entries" hx-push-url="true">
-        <label for="action">Event</label>
+        <label for="action">{{ t('field.event') }}</label>
         <select id="action" name="action" onchange="this.form.requestSubmit()">
-            <option value="">All events</option>
+            <option value="">{{ t('audit.all_events') }}</option>
             {% for item in actions %}
                 <option value="{{ item.value }}" {{ selected_action == item.value ? 'selected' : '' }}>
-                    {{ item.label }}
+                    {{ t(item.labelKey()) }}
                 </option>
             {% endfor %}
         </select>
-        <noscript><button type="submit" class="button">Filter</button></noscript>
+        <noscript><button type="submit" class="button">{{ t('audit.filter') }}</button></noscript>
     </form>
 
     <div id="audit-entries">

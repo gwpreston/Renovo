@@ -29,9 +29,9 @@ final class ExchangeRateHostProvider extends HttpRateProvider
         return 'exchangerate.host';
     }
 
-    public function description(): string
+    public function descriptionKey(): string
     {
-        return 'Free tier with a wider currency list than the ECB feed. Requires a free account and an access key.';
+        return 'rate_provider.exchangerate_host';
     }
 
     public function requiresApiKey(): bool

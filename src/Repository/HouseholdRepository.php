@@ -19,6 +19,15 @@ final class HouseholdRepository extends AbstractRepository
         return ['id', 'name', 'created_by_user_id'];
     }
 
+    /**
+     * How many households exist. For the metrics endpoint: a count, never a
+     * name.
+     */
+    public function countAll(): int
+    {
+        return (int) $this->db->fetchValue('SELECT COUNT(*) FROM ' . $this->quote('households'));
+    }
+
     public function create(string $name, int $createdByUserId): int
     {
         $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');

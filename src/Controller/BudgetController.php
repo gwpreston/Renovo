@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Domain\BudgetPeriod;
 use App\Domain\Currency;
 use App\Repository\MembershipRepository;
@@ -26,12 +27,13 @@ final class BudgetController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly BudgetService $budgets,
         private readonly CategoryService $categories,
         private readonly MembershipRepository $memberships,
         private readonly InstanceSettingsService $settings,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -67,7 +69,7 @@ final class BudgetController extends Controller
             );
         }
 
-        $this->flash('success', 'Budget created.');
+        $this->flash('success', 'flash.budget_created');
 
         return $this->redirectAfterWrite($request, $response, '/budgets');
     }
@@ -110,7 +112,7 @@ final class BudgetController extends Controller
             );
         }
 
-        $this->flash('success', 'Budget saved.');
+        $this->flash('success', 'flash.budget_saved');
 
         return $this->redirectAfterWrite($request, $response, '/budgets');
     }
@@ -118,14 +120,14 @@ final class BudgetController extends Controller
     public function delete(ServerRequestInterface $request, ResponseInterface $response, string $id): ResponseInterface
     {
         $this->budgets->delete($this->scope($request), (int) $id);
-        $this->flash('success', 'Budget deleted.');
+        $this->flash('success', 'flash.budget_deleted');
 
         return $this->redirectAfterWrite($request, $response, '/budgets');
     }
 
     /**
      * @param array<string, mixed>  $values
-     * @param array<string, string> $errors
+     * @param array<string, \App\Service\ValidationError> $errors
      * @return array<string, mixed>
      */
     private function formData(

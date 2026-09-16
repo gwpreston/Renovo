@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Support\TestLogoFetcher;
 use App\Domain\IsolationMode;
 use App\Domain\NoticePeriod;
 use App\Domain\Role;
@@ -69,6 +70,7 @@ final class UsageAndCancellationTest extends DatabaseTestCase
             $this->subscriptions,
             new CategoryRepository($this->db),
             new TagRepository($this->db),
+            TestLogoFetcher::silent($this->db, $this->clock),
             $memberships,
             $priceHistory,
             $this->db,

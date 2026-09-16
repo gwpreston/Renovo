@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Security\SessionInterface;
 use App\Service\ImportService;
 use App\Service\Import\ImportField;
@@ -31,10 +32,11 @@ final class ImportController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly ImportService $imports,
         private readonly InstanceSettingsService $settings,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function start(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -54,7 +56,7 @@ final class ImportController extends Controller
         $file = $files['file'] ?? null;
 
         if (!$file instanceof UploadedFileInterface) {
-            $this->flash('error', 'Choose a CSV or JSON file to import.');
+            $this->flash('error', 'error.import.file_required');
 
             return $this->redirectAfterWrite($request, $response, '/import');
         }
@@ -62,9 +64,7 @@ final class ImportController extends Controller
         try {
             $id = $this->imports->stage($file);
         } catch (ValidationException $exception) {
-            foreach ($exception->errors() as $message) {
-                $this->flash('error', $message);
-            }
+            $this->flashErrors($exception);
 
             return $this->redirectAfterWrite($request, $response, '/import');
         }
@@ -166,12 +166,14 @@ final class ImportController extends Controller
 
         $this->clearSession();
 
-        $this->flash('success', sprintf(
-            'Imported %d subscription%s.%s',
-            $result['imported'],
-            $result['imported'] === 1 ? '' : 's',
-            $result['skipped'] > 0 ? sprintf(' %d row(s) were skipped.', $result['skipped']) : '',
-        ));
+        $this->flash('success', 'flash.import_finished', ['count' => $result['imported']]);
+
+        if ($result['skipped'] > 0) {
+            // Its own message rather than a clause tacked onto the first: a
+            // sentence that only sometimes has a second half is one a
+            // translator has to guess the shape of.
+            $this->flash('warning', 'flash.import_skipped', ['count' => $result['skipped']]);
+        }
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions');
     }
@@ -213,9 +215,7 @@ final class ImportController extends Controller
     ): ResponseInterface {
         $this->clearSession();
 
-        foreach ($exception->errors() as $message) {
-            $this->flash('error', $message);
-        }
+        $this->flashErrors($exception);
 
         return $this->redirectAfterWrite($request, $response, '/import');
     }

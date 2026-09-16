@@ -46,15 +46,16 @@ final class LogoStorage
         }
 
         if ($file->getError() !== UPLOAD_ERR_OK) {
-            throw ValidationException::field('logo', 'The logo could not be uploaded. Try again.');
+            throw ValidationException::field('logo', 'error.logo.upload_failed');
         }
 
         $size = $file->getSize();
         if ($size !== null && $size > $this->maxBytes) {
-            throw ValidationException::field('logo', sprintf(
-                'The logo must be %d KB or smaller.',
-                intdiv($this->maxBytes, 1024),
-            ));
+            throw ValidationException::field(
+                'logo',
+                'error.logo.too_large',
+                ['kilobytes' => intdiv($this->maxBytes, 1024)],
+            );
         }
 
         $temporary = tempnam(sys_get_temp_dir(), 'logo');
@@ -70,7 +71,7 @@ final class LogoStorage
         if (!isset(self::ALLOWED_TYPES[$detectedType])) {
             @unlink($temporary);
 
-            throw ValidationException::field('logo', 'Upload a PNG, JPEG, GIF or WebP image.');
+            throw ValidationException::field('logo', 'error.logo.type');
         }
 
         if (!is_dir($this->directory) && !mkdir($this->directory, 0o775, true) && !is_dir($this->directory)) {

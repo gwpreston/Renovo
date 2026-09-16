@@ -19,6 +19,7 @@ use App\Service\InstanceSettingsService;
 use App\Tests\Integration\DatabaseTestCase;
 use App\Tests\Support\ArraySession;
 use App\Tests\Support\RecordingMailer;
+use App\Tests\Support\TestTranslator;
 use DateTimeImmutable;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -216,8 +217,8 @@ final class AuditLogViewTest extends DatabaseTestCase
             true,
         )->getBody();
 
-        self::assertStringContainsString(AuditAction::PasskeyRegistered->label(), $body);
-        self::assertStringNotContainsString(AuditAction::LoginSucceeded->label(), $body);
+        self::assertStringContainsString($this->label(AuditAction::PasskeyRegistered), $body);
+        self::assertStringNotContainsString($this->label(AuditAction::LoginSucceeded), $body);
     }
 
     /**
@@ -325,5 +326,14 @@ final class AuditLogViewTest extends DatabaseTestCase
         }
 
         return $this->app->handle($request);
+    }
+
+    /**
+     * An action as the page renders it — through the catalogue, since the
+     * label is no longer a hardcoded English string on the enum.
+     */
+    private function label(AuditAction $action): string
+    {
+        return TestTranslator::create()->trans($action->labelKey());
     }
 }

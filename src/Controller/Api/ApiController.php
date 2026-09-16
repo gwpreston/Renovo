@@ -6,6 +6,7 @@ namespace App\Controller\Api;
 
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Domain\Entity\User;
+use App\I18n\Translator;
 use App\Security\Scope;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -27,6 +28,10 @@ use RuntimeException;
  */
 abstract class ApiController
 {
+    public function __construct(protected readonly Translator $translator)
+    {
+    }
+
     /**
      * @param array<string, mixed>|list<mixed> $data
      */

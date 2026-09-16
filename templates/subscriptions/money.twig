@@ -1,24 +1,24 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ subscription.name }} — cost — {{ instance_name }}{% endblock %}
+{% block title %}{{ subscription.name }} — {{ t('subscriptions_money.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <div class="page-header">
         <h1>{{ subscription.name }}</h1>
-        <a class="button button-quiet" href="/subscriptions/{{ subscription.id }}/edit">Edit subscription</a>
+        <a class="button button-quiet" href="/subscriptions/{{ subscription.id }}/edit">{{ t('subscriptions_form.edit_title') }}</a>
     </div>
 
     {% include 'partials/errors.twig' %}
 
     {% if subscription.isTrial and subscription.trialEndDate %}
         <section class="card callout">
-            <h2>Free trial</h2>
+            <h2>{{ t('subscriptions_form.free_trial') }}</h2>
             <p>
-                Free until <strong>{{ subscription.trialEndDate|date('j M Y') }}</strong>, which is also the day
-                the first charge falls — the last day of the trial, not the day after.
+                {{ t('subscriptions_money.free_until') }} <strong>{{ subscription.trialEndDate|local_date('d MMM y') }}</strong>.
+                {{ t('subscriptions_money.trial_end_is_first_charge') }}
             </p>
             <p>
-                It converts to
+                {{ t('subscriptions_money.it_converts_to') }}
                 <strong>{{ subscription.priceAfterConversion.amountMinor|money(
                     subscription.priceAfterConversion.currency) }}</strong>
                 {% if subscription.billingCycleAfterConversion %}
@@ -31,20 +31,19 @@
 
     <div class="columns">
         <section class="card">
-            <h2>Price history</h2>
-            <p class="muted">Every price is kept. A change is a new entry, never an edit, so what this cost
-                last year stays knowable.</p>
+            <h2>{{ t('subscriptions_money.price_history') }}</h2>
+            <p class="muted">{{ t('subscriptions_money.history_note') }}</p>
 
             {% if trend is empty %}
-                <p class="muted empty">No price history recorded yet.</p>
+                <p class="muted empty">{{ t('subscriptions_money.history_empty') }}</p>
             {% else %}
                 <ol class="timeline">
                     {% for entry in trend %}
                         <li class="{{ entry.is_scheduled ? 'is-scheduled' : '' }}">
                             <div class="timeline-date">
-                                {{ entry.change.effectiveFrom|date('j M Y') }}
+                                {{ entry.change.effectiveFrom|local_date('d MMM y') }}
                                 {% if entry.is_scheduled %}
-                                    <span class="badge badge-warning">Scheduled</span>
+                                    <span class="badge badge-warning">{{ t('subscriptions_money.scheduled') }}</span>
                                 {% endif %}
                             </div>
                             <div class="timeline-amount">
@@ -69,44 +68,43 @@
             {% if can(scope, 'price.manage') %}
                 <form method="post" action="/subscriptions/{{ subscription.id }}/price-changes" class="stack">
                     {{ csrf_field() }}
-                    <h3>Schedule a price change</h3>
-                    <p class="hint">For an increase you have been told about but which has not happened yet.
-                        It is counted in forecasts and budgets from its date, and becomes the current price on
-                        the day it arrives.</p>
+                    <h3>{{ t('subscriptions_money.schedule_a_price_change') }}</h3>
+                    <p class="hint">{{ t('subscriptions_money.schedule_note') }}</p>
 
-                    <label for="price">New price</label>
+                    <label for="price">{{ t('subscriptions_money.new_price') }}</label>
                     <div class="field-row">
                         <input type="text" id="price" name="price" inputmode="decimal" placeholder="12.99" required>
-                        <select name="currency" aria-label="Currency">
+                        <select name="currency" aria-label="{{ t('field.currency') }}">
                             <option value="{{ subscription.price.currency }}">{{ subscription.price.currency }}</option>
                         </select>
                     </div>
 
-                    <label for="effective_from">Starts on</label>
+                    <label for="effective_from">{{ t('subscriptions_money.starts_on') }}</label>
                     <input type="date" id="effective_from" name="effective_from" required>
 
-                    <label for="note">Note (optional)</label>
+                    <label for="note">{{ t('subscriptions_money.note_optional') }}</label>
                     <input type="text" id="note" name="note" maxlength="255"
-                           placeholder="Announced in their email of 3 March">
+                           placeholder="{{ t('subscriptions_money.price_note_placeholder') }}">
 
-                    <button type="submit" class="button">Schedule change</button>
+                    <button type="submit" class="button">{{ t('subscriptions_money.schedule_change') }}</button>
                 </form>
             {% endif %}
         </section>
 
         <section class="card">
-            <h2>Shared cost</h2>
+            <h2>{{ t('subscriptions_money.shared_cost') }}</h2>
 
             {% if shares is empty %}
-                <p class="muted">The whole cost sits with
-                    {{ subscription.ownerName ?? 'its owner' }}.</p>
+                <p class="muted">{{ t('subscriptions_money.not_split_owner', {
+                    'owner': subscription.ownerName ?? t('subscriptions_money.its_owner'),
+                }) }}</p>
             {% else %}
                 <table class="table">
                     <thead>
                     <tr>
-                        <th scope="col">Member</th>
-                        <th scope="col" class="numeric">Share</th>
-                        <th scope="col" class="numeric">Amount</th>
+                        <th scope="col">{{ t('field.member') }}</th>
+                        <th scope="col" class="numeric">{{ t('field.share') }}</th>
+                        <th scope="col" class="numeric">{{ t('field.amount') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -119,31 +117,29 @@
                     {% endfor %}
                     </tbody>
                 </table>
-                <p class="hint">Shares are worked out from the current price every time, and always add up to
-                    it exactly — the odd penny goes to one member rather than disappearing.</p>
+                <p class="hint">{{ t('subscriptions_money.split_note') }}</p>
             {% endif %}
 
             {% if can_edit_split and can(scope, 'split.manage') %}
                 <form method="post" action="/subscriptions/{{ subscription.id }}/split" class="stack">
                     {{ csrf_field() }}
 
-                    <label for="split_mode">How it is split</label>
+                    <label for="split_mode">{{ t('subscriptions_money.how_it_is_split') }}</label>
                     <select id="split_mode" name="split_mode">
                         <option value="none" {{ subscription.splitMode.value == 'none' ? 'selected' : '' }}>
-                            Not split
+                            {{ t('subscriptions_money.not_split') }}
                         </option>
                         <option value="equal" {{ subscription.splitMode.value == 'equal' ? 'selected' : '' }}>
-                            Equally between the members below
+                            {{ t('subscriptions_money.split_equal') }}
                         </option>
                         <option value="custom" {{ subscription.splitMode.value == 'custom' ? 'selected' : '' }}>
-                            By the shares below
+                            {{ t('subscriptions_money.by_the_shares_below') }}
                         </option>
                     </select>
 
                     <fieldset class="stack">
-                        <legend>Members</legend>
-                        <p class="hint">A share of 0 means that member is not part of the split. Shares are
-                            relative weights, not percentages — 2 and 1 means two thirds and one third.</p>
+                        <legend>{{ t('settings.members') }}</legend>
+                        <p class="hint">{{ t('subscriptions_money.shares_hint') }}</p>
                         {% for member in members %}
                             {% set current = 0 %}
                             {% for participant in participants %}
@@ -157,35 +153,39 @@
                         {% endfor %}
                     </fieldset>
 
-                    <button type="submit" class="button">Save split</button>
+                    <button type="submit" class="button">{{ t('subscriptions_money.save_split') }}</button>
                 </form>
             {% elseif subscription.splitMode.isSplit %}
-                <p class="hint">Only the member who owns this subscription can change how it is split.</p>
+                <p class="hint">{{ t('error.split.owner_only') }}</p>
             {% endif %}
         </section>
     </div>
 
     <section class="card">
-        <h2>Usage</h2>
+        <h2>{{ t('subscriptions_money.usage') }}</h2>
         <p class="muted">
-            Recorded {{ subscription.usageCount }} time{{ subscription.usageCount == 1 ? '' : 's' }}
-            {%- if subscription.usageCountedSince %} since
-                {{- ' ' }}{{ subscription.usageCountedSince|date('j M Y') }}
-            {%- endif -%}.
+            {% if subscription.usageCountedSince %}
+                {{ t('subscriptions_money.used_since', {
+                    'count': subscription.usageCount,
+                    'since': subscription.usageCountedSince|local_date('d MMM y'),
+                }) }}
+            {% else %}
+                {{ t('subscriptions_money.used_count', {'count': subscription.usageCount}) }}
+            {% endif %}
         </p>
 
         {% if can(scope, 'usage.record') %}
             <div class="form-actions">
                 <form method="post" action="/subscriptions/{{ subscription.id }}/usage" class="inline">
                     {{ csrf_field() }}
-                    <button type="submit" class="button button-primary">Used it</button>
+                    <button type="submit" class="button button-primary">{{ t('stats.used_it') }}</button>
                 </form>
 
                 <form method="post" action="/subscriptions/{{ subscription.id }}/usage/rating" class="inline">
                     {{ csrf_field() }}
-                    <label for="rating" class="visually-hidden">Rating</label>
+                    <label for="rating" class="visually-hidden">{{ t('field.rating') }}</label>
                     <select id="rating" name="rating">
-                        <option value="">No rating</option>
+                        <option value="">{{ t('subscriptions_money.no_rating') }}</option>
                         {% for value in 1..max_rating %}
                             <option value="{{ value }}"
                                     {{ subscription.usageRating == value ? 'selected' : '' }}>
@@ -193,33 +193,33 @@
                             </option>
                         {% endfor %}
                     </select>
-                    <button type="submit" class="button">Save rating</button>
+                    <button type="submit" class="button">{{ t('subscriptions_money.save_rating') }}</button>
                 </form>
 
                 <form method="post" action="/subscriptions/{{ subscription.id }}/usage/reset" class="inline"
                       onsubmit="return confirm('Reset the usage count to zero?')">
                     {{ csrf_field() }}
-                    <button type="submit" class="button button-quiet">Reset count</button>
+                    <button type="submit" class="button button-quiet">{{ t('subscriptions_money.reset_count') }}</button>
                 </form>
             </div>
         {% endif %}
     </section>
 
     <section class="card">
-        <h2>Invoices and receipts</h2>
+        <h2>{{ t('subscriptions_money.invoices_and_receipts') }}</h2>
 
         {% if attachments is empty %}
-            <p class="muted">Nothing attached yet.</p>
+            <p class="muted">{{ t('subscriptions_money.nothing_attached_yet') }}</p>
         {% else %}
             <div class="table-wrap">
                 <table class="table">
                     <thead>
                     <tr>
-                        <th>File</th>
-                        <th>Period</th>
-                        <th>Size</th>
-                        <th>Added</th>
-                        <th><span class="visually-hidden">Actions</span></th>
+                        <th scope="col">{{ t('field.file') }}</th>
+                        <th scope="col">{{ t('field.period') }}</th>
+                        <th scope="col">{{ t('field.size') }}</th>
+                        <th scope="col">{{ t('field.added') }}</th>
+                        <th scope="col"><span class="visually-hidden">{{ t('field.actions') }}</span></th>
                     </tr>
                     </thead>
                     <tbody>
@@ -230,9 +230,9 @@
                                     {{ attachment.originalFilename }}
                                 </a>
                             </td>
-                            <td>{{ attachment.periodDate ? attachment.periodDate|date('M Y') : '—' }}</td>
+                            <td>{{ attachment.periodDate ? attachment.periodDate|local_date('MMM y') : '—' }}</td>
                             <td class="muted">{{ attachment.humanSize() }}</td>
-                            <td class="muted">{{ attachment.createdAt|date('j M Y') }}</td>
+                            <td class="muted">{{ attachment.createdAt|local_date('d MMM y') }}</td>
                             <td>
                                 {% if can(scope, 'attachment.manage') %}
                                     <form method="post"
@@ -240,7 +240,7 @@
                                           class="inline"
                                           onsubmit="return confirm('Delete this file?')">
                                         {{ csrf_field() }}
-                                        <button type="submit" class="button button-quiet">Delete</button>
+                                        <button type="submit" class="button button-quiet">{{ t('action.delete') }}</button>
                                     </form>
                                 {% endif %}
                             </td>
@@ -256,16 +256,15 @@
                   enctype="multipart/form-data" class="stack">
                 {{ csrf_field() }}
 
-                <label for="attachment-file">Attach a file</label>
+                <label for="attachment-file">{{ t('subscriptions_money.attach_a_file') }}</label>
                 <input type="file" id="attachment-file" name="file"
                        accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,application/pdf,image/*" required>
-                <p class="field-hint">PDF or an image. Stored outside the web root and only
-                    readable by people who can see this subscription.</p>
+                <p class="field-hint">{{ t('subscriptions_money.attachment_hint') }}</p>
 
-                <label for="attachment-period">Billing period it covers (optional)</label>
+                <label for="attachment-period">{{ t('subscriptions_money.attachment_period_label') }}</label>
                 <input type="date" id="attachment-period" name="period_date">
 
-                <button type="submit" class="button">Upload</button>
+                <button type="submit" class="button">{{ t('action.upload') }}</button>
             </form>
         {% endif %}
     </section>

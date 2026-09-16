@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\I18n\Locales;
+use App\I18n\Translator;
 use App\Domain\AuditAction;
 use App\Domain\Entity\User;
 use App\Domain\Role;
@@ -38,6 +40,8 @@ final class AuthService
         private readonly RateLimiter $rateLimiter,
         private readonly MailerService $mailer,
         private readonly InstanceSettingsService $settings,
+        private readonly Translator $translator,
+        private readonly Locales $locales,
         private readonly AuditLogService $audit,
         private readonly Clock $clock,
         private readonly string $appUrl,
@@ -57,15 +61,15 @@ final class AuthService
         $displayName = trim($displayName);
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors['email'] = 'Enter a valid email address.';
+            $errors['email'] = 'error.email.invalid';
         } elseif ($this->users->emailExists($email)) {
-            $errors['email'] = 'An account with that email address already exists.';
+            $errors['email'] = 'error.email.taken';
         }
 
         if ($displayName === '') {
-            $errors['display_name'] = 'Enter a name.';
+            $errors['display_name'] = 'error.name.required';
         } elseif (mb_strlen($displayName) > 100) {
-            $errors['display_name'] = 'Name must be 100 characters or fewer.';
+            $errors['display_name'] = 'error.name.too_long_100';
         }
 
         $errors += $this->validatePassword($password, $passwordConfirm);
@@ -99,20 +103,15 @@ final class AuthService
 
         $link = rtrim($this->appUrl, '/') . '/verify-email?token=' . urlencode($token);
 
+        // In the recipient's language, not the language of whoever triggered
+        // the send: a message is read by the person it is addressed to.
+        $locale = $this->locales->resolve($user->locale);
+
         $this->mailer->send(
             $user->email,
             $user->displayName,
-            sprintf('Confirm your %s account', $this->settings->instanceName()),
-            <<<TEXT
-            Hello {$user->displayName},
-
-            Confirm your email address to finish setting up your account:
-
-            {$link}
-
-            The link is valid for two days. If you did not create an account,
-            you can ignore this message.
-            TEXT,
+            $this->translator->trans('mail.verify.subject', ['instance' => $this->settings->instanceName()], $locale),
+            $this->translator->trans('mail.verify.body', ['name' => $user->displayName, 'link' => $link], $locale),
         );
     }
 
@@ -166,10 +165,11 @@ final class AuthService
                 'retry_in_seconds' => $remaining,
             ]);
 
-            throw ValidationException::field('email', sprintf(
-                'Too many attempts. Try again in %d minutes.',
-                max(1, (int) ceil($remaining / 60)),
-            ));
+            throw ValidationException::field(
+                'email',
+                'error.auth.throttled',
+                ['minutes' => max(1, (int) ceil($remaining / 60))],
+            );
         }
 
         $user = $this->users->findByEmail($email);
@@ -187,7 +187,7 @@ final class AuthService
                 'reason' => $user === null ? 'unknown_account' : 'bad_password',
             ]);
 
-            throw ValidationException::field('email', 'Those credentials are not correct.');
+            throw ValidationException::field('email', 'error.auth.credentials');
         }
 
         if (!$user->isVerified()) {
@@ -197,7 +197,7 @@ final class AuthService
 
             throw ValidationException::field(
                 'email',
-                'Confirm your email address before signing in. Check your inbox for the link.',
+                'error.auth.unverified',
             );
         }
 
@@ -213,25 +213,25 @@ final class AuthService
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, ValidationError|string>
      */
     public function validatePassword(string $password, string $confirm): array
     {
         $errors = [];
 
         if (mb_strlen($password) < self::MIN_PASSWORD_LENGTH) {
-            $errors['password'] = sprintf(
-                'Use at least %d characters.',
-                self::MIN_PASSWORD_LENGTH,
+            $errors['password'] = new ValidationError(
+                'error.password.too_short',
+                ['count' => self::MIN_PASSWORD_LENGTH],
             );
         } elseif (mb_strlen($password) > 4096) {
             // Cap the input so an enormous string cannot be used to burn CPU
             // in the hashing function.
-            $errors['password'] = 'That password is too long.';
+            $errors['password'] = 'error.password.too_long';
         }
 
         if ($password !== $confirm) {
-            $errors['password_confirm'] = 'The two passwords do not match.';
+            $errors['password_confirm'] = 'error.password.mismatch';
         }
 
         return $errors;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Support\TestLogoFetcher;
 use App\Domain\BudgetPeriod;
 use App\Domain\IsolationMode;
 use App\Domain\Money;
@@ -89,6 +90,7 @@ final class BudgetProjectionTest extends DatabaseTestCase
             $this->subscriptions,
             $this->categories,
             new TagRepository($this->db),
+            TestLogoFetcher::silent($this->db, $this->clock),
             $memberships,
             $this->priceHistory,
             $this->db,

@@ -218,7 +218,7 @@ final class BackupService
     {
         $zip = new ZipArchive();
         if ($zip->open($archivePath, ZipArchive::RDONLY) !== true) {
-            throw ValidationException::field('file', 'That file is not a readable ZIP archive.');
+            throw ValidationException::field('file', 'error.backup.not_zip');
         }
 
         $written = [];
@@ -230,7 +230,7 @@ final class BackupService
             $manifest = $this->readJson($zip, 'manifest.json');
 
             if (($manifest['format'] ?? null) !== self::FORMAT) {
-                throw ValidationException::field('file', 'That archive was not produced by Renovo.');
+                throw ValidationException::field('file', 'error.backup.foreign');
             }
 
             $summary = $this->restoreData($scope, $zip, $data, $written);
@@ -539,7 +539,7 @@ final class BackupService
     private function assertSafeEntries(ZipArchive $zip): void
     {
         if ($zip->numFiles > self::MAX_ENTRIES) {
-            throw ValidationException::field('file', 'That archive contains too many files.');
+            throw ValidationException::field('file', 'error.backup.too_many_files');
         }
 
         for ($index = 0; $index < $zip->numFiles; $index++) {
@@ -548,7 +548,7 @@ final class BackupService
             if (!is_string($name) || preg_match(self::ENTRY_PATTERN, $name) !== 1) {
                 throw ValidationException::field(
                     'file',
-                    'That archive contains an unexpected file and was not restored.',
+                    'error.backup.unexpected_file',
                 );
             }
         }
@@ -750,12 +750,12 @@ final class BackupService
     {
         $contents = $zip->getFromName($entry);
         if ($contents === false) {
-            throw ValidationException::field('file', sprintf('That archive has no %s.', $entry));
+            throw ValidationException::field('file', 'error.backup.missing_entry', ['entry' => $entry]);
         }
 
         $decoded = json_decode($contents, true);
         if (!is_array($decoded)) {
-            throw ValidationException::field('file', sprintf('The %s in that archive is not valid JSON.', $entry));
+            throw ValidationException::field('file', 'error.backup.invalid_json', ['entry' => $entry]);
         }
 
         return $decoded;

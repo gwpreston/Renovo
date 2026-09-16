@@ -1,14 +1,21 @@
-{% extends 'layout.twig' %}
+{#
+    The form, whole. It is also what the quick-add dialog loads, which is why
+    it renders without the surrounding page when htmx asks for it: one
+    definition of what a subscription needs, not a short version that drifts.
+#}
+{% extends is_htmx ? 'partials/bare.twig' : 'layout.twig' %}
 
 {% set is_edit = subscription_id is not null %}
 
-{% block title %}{{ is_edit ? 'Edit subscription' : 'Add subscription' }} — {{ instance_name }}{% endblock %}
+{% block title %}{{ is_edit ? t('subscriptions_form.edit_title') : t('subscriptions.add_subscription') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ is_edit ? 'Edit subscription' : 'Add subscription' }}</h1>
-        <a class="button button-quiet" href="/subscriptions">Back to list</a>
-    </div>
+    {% if not is_htmx %}
+        <div class="page-header">
+            <h1>{{ is_edit ? t('subscriptions_form.edit_title') : t('subscriptions.add_subscription') }}</h1>
+            <a class="button button-quiet" href="/subscriptions">{{ t('subscriptions_form.back_to_list') }}</a>
+        </div>
+    {% endif %}
 
     {% include 'partials/errors.twig' %}
 
@@ -20,25 +27,25 @@
 
         <div class="grid-2">
             <div class="stack">
-                <label for="name">Name</label>
+                <label for="name">{{ t('field.name') }}</label>
                 <input type="text" id="name" name="name" value="{{ values.name|default('') }}" required autofocus>
-                {% if errors.name is defined %}<p class="field-error">{{ errors.name }}</p>{% endif %}
+                {% if errors.name is defined %}<p class="field-error">{{ error_message(errors.name) }}</p>{% endif %}
 
-                <label for="price">Price</label>
+                <label for="price">{{ t('field.price') }}</label>
                 <div class="input-group">
                     <input type="text" id="price" name="price" inputmode="decimal"
                            value="{{ values.price|default('') }}" placeholder="9.99" required>
-                    <select name="currency" aria-label="Currency">
+                    <select name="currency" aria-label="{{ t('field.currency') }}">
                         {% for code in currencies %}
                             <option value="{{ code }}"
                                     {{ values.currency|default(base_currency) == code ? 'selected' : '' }}>{{ code }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                {% if errors.price is defined %}<p class="field-error">{{ errors.price }}</p>{% endif %}
-                {% if errors.currency is defined %}<p class="field-error">{{ errors.currency }}</p>{% endif %}
+                {% if errors.price is defined %}<p class="field-error">{{ error_message(errors.price) }}</p>{% endif %}
+                {% if errors.currency is defined %}<p class="field-error">{{ error_message(errors.currency) }}</p>{% endif %}
 
-                <label for="subscription_type">Type</label>
+                <label for="subscription_type">{{ t('field.type') }}</label>
                 <select id="subscription_type" name="subscription_type">
                     {% for type in types %}
                         <option value="{{ type.value }}"
@@ -47,9 +54,9 @@
                         </option>
                     {% endfor %}
                 </select>
-                <p class="hint">One-off and lifetime entries are tracked but left out of monthly totals.</p>
+                <p class="hint">{{ t('subscriptions_form.type_hint') }}</p>
 
-                <label for="billing_cycle">Billing cycle</label>
+                <label for="billing_cycle">{{ t('subscriptions_form.billing_cycle') }}</label>
                 <select id="billing_cycle" name="billing_cycle">
                     {% for cycle in cycles %}
                         <option value="{{ cycle.value }}"
@@ -58,57 +65,56 @@
                         </option>
                     {% endfor %}
                 </select>
-                {% if errors.billing_cycle is defined %}<p class="field-error">{{ errors.billing_cycle }}</p>{% endif %}
+                {% if errors.billing_cycle is defined %}<p class="field-error">{{ error_message(errors.billing_cycle) }}</p>{% endif %}
 
-                <label for="cycle_days">Days between payments</label>
+                <label for="cycle_days">{{ t('subscriptions_form.days_between_payments') }}</label>
                 <input type="number" id="cycle_days" name="cycle_days" min="1" max="3650"
                        value="{{ values.cycle_days|default('') }}">
-                <p class="hint">Only used when the cycle is “Custom”.</p>
-                {% if errors.cycle_days is defined %}<p class="field-error">{{ errors.cycle_days }}</p>{% endif %}
+                <p class="hint">{{ t('subscriptions_form.cycle_days_hint') }}</p>
+                {% if errors.cycle_days is defined %}<p class="field-error">{{ error_message(errors.cycle_days) }}</p>{% endif %}
             </div>
 
             <div class="stack">
-                <label for="next_payment_date">Next payment date</label>
+                <label for="next_payment_date">{{ t('subscriptions_form.next_payment_date') }}</label>
                 <input type="date" id="next_payment_date" name="next_payment_date"
                        value="{{ values.next_payment_date|default('') }}">
                 {% if errors.next_payment_date is defined %}
-                    <p class="field-error">{{ errors.next_payment_date }}</p>
+                    <p class="field-error">{{ error_message(errors.next_payment_date) }}</p>
                 {% endif %}
 
-                <label for="start_date">Started on</label>
+                <label for="start_date">{{ t('subscriptions_form.started_on') }}</label>
                 <input type="date" id="start_date" name="start_date" value="{{ values.start_date|default('') }}">
-                <p class="hint">Used to reconstruct what you spent in previous years, and to date the first
-                    entry in the price history.</p>
+                <p class="hint">{{ t('subscriptions_form.start_date_hint') }}</p>
 
                 <fieldset class="stack">
-                    <legend>Free trial</legend>
+                    <legend>{{ t('subscriptions_form.free_trial') }}</legend>
 
                     <input type="hidden" name="is_trial" value="0">
                     <label class="choice">
                         <input type="checkbox" name="is_trial" value="1"
                                {{ values.is_trial|default('0') == '1' ? 'checked' : '' }}>
-                        <span>This is a free trial</span>
+                        <span>{{ t('subscriptions_form.is_trial') }}</span>
                     </label>
 
-                    <label for="trial_end_date">Trial ends</label>
+                    <label for="trial_end_date">{{ t('subscriptions_form.trial_ends') }}</label>
                     <input type="date" id="trial_end_date" name="trial_end_date"
                            value="{{ values.trial_end_date|default('') }}">
-                    <p class="hint">The last free day — and the day the first charge falls.</p>
+                    <p class="hint">{{ t('subscriptions_form.trial_end_hint') }}</p>
                     {% if errors.trial_end_date is defined %}
-                        <p class="field-error">{{ errors.trial_end_date }}</p>
+                        <p class="field-error">{{ error_message(errors.trial_end_date) }}</p>
                     {% endif %}
 
-                    <label for="converts_to_price">Converts to</label>
+                    <label for="converts_to_price">{{ t('subscriptions_form.converts_to') }}</label>
                     <input type="text" id="converts_to_price" name="converts_to_price" inputmode="decimal"
                            value="{{ values.converts_to_price|default('') }}" placeholder="9.99">
-                    <p class="hint">Leave blank if it converts to the price above.</p>
+                    <p class="hint">{{ t('subscriptions_form.converts_to_price_hint') }}</p>
                     {% if errors.converts_to_price is defined %}
-                        <p class="field-error">{{ errors.converts_to_price }}</p>
+                        <p class="field-error">{{ error_message(errors.converts_to_price) }}</p>
                     {% endif %}
 
-                    <label for="converts_to_billing_cycle">Converts to cycle</label>
+                    <label for="converts_to_billing_cycle">{{ t('subscriptions_form.converts_to_cycle') }}</label>
                     <select id="converts_to_billing_cycle" name="converts_to_billing_cycle">
-                        <option value="">Same as above</option>
+                        <option value="">{{ t('subscriptions_form.same_as_above') }}</option>
                         {% for cycle in cycles %}
                             <option value="{{ cycle.value }}"
                                     {{ values.converts_to_billing_cycle|default('') == cycle.value
@@ -118,53 +124,52 @@
                         {% endfor %}
                     </select>
 
-                    <label for="converts_to_cycle_days">Converts to days between payments</label>
+                    <label for="converts_to_cycle_days">{{ t('subscriptions_form.converts_to_cycle_days') }}</label>
                     <input type="number" id="converts_to_cycle_days" name="converts_to_cycle_days"
                            min="1" max="3650" value="{{ values.converts_to_cycle_days|default('') }}">
-                    <p class="hint">Only used when it converts to a custom cycle.</p>
+                    <p class="hint">{{ t('subscriptions_form.converts_to_cycle_days_hint') }}</p>
                     {% if errors.converts_to_cycle_days is defined %}
-                        <p class="field-error">{{ errors.converts_to_cycle_days }}</p>
+                        <p class="field-error">{{ error_message(errors.converts_to_cycle_days) }}</p>
                     {% endif %}
                 </fieldset>
 
-                <label for="notice_period_amount">Notice period</label>
+                <label for="notice_period_amount">{{ t('subscriptions_form.notice_period') }}</label>
                 <div class="input-group">
                     <input type="number" id="notice_period_amount" name="notice_period_amount" min="0" max="3650"
                            value="{{ values.notice_period_amount|default('') }}" placeholder="0">
-                    <select name="notice_period_unit" aria-label="Notice period unit">
+                    <select name="notice_period_unit" aria-label="{{ t('subscriptions_form.notice_period_unit') }}">
                         {% for unit in notice_units %}
                             <option value="{{ unit }}"
                                     {{ values.notice_period_unit|default('days') == unit ? 'selected' : '' }}>{{ unit }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <p class="hint">Used to work out the last day you can cancel before the next charge.</p>
+                <p class="hint">{{ t('subscriptions_form.notice_hint') }}</p>
                 {% if errors.notice_period_amount is defined %}
-                    <p class="field-error">{{ errors.notice_period_amount }}</p>
+                    <p class="field-error">{{ error_message(errors.notice_period_amount) }}</p>
                 {% endif %}
 
-                <label for="reminder_days">Reminders</label>
+                <label for="reminder_days">{{ t('subscriptions_form.reminders') }}</label>
                 <input type="text" id="reminder_days" name="reminder_days"
                        value="{{ values.reminder_days|default('') }}"
-                       placeholder="Use my usual reminders">
+                       placeholder="{{ t('subscriptions_form.use_my_usual_reminders') }}">
                 <p class="hint">
-                    Days before the charge, for example <code>60, 14</code> — or <code>none</code> to never be
-                    reminded about this one. Leave blank to use the schedule from
-                    <a href="/settings/notifications">your notification settings</a>.
+                    {{ t('subscriptions_form.reminders_hint', {'example': '60, 14', 'never': 'none'}) }}
+                    <a href="/settings/notifications">{{ t('subscriptions_form.reminders_hint_link') }}</a>.
                 </p>
-                {% if errors.reminder_days is defined %}<p class="field-error">{{ errors.reminder_days }}</p>{% endif %}
+                {% if errors.reminder_days is defined %}<p class="field-error">{{ error_message(errors.reminder_days) }}</p>{% endif %}
 
-                <label for="category_id">Category</label>
+                <label for="category_id">{{ t('field.category') }}</label>
                 <select id="category_id" name="category_id">
-                    <option value="">None</option>
+                    <option value="">{{ t('state.none') }}</option>
                     {% for category in categories %}
                         <option value="{{ category.id }}"
                                 {{ values.category_id|default('') == category.id ? 'selected' : '' }}>{{ category.name }}</option>
                     {% endfor %}
                 </select>
-                {% if errors.category_id is defined %}<p class="field-error">{{ errors.category_id }}</p>{% endif %}
+                {% if errors.category_id is defined %}<p class="field-error">{{ error_message(errors.category_id) }}</p>{% endif %}
 
-                <label for="owner_user_id">Belongs to</label>
+                <label for="owner_user_id">{{ t('subscriptions_form.belongs_to') }}</label>
                 <select id="owner_user_id" name="owner_user_id" {{ scope.isOwnerRestricted ? 'disabled' : '' }}>
                     {% for member in members %}
                         <option value="{{ member.id }}"
@@ -174,14 +179,13 @@
                     {% endfor %}
                 </select>
                 {% if scope.isOwnerRestricted %}
-                    <p class="hint">This instance keeps members' subscriptions separate, so new entries belong
-                        to you.</p>
+                    <p class="hint">{{ t('subscriptions_form.isolated_owner_note') }}</p>
                 {% endif %}
-                {% if errors.owner_user_id is defined %}<p class="field-error">{{ errors.owner_user_id }}</p>{% endif %}
+                {% if errors.owner_user_id is defined %}<p class="field-error">{{ error_message(errors.owner_user_id) }}</p>{% endif %}
 
-                <label for="payer_user_id">Paid by</label>
+                <label for="payer_user_id">{{ t('subscriptions_form.paid_by') }}</label>
                 <select id="payer_user_id" name="payer_user_id">
-                    <option value="">Not recorded</option>
+                    <option value="">{{ t('subscriptions_form.not_recorded') }}</option>
                     {% for member in members %}
                         <option value="{{ member.id }}"
                                 {{ values.payer_user_id|default('') == member.id ? 'selected' : '' }}>
@@ -189,28 +193,38 @@
                         </option>
                     {% endfor %}
                 </select>
-                {% if errors.payer_user_id is defined %}<p class="field-error">{{ errors.payer_user_id }}</p>{% endif %}
+                {% if errors.payer_user_id is defined %}<p class="field-error">{{ error_message(errors.payer_user_id) }}</p>{% endif %}
 
-                <label for="tags">Tags</label>
+                <label for="tags">{{ t('field.tags') }}</label>
                 <input type="text" id="tags" name="tags" value="{{ values.tags|default('') }}"
-                       placeholder="streaming, shared">
-                <p class="hint">Comma separated. New tags are created automatically.</p>
+                       placeholder="{{ t('subscriptions_form.streaming_shared') }}">
+                <p class="hint">{{ t('subscriptions_form.tags_hint') }}</p>
 
-                <label for="logo">Logo</label>
+                <label for="logo">{{ t('subscriptions_form.logo') }}</label>
                 <input type="file" id="logo" name="logo" accept="image/png,image/jpeg,image/gif,image/webp">
                 {% if values.logo_path is defined and values.logo_path %}
                     <p class="hint">
                         <img class="logo" src="/{{ values.logo_path }}" alt="" width="32" height="32">
-                        Uploading a new file replaces it.
+                        {{ t('subscriptions_form.logo_hint') }}
                     </p>
                 {% endif %}
-                {% if errors.logo is defined %}<p class="field-error">{{ errors.logo }}</p>{% endif %}
+                {% if errors.logo is defined %}<p class="field-error">{{ error_message(errors.logo) }}</p>{% endif %}
             </div>
         </div>
 
-        <label for="notes">Notes</label>
+        <label for="website_url">{{ t('field.website') }}</label>
+        <input type="url" id="website_url" name="website_url" inputmode="url"
+               value="{{ values.website_url|default('') }}"
+               placeholder="{{ t('subscriptions_form.website_placeholder') }}"
+               aria-describedby="website-hint">
+        <p class="hint" id="website-hint">{{ t('subscriptions_form.website_hint') }}</p>
+        {% if errors.website_url is defined %}
+            <p class="field-error">{{ error_message(errors.website_url) }}</p>
+        {% endif %}
+
+        <label for="notes">{{ t('field.notes') }}</label>
         <textarea id="notes" name="notes" rows="3">{{ values.notes|default('') }}</textarea>
-        {% if errors.notes is defined %}<p class="field-error">{{ errors.notes }}</p>{% endif %}
+        {% if errors.notes is defined %}<p class="field-error">{{ error_message(errors.notes) }}</p>{% endif %}
 
         {#
             An unchecked checkbox submits nothing at all, so a hidden field
@@ -221,14 +235,14 @@
         <label class="choice">
             <input type="checkbox" name="is_active" value="1"
                    {{ values.is_active|default('1') == '1' ? 'checked' : '' }}>
-            <span>Active</span>
+            <span>{{ t('state.active') }}</span>
         </label>
 
         <div class="form-actions">
             <button type="submit" class="button button-primary">
                 {{ is_edit ? 'Save changes' : 'Add subscription' }}
             </button>
-            <a class="button button-quiet" href="/subscriptions">Cancel</a>
+            <a class="button button-quiet" href="/subscriptions">{{ t('action.cancel') }}</a>
         </div>
     </form>
 {% endblock %}

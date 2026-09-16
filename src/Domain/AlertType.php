@@ -39,14 +39,9 @@ enum AlertType: string
         return $this !== self::BudgetExceeded;
     }
 
-    public function label(): string
+    public function labelKey(): string
     {
-        return match ($this) {
-            self::Renewal => 'Upcoming renewal',
-            self::TrialConversion => 'Trial about to convert',
-            self::CancelBy => 'Cancellation deadline',
-            self::BudgetExceeded => 'Budget projected to be exceeded',
-        };
+        return 'alert.' . $this->value;
     }
 
     /**

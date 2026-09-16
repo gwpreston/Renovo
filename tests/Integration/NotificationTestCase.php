@@ -43,9 +43,14 @@ use App\Service\SplitService;
 use App\Service\SubscriptionService;
 use App\Service\TrialService;
 use App\Support\FrozenClock;
+use App\I18n\CatalogLoader;
+use App\I18n\LocaleContext;
+use App\I18n\Locales;
 use App\Support\MoneyFormatter;
 use App\Tests\Support\FakeHttpClient;
+use App\Tests\Support\TestLogoFetcher;
 use App\Tests\Support\RecordingNotifier;
+use App\Tests\Support\TestTranslator;
 use DateTimeImmutable;
 use Psr\Log\NullLogger;
 use Slim\Psr7\Factory\RequestFactory;
@@ -113,6 +118,7 @@ abstract class NotificationTestCase extends DatabaseTestCase
             $this->subscriptions,
             $categories,
             new TagRepository($this->db),
+            TestLogoFetcher::silent($this->db, $this->clock),
             $this->memberships,
             $priceHistory,
             $this->db,
@@ -185,19 +191,23 @@ abstract class NotificationTestCase extends DatabaseTestCase
             new NotificationRateLimiter($this->log, $this->clock, 60, 20),
             new NullLogger(),
             $this->clock,
+            TestTranslator::create(),
         );
 
         $this->scanner = new AlertScanner(
             $this->subscriptionService,
             $this->budgets,
             new BudgetAlertStateRepository($this->db),
-            new MoneyFormatter('en_GB'),
+            new MoneyFormatter(new LocaleContext('en_GB')),
+            TestTranslator::create(),
             $this->clock,
             'https://renovo.example',
         );
 
         $this->runner = new ReminderRunner(
             $this->users,
+            new LocaleContext('en_GB'),
+            new Locales(new CatalogLoader(dirname(__DIR__, 2) . '/translations'), 'en_GB'),
             $this->memberships,
             new ScopeFactory($this->memberships, $this->instanceSettings),
             new CatchUpService(
@@ -206,7 +216,7 @@ abstract class NotificationTestCase extends DatabaseTestCase
                 $this->subscriptionService,
             ),
             $this->scanner,
-            new DigestBuilder(),
+            new DigestBuilder(TestTranslator::create()),
             $this->dispatcher,
             $this->notificationSettings,
             $this->clock,

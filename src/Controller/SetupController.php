@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
@@ -26,6 +27,7 @@ final class SetupController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly SetupService $setup,
         private readonly MembershipRepository $memberships,
         private readonly NotificationSettingsService $notifications,
@@ -35,7 +37,7 @@ final class SetupController extends Controller
         private readonly string $smtpHost = '',
         private readonly string $mailFrom = '',
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function showForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -66,7 +68,7 @@ final class SetupController extends Controller
             $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $memberships[0]->householdId);
         }
 
-        $this->flash('success', 'Your instance is ready. One more step: where should reminders go?');
+        $this->flash('success', 'flash.setup_ready');
 
         // Straight into step two rather than to the dashboard. Notifications
         // are the one part of this application that is worthless if nobody ever
@@ -121,7 +123,7 @@ final class SetupController extends Controller
             );
         }
 
-        $this->flash('success', 'Channel added. Send yourself a test message to confirm it arrives.');
+        $this->flash('success', 'flash.setup_channel_added');
 
         return $this->redirectAfterWrite($request, $response, '/setup/notifications');
     }
@@ -132,13 +134,13 @@ final class SetupController extends Controller
     ): ResponseInterface {
         $this->instance->markNotificationSetupComplete($this->clock->now()->format('Y-m-d H:i:s'));
 
-        $this->flash('success', 'All set. Add your first subscription to get started.');
+        $this->flash('success', 'flash.setup_finished');
 
         return $this->redirectAfterWrite($request, $response, '/');
     }
 
     /**
-     * @param array<string, string> $errors
+     * @param array<string, \App\Service\ValidationError> $errors
      * @param array<string, mixed> $submitted
      * @return array<string, mixed>
      */
@@ -159,7 +161,7 @@ final class SetupController extends Controller
 
     /**
      * @param array<string, mixed> $values
-     * @param array<string, string> $errors
+     * @param array<string, \App\Service\ValidationError> $errors
      * @return array<string, mixed>
      */
     private function formData(array $values, array $errors = []): array

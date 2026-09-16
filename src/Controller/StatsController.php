@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Security\SessionInterface;
 use App\Service\CatchUpService;
 use App\Service\InstanceSettingsService;
@@ -23,13 +24,14 @@ final class StatsController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly StatsService $stats,
         private readonly UsageService $usage,
         private readonly SubscriptionService $subscriptions,
         private readonly CatchUpService $catchUp,
         private readonly InstanceSettingsService $settings,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

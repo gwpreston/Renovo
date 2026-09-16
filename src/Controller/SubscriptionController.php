@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Domain\BillingCycle;
 use App\Domain\Currency;
 use App\Domain\NoticePeriod;
@@ -16,6 +17,7 @@ use App\Service\CategoryService;
 use App\Service\LogoStorage;
 use App\Service\BulkActionService;
 use App\Service\CatchUpService;
+use App\Service\SavedViewService;
 use App\Service\SubscriptionService;
 use App\Service\TagService;
 use App\Service\ValidationException;
@@ -33,6 +35,7 @@ final class SubscriptionController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly SubscriptionService $subscriptions,
         private readonly CategoryService $categories,
         private readonly TagService $tags,
@@ -40,8 +43,9 @@ final class SubscriptionController extends Controller
         private readonly LogoStorage $logos,
         private readonly CatchUpService $catchUp,
         private readonly BulkActionService $bulkActions,
+        private readonly SavedViewService $savedViews,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -69,6 +73,10 @@ final class SubscriptionController extends Controller
             // one needs the full pick-list.
             'all_currencies' => Currency::common(),
             'types' => SubscriptionType::cases(),
+            'saved_views' => $this->savedViews->forScope($scope),
+            // What "save this view" would store: the filter as the list itself
+            // would write it, rather than whatever is in the address bar.
+            'current_query' => $filter->toQueryString(['page' => null]),
             'bulk_actions' => BulkActionService::actions(),
         ];
 
@@ -96,18 +104,12 @@ final class SubscriptionController extends Controller
         try {
             $changed = $this->bulkActions->apply($this->scope($request), $body);
         } catch (ValidationException $exception) {
-            foreach ($exception->errors() as $message) {
-                $this->flash('error', $message);
-            }
+            $this->flashErrors($exception);
 
             return $this->redirectAfterWrite($request, $response, '/subscriptions');
         }
 
-        $this->flash('success', sprintf(
-            '%d subscription%s updated.',
-            $changed,
-            $changed === 1 ? '' : 's',
-        ));
+        $this->flash('success', 'flash.bulk_updated', ['count' => $changed]);
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions');
     }
@@ -144,7 +146,7 @@ final class SubscriptionController extends Controller
             );
         }
 
-        $this->flash('success', 'Subscription added.');
+        $this->flash('success', 'flash.subscription_added');
 
         // Back to the list, the same place a save from the edit form lands.
         // The new row is visible there, which is the confirmation the user is
@@ -194,6 +196,7 @@ final class SubscriptionController extends Controller
             'notes' => $subscription->notes,
             'is_active' => $subscription->isActive ? '1' : '0',
             'logo_path' => $subscription->logoPath,
+            'website_url' => $subscription->websiteUrl,
             'tags' => implode(', ', array_map(static fn ($tag): string => $tag->name, $subscription->tags)),
         ], [], $subscription->id));
     }
@@ -221,7 +224,7 @@ final class SubscriptionController extends Controller
             throw $this->notFound($request);
         }
 
-        $this->flash('success', 'Subscription saved.');
+        $this->flash('success', 'flash.subscription_saved');
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions');
     }
@@ -238,7 +241,7 @@ final class SubscriptionController extends Controller
             throw $this->notFound($request);
         }
 
-        $this->flash('success', 'Subscription deleted.');
+        $this->flash('success', 'flash.subscription_deleted');
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions');
     }
@@ -258,7 +261,7 @@ final class SubscriptionController extends Controller
             throw $this->notFound($request);
         }
 
-        $this->flash('success', $subscription->isActive ? 'Subscription paused.' : 'Subscription resumed.');
+        $this->flash('success', $subscription->isActive ? 'flash.subscription_paused' : 'flash.subscription_resumed');
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions');
     }
@@ -273,7 +276,7 @@ final class SubscriptionController extends Controller
 
     /**
      * @param array<string, mixed>  $values
-     * @param array<string, string> $errors
+     * @param array<string, \App\Service\ValidationError> $errors
      * @return array<string, mixed>
      */
     private function formData(

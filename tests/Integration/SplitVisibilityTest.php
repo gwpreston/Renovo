@@ -36,6 +36,7 @@ use App\Service\ValidationException;
 use App\Repository\InstanceSettingsRepository;
 use App\Support\FrozenClock;
 use App\Tests\Support\FakeHttpClient;
+use App\Tests\Support\TestLogoFetcher;
 use DateTimeImmutable;
 use Psr\Log\NullLogger;
 use Slim\Psr7\Factory\RequestFactory;
@@ -596,6 +597,7 @@ final class SplitVisibilityTest extends DatabaseTestCase
                 $this->subscriptions,
                 new CategoryRepository($this->db),
                 new TagRepository($this->db),
+                TestLogoFetcher::silent($this->db, $this->clock),
                 new MembershipRepository($this->db),
                 $this->priceHistory,
                 $this->db,

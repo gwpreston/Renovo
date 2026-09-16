@@ -63,6 +63,7 @@ final class Resource
             'usage_count' => $subscription->usageCount,
             'usage_rating' => $subscription->usageRating,
             'logo_path' => $subscription->logoPath,
+            'website_url' => $subscription->websiteUrl,
             // Derived, and read-only. A client that recomputed these would have
             // to reimplement the billing-cycle normalisation to get them right.
             'monthly_minor' => $subscription->monthlyMinor(),

@@ -37,10 +37,9 @@ final class FixerProvider extends HttpRateProvider
         return 'Fixer';
     }
 
-    public function description(): string
+    public function descriptionKey(): string
     {
-        return 'Commercial service. Requires an access key; the free tier publishes EUR rates only, '
-            . 'from which other bases are derived.';
+        return 'rate_provider.fixer';
     }
 
     public function requiresApiKey(): bool

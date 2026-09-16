@@ -100,20 +100,20 @@ abstract class HttpNotifier
         $url = trim($url);
 
         if ($url === '') {
-            throw ValidationException::field($field, 'Enter a URL.');
+            throw ValidationException::field($field, 'error.url.required');
         }
 
         if (filter_var($url, FILTER_VALIDATE_URL) === false) {
-            throw ValidationException::field($field, 'Enter a valid URL, including https://.');
+            throw ValidationException::field($field, 'error.url.invalid');
         }
 
         $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
         if (!in_array($scheme, ['http', 'https'], true)) {
-            throw ValidationException::field($field, 'The URL must start with https:// or http://.');
+            throw ValidationException::field($field, 'error.url.scheme');
         }
 
         if ((string) parse_url($url, PHP_URL_HOST) === '') {
-            throw ValidationException::field($field, 'The URL is missing a host name.');
+            throw ValidationException::field($field, 'error.url.no_host');
         }
 
         return rtrim($url, '/');

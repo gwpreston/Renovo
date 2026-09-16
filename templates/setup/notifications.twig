@@ -1,34 +1,29 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Set up notifications — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('setup_notifications.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <div class="page-header">
-        <h1>Where should reminders go?</h1>
+        <h1>{{ t('setup_notifications.where_should_reminders_go') }}</h1>
     </div>
 
     <p class="muted note">
-        Step 2 of 2. Renovo will tell you before a subscription renews, before a free trial starts charging,
-        before a cancellation deadline passes, and when a budget is heading over. Add somewhere for it to send
-        that — and send yourself a test message, because a token that looks right and is not is the sort of
-        thing you want to find out now rather than the week you miss a renewal.
+        {{ t('setup_notifications.intro') }}
     </p>
 
     <p class="muted note">
-        Mail goes out through <code>{{ smtp_host }}</code>, from <code>{{ mail_from }}</code>. Those come from
-        the environment (<code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>MAIL_FROM_ADDRESS</code>) and are
-        not set here — an instance secret belongs in the environment, not in the database. Add an Email channel
-        below and send a test to confirm the relay actually works.
+        {{ t('setup_notifications.mail_relay', {'host': smtp_host, 'from': mail_from}) }}
+        <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>MAIL_FROM_ADDRESS</code>.
+        {{ t('setup_notifications.mail_relay_env') }}
     </p>
 
     <p class="muted note">
-        You can add more channels, or change any of this, later under Settings → Notifications. Every member
-        configures their own.
+        {{ t('setup_notifications.later_note') }}
     </p>
 
     {% if channels is not empty %}
         <section class="card">
-            <h2>Configured</h2>
+            <h2>{{ t('setup_notifications.configured') }}</h2>
             <ul class="channel-list">
                 {% for channel in channels %}
                     <li class="channel">
@@ -36,9 +31,9 @@
                             <strong>{{ channel.label }}</strong>
                             <span class="muted">{{ channel_description(channel) }}</span>
                             {% if channel.lastError %}
-                                <p class="field-error">Last attempt failed: {{ channel.lastError }}</p>
+                                <p class="field-error">{{ t('notifications.last_error', {'reason': channel.lastError}) }}</p>
                             {% elseif channel.lastSuccessAt %}
-                                <p class="hint">Test message delivered.</p>
+                                <p class="hint">{{ t('setup_notifications.test_message_delivered') }}</p>
                             {% endif %}
                         </div>
                         <div class="channel-actions">
@@ -46,7 +41,7 @@
                                   class="inline">
                                 {{ csrf_field() }}
                                 <input type="hidden" name="return_to" value="/setup/notifications">
-                                <button type="submit" class="button button-quiet">Send test</button>
+                                <button type="submit" class="button button-quiet">{{ t('action.send_test') }}</button>
                             </form>
                         </div>
                     </li>
@@ -56,7 +51,7 @@
     {% endif %}
 
     <section class="card">
-        <h2>Add a channel</h2>
+        <h2>{{ t('notifications.add_a_channel') }}</h2>
 
         {% for notifier in notifiers %}
             <details class="channel-form" {{ submitted.channel_type is defined
@@ -67,24 +62,26 @@
                     {{ csrf_field() }}
                     <input type="hidden" name="channel_type" value="{{ notifier.key }}">
 
-                    <label for="{{ notifier.key }}_label">Name</label>
+                    <label for="{{ notifier.key }}_label">{{ t('field.name') }}</label>
                     <input type="text" id="{{ notifier.key }}_label" name="label"
                            placeholder="{{ notifier.label }}">
 
                     {% for field in notifier.fields %}
-                        <label for="{{ notifier.key }}_{{ field.name }}">{{ field.label }}</label>
+                        <label for="{{ notifier.key }}_{{ field.name }}">{{ t(field.label) }}</label>
                         <input type="{{ field.type }}"
                                id="{{ notifier.key }}_{{ field.name }}"
                                name="{{ field.name }}"
                                {{ field.required ? 'required' : '' }}
                                autocomplete="off">
-                        {% if field.hint %}<p class="hint">{{ field.hint }}</p>{% endif %}
+                        {% if field.hint %}<p class="hint">{{ t(field.hint) }}</p>{% endif %}
                         {% if errors[field.name] is defined %}
                             <p class="field-error">{{ errors[field.name] }}</p>
                         {% endif %}
                     {% endfor %}
 
-                    <button type="submit" class="button button-primary">Add {{ notifier.label }}</button>
+                    <button type="submit" class="button button-primary">
+                        {{ t('notifications.add_channel_of_type', {'type': notifier.label}) }}
+                    </button>
                 </form>
             </details>
         {% endfor %}

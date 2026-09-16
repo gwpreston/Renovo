@@ -32,13 +32,20 @@ interface SessionInterface
 
     /**
      * Store a message for the next request only.
+     *
+     * What is stored is a translation key and its arguments, not a sentence.
+     * A flash outlives the request that set it, and the request that renders
+     * it may be in a different language — a message translated when it was
+     * queued would be the wrong one by the time it was read.
+     *
+     * @param array<string, string|int|float> $parameters
      */
-    public function flash(string $type, string $message): void;
+    public function flash(string $type, string $key, array $parameters = []): void;
 
     /**
      * Read and clear all flash messages.
      *
-     * @return list<array{type: string, message: string}>
+     * @return list<array{type: string, message: string, parameters: array<string, string|int|float>}>
      */
     public function consumeFlashes(): array;
 }

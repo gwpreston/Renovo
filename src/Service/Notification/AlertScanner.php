@@ -13,6 +13,7 @@ use App\Security\Scope;
 use App\Service\BudgetService;
 use App\Service\SubscriptionService;
 use App\Support\Clock;
+use App\I18n\Translator;
 use App\Support\MoneyFormatter;
 use DateTimeImmutable;
 
@@ -43,6 +44,7 @@ final class AlertScanner
         private readonly BudgetService $budgets,
         private readonly BudgetAlertStateRepository $budgetState,
         private readonly MoneyFormatter $money,
+        private readonly Translator $translator,
         private readonly Clock $clock,
         private readonly string $appUrl = '',
     ) {
@@ -201,14 +203,13 @@ final class AlertScanner
                 // goes over again later is a new occurrence and is announced
                 // again; the same crossing seen twice in one day is not.
                 $today->format('Y-m-d'),
-                sprintf('Budget "%s" is projected to be exceeded', $budget->name),
+                $this->translator->trans('alert.budget.title', ['budget' => $budget->name]),
                 [
-                    sprintf(
-                        'Projected %s against a limit of %s.',
-                        $this->money->format($projected),
-                        $this->money->format($progress['limit']),
-                    ),
-                    sprintf('That is %s over.', $this->money->format($over)),
+                    $this->translator->trans('alert.budget.projected', [
+                        'projected' => $this->money->format($projected),
+                        'limit' => $this->money->format($progress['limit']),
+                    ]),
+                    $this->translator->trans('alert.budget.over', ['amount' => $this->money->format($over)]),
                 ],
                 $this->url('/budgets'),
                 null,
@@ -277,42 +278,33 @@ final class AlertScanner
     private function subscriptionAlert(Subscription $subscription, array $event, int $days, int $lead): Alert
     {
         $when = match (true) {
-            $days === 0 => 'today',
-            $days === 1 => 'tomorrow',
-            default => sprintf('in %d days', $days),
+            $days === 0 => $this->translator->trans('alert.when.today'),
+            $days === 1 => $this->translator->trans('alert.when.tomorrow'),
+            default => $this->translator->trans('alert.when.in_days', ['days' => $days]),
         };
 
         $price = $subscription->isTrial
             ? $subscription->priceAfterConversion()
             : $subscription->price;
 
+        $amount = $this->money->format($price);
+        $date = $event['date']->format('j M Y');
+
         [$title, $lines] = match ($event['type']) {
             AlertType::TrialConversion => [
-                sprintf('%s trial ends %s', $subscription->name, $when),
-                [
-                    sprintf(
-                        'It starts charging %s on %s.',
-                        $this->money->format($price),
-                        $event['date']->format('j M Y'),
-                    ),
-                ],
+                $this->translator->trans('alert.trial.title', ['name' => $subscription->name, 'when' => $when]),
+                [$this->translator->trans('alert.trial.line', ['amount' => $amount, 'date' => $date])],
             ],
             AlertType::CancelBy => [
-                sprintf('Cancel %s by %s', $subscription->name, $event['date']->format('j M Y')),
+                $this->translator->trans('alert.cancel.title', ['name' => $subscription->name, 'date' => $date]),
                 [
-                    sprintf('That is %s — the last day to give notice and avoid the next charge.', $when),
-                    sprintf('It renews at %s.', $this->money->format($price)),
+                    $this->translator->trans('alert.cancel.line', ['when' => $when]),
+                    $this->translator->trans('alert.cancel.renews', ['amount' => $amount]),
                 ],
             ],
             default => [
-                sprintf('%s renews %s', $subscription->name, $when),
-                [
-                    sprintf(
-                        '%s is due on %s.',
-                        $this->money->format($price),
-                        $event['date']->format('j M Y'),
-                    ),
-                ],
+                $this->translator->trans('alert.renewal.title', ['name' => $subscription->name, 'when' => $when]),
+                [$this->translator->trans('alert.renewal.line', ['amount' => $amount, 'date' => $date])],
             ],
         };
 

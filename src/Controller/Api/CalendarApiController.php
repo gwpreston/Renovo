@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Api;
 
+use App\I18n\Translator;
 use App\Service\CalendarFeedService;
 use App\Service\InstanceSettingsService;
 use Psr\Http\Message\ResponseInterface;
@@ -19,9 +20,11 @@ use Psr\Http\Message\ServerRequestInterface;
 final class CalendarApiController extends ApiController
 {
     public function __construct(
+        Translator $translator,
         private readonly CalendarFeedService $calendar,
         private readonly InstanceSettingsService $settings,
     ) {
+        parent::__construct($translator);
     }
 
     public function feed(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

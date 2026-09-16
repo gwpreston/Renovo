@@ -51,6 +51,7 @@ final class Subscription
         public readonly bool $isActive,
         public readonly ?string $reminderDays,
         public readonly ?string $logoPath,
+        public readonly ?string $websiteUrl,
         public readonly ?int $categoryId,
         public readonly ?string $categoryName,
         public readonly ?string $ownerName,

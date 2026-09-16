@@ -27,6 +27,8 @@ final class InstanceSettingsService
     public const KEY_RATE_PROVIDER_KEY = 'rate_provider_key';
     public const KEY_RATES_LAST_ATTEMPT_AT = 'rates_last_attempt_at';
     public const KEY_NOTIFICATIONS_SETUP_AT = 'notifications_setup_at';
+    public const KEY_SCHEDULER_LAST_RUN_AT = 'scheduler_last_run_at';
+    public const KEY_DEMO_MODE = 'demo_mode';
 
     /** @var array<string, string>|null */
     private ?array $cache = null;
@@ -156,6 +158,42 @@ final class InstanceSettingsService
     public function markNotificationSetupComplete(string $timestamp): void
     {
         $this->set(self::KEY_NOTIFICATIONS_SETUP_AT, $timestamp);
+    }
+
+    /**
+     * When the scheduler last finished a run.
+     *
+     * Written by `reminders:run` and read by the readiness endpoint. Without
+     * it an instance whose scheduler container died would look perfectly
+     * healthy right up until somebody noticed they had stopped being reminded
+     * about anything.
+     */
+    public function schedulerLastRunAt(): ?DateTimeImmutable
+    {
+        $value = $this->get(self::KEY_SCHEDULER_LAST_RUN_AT, '');
+
+        return $value === '' ? null : new DateTimeImmutable($value);
+    }
+
+    public function markSchedulerRun(DateTimeImmutable $at): void
+    {
+        $this->set(self::KEY_SCHEDULER_LAST_RUN_AT, $at->format('Y-m-d H:i:s'));
+    }
+
+    /**
+     * Whether this instance is a read-only demonstration.
+     *
+     * An instance-wide switch, not a per-user one: a demo is what the whole
+     * server is for while it is on.
+     */
+    public function isDemoMode(): bool
+    {
+        return $this->get(self::KEY_DEMO_MODE, '0') === '1';
+    }
+
+    public function setDemoMode(bool $enabled): void
+    {
+        $this->set(self::KEY_DEMO_MODE, $enabled ? '1' : '0');
     }
 
     private function get(string $key, string $default): string

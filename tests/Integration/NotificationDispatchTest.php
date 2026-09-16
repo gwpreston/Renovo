@@ -10,6 +10,7 @@ use App\Notification\NotifierException;
 use App\Repository\NotificationLogRepository;
 use App\Service\Notification\NotificationDispatcher;
 use App\Service\Notification\NotificationRateLimiter;
+use App\Tests\Support\TestTranslator;
 use DateTimeImmutable;
 use Psr\Log\NullLogger;
 
@@ -247,6 +248,7 @@ final class NotificationDispatchTest extends NotificationTestCase
             new NotificationRateLimiter($this->log, $this->clock, 3, 20),
             new NullLogger(),
             $this->clock,
+            TestTranslator::create(),
         );
 
         $id = $this->addChannel($this->alice);

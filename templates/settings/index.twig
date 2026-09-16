@@ -1,79 +1,161 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Settings — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('nav.settings') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <div class="page-header">
-        <h1>Settings</h1>
+        <h1>{{ t('nav.settings') }}</h1>
     </div>
 
     <section class="card">
-        <h2>Signing in</h2>
+        <h2>{{ t('settings.signing_in') }}</h2>
         <p class="muted">
-            Two-step verification, passkeys and the browsers currently signed in as you.
+            {{ t('settings.security_intro') }}
         </p>
-        <a class="button" href="/settings/security">Account security</a>
+        <a class="button" href="/settings/security">{{ t('security.title') }}</a>
     </section>
 
     <section class="card">
-        <h2>API and calendar</h2>
+        <h2>{{ t('settings.api_and_calendar') }}</h2>
         <p class="muted">
-            Tokens for scripts, other machines and calendar apps. A token can never do more than
-            you can.
+            {{ t('settings.api_intro') }}
         </p>
-        <a class="button" href="/settings/api-tokens">API tokens</a>
+        <a class="button" href="/settings/api-tokens">{{ t('tokens.title') }}</a>
     </section>
 
     {% if can(scope, 'data.import') or can(scope, 'backup.manage') %}
         <section class="card">
-            <h2>Your data</h2>
+            <h2>{{ t('settings.your_data') }}</h2>
             <p class="muted">
-                Bring subscriptions in from a file, or take everything out again — including the
-                attached invoices — in a format that needs no database to read.
+                {{ t('settings.data_intro') }}
             </p>
             <div class="form-actions">
                 {% if can(scope, 'data.import') %}
-                    <a class="button" href="/import">Import a file</a>
+                    <a class="button" href="/import">{{ t('settings.import_a_file') }}</a>
                 {% endif %}
                 {% if can(scope, 'backup.manage') %}
-                    <a class="button" href="/settings/backup">Backup and restore</a>
+                    <a class="button" href="/settings/backup">{{ t('backup.title') }}</a>
                 {% endif %}
             </div>
         </section>
     {% endif %}
 
     <section class="card">
-        <h2>Appearance</h2>
-        <form method="post" action="/settings/theme" class="stack">
+        <h2>{{ t('settings.appearance') }}</h2>
+        <form method="post" action="/settings/preferences" class="stack">
             {{ csrf_field() }}
-            <label for="theme">Theme</label>
-            <select id="theme" name="theme">
-                {% for theme in themes %}
-                    <option value="{{ theme }}"
-                            {{ current_user.theme == theme ? 'selected' : '' }}>{{ theme|capitalize }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="button">Save</button>
+
+            <div class="field">
+                <label for="theme">{{ t('settings.theme') }}</label>
+                <select id="theme" name="theme">
+                    {% for theme in themes %}
+                        <option value="{{ theme.value }}"
+                                {{ current_user.theme == theme.value ? 'selected' : '' }}>
+                            {{ t(theme.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="locale">{{ t('settings.language') }}</label>
+                <select id="locale" name="locale">
+                    {# An empty value is a real choice: follow whatever the instance is set to. #}
+                    <option value="" {{ current_user.locale == '' ? 'selected' : '' }}>
+                        {{ t('settings.language_instance_default') }}
+                    </option>
+                    {% for code, name in locale_choices %}
+                        <option value="{{ code }}" {{ current_user.locale == code ? 'selected' : '' }}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="week_start">{{ t('settings.week_start') }}</label>
+                <select id="week_start" name="week_start">
+                    {% for day in week_starts %}
+                        <option value="{{ day.value }}"
+                                {{ current_user.weekStart == day.value ? 'selected' : '' }}>
+                            {{ t(day.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p class="hint">{{ t('settings.week_start_hint') }}</p>
+            </div>
+
+            <div class="field">
+                <label for="density">{{ t('settings.density') }}</label>
+                <select id="density" name="density">
+                    {% for option in densities %}
+                        <option value="{{ option.value }}"
+                                {{ current_user.density == option.value ? 'selected' : '' }}>
+                            {{ t(option.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="landing_view">{{ t('settings.landing_view') }}</label>
+                <select id="landing_view" name="landing_view">
+                    {% for view in landing_views %}
+                        <option value="{{ view.value }}"
+                                {{ current_user.landingView == view.value ? 'selected' : '' }}>
+                            {{ t(view.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p class="hint">{{ t('settings.landing_view_hint') }}</p>
+            </div>
+
+            <fieldset class="stack">
+                <legend>{{ t('settings.dashboard_cards') }}</legend>
+                <p class="hint">{{ t('settings.dashboard_cards_hint') }}</p>
+
+                <ul class="card-layout">
+                    {% for entry in dashboard_layout %}
+                        <li class="card-layout-row">
+                            <label for="card-position-{{ entry.card.value }}" class="card-layout-name">
+                                {{ t(entry.card.labelKey()) }}
+                            </label>
+                            <input type="number" min="1" max="{{ dashboard_layout|length }}"
+                                   id="card-position-{{ entry.card.value }}"
+                                   name="card_position[{{ entry.card.value }}]"
+                                   value="{{ loop.index }}"
+                                   aria-label="{{ t('settings.card_position', {
+                                       'card': t(entry.card.labelKey()),
+                                   }) }}">
+                            <label class="choice">
+                                <input type="checkbox" name="card_visible[{{ entry.card.value }}]" value="1"
+                                       {{ entry.visible ? 'checked' : '' }}>
+                                <span>{{ t('settings.card_visible') }}</span>
+                            </label>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </fieldset>
+
+            <button type="submit" class="button">{{ t('action.save') }}</button>
         </form>
     </section>
 
     {% if household %}
         <section class="card">
-            <h2>Household</h2>
+            <h2>{{ t('settings.household') }}</h2>
 
             {% if can(scope, 'household.manage') %}
                 <form method="post" action="/settings/household" class="stack">
                     {{ csrf_field() }}
 
-                    <label for="household_name">Name</label>
+                    <label for="household_name">{{ t('field.name') }}</label>
                     <input type="text" id="household_name" name="name" value="{{ household.name }}">
 
-                    <h3>Members</h3>
+                    <h3>{{ t('settings.members') }}</h3>
                     <table class="table">
                         <thead>
                         <tr>
-                            <th scope="col">Member</th>
-                            <th scope="col">Role</th>
+                            <th scope="col">{{ t('field.member') }}</th>
+                            <th scope="col">{{ t('field.role') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -83,9 +165,12 @@
                                 <td>
                                     {% if member.id == current_user.id %}
                                         {{ role_label(member.role) }}
-                                        <span class="hint">(you)</span>
+                                        <span class="hint">{{ t('settings.you') }}</span>
                                     {% else %}
-                                        <select name="roles[{{ member.id }}]">
+                                        <select name="roles[{{ member.id }}]"
+                                                aria-label="{{ t('settings.role_for', {
+                                                    'name': member.display_name,
+                                                }) }}">
                                             {% for role in roles %}
                                                 <option value="{{ role.value }}"
                                                         {{ member.role == role.value ? 'selected' : '' }}>
@@ -100,7 +185,7 @@
                         </tbody>
                     </table>
 
-                    <button type="submit" class="button button-primary">Save household</button>
+                    <button type="submit" class="button button-primary">{{ t('settings.save_household') }}</button>
                 </form>
             {% else %}
                 <p><strong>{{ household.name }}</strong></p>
@@ -109,20 +194,20 @@
                         <li>{{ member.display_name }} — {{ role_label(member.role) }}</li>
                     {% endfor %}
                 </ul>
-                <p class="muted">Only an owner or admin of this household can change these.</p>
+                <p class="muted">{{ t('settings.household_permission_note') }}</p>
             {% endif %}
         </section>
     {% endif %}
 
     {% if can(scope, 'instance.manage') %}
         <section class="card">
-            <h2>Instance</h2>
-            <p class="muted">These apply to everybody on this instance.</p>
+            <h2>{{ t('settings.instance') }}</h2>
+            <p class="muted">{{ t('settings.instance_note') }}</p>
 
             <form method="post" action="/settings/instance" class="stack">
                 {{ csrf_field() }}
 
-                <label for="base_currency">Base currency</label>
+                <label for="base_currency">{{ t('settings.base_currency') }}</label>
                 <select id="base_currency" name="base_currency">
                     {% for code in currencies %}
                         <option value="{{ code }}"
@@ -131,10 +216,8 @@
                 </select>
 
                 <fieldset class="stack">
-                    <legend>Exchange rates</legend>
-                    <p class="hint">Rates are cached and used only for display. Amounts stay in the currency
-                        they were entered in. When a rate is unavailable, totals are shown per currency
-                        instead of combined.</p>
+                    <legend>{{ t('settings.exchange_rates') }}</legend>
+                    <p class="hint">{{ t('settings.rates_note') }}</p>
 
                     {% for provider in rate_providers %}
                         <label class="choice">
@@ -142,38 +225,38 @@
                                    {{ rates.provider == provider.key ? 'checked' : '' }}>
                             <span>
                                 <strong>{{ provider.label }}</strong>
-                                <span class="muted block">{{ provider.description }}</span>
+                                <span class="muted block">{{ t(provider.descriptionKey) }}</span>
                             </span>
                         </label>
                     {% endfor %}
 
-                    <label for="rate_provider_key">API key</label>
+                    <label for="rate_provider_key">{{ t('settings.api_key') }}</label>
                     <input type="password" id="rate_provider_key" name="rate_provider_key" autocomplete="off"
-                           placeholder="Leave blank to keep the current key">
+                           placeholder="{{ t('settings.rate_key_placeholder') }}">
                     <label class="choice">
                         <input type="checkbox" name="clear_rate_provider_key" value="1">
-                        <span>Remove the stored API key</span>
+                        <span>{{ t('settings.rate_key_clear') }}</span>
                     </label>
-                    <p class="hint"><code>EXCHANGE_RATE_API_KEY</code> in the environment overrides whatever is
-                        stored here.</p>
+                    <p class="hint">{{ t('settings.rate_key_env_wins', {'variable': 'EXCHANGE_RATE_API_KEY'}) }}</p>
 
                     <p class="muted">
                         {% if rates.is_misconfigured %}
-                            <strong>{{ rates.provider_label }} needs an API key</strong> and has not been given
-                            one, so no rates are being fetched.
+                            {{ t('settings.rates_need_key', {'provider': rates.provider_label}) }}
                         {% elseif rates.last_refreshed_at %}
-                            {{ rates.currency_count }} currencies cached, last updated
-                            {{ rates.last_refreshed_at|date('j M Y H:i') }} UTC{{ rates.is_stale
-                                ? ' — due a refresh' : '' }}.
+                            {{ t('settings.rates_cached', {
+                                'count': rates.currency_count,
+                                'when': rates.last_refreshed_at|local_date('d MMM y HH:mm'),
+                            }) }}
+                            {%- if rates.is_stale %} {{ t('settings.rates_stale') }}{% endif %}
                         {% else %}
-                            No rates cached yet. They are fetched the first time a dashboard is viewed, or by
-                            running <code>php bin/console rates:refresh</code>.
+                            {{ t('settings.rates_none') }}
+                            <code>php bin/console rates:refresh</code>.
                         {% endif %}
                     </p>
                 </fieldset>
 
                 <fieldset class="stack">
-                    <legend>Data isolation</legend>
+                    <legend>{{ t('settings.data_isolation') }}</legend>
                     {% for mode in isolation_modes %}
                         <label class="choice">
                             <input type="radio" name="isolation_mode" value="{{ mode.value }}"
@@ -187,38 +270,42 @@
                 <label class="choice">
                     <input type="checkbox" name="allow_registration" value="1"
                            {{ instance.allow_registration ? 'checked' : '' }}>
-                    <span>Allow anyone to create an account</span>
+                    <span>{{ t('settings.allow_registration') }}</span>
                 </label>
 
-                <button type="submit" class="button button-primary">Save instance settings</button>
+                <input type="hidden" name="demo_mode" value="0">
+                <label class="choice">
+                    <input type="checkbox" name="demo_mode" value="1"
+                           {{ instance.demo_mode ? 'checked' : '' }}>
+                    <span>{{ t('settings.demo_mode') }}</span>
+                </label>
+                <p class="hint">{{ t('settings.demo_mode_hint') }}</p>
+
+                <button type="submit" class="button button-primary">{{ t('settings.save_instance_settings') }}</button>
             </form>
         </section>
 
         <section class="card">
-            <h2>Trusted hosts</h2>
+            <h2>{{ t('settings.trusted_hosts') }}</h2>
 
             <p class="muted note">
-                Notifications and webhooks may only be sent to addresses on the public internet. That is what
-                stops somebody using a webhook URL to make this server fetch something on your private network
-                — including, on a cloud host, the metadata service holding its credentials.
+                {{ t('settings.trusted_hosts_intro') }}
             </p>
 
             <p class="muted note">
-                A self-hosted Gotify on your LAN or on a Tailscale address is on the wrong side of that rule,
-                so add it here. Each entry is an exception you have chosen, and every use of one is written to
-                the log. A trusted host may also be reached over plain <code>http</code>.
+                {{ t('settings.trusted_hosts_exception') }} <code>http</code>.
             </p>
 
             {% if trusted_hosts is empty %}
-                <p class="muted empty">Nothing is trusted. Only public addresses can be reached.</p>
+                <p class="muted empty">{{ t('settings.trusted_hosts_empty') }}</p>
             {% else %}
                 <div class="table-scroll">
                     <table class="table">
                         <thead>
                         <tr>
-                            <th scope="col">Host or range</th>
-                            <th scope="col">Note</th>
-                            <th scope="col">Added</th>
+                            <th scope="col">{{ t('settings.host_or_range') }}</th>
+                            <th scope="col">{{ t('field.note') }}</th>
+                            <th scope="col">{{ t('field.added') }}</th>
                             <th scope="col"></th>
                         </tr>
                         </thead>
@@ -228,14 +315,14 @@
                                 <td><code>{{ host.pattern }}</code></td>
                                 <td>{{ host.note }}</td>
                                 <td>
-                                    {{ host.created_at|date('j M Y') }}
+                                    {{ host.created_at|local_date('d MMM y') }}
                                     {% if host.created_by %}<span class="muted">by {{ host.created_by }}</span>{% endif %}
                                 </td>
                                 <td>
                                     <form method="post" action="/settings/trusted-hosts/{{ host.id }}/delete"
                                           class="inline">
                                         {{ csrf_field() }}
-                                        <button type="submit" class="button button-quiet">Remove</button>
+                                        <button type="submit" class="button button-quiet">{{ t('action.remove') }}</button>
                                     </form>
                                 </td>
                             </tr>
@@ -248,14 +335,14 @@
             <form method="post" action="/settings/trusted-hosts" class="stack">
                 {{ csrf_field() }}
 
-                <label for="trusted_pattern">Host, address or range</label>
+                <label for="trusted_pattern">{{ t('settings.host_address_or_range') }}</label>
                 <input type="text" id="trusted_pattern" name="pattern"
-                       placeholder="gotify.lan, .lan, 192.168.1.10 or 100.64.0.0/10" required>
+                       placeholder="{{ t('settings.trusted_host_placeholder') }}" required>
 
-                <label for="trusted_note">Note</label>
-                <input type="text" id="trusted_note" name="note" placeholder="What this is, for later">
+                <label for="trusted_note">{{ t('field.note') }}</label>
+                <input type="text" id="trusted_note" name="note" placeholder="{{ t('settings.trusted_host_note_placeholder') }}">
 
-                <button type="submit" class="button">Trust this host</button>
+                <button type="submit" class="button">{{ t('settings.trust_this_host') }}</button>
             </form>
         </section>
     {% endif %}

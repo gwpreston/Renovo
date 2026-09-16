@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Api;
 
+use App\I18n\Translator;
 use App\Application\Api\OpenApiDocument;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -22,8 +23,11 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 final class OpenApiController extends ApiController
 {
-    public function __construct(private readonly OpenApiDocument $document)
-    {
+    public function __construct(
+        Translator $translator,
+        private readonly OpenApiDocument $document,
+    ) {
+        parent::__construct($translator);
     }
 
     public function asYaml(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

@@ -1,5 +1,5 @@
 {% if errors is defined and errors %}
     <div class="alert alert-error" role="alert">
-        <p>Check the highlighted fields and try again.</p>
+        <p>{{ t('form.has_errors') }}</p>
     </div>
 {% endif %}

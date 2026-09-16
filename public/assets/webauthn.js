@@ -13,6 +13,17 @@
 (function () {
     'use strict';
 
+    /**
+     * A message from the catalogue the layout rendered, under this file's own
+     * prefix. The key is the fallback, which is what a page that somehow
+     * rendered without the catalogue will show.
+     */
+    function message(key, params) {
+        const i18n = window.renovoI18n;
+
+        return i18n ? i18n.t('passkey_' + key, params) : key;
+    }
+
     function base64UrlToBuffer(value) {
         const padded = value.replace(/-/g, '+').replace(/_/g, '/');
         const binary = atob(padded + '='.repeat((4 - (padded.length % 4)) % 4));
@@ -52,9 +63,9 @@
         try {
             const payload = await response.json();
 
-            return payload.error || 'That did not work. Try again.';
+            return payload.error || message('generic_error');
         } catch (error) {
-            return 'That did not work. Try again.';
+            return message('generic_error');
         }
     }
 
@@ -90,7 +101,7 @@
 
         if (!supported()) {
             config.button.disabled = true;
-            show(config.error, 'This browser cannot use passkeys on this connection.');
+            show(config.error, message('unsupported'));
 
             return;
         }
@@ -143,8 +154,8 @@
                 // A user who dismisses the browser prompt lands here. That is
                 // not a failure worth shouting about.
                 show(config.error, error.name === 'NotAllowedError'
-                    ? 'No passkey was used.'
-                    : 'That passkey could not be used: ' + error.message);
+                    ? message('not_used')
+                    : message('use_failed', {reason: error.message}));
             } finally {
                 config.button.disabled = false;
             }
@@ -161,7 +172,7 @@
 
         if (!supported()) {
             config.button.disabled = true;
-            show(config.error, 'This browser cannot register passkeys on this connection.');
+            show(config.error, message('register_unsupported'));
 
             return;
         }
@@ -217,8 +228,8 @@
                 window.location.assign(result.redirect || '/settings/security');
             } catch (error) {
                 show(config.error, error.name === 'NotAllowedError'
-                    ? 'Registration was cancelled.'
-                    : 'That key could not be registered: ' + error.message);
+                    ? message('register_cancelled')
+                    : message('register_failed', {reason: error.message}));
             } finally {
                 config.button.disabled = false;
             }

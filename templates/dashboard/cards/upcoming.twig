@@ -1,0 +1,35 @@
+{# The next seven and thirty days. #}
+{% import _self as ui %}
+<div class="columns">
+    <section class="card">
+        <h2>{{ t('dashboard.next_7_days') }}</h2>
+        {{ ui.upcoming(stats.upcoming_7, stats.upcoming_7_totals) }}
+    </section>
+
+    <section class="card">
+        <h2>{{ t('dashboard.next_30_days') }}</h2>
+        {{ ui.upcoming(stats.upcoming_30, stats.upcoming_30_totals) }}
+    </section>
+</div>
+
+{% macro upcoming(items, totals) %}
+    {% if items is empty %}
+        <p class="muted">{{ t('dashboard.nothing_due') }}</p>
+    {% else %}
+        <ul class="renewals">
+            {% for item in items %}
+                <li>
+                    <span class="renewal-name">{{ item.name }}</span>
+                    <span class="renewal-date">{{ item.nextPaymentDate|local_date('d MMM') }}</span>
+                    <span class="renewal-amount">{{ item.price.amountMinor|money(item.price.currency) }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+        <p class="muted">
+            {% for total in totals %}
+                {{ total.total_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
+            {% endfor %}
+            {{ t('dashboard.due_in_total') }}
+        </p>
+    {% endif %}
+{% endmacro %}

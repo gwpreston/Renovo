@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Auth;
 
+use App\I18n\Translator;
 use App\Controller\Controller;
 use App\Domain\AuditAction;
 use App\Domain\Entity\User;
@@ -15,6 +16,7 @@ use App\Service\Auth\TwoFactorService;
 use App\Service\Auth\WebAuthnService;
 use App\Service\AuditLogService;
 use App\Service\RateLimiter;
+use App\Service\ValidationError;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -38,6 +40,7 @@ final class TwoFactorController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly TwoFactorService $twoFactor,
         private readonly TotpService $totp,
         private readonly WebAuthnService $webAuthn,
@@ -45,7 +48,7 @@ final class TwoFactorController extends Controller
         private readonly RateLimiter $rateLimiter,
         private readonly AuditLogService $audit,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function showChallenge(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -62,7 +65,7 @@ final class TwoFactorController extends Controller
     {
         $user = $this->twoFactor->pendingUser();
         if ($user === null) {
-            $this->flash('error', 'That sign-in attempt expired. Start again.');
+            $this->flash('error', 'flash.two_factor_expired');
 
             return $this->redirect($response, '/login');
         }
@@ -79,7 +82,10 @@ final class TwoFactorController extends Controller
 
         if ($remaining > 0) {
             return $this->renderChallenge($request, $response->withStatus(429), $user, [
-                'code' => sprintf('Too many attempts. Try again in %d minutes.', max(1, (int) ceil($remaining / 60))),
+                'code' => new ValidationError(
+                    'error.auth.throttled',
+                    ['minutes' => max(1, (int) ceil($remaining / 60))],
+                ),
             ]);
         }
 
@@ -100,8 +106,8 @@ final class TwoFactorController extends Controller
 
             return $this->renderChallenge($request, $response->withStatus(422), $user, [
                 'code' => $useRecovery
-                    ? 'That recovery code is not valid, or has already been used.'
-                    : 'That code is not correct.',
+                    ? new ValidationError('error.recovery_code.invalid')
+                    : new ValidationError('error.totp.code_wrong'),
             ]);
         }
 
@@ -120,7 +126,10 @@ final class TwoFactorController extends Controller
     {
         $user = $this->twoFactor->pendingUser();
         if ($user === null) {
-            return $this->json($response->withStatus(401), ['error' => 'That sign-in attempt expired.']);
+            return $this->json(
+                $response->withStatus(401),
+                ['error' => $this->translator->trans('error.two_factor.expired')],
+            );
         }
 
         $options = $this->webAuthn->serializeOptions($this->webAuthn->authenticationOptions($user));
@@ -133,12 +142,18 @@ final class TwoFactorController extends Controller
     {
         $user = $this->twoFactor->pendingUser();
         if ($user === null) {
-            return $this->json($response->withStatus(401), ['error' => 'That sign-in attempt expired.']);
+            return $this->json(
+                $response->withStatus(401),
+                ['error' => $this->translator->trans('error.two_factor.expired')],
+            );
         }
 
         $stored = $this->session->get(self::CHALLENGE_SESSION_KEY);
         if (!is_string($stored) || $stored === '') {
-            return $this->json($response->withStatus(400), ['error' => 'Start the passkey step again.']);
+            return $this->json(
+                $response->withStatus(400),
+                ['error' => $this->translator->trans('error.two_factor.restart_passkey')],
+            );
         }
 
         try {
@@ -158,7 +173,7 @@ final class TwoFactorController extends Controller
                 'method' => 'passkey',
             ]);
 
-            return $this->json($response->withStatus(422), ['error' => implode(' ', $exception->errors())]);
+            return $this->json($response->withStatus(422), ['error' => $this->errorSentence($exception)]);
         } finally {
             // One challenge, one use, however it ended.
             $this->session->remove(self::CHALLENGE_SESSION_KEY);
@@ -190,7 +205,7 @@ final class TwoFactorController extends Controller
         $target = $this->twoFactor->pendingTarget();
         $this->completeSignIn($user, $method, $ipAddress);
 
-        $this->flash('success', sprintf('Welcome back, %s.', $user->displayName));
+        $this->flash('success', 'flash.welcome_back', ['name' => $user->displayName]);
 
         return $this->redirect($response, $target);
     }
@@ -210,7 +225,7 @@ final class TwoFactorController extends Controller
     }
 
     /**
-     * @param array<string, string> $errors
+     * @param array<string, ValidationError> $errors
      */
     private function renderChallenge(
         ServerRequestInterface $request,

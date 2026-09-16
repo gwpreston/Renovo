@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Auth;
 
+use App\I18n\Translator;
 use App\Controller\Controller;
 use App\Domain\AuditAction;
 use App\Repository\AuthAttemptRepository;
@@ -37,12 +38,13 @@ final class PasskeyLoginController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly WebAuthnService $webAuthn,
         private readonly SignInService $signIn,
         private readonly RateLimiter $rateLimiter,
         private readonly AuditLogService $audit,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function options(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -54,7 +56,10 @@ final class PasskeyLoginController extends Controller
         );
 
         if ($remaining > 0) {
-            return $this->json($response->withStatus(429), ['error' => 'Too many attempts. Try again shortly.']);
+            return $this->json(
+                $response->withStatus(429),
+                ['error' => $this->translator->trans('error.auth.throttled_short')],
+            );
         }
 
         // No user: the allow-list is empty and the browser offers whichever
@@ -82,7 +87,7 @@ final class PasskeyLoginController extends Controller
 
             $this->audit->recordAnonymous(AuditAction::LoginFailed, 'passkey', null, ['method' => 'passkey']);
 
-            return $this->json($response->withStatus(422), ['error' => implode(' ', $exception->errors())]);
+            return $this->json($response->withStatus(422), ['error' => $this->errorSentence($exception)]);
         } finally {
             $this->session->remove(self::CHALLENGE_SESSION_KEY);
         }
@@ -91,7 +96,7 @@ final class PasskeyLoginController extends Controller
 
         if (!$user->isVerified()) {
             return $this->json($response->withStatus(403), [
-                'error' => 'Confirm your email address before signing in.',
+                'error' => $this->translator->trans('error.auth.unverified_short'),
             ]);
         }
 
@@ -103,7 +108,7 @@ final class PasskeyLoginController extends Controller
 
         $this->signIn->establish($user, SignInService::METHOD_PASSKEY);
 
-        $this->flash('success', sprintf('Welcome back, %s.', $user->displayName));
+        $this->flash('success', 'flash.welcome_back', ['name' => $user->displayName]);
 
         return $this->json($response, ['redirect' => $this->safeTarget($request)]);
     }

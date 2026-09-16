@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\I18n\Translator;
 use App\Domain\Entity\Subscription;
 use App\Security\Scope;
 use App\Support\Clock;
@@ -46,6 +47,7 @@ final class CalendarFeedService
     public function __construct(
         private readonly SubscriptionService $subscriptions,
         private readonly MoneyFormatter $money,
+        private readonly Translator $translator,
         private readonly Clock $clock,
     ) {
     }
@@ -69,8 +71,10 @@ final class CalendarFeedService
             'PRODID:' . self::PRODUCT_ID,
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
-            'X-WR-CALNAME:' . $this->escape($instanceName . ' subscriptions'),
-            'X-WR-CALDESC:' . $this->escape('Renewals, trial conversions and cancellation deadlines.'),
+            'X-WR-CALNAME:' . $this->escape(
+                $this->translator->trans('calendar.feed_name', ['instance' => $instanceName]),
+            ),
+            'X-WR-CALDESC:' . $this->escape($this->translator->trans('calendar.feed_description')),
         ];
 
         foreach ($this->subscriptions->allForStats($scope, activeOnly: true) as $subscription) {
@@ -103,12 +107,14 @@ final class CalendarFeedService
                 $events[] = [
                     'uid' => $this->uid($subscription->id, 'trial', $subscription->trialEndDate),
                     'date' => $subscription->trialEndDate,
-                    'summary' => sprintf('%s trial ends (%s)', $subscription->name, $converts),
-                    'description' => sprintf(
-                        'The free trial of %s ends and it converts to %s.',
-                        $subscription->name,
-                        $converts,
-                    ),
+                    'summary' => $this->translator->trans('calendar.trial_summary', [
+                        'name' => $subscription->name,
+                        'amount' => $converts,
+                    ]),
+                    'description' => $this->translator->trans('calendar.trial_description', [
+                        'name' => $subscription->name,
+                        'amount' => $converts,
+                    ]),
                 ];
             }
         }
@@ -117,8 +123,14 @@ final class CalendarFeedService
             $events[] = [
                 'uid' => $this->uid($subscription->id, 'payment', $date),
                 'date' => $date,
-                'summary' => sprintf('%s — %s', $subscription->name, $price),
-                'description' => sprintf('%s is due (%s).', $subscription->name, $price),
+                'summary' => $this->translator->trans('calendar.payment_summary', [
+                    'name' => $subscription->name,
+                    'amount' => $price,
+                ]),
+                'description' => $this->translator->trans('calendar.payment_description', [
+                    'name' => $subscription->name,
+                    'amount' => $price,
+                ]),
             ];
         }
 
@@ -127,12 +139,11 @@ final class CalendarFeedService
             $events[] = [
                 'uid' => $this->uid($subscription->id, 'cancel-by', $deadline),
                 'date' => $deadline,
-                'summary' => sprintf('Last day to cancel %s', $subscription->name),
-                'description' => sprintf(
-                    'Cancel %s on or before this date to avoid the next charge of %s.',
-                    $subscription->name,
-                    $price,
-                ),
+                'summary' => $this->translator->trans('calendar.cancel_summary', ['name' => $subscription->name]),
+                'description' => $this->translator->trans('calendar.cancel_description', [
+                    'name' => $subscription->name,
+                    'amount' => $price,
+                ]),
             ];
         }
 

@@ -72,7 +72,7 @@ final class AttachmentService
         // two answers differ only for a split participant, and that is exactly
         // the case this rejects.
         if ($subscription === null || !$this->subscriptions->isWritable($scope, $subscriptionId)) {
-            throw ValidationException::field('subscription_id', 'That subscription does not exist.');
+            throw ValidationException::field('subscription_id', 'error.subscription.not_found');
         }
 
         $stored = $this->storage->store($file, $subscription->householdId);

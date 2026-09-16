@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Security\SessionInterface;
 use App\Service\CancellationService;
 use App\Service\CatchUpService;
@@ -19,10 +20,11 @@ final class CancellationController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly CancellationService $cancellations,
         private readonly CatchUpService $catchUp,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

@@ -30,13 +30,9 @@ enum DigestMode: string
         return $this !== self::Immediate;
     }
 
-    public function label(): string
+    public function labelKey(): string
     {
-        return match ($this) {
-            self::Immediate => 'As they happen',
-            self::Weekly => 'Weekly summary',
-            self::Monthly => 'Monthly summary',
-        };
+        return 'digest_mode.' . $this->value;
     }
 
     /**

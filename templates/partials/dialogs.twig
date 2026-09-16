@@ -1,0 +1,56 @@
+{#
+    The two dialogs every signed-in page carries: quick-add and the shortcut
+    list. Native <dialog>, so focus trapping and Escape are the browser's job
+    rather than ours.
+#}
+{% if can(scope, 'subscription.create') %}
+    <dialog id="quick-add" class="dialog" aria-labelledby="quick-add-title">
+        <div class="dialog-header">
+            <h2 id="quick-add-title">{{ t('subscriptions.add_subscription') }}</h2>
+            <button type="button" class="button-icon" data-closes-dialog="quick-add"
+                    aria-label="{{ t('action.close') }}">×</button>
+        </div>
+
+        {#
+            Filled from /subscriptions/new on first open. The form that lands
+            here is the same one the full page renders, so there is one
+            definition of what a subscription needs.
+        #}
+        <div class="dialog-body" data-quick-add-body data-url="/subscriptions/new">
+            <p class="muted">{{ t('quick_add.loading') }}</p>
+        </div>
+    </dialog>
+{% endif %}
+
+<dialog id="shortcut-help" class="dialog" aria-labelledby="shortcut-help-title">
+    <div class="dialog-header">
+        <h2 id="shortcut-help-title">{{ t('shortcuts.title') }}</h2>
+        <button type="button" class="button-icon" data-closes-dialog="shortcut-help"
+                aria-label="{{ t('action.close') }}">×</button>
+    </div>
+
+    <dl class="shortcut-list">
+        <dt><kbd>n</kbd></dt>
+        <dd>{{ t('shortcuts.new') }}</dd>
+        <dt><kbd>/</kbd></dt>
+        <dd>{{ t('shortcuts.search') }}</dd>
+        <dt><kbd>?</kbd></dt>
+        <dd>{{ t('shortcuts.help') }}</dd>
+        <dt><kbd>g</kbd> <kbd>d</kbd></dt>
+        <dd>{{ t('nav.dashboard') }}</dd>
+        <dt><kbd>g</kbd> <kbd>s</kbd></dt>
+        <dd>{{ t('nav.subscriptions') }}</dd>
+        <dt><kbd>g</kbd> <kbd>c</kbd></dt>
+        <dd>{{ t('nav.calendar') }}</dd>
+        <dt><kbd>g</kbd> <kbd>b</kbd></dt>
+        <dd>{{ t('nav.budgets') }}</dd>
+        <dt><kbd>g</kbd> <kbd>f</kbd></dt>
+        <dd>{{ t('nav.forecast') }}</dd>
+        <dt><kbd>g</kbd> <kbd>t</kbd></dt>
+        <dd>{{ t('nav.stats') }}</dd>
+        <dt><kbd>g</kbd> <kbd>a</kbd></dt>
+        <dd>{{ t('nav.alerts') }}</dd>
+        <dt><kbd>Esc</kbd></dt>
+        <dd>{{ t('shortcuts.close') }}</dd>
+    </dl>
+</dialog>

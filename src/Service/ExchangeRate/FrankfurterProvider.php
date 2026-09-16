@@ -34,9 +34,9 @@ final class FrankfurterProvider extends HttpRateProvider
         return 'Frankfurter';
     }
 
-    public function description(): string
+    public function descriptionKey(): string
     {
-        return 'Free, no account needed. European Central Bank reference rates, updated each working day.';
+        return 'rate_provider.frankfurter';
     }
 
     public function requiresApiKey(): bool

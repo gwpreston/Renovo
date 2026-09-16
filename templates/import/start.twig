@@ -1,38 +1,36 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Import — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('nav.import') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
-    <h1>Import subscriptions</h1>
+    <h1>{{ t('import_start.import_subscriptions') }}</h1>
 
     <p class="muted">
-        Bring in a CSV or JSON file from a spreadsheet or another tracker. You choose which
-        column feeds which field, and you see exactly what will be created before anything is
-        written.
+        {{ t('import_start.intro') }}
     </p>
 
     <section class="card">
         <form method="post" action="/import" enctype="multipart/form-data" class="stack">
             {{ csrf_field() }}
 
-            <label for="import-file">File</label>
+            <label for="import-file">{{ t('field.file') }}</label>
             <input type="file" id="import-file" name="file" accept=".csv,.json,.txt,text/csv,application/json"
                    required>
             <p class="field-hint">
-                CSV (comma, semicolon or tab separated) or JSON, up to {{ max_rows }} rows.
+                {{ t('import_start.file_hint', {'rows': max_rows}) }}
             </p>
 
-            <label for="import-preset">It came from</label>
+            <label for="import-preset">{{ t('import_start.it_came_from') }}</label>
             <select id="import-preset" name="preset">
                 {% for key, label in presets %}
                     <option value="{{ key }}">{{ label }}</option>
                 {% endfor %}
             </select>
             <p class="field-hint">
-                Only a starting point for the column mapping — you confirm it on the next screen.
+                {{ t('import_start.source_hint') }}
             </p>
 
-            <button type="submit" class="button button-primary">Continue</button>
+            <button type="submit" class="button button-primary">{{ t('action.continue') }}</button>
         </form>
     </section>
 {% endblock %}

@@ -79,11 +79,11 @@ final class TotpService
     {
         $enrolment = $this->totp->find($user->id);
         if ($enrolment === null) {
-            throw ValidationException::field('code', 'Start the setup again — no pending enrolment was found.');
+            throw ValidationException::field('code', 'error.totp.no_pending');
         }
 
         if ($enrolment['confirmed_at'] !== null) {
-            throw ValidationException::field('code', 'An authenticator app is already set up for this account.');
+            throw ValidationException::field('code', 'error.totp.already_set_up');
         }
 
         $step = Totp::verify(
@@ -93,7 +93,7 @@ final class TotpService
         );
 
         if ($step === null) {
-            throw ValidationException::field('code', 'That code is not correct. Check the clock on your device.');
+            throw ValidationException::field('code', 'error.totp.code_incorrect');
         }
 
         $this->totp->confirm($user->id, $this->clock->now(), $step);
@@ -189,7 +189,7 @@ final class TotpService
     private function assertPassword(User $user, string $password): void
     {
         if (!$this->hasher->verify($password, $user->passwordHash)) {
-            throw ValidationException::field('password', 'That password is not correct.');
+            throw ValidationException::field('password', 'error.password.incorrect');
         }
     }
 }

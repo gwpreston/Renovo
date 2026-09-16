@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Api;
 
+use App\I18n\Translator;
 use App\Application\Api\Resource;
 use App\Domain\Entity\Category;
 use App\Domain\Entity\Tag;
@@ -25,9 +26,11 @@ use Slim\Exception\HttpNotFoundException;
 final class TaxonomyApiController extends ApiController
 {
     public function __construct(
+        Translator $translator,
         private readonly CategoryService $categories,
         private readonly TagService $tags,
     ) {
+        parent::__construct($translator);
     }
 
     public function categories(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -113,7 +116,7 @@ final class TaxonomyApiController extends ApiController
             }
         }
 
-        throw new HttpNotFoundException($request, 'No such category.');
+        throw new HttpNotFoundException($request, $this->translator->trans('error.api.category_not_found'));
     }
 
     /**

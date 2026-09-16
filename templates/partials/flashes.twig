@@ -1,7 +1,12 @@
+{#
+    A flash carries a translation key and its arguments, not a finished
+    sentence: it is queued by one request and rendered by the next, which may
+    not be in the same language.
+#}
 {% if flashes is defined and flashes %}
     <ul class="flashes" role="status">
         {% for flash in flashes %}
-            <li class="flash flash-{{ flash.type }}">{{ flash.message }}</li>
+            <li class="flash flash-{{ flash.type }}">{{ t(flash.message, flash.parameters|default({})) }}</li>
         {% endfor %}
     </ul>
 {% endif %}

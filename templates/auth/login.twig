@@ -1,25 +1,25 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Sign in — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('auth_login.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <section class="card narrow">
-        <h1>Sign in</h1>
+        <h1>{{ t('auth_login.title') }}</h1>
 
         <form method="post" action="/login" class="stack">
             {{ csrf_field() }}
             <input type="hidden" name="next" value="{{ next }}">
 
-            <label for="email">Email address</label>
+            <label for="email">{{ t('field.email') }}</label>
             <input type="email" id="email" name="email" value="{{ values.email|default('') }}"
                    autocomplete="username" required autofocus>
-            {% if errors.email is defined %}<p class="field-error">{{ errors.email }}</p>{% endif %}
+            {% if errors.email is defined %}<p class="field-error">{{ error_message(errors.email) }}</p>{% endif %}
 
-            <label for="password">Password</label>
+            <label for="password">{{ t('field.password') }}</label>
             <input type="password" id="password" name="password" autocomplete="current-password" required>
-            {% if errors.password is defined %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+            {% if errors.password is defined %}<p class="field-error">{{ error_message(errors.password) }}</p>{% endif %}
 
-            <button type="submit" class="button button-primary">Sign in</button>
+            <button type="submit" class="button button-primary">{{ t('auth_login.title') }}</button>
         </form>
 
         {#
@@ -29,14 +29,14 @@
         <hr class="divider">
 
         <div class="stack">
-            <button type="button" class="button" id="passkey-button">Sign in with a passkey</button>
+            <button type="button" class="button" id="passkey-button">{{ t('auth_login.passkey') }}</button>
             <p class="field-error" id="passkey-error" hidden></p>
         </div>
 
         <p class="muted">
-            <a href="/forgot-password">Forgotten your password?</a>
+            <a href="/forgot-password">{{ t('auth_login.forgotten_your_password') }}</a>
             {% if registration_allowed %}
-                · <a href="/register">Create an account</a>
+                · <a href="/register">{{ t('auth_register.title') }}</a>
             {% endif %}
         </p>
     </section>

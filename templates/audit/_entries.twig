@@ -4,18 +4,18 @@
 <table class="table">
     <thead>
     <tr>
-        <th>When</th>
-        <th>Event</th>
-        <th>Who</th>
-        <th>Detail</th>
-        <th>Address</th>
+        <th scope="col">{{ t('field.when') }}</th>
+        <th scope="col">{{ t('field.event') }}</th>
+        <th scope="col">{{ t('field.who') }}</th>
+        <th scope="col">{{ t('field.detail') }}</th>
+        <th scope="col">{{ t('field.address') }}</th>
     </tr>
     </thead>
     <tbody>
     {% for entry in entries %}
         <tr class="{{ entry.action.isFailure ? 'row-warning' : '' }}">
-            <td>{{ entry.occurredAt|date('j M Y H:i') }}</td>
-            <td>{{ entry.action.label }}</td>
+            <td>{{ entry.occurredAt|local_date('d MMM y HH:mm') }}</td>
+            <td>{{ t(entry.action.labelKey()) }}</td>
             <td>
                 {{ entry.actorName }}
                 {% if entry.targetLabel and entry.targetUserId != entry.actorUserId %}
@@ -27,28 +27,28 @@
         </tr>
     {% else %}
         <tr>
-            <td colspan="5" class="muted">No events recorded.</td>
+            <td colspan="5" class="muted">{{ t('audit_entries.no_events_recorded') }}</td>
         </tr>
     {% endfor %}
     </tbody>
 </table>
 
 {% if pages > 1 %}
-    <nav class="pagination">
+    <nav class="pagination" aria-label="{{ t('subscriptions_list.pagination') }}">
         {% if page > 1 %}
             <a class="button button-quiet"
                href="/audit?page={{ page - 1 }}{{ selected_action ? '&action=' ~ selected_action : '' }}"
                hx-get="/audit?page={{ page - 1 }}{{ selected_action ? '&action=' ~ selected_action : '' }}"
-               hx-target="#audit-entries" hx-push-url="true">Newer</a>
+               hx-target="#audit-entries" hx-push-url="true">{{ t('action.newer') }}</a>
         {% endif %}
 
-        <span class="muted">Page {{ page }} of {{ pages }} · {{ total }} entr{{ total == 1 ? 'y' : 'ies' }}</span>
+        <span class="muted">{{ t('audit_entries.pager', {'page': page, 'pages': pages, 'total': total}) }}</span>
 
         {% if page < pages %}
             <a class="button button-quiet"
                href="/audit?page={{ page + 1 }}{{ selected_action ? '&action=' ~ selected_action : '' }}"
                hx-get="/audit?page={{ page + 1 }}{{ selected_action ? '&action=' ~ selected_action : '' }}"
-               hx-target="#audit-entries" hx-push-url="true">Older</a>
+               hx-target="#audit-entries" hx-push-url="true">{{ t('action.older') }}</a>
         {% endif %}
     </nav>
 {% endif %}

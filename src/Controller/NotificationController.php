@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Domain\AlertType;
 use App\Domain\DigestMode;
 use App\Notification\NotifierException;
@@ -32,12 +33,13 @@ final class NotificationController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly NotificationSettingsService $settings,
         private readonly NotifierRegistry $notifiers,
         private readonly NotificationDispatcher $dispatcher,
         private readonly NotificationLogRepository $log,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -61,7 +63,7 @@ final class NotificationController extends Controller
             );
         }
 
-        $this->flash('success', 'Notification channel added. Send a test message to check it works.');
+        $this->flash('success', 'flash.channel_added');
 
         return $this->redirectAfterWrite($request, $response, '/settings/notifications');
     }
@@ -85,7 +87,7 @@ final class NotificationController extends Controller
             );
         }
 
-        $this->flash('success', 'Channel updated.');
+        $this->flash('success', 'flash.channel_updated');
 
         return $this->redirectAfterWrite($request, $response, '/settings/notifications');
     }
@@ -96,7 +98,7 @@ final class NotificationController extends Controller
         string $id,
     ): ResponseInterface {
         $this->settings->deleteChannel($this->user($request)->id, (int) $id);
-        $this->flash('success', 'Channel removed.');
+        $this->flash('success', 'flash.channel_removed');
 
         return $this->redirectAfterWrite($request, $response, '/settings/notifications');
     }
@@ -112,12 +114,15 @@ final class NotificationController extends Controller
 
         try {
             $this->dispatcher->sendTest($user, $channel);
-            $this->flash('success', sprintf('Test message sent to %s.', $channel->label));
+            $this->flash('success', 'flash.test_message_sent', ['label' => $channel->label]);
         } catch (NotifierException $exception) {
             // Shown rather than logged and swallowed: the whole point of a test
             // button is to put the failure in front of the person who can fix
             // it, while they are looking at the settings that caused it.
-            $this->flash('error', $exception->getMessage());
+            // A notifier's own words about why a delivery failed: the
+            // channel knows what went wrong and this application does not, so
+            // the sentence is passed through rather than reinvented as a key.
+            $this->flash('error', 'flash.raw', ['message' => $exception->getMessage()]);
         }
 
         return $this->redirectAfterWrite($request, $response, $this->returnTo($request));
@@ -148,7 +153,7 @@ final class NotificationController extends Controller
 
         $this->settings->saveRoutes($user->id, $routes);
 
-        $this->flash('success', 'Notification preferences saved.');
+        $this->flash('success', 'flash.notification_preferences_saved');
 
         return $this->redirectAfterWrite($request, $response, '/settings/notifications');
     }
@@ -180,7 +185,7 @@ final class NotificationController extends Controller
     }
 
     /**
-     * @param array<string, string> $errors
+     * @param array<string, \App\Service\ValidationError> $errors
      * @param array<string, mixed> $submitted
      * @param array<int, list<string>>|null $routes
      * @return array<string, mixed>

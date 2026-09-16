@@ -64,43 +64,15 @@ enum AuditAction: string
     case AttachmentDeleted = 'attachment.deleted';
 
     /**
-     * A short description for the log view. Kept here rather than in a template
-     * because the API phase will want the same wording.
+     * The key for a short description of the event, for the log view.
+     *
+     * Kept here rather than in a template because the API describes the same
+     * events, and a key rather than a sentence because the log is read by
+     * whoever is looking at it, in their own language.
      */
-    public function label(): string
+    public function labelKey(): string
     {
-        return match ($this) {
-            self::LoginSucceeded => 'Signed in',
-            self::LoginFailed => 'Failed sign-in',
-            self::LoginBlocked => 'Sign-in blocked by throttle',
-            self::LoggedOut => 'Signed out',
-            self::TwoFactorSucceeded => 'Second factor accepted',
-            self::TwoFactorFailed => 'Second factor rejected',
-            self::PasswordResetRequested => 'Password reset requested',
-            self::PasswordChanged => 'Password changed',
-            self::EmailVerified => 'Email address verified',
-            self::TotpEnabled => 'Authenticator app enabled',
-            self::TotpDisabled => 'Authenticator app disabled',
-            self::RecoveryCodesRegenerated => 'Recovery codes regenerated',
-            self::RecoveryCodeUsed => 'Recovery code used',
-            self::PasskeyRegistered => 'Passkey added',
-            self::PasskeyRenamed => 'Passkey renamed',
-            self::PasskeyRevoked => 'Passkey revoked',
-            self::SessionRevoked => 'Session revoked',
-            self::SessionsRevokedAll => 'All other sessions revoked',
-            self::InstanceSettingsChanged => 'Instance settings changed',
-            self::HouseholdUpdated => 'Household renamed',
-            self::RoleChanged => 'Household role changed',
-            self::TrustedHostAdded => 'Trusted host added',
-            self::TrustedHostRemoved => 'Trusted host removed',
-            self::ApiTokenIssued => 'API token issued',
-            self::ApiTokenRevoked => 'API token revoked',
-            self::DataImported => 'Data imported',
-            self::BackupExported => 'Backup exported',
-            self::BackupRestored => 'Backup restored',
-            self::AttachmentUploaded => 'Attachment uploaded',
-            self::AttachmentDeleted => 'Attachment deleted',
-        };
+        return 'audit_action.' . $this->value;
     }
 
     /**

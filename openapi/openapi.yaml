@@ -739,6 +739,13 @@ components:
       properties:
         name: { type: string, maxLength: 150 }
         notes: { type: string, nullable: true, maxLength: 5000 }
+        website_url:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: |
+            Where the subscription is managed. A bare host is accepted and
+            stored as https.
         price_minor:
           type: integer
           description: Minor units. £19.99 is 1999.
@@ -825,6 +832,14 @@ components:
               type: string
               nullable: true
               description: Read-only. Set it with the logo endpoints.
+            website_url:
+              type: string
+              nullable: true
+              description: |
+                Where the subscription is managed. Also the domain its icon is
+                fetched from when no logo has been uploaded — that fetch goes
+                through the instance's guarded HTTP client and is cached per
+                domain.
             monthly_minor:
               type: integer
               nullable: true

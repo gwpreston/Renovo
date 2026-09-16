@@ -40,28 +40,9 @@ enum ImportField: string
     case ConvertsToPrice = 'converts_to_price';
     case ConvertsToPriceMinor = 'converts_to_price_minor';
 
-    public function label(): string
+    public function labelKey(): string
     {
-        return match ($this) {
-            self::Name => 'Name',
-            self::Price => 'Price',
-            self::PriceMinor => 'Price in minor units',
-            self::Currency => 'Currency',
-            self::SubscriptionType => 'Type',
-            self::BillingCycle => 'Billing cycle',
-            self::CycleDays => 'Days between payments',
-            self::NextPaymentDate => 'Next payment date',
-            self::StartDate => 'Start date',
-            self::Category => 'Category',
-            self::Tags => 'Tags',
-            self::Notes => 'Notes',
-            self::IsActive => 'Active',
-            self::NoticePeriodAmount => 'Notice period',
-            self::NoticePeriodUnit => 'Notice period unit',
-            self::TrialEndDate => 'Trial end date',
-            self::ConvertsToPrice => 'Price after trial',
-            self::ConvertsToPriceMinor => 'Price after trial, in minor units',
-        };
+        return 'import_field.' . $this->value . '.label';
     }
 
     /**
@@ -73,18 +54,17 @@ enum ImportField: string
         return $this === self::Name || $this === self::Price;
     }
 
-    public function hint(): string
+    /**
+     * A key for the note beside the column chooser, or null where the field
+     * needs no explaining.
+     */
+    public function hintKey(): ?string
     {
         return match ($this) {
-            self::Price => 'A decimal amount, for example 9.99',
-            self::PriceMinor, self::ConvertsToPriceMinor =>
-                'A whole number of pence or cents, for example 999. Takes precedence over the decimal price.',
-            self::BillingCycle => 'weekly, monthly, quarterly, yearly or a number of days',
-            self::NextPaymentDate, self::StartDate, self::TrialEndDate => 'YYYY-MM-DD or DD/MM/YYYY',
-            self::Tags => 'Separated by commas or semicolons',
-            self::IsActive => 'yes/no, true/false or 1/0',
-            self::NoticePeriodUnit => 'days, weeks or months',
-            default => '',
+            self::Price, self::PriceMinor, self::ConvertsToPriceMinor, self::BillingCycle,
+            self::NextPaymentDate, self::StartDate, self::TrialEndDate, self::Tags,
+            self::IsActive, self::NoticePeriodUnit => 'import_field.' . $this->value . '.hint',
+            default => null,
         };
     }
 }

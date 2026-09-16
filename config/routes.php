@@ -17,6 +17,7 @@ use App\Application\Middleware\ApiAuthenticationMiddleware;
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Application\Middleware\FeedAuthenticationMiddleware;
 use App\Application\Middleware\RequirePermissionMiddleware;
+use App\Application\Ops\OpsPath;
 use App\Controller\Api\AttachmentApiController;
 use App\Controller\Api\CalendarApiController;
 use App\Controller\Api\MeApiController;
@@ -34,12 +35,16 @@ use App\Controller\Auth\RegisterController;
 use App\Controller\Auth\TwoFactorController;
 use App\Controller\Auth\VerifyEmailController;
 use App\Controller\BudgetController;
+use App\Controller\CalendarController;
 use App\Controller\CancellationController;
 use App\Controller\CategoryController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
 use App\Controller\ImportController;
 use App\Controller\NotificationController;
+use App\Controller\Ops\HealthController;
+use App\Controller\Ops\MetricsController;
+use App\Controller\SavedViewController;
 use App\Controller\SecurityController;
 use App\Controller\SettingsController;
 use App\Controller\SetupController;
@@ -68,6 +73,22 @@ return static function (App $app): void {
     // ----------------------------------------------------------------------
     $app->get('/setup', [SetupController::class, 'showForm'])->setName('setup');
     $app->post('/setup', [SetupController::class, 'submit']);
+
+    // ----------------------------------------------------------------------
+    // Operations: liveness, readiness and metrics
+    //
+    // Outside every group. The caller is an orchestrator or a scrape job with
+    // no session, no token in a cookie and nothing to be redirected with — and
+    // SetupGuardMiddleware lets these three through explicitly, so a container
+    // that has never been configured still reports honestly instead of
+    // answering "302 to /setup".
+    //
+    // Liveness and readiness are open and say only whether this instance is
+    // serving. /metrics has numbers on it and is not: see MetricsController.
+    // ----------------------------------------------------------------------
+    $app->get(OpsPath::LIVENESS, [HealthController::class, 'live'])->setName('healthz');
+    $app->get(OpsPath::READINESS, [HealthController::class, 'ready'])->setName('readyz');
+    $app->get(OpsPath::METRICS, [MetricsController::class, 'show'])->setName('metrics');
 
     // ----------------------------------------------------------------------
     // Public authentication routes
@@ -193,6 +214,23 @@ return static function (App $app): void {
             ->setName('forecast')
             ->add($requires(Permission::ViewSubscriptions));
 
+        // ------------------------------------------------------------------
+        // Phase 6: the calendar, saved views and preferences
+        // ------------------------------------------------------------------
+        $group->get('/calendar', [CalendarController::class, 'index'])
+            ->setName('calendar')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        // A saved view is one account's way of looking at the list. It names
+        // no permission for the same reason a theme does not — but it is still
+        // a list of subscriptions, so seeing the page it points at needs the
+        // usual role.
+        $group->post('/saved-views', [SavedViewController::class, 'create'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post('/saved-views/{id:[0-9]+}/delete', [SavedViewController::class, 'delete'])
+            ->add($requires(Permission::ViewSubscriptions));
+
         $group->get('/cancellations', [CancellationController::class, 'index'])
             ->setName('cancellations')
             ->add($requires(Permission::ViewSubscriptions));
@@ -219,8 +257,11 @@ return static function (App $app): void {
 
         $group->get('/settings', [SettingsController::class, 'index'])->setName('settings');
 
-        // Changing your own theme needs no permission beyond being signed in.
+        // Changing your own appearance settings needs no permission beyond
+        // being signed in: they alter what one account sees and nothing that
+        // anybody else does.
         $group->post('/settings/theme', [SettingsController::class, 'updateTheme']);
+        $group->post('/settings/preferences', [SettingsController::class, 'updatePreferences']);
 
         $group->post('/settings/household', [SettingsController::class, 'updateHousehold'])
             ->add($requires(Permission::ManageHousehold));

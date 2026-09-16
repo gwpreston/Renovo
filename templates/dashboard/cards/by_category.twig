@@ -1,0 +1,24 @@
+{# Where the money goes. #}
+{% if stats.by_category %}
+    <section class="card">
+        <h2>{{ t('dashboard.by_category') }}</h2>
+        <table class="table">
+            <thead>
+            <tr>
+                <th scope="col">{{ t('field.category') }}</th>
+                <th scope="col">{{ t('field.subscriptions') }}</th>
+                <th scope="col" class="numeric">{{ t('field.per_month') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in stats.by_category %}
+                <tr>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.count }}</td>
+                    <td class="numeric">{{ row.monthly_minor|money(row.currency) }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endif %}

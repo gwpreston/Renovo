@@ -1,28 +1,76 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="{{ current_user.theme|default('system') }}">
+<html lang="{{ locale_tag() }}"
+      data-theme="{{ current_user.theme|default('system') }}"
+      data-density="{{ current_user.density|default('comfortable') }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ instance_name }}{% endblock %}</title>
     <link rel="stylesheet" href="/assets/app.css">
     <script src="/assets/htmx.min.js" defer></script>
+    <script src="/assets/app.js" defer></script>
 </head>
 {#
     The CSRF token rides on every htmx request via hx-headers, so a fragment
     swap does not need a hidden field of its own.
 #}
 <body hx-headers='{"X-CSRF-Token": "{{ csrf_token() }}"}'>
+{#
+    The strings this page's JavaScript needs, from the same catalogue the
+    server reads — see AppExtension::jsTranslations(). Rendered as JSON in a
+    non-executing script tag rather than assigned in code, so a message
+    containing a quote or a bracket cannot end up being parsed as JavaScript.
+#}
+<script id="renovo-messages" type="application/json">{{ js_translations()|raw }}</script>
+<script>
+    window.renovoI18n = (function () {
+        var messages = {};
+
+        try {
+            messages = JSON.parse(document.getElementById('renovo-messages').textContent);
+        } catch (error) {
+            messages = {};
+        }
+
+        return {
+            /* Named arguments only: the browser-side strings take no plurals. */
+            t: function (key, params) {
+                var message = messages[key] || key;
+
+                if (params) {
+                    Object.keys(params).forEach(function (name) {
+                        message = message.split('{' + name + '}').join(params[name]);
+                    });
+                }
+
+                return message;
+            }
+        };
+    }());
+</script>
+
+<a class="skip-link" href="#main">{{ t('nav.skip_to_content') }}</a>
+
 {% if current_user %}
     {% include 'partials/nav.twig' %}
 {% endif %}
 
-<main class="container">
+<main class="container" id="main" tabindex="-1">
     {% include 'partials/flashes.twig' %}
     {% block content %}{% endblock %}
 </main>
 
 <footer class="container footer">
     <span>{{ instance_name }}</span>
+    {% if current_user %}
+        <button type="button" class="button-link" data-opens-dialog="shortcut-help">
+            {{ t('shortcuts.title') }}
+        </button>
+    {% endif %}
 </footer>
+
+{% if current_user %}
+    {% include 'partials/dialogs.twig' %}
+{% endif %}
 </body>
 </html>

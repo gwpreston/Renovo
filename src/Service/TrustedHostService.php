@@ -59,23 +59,19 @@ final class TrustedHostService implements TrustedTargets
         $pattern = strtolower(trim($pattern));
 
         if ($pattern === '') {
-            throw ValidationException::field('pattern', 'Enter a host name, address or CIDR range.');
+            throw ValidationException::field('pattern', 'error.trusted_host.required');
         }
 
         if (mb_strlen($pattern) > 255) {
-            throw ValidationException::field('pattern', 'That is too long to be a host or range.');
+            throw ValidationException::field('pattern', 'error.trusted_host.too_long');
         }
 
         if (!$this->isValidPattern($pattern)) {
-            throw ValidationException::field(
-                'pattern',
-                'Enter a host name (gotify.lan), a suffix (.lan), an address (192.168.1.10) '
-                . 'or a range (100.64.0.0/10).',
-            );
+            throw ValidationException::field('pattern', 'error.trusted_host.invalid');
         }
 
         if ($this->repository->exists($pattern)) {
-            throw ValidationException::field('pattern', 'That is already on the list.');
+            throw ValidationException::field('pattern', 'error.trusted_host.duplicate');
         }
 
         $note = $note === null || trim($note) === '' ? null : mb_substr(trim($note), 0, 255);

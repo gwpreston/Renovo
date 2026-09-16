@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Middleware;
 
+use App\Application\Ops\OpsPath;
 use App\Service\SetupService;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -18,6 +19,11 @@ use Psr\Http\Server\RequestHandlerInterface;
  * The second direction matters as much as the first: leaving /setup reachable
  * after the instance is live would let anybody create a second instance
  * administrator.
+ *
+ * The health and metrics endpoints are exempt. A container orchestrator polls
+ * them before anybody has opened a browser, and a liveness probe that answered
+ * "302 to /setup" would report a healthy instance as broken — or, worse, be
+ * followed, and count a redirect as a pass.
  *
  * `/setup/notifications` is the exception, and deliberately so. It is the
  * wizard's second step, it runs *after* the administrator account exists, and
@@ -47,7 +53,7 @@ final class SetupGuardMiddleware implements MiddlewareInterface
         $isSetupRoute = str_starts_with($path, '/setup') && !$isPostSetupStep;
         $isAsset = str_starts_with($path, '/assets');
 
-        if ($isAsset) {
+        if ($isAsset || OpsPath::matches($request)) {
             return $handler->handle($request);
         }
 

@@ -1,14 +1,13 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Map columns — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('import_map.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
-    <h1>Map the columns</h1>
+    <h1>{{ t('import_map.map_the_columns') }}</h1>
 
     <p class="muted">
-        <strong>{{ filename }}</strong> — {{ row_count }} row{{ row_count == 1 ? '' : 's' }}.
-        Suggested using “{{ preset_label }}”. Change anything that looks wrong; “Do not import”
-        leaves a field empty.
+        <strong>{{ filename }}</strong> —
+        {{ t('import_map.summary', {'rows': row_count, 'preset': preset_label}) }}
     </p>
 
     <form method="post" action="/import/preview" class="stack">
@@ -19,9 +18,9 @@
                 <table class="table">
                     <thead>
                     <tr>
-                        <th>Field</th>
-                        <th>Column in your file</th>
-                        <th>Example</th>
+                        <th scope="col">{{ t('import_map.field') }}</th>
+                        <th scope="col">{{ t('import_map.column_in_your_file') }}</th>
+                        <th scope="col">{{ t('import_map.example') }}</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -30,15 +29,15 @@
                         <tr>
                             <td>
                                 <label for="map-{{ field.value }}">
-                                    {{ field.label() }}{{ field.isRequired() ? ' *' : '' }}
+                                    {{ t(field.labelKey()) }}{{ field.isRequired() ? ' *' : '' }}
                                 </label>
-                                {% if field.hint() %}
-                                    <span class="field-hint">{{ field.hint() }}</span>
+                                {% if field.hintKey() %}
+                                    <span class="field-hint">{{ t(field.hintKey()) }}</span>
                                 {% endif %}
                             </td>
                             <td>
                                 <select id="map-{{ field.value }}" name="mapping[{{ field.value }}]">
-                                    <option value="">Do not import</option>
+                                    <option value="">{{ t('import_map.do_not_import') }}</option>
                                     {% for header in headers %}
                                         <option value="{{ header }}"
                                                 {{ chosen == header ? 'selected' : '' }}>{{ header }}</option>
@@ -56,12 +55,12 @@
                 </table>
             </div>
 
-            <p class="field-hint">* Name and price are required. A row missing either is skipped.</p>
+            <p class="field-hint">{{ t('import_map.required_note') }}</p>
         </section>
 
         <div class="form-actions">
-            <button type="submit" class="button button-primary">Preview</button>
-            <button type="submit" class="button button-quiet" formaction="/import/cancel">Cancel</button>
+            <button type="submit" class="button button-primary">{{ t('action.preview') }}</button>
+            <button type="submit" class="button button-quiet" formaction="/import/cancel">{{ t('action.cancel') }}</button>
         </div>
     </form>
 {% endblock %}

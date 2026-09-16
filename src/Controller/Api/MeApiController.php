@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Api;
 
+use App\I18n\Translator;
 use App\Domain\Permission;
 use App\Security\PermissionService;
 use Psr\Http\Message\ResponseInterface;
@@ -20,8 +21,11 @@ use Psr\Http\Message\ServerRequestInterface;
  */
 final class MeApiController extends ApiController
 {
-    public function __construct(private readonly PermissionService $permissions)
-    {
+    public function __construct(
+        Translator $translator,
+        private readonly PermissionService $permissions,
+    ) {
+        parent::__construct($translator);
     }
 
     public function show(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

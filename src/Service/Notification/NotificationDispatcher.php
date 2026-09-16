@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Notification;
 
+use App\I18n\Translator;
 use App\Domain\AlertType;
 use App\Domain\Entity\NotificationChannel;
 use App\Domain\Entity\User;
@@ -50,6 +51,7 @@ final class NotificationDispatcher
         private readonly NotificationRateLimiter $limiter,
         private readonly LoggerInterface $logger,
         private readonly Clock $clock,
+        private readonly Translator $translator,
         private readonly int $maxAttempts = 3,
     ) {
     }
@@ -131,10 +133,10 @@ final class NotificationDispatcher
             Alert::SUBJECT_TEST,
             0,
             'test:' . $this->clock->now()->format('Y-m-d\TH:i:s'),
-            'Test notification from Renovo',
+            $this->translator->trans('alert.test.title'),
             [
-                'If you are reading this, ' . $channel->label . ' is configured correctly.',
-                'Renewal reminders, trial warnings, cancellation deadlines and budget alerts will arrive here.',
+                $this->translator->trans('alert.test.line', ['channel' => $channel->label]),
+                $this->translator->trans('alert.test.what_arrives'),
             ],
         );
 

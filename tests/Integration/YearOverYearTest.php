@@ -30,6 +30,7 @@ use App\Service\SubscriptionService;
 use App\Service\TrialService;
 use App\Support\FrozenClock;
 use App\Tests\Support\FakeHttpClient;
+use App\Tests\Support\TestLogoFetcher;
 use DateTimeImmutable;
 use Psr\Log\NullLogger;
 use Slim\Psr7\Factory\RequestFactory;
@@ -79,6 +80,7 @@ final class YearOverYearTest extends DatabaseTestCase
             $this->subscriptions,
             new CategoryRepository($this->db),
             new TagRepository($this->db),
+            TestLogoFetcher::silent($this->db, $clock),
             $memberships,
             $this->priceHistory,
             $this->db,

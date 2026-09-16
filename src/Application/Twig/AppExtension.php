@@ -15,11 +15,17 @@ use App\Domain\Role;
 use App\Domain\SplitMode;
 use App\Domain\SubscriptionType;
 use App\Domain\Entity\NotificationChannel;
+use App\I18n\LocaleContext;
+use App\I18n\Translator;
 use App\Notification\NotifierRegistry;
 use App\Security\CsrfTokenManager;
 use App\Security\PermissionService;
 use App\Security\Scope;
+use App\Service\ValidationError;
 use App\Support\MoneyFormatter;
+use DateTimeImmutable;
+use DateTimeInterface;
+use IntlDateFormatter;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
@@ -30,20 +36,34 @@ use Twig\TwigFunction;
  * Formatting and permission *questions* live here; no decision does. `can()`
  * exists so a template can hide a control the user cannot use, and is never
  * the thing that stops them using it — that is RequirePermissionMiddleware.
+ *
+ * Every label helper resolves an enum to a translation key and hands it to the
+ * translator. The keys were already there — `BillingCycle::labelKey()` and its
+ * siblings have returned `cycle.monthly` since Phase 1 — waiting for something
+ * to look them up in.
  */
 final class AppExtension extends AbstractExtension
 {
+    /** The catalogue prefix whose messages are handed to the browser. */
+    private const JS_PREFIX = 'js.';
+
     public function __construct(
         private readonly MoneyFormatter $money,
         private readonly PermissionService $permissions,
         private readonly CsrfTokenManager $csrf,
         private readonly NotifierRegistry $notifiers,
+        private readonly Translator $translator,
+        private readonly LocaleContext $locale,
     ) {
     }
 
     public function getFunctions(): array
     {
         return [
+            new TwigFunction('t', $this->translate(...)),
+            new TwigFunction('locale_tag', fn (): string => $this->locale->tag()),
+            new TwigFunction('js_translations', $this->jsTranslations(...)),
+            new TwigFunction('error_message', $this->errorMessage(...)),
             new TwigFunction('csrf_token', fn (): string => $this->csrf->token()),
             new TwigFunction('csrf_field', $this->csrfField(...), ['is_safe' => ['html']]),
             new TwigFunction('can', $this->can(...)),
@@ -65,7 +85,45 @@ final class AppExtension extends AbstractExtension
     {
         return [
             new TwigFilter('money', $this->formatMoney(...)),
+            new TwigFilter('local_date', $this->formatDate(...)),
         ];
+    }
+
+    /**
+     * A date in the reader's own locale.
+     *
+     * Twig's `date` filter formats with PHP's own names — "September", "Mon" —
+     * whatever language the page is in, which is the one part of a translated
+     * page that stays stubbornly English. This hands the job to ICU, which
+     * knows that a French reader wants "septembre" and that a Japanese one
+     * wants the year first.
+     *
+     * The patterns are ICU skeletons, not strftime: `d MMM y` is "4 Sep 2026"
+     * in English and "4 sept. 2026" in French, with the order decided by the
+     * locale rather than by this file.
+     */
+    public function formatDate(
+        DateTimeInterface|string|null $value,
+        string $pattern = 'd MMM y',
+    ): string {
+        if ($value === null || $value === '') {
+            return $this->translator->trans('common.none_symbol');
+        }
+
+        $date = $value instanceof DateTimeInterface ? $value : new DateTimeImmutable($value);
+
+        $formatter = new IntlDateFormatter(
+            $this->locale->get(),
+            IntlDateFormatter::NONE,
+            IntlDateFormatter::NONE,
+        );
+        $formatter->setPattern($pattern);
+
+        $formatted = $formatter->format($date);
+
+        // ICU can refuse a pattern it does not understand; the ISO date is a
+        // worse answer than the formatted one and a better one than nothing.
+        return $formatted === false ? $date->format('Y-m-d') : $formatted;
     }
 
     public function formatMoney(?int $amountMinor, string $currency): string
@@ -73,9 +131,64 @@ final class AppExtension extends AbstractExtension
         return $this->money->formatMinor($amountMinor ?? 0, $currency);
     }
 
+    /**
+     * @param array<string, string|int|float> $parameters
+     */
+    public function translate(string $key, array $parameters = []): string
+    {
+        return $this->translator->trans($key, $parameters);
+    }
+
+    /**
+     * The strings the page's JavaScript needs, as a JSON object.
+     *
+     * Rendered into the layout from the same catalogue the server reads, so
+     * the completeness check covers them — a separate JavaScript catalogue
+     * would be one nothing checks, and it would drift the first time somebody
+     * added a string to only one of the two.
+     */
+    public function jsTranslations(): string
+    {
+        $messages = [];
+        foreach ($this->translator->group(self::JS_PREFIX) as $key => $message) {
+            $messages[substr($key, strlen(self::JS_PREFIX))] = $message;
+        }
+
+        // The tag-escaping flags matter: this JSON is written inside a
+        // <script> element, and a message containing "</script>" would
+        // otherwise end the element early.
+        return json_encode(
+            $messages,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP,
+        );
+    }
+
+    /**
+     * One field's validation failure, as a sentence.
+     *
+     * The service raised a key; this is where it becomes words. Doing it here
+     * rather than inside the service is what keeps a Translator out of twenty
+     * constructors, and it is the same resolution the API's error envelope
+     * performs on the same object.
+     */
+    public function errorMessage(ValidationError|string|null $error): string
+    {
+        if ($error === null) {
+            return '';
+        }
+
+        if (is_string($error)) {
+            return $this->translator->trans($error);
+        }
+
+        return $this->translator->trans($error->key, $error->parameters);
+    }
+
     public function alertTypeLabel(?string $value): string
     {
-        return AlertType::tryFromString($value)?->label() ?? (string) $value;
+        $type = AlertType::tryFromString($value);
+
+        return $type === null ? (string) $value : $this->translator->trans($type->labelKey());
     }
 
     /**
@@ -119,47 +232,41 @@ final class AppExtension extends AbstractExtension
         return $scope !== null && $resolved !== null && $this->permissions->allows($scope, $resolved);
     }
 
+    /**
+     * A billing cycle, including the custom one, whose message carries the
+     * day count as an ICU plural so that a language with more than two forms
+     * can state all of them.
+     */
     public function cycleLabel(?string $cycle, ?int $cycleDays = null): string
     {
-        return match (BillingCycle::tryFromString($cycle)) {
-            BillingCycle::Weekly => 'Weekly',
-            BillingCycle::Monthly => 'Monthly',
-            BillingCycle::Quarterly => 'Quarterly',
-            BillingCycle::Yearly => 'Yearly',
-            BillingCycle::CustomDays => $cycleDays === null
-                ? 'Custom'
-                : sprintf('Every %d days', $cycleDays),
-            null => '—',
-        };
+        $resolved = BillingCycle::tryFromString($cycle);
+
+        if ($resolved === null) {
+            return $this->translator->trans('common.none_symbol');
+        }
+
+        if ($resolved === BillingCycle::CustomDays) {
+            return $cycleDays === null
+                ? $this->translator->trans('cycle.custom')
+                : $this->translator->trans($resolved->labelKey(), ['days' => $cycleDays]);
+        }
+
+        return $this->translator->trans($resolved->labelKey());
     }
 
     public function typeLabel(?string $type): string
     {
-        return match (SubscriptionType::tryFrom($type ?? '')) {
-            SubscriptionType::Recurring => 'Recurring',
-            SubscriptionType::OneOff => 'One-off',
-            SubscriptionType::Lifetime => 'Lifetime',
-            null => '—',
-        };
+        return $this->label(SubscriptionType::tryFrom($type ?? '')?->labelKey());
     }
 
     public function roleLabel(?string $role): string
     {
-        return match (Role::tryFrom($role ?? '')) {
-            Role::OwnerAdmin => 'Owner / Admin',
-            Role::Editor => 'Editor',
-            Role::Viewer => 'Viewer',
-            null => '—',
-        };
+        return $this->label(Role::tryFrom($role ?? '')?->labelKey());
     }
 
     public function isolationLabel(?string $mode): string
     {
-        return match (IsolationMode::tryFrom($mode ?? '')) {
-            IsolationMode::Shared => 'Shared — everyone in a household sees its subscriptions',
-            IsolationMode::Isolated => 'Isolated — each member sees only their own',
-            null => '—',
-        };
+        return $this->label(IsolationMode::tryFrom($mode ?? '')?->labelKey());
     }
 
     /**
@@ -168,47 +275,39 @@ final class AppExtension extends AbstractExtension
      */
     public function priceChangeLabel(?string $source): string
     {
-        return match (PriceChangeSource::tryFrom($source ?? '')) {
-            PriceChangeSource::Initial => 'Starting price',
-            PriceChangeSource::Manual => 'Price changed',
-            PriceChangeSource::Scheduled => 'Scheduled change',
-            PriceChangeSource::TrialConversion => 'Free trial ended',
-            PriceChangeSource::CurrencyChange => 'Currency converted',
-            null => 'Price',
-        };
+        $resolved = PriceChangeSource::tryFrom($source ?? '');
+
+        return $this->translator->trans($resolved?->labelKey() ?? 'price_change.unknown');
     }
 
     public function splitLabel(?string $mode): string
     {
-        return match (SplitMode::tryFrom($mode ?? '')) {
-            SplitMode::None => 'Not split',
-            SplitMode::Equal => 'Split equally',
-            SplitMode::Custom => 'Split by share',
-            null => '—',
-        };
+        return $this->label(SplitMode::tryFrom($mode ?? '')?->labelKey());
     }
 
     public function budgetPeriodLabel(?string $period): string
     {
-        return match (BudgetPeriod::tryFrom($period ?? '')) {
-            BudgetPeriod::Monthly => 'Next month',
-            BudgetPeriod::Annual => 'Next 12 months',
-            null => '—',
-        };
+        return $this->label(BudgetPeriod::tryFrom($period ?? '')?->labelKey());
     }
 
     public function noticeLabel(?int $amount, ?string $unit): string
     {
-        if ($amount === null || $amount <= 0) {
-            return 'None';
+        $period = NoticePeriod::of($amount, $unit);
+
+        if (!$period->isSet()) {
+            return $this->translator->trans('notice.none');
         }
 
-        $label = match ($unit) {
-            NoticePeriod::UNIT_WEEKS => 'week',
-            NoticePeriod::UNIT_MONTHS => 'month',
-            default => 'day',
-        };
+        return $this->translator->trans($period->labelKey(), ['count' => (int) $period->amount]);
+    }
 
-        return sprintf('%d %s%s', $amount, $label, $amount === 1 ? '' : 's');
+    /**
+     * An enum label, or the em dash that stands for "nothing recorded" — the
+     * one string in this class that is not a sentence and still has to be
+     * translatable, because not every script writes an absence as "—".
+     */
+    private function label(?string $key): string
+    {
+        return $this->translator->trans($key ?? 'common.none_symbol');
     }
 }

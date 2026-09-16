@@ -153,7 +153,7 @@ final class WebAuthnService
         $response = $credential->response;
 
         if (!$response instanceof AuthenticatorAttestationResponse) {
-            throw ValidationException::field('credential', 'That is not a registration response.');
+            throw ValidationException::field('credential', 'error.passkey.not_registration');
         }
 
         try {
@@ -163,14 +163,15 @@ final class WebAuthnService
         } catch (Throwable $exception) {
             throw ValidationException::field(
                 'credential',
-                'That security key could not be registered: ' . $exception->getMessage(),
+                'error.passkey.registration_failed',
+                ['reason' => $exception->getMessage()],
             );
         }
 
         $credentialId = self::encodeId($record->publicKeyCredentialId);
 
         if ($this->credentials->findByCredentialId($credentialId) !== null) {
-            throw ValidationException::field('credential', 'That key is already registered.');
+            throw ValidationException::field('credential', 'error.passkey.already_registered');
         }
 
         $id = $this->credentials->create(
@@ -253,21 +254,21 @@ final class WebAuthnService
         $response = $credential->response;
 
         if (!$response instanceof AuthenticatorAssertionResponse) {
-            throw ValidationException::field('credential', 'That is not an authentication response.');
+            throw ValidationException::field('credential', 'error.passkey.not_authentication');
         }
 
         $stored = $this->credentials->findByCredentialId(self::encodeId($credential->rawId));
         if ($stored === null) {
-            throw ValidationException::field('credential', 'That key is not registered on this instance.');
+            throw ValidationException::field('credential', 'error.passkey.unknown');
         }
 
         if ($expectedUserId !== null && $stored->userId !== $expectedUserId) {
-            throw ValidationException::field('credential', 'That key belongs to a different account.');
+            throw ValidationException::field('credential', 'error.passkey.other_account');
         }
 
         $user = $this->users->findById($stored->userId);
         if ($user === null) {
-            throw ValidationException::field('credential', 'That key is not registered on this instance.');
+            throw ValidationException::field('credential', 'error.passkey.unknown');
         }
 
         $record = $this->deserializeRecord($stored->record);
@@ -285,7 +286,8 @@ final class WebAuthnService
         } catch (Throwable $exception) {
             throw ValidationException::field(
                 'credential',
-                'That key could not be verified: ' . $exception->getMessage(),
+                'error.passkey.verification_failed',
+                ['reason' => $exception->getMessage()],
             );
         }
 
@@ -307,7 +309,7 @@ final class WebAuthnService
         $name = $this->normaliseName($name, 'Passkey');
 
         if (!$this->credentials->rename($user->id, $credentialId, $name)) {
-            throw ValidationException::field('name', 'That passkey no longer exists.');
+            throw ValidationException::field('name', 'error.passkey.missing');
         }
 
         $this->audit->record(AuditAction::PasskeyRenamed, $user, ['name' => $name]);
@@ -320,7 +322,7 @@ final class WebAuthnService
     {
         $credential = $this->credentials->find($user->id, $credentialId);
         if ($credential === null) {
-            throw ValidationException::field('credential', 'That passkey no longer exists.');
+            throw ValidationException::field('credential', 'error.passkey.missing');
         }
 
         $this->credentials->delete($user->id, $credentialId);
@@ -403,7 +405,7 @@ final class WebAuthnService
             /** @var PublicKeyCredential */
             return $this->serializer()->deserialize($responseJson, PublicKeyCredential::class, 'json');
         } catch (Throwable $exception) {
-            throw ValidationException::field('credential', 'The browser sent a response we could not read.');
+            throw ValidationException::field('credential', 'error.passkey.unreadable');
         }
     }
 

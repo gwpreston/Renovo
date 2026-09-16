@@ -1,39 +1,39 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Create an account — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('auth_register.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <section class="card narrow">
-        <h1>Create an account</h1>
+        <h1>{{ t('auth_register.title') }}</h1>
 
         <form method="post" action="/register" class="stack">
             {{ csrf_field() }}
 
-            <label for="display_name">Your name</label>
+            <label for="display_name">{{ t('field.your_name') }}</label>
             <input type="text" id="display_name" name="display_name"
                    value="{{ values.display_name|default('') }}" required autofocus>
-            {% if errors.display_name is defined %}<p class="field-error">{{ errors.display_name }}</p>{% endif %}
+            {% if errors.display_name is defined %}<p class="field-error">{{ error_message(errors.display_name) }}</p>{% endif %}
 
-            <label for="email">Email address</label>
+            <label for="email">{{ t('field.email') }}</label>
             <input type="email" id="email" name="email" value="{{ values.email|default('') }}"
                    autocomplete="username" required>
-            {% if errors.email is defined %}<p class="field-error">{{ errors.email }}</p>{% endif %}
+            {% if errors.email is defined %}<p class="field-error">{{ error_message(errors.email) }}</p>{% endif %}
 
-            <label for="password">Password</label>
+            <label for="password">{{ t('field.password') }}</label>
             <input type="password" id="password" name="password" autocomplete="new-password" required>
-            <p class="hint">At least 10 characters.</p>
-            {% if errors.password is defined %}<p class="field-error">{{ errors.password }}</p>{% endif %}
+            <p class="hint">{{ t('hint.password_length') }}</p>
+            {% if errors.password is defined %}<p class="field-error">{{ error_message(errors.password) }}</p>{% endif %}
 
-            <label for="password_confirm">Confirm password</label>
+            <label for="password_confirm">{{ t('field.confirm_password') }}</label>
             <input type="password" id="password_confirm" name="password_confirm"
                    autocomplete="new-password" required>
             {% if errors.password_confirm is defined %}
-                <p class="field-error">{{ errors.password_confirm }}</p>
+                <p class="field-error">{{ error_message(errors.password_confirm) }}</p>
             {% endif %}
 
-            <button type="submit" class="button button-primary">Create account</button>
+            <button type="submit" class="button button-primary">{{ t('auth_register.create_account') }}</button>
         </form>
 
-        <p class="muted"><a href="/login">Already have an account?</a></p>
+        <p class="muted"><a href="/login">{{ t('auth_register.already_have_an_account') }}</a></p>
     </section>
 {% endblock %}

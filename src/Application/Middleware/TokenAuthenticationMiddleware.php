@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Application\Middleware;
 
 use App\Domain\Entity\ApiToken;
+use App\I18n\LocaleContext;
+use App\I18n\Locales;
+use App\I18n\Translator;
 use App\Domain\Entity\User;
 use App\Security\ScopeFactory;
 use App\Service\ApiTokenService;
@@ -46,6 +49,9 @@ abstract class TokenAuthenticationMiddleware implements MiddlewareInterface
     public function __construct(
         private readonly ApiTokenService $tokens,
         private readonly ScopeFactory $scopeFactory,
+        private readonly LocaleContext $locale,
+        private readonly Locales $locales,
+        private readonly Translator $translator,
     ) {
     }
 
@@ -63,16 +69,21 @@ abstract class TokenAuthenticationMiddleware implements MiddlewareInterface
     {
         $presented = $this->credential($request);
         if ($presented === null || $presented === '') {
-            throw new HttpUnauthorizedException($request, 'This endpoint requires an API token.');
+            throw new HttpUnauthorizedException($request, $this->translator->trans('error.api.token_required'));
         }
 
         $resolved = $this->tokens->authenticate($presented);
         if ($resolved === null) {
             // Expired, revoked, malformed and never-existed are one answer.
-            throw new HttpUnauthorizedException($request, 'That API token is not valid.');
+            throw new HttpUnauthorizedException($request, $this->translator->trans('error.api.token_invalid'));
         }
 
         [$token, $user] = $resolved;
+
+        // The token's holder has a language too. Without this an API error and
+        // an iCalendar feed would always answer in the instance's default,
+        // whatever the account behind the token had chosen.
+        $this->locale->set($this->locales->resolve($user->locale));
 
         $this->assertMayProceed($request, $token);
 
@@ -97,7 +108,7 @@ abstract class TokenAuthenticationMiddleware implements MiddlewareInterface
         $isSafe = in_array(strtoupper($request->getMethod()), self::SAFE_METHODS, true);
 
         if (!$isSafe && (!$this->acceptsWrites() || !$token->abilities->allowsWrites())) {
-            throw new HttpForbiddenException($request, 'This token is read-only.');
+            throw new HttpForbiddenException($request, $this->translator->trans('error.api.token_read_only'));
         }
 
         if (!$this->acceptsWrites() && $token->abilities->allowsWrites()) {
@@ -105,7 +116,10 @@ abstract class TokenAuthenticationMiddleware implements MiddlewareInterface
             // Refused rather than downgraded: a token that can change data does
             // not belong in a calendar subscription URL, and quietly accepting
             // it teaches the operator that it is fine to put one there.
-            throw new HttpForbiddenException($request, 'This endpoint accepts read-only tokens only.');
+            throw new HttpForbiddenException(
+                $request,
+                $this->translator->trans('error.api.read_only_tokens_only'),
+            );
         }
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Application\Http\AttachmentResponse;
 use App\Security\SessionInterface;
 use App\Service\AttachmentService;
@@ -27,10 +28,11 @@ final class AttachmentController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly AttachmentService $attachments,
         private readonly StreamFactoryInterface $streams,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function upload(
@@ -43,7 +45,7 @@ final class AttachmentController extends Controller
         $file = $files['file'] ?? null;
 
         if (!$file instanceof UploadedFileInterface) {
-            $this->flash('error', 'Choose a file to attach.');
+            $this->flash('error', 'flash.attachment_required');
 
             return $this->back($request, $response, $subscriptionId);
         }
@@ -58,11 +60,9 @@ final class AttachmentController extends Controller
                 $file,
                 is_scalar($body['period_date'] ?? null) ? (string) $body['period_date'] : null,
             );
-            $this->flash('success', 'Attachment uploaded.');
+            $this->flash('success', 'flash.attachment_uploaded');
         } catch (ValidationException $exception) {
-            foreach ($exception->errors() as $message) {
-                $this->flash('error', $message);
-            }
+            $this->flashErrors($exception);
         }
 
         return $this->back($request, $response, $subscriptionId);
@@ -102,7 +102,10 @@ final class AttachmentController extends Controller
             (int) $attachmentId,
         );
 
-        $this->flash($deleted ? 'success' : 'error', $deleted ? 'Attachment deleted.' : 'No such attachment.');
+        $this->flash(
+            $deleted ? 'success' : 'error',
+            $deleted ? 'flash.attachment_deleted' : 'flash.attachment_missing',
+        );
 
         return $this->back($request, $response, $subscriptionId);
     }

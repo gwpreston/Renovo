@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Security\SessionInterface;
 use App\Service\BackupService;
 use App\Service\InstanceSettingsService;
@@ -27,11 +28,12 @@ final class BackupController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly BackupService $backups,
         private readonly InstanceSettingsService $settings,
         private readonly StreamFactoryInterface $streams,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -55,7 +57,7 @@ final class BackupController extends Controller
         @unlink($path);
 
         if ($handle === false) {
-            $this->flash('error', 'The backup could not be prepared.');
+            $this->flash('error', 'flash.backup_failed');
 
             return $this->redirectAfterWrite($request, $response, '/settings/backup');
         }
@@ -78,14 +80,14 @@ final class BackupController extends Controller
         $file = $files['archive'] ?? null;
 
         if (!$file instanceof UploadedFileInterface || $file->getError() !== UPLOAD_ERR_OK) {
-            $this->flash('error', 'Choose a backup archive to restore.');
+            $this->flash('error', 'flash.backup_file_required');
 
             return $this->redirectAfterWrite($request, $response, '/settings/backup');
         }
 
         $temporary = tempnam(sys_get_temp_dir(), 'renovo-upload');
         if ($temporary === false) {
-            $this->flash('error', 'The archive could not be read.');
+            $this->flash('error', 'flash.backup_unreadable');
 
             return $this->redirectAfterWrite($request, $response, '/settings/backup');
         }
@@ -95,24 +97,24 @@ final class BackupController extends Controller
         try {
             $summary = $this->backups->restore($this->scope($request), $this->user($request), $temporary);
         } catch (ValidationException $exception) {
-            foreach ($exception->errors() as $message) {
-                $this->flash('error', $message);
-            }
+            $this->flashErrors($exception);
 
             return $this->redirectAfterWrite($request, $response, '/settings/backup');
         } finally {
             @unlink($temporary);
         }
 
-        $this->flash('success', sprintf(
-            'Restored %d subscription(s), %d categor(y/ies), %d tag(s), %d budget(s) and %d attachment(s).%s',
-            $summary['subscriptions'],
-            $summary['categories'],
-            $summary['tags'],
-            $summary['budgets'],
-            $summary['attachments'],
-            $summary['skipped'] > 0 ? sprintf(' %d item(s) were skipped.', $summary['skipped']) : '',
-        ));
+        $this->flash('success', 'flash.restore_finished', [
+            'subscriptions' => $summary['subscriptions'],
+            'categories' => $summary['categories'],
+            'tags' => $summary['tags'],
+            'budgets' => $summary['budgets'],
+            'attachments' => $summary['attachments'],
+        ]);
+
+        if ($summary['skipped'] > 0) {
+            $this->flash('warning', 'flash.restore_skipped', ['count' => $summary['skipped']]);
+        }
 
         return $this->redirectAfterWrite($request, $response, '/settings/backup');
     }

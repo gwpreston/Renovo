@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Api;
 
+use App\I18n\Translator;
 use App\Application\Api\Resource;
 use App\Application\Http\AttachmentResponse;
 use App\Domain\Entity\Attachment;
@@ -25,9 +26,11 @@ use Slim\Exception\HttpNotFoundException;
 final class AttachmentApiController extends ApiController
 {
     public function __construct(
+        Translator $translator,
         private readonly AttachmentService $attachments,
         private readonly StreamFactoryInterface $streams,
     ) {
+        parent::__construct($translator);
     }
 
     public function index(
@@ -70,7 +73,7 @@ final class AttachmentApiController extends ApiController
 
         $created = $this->attachments->find($this->scope($request), $attachmentId);
         if ($created === null) {
-            throw new HttpNotFoundException($request, 'The attachment could not be read back.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.attachment_unreadable'));
         }
 
         return $this->json($response, ['data' => Resource::attachment($created)], 201);
@@ -87,12 +90,12 @@ final class AttachmentApiController extends ApiController
         // Out of scope and non-existent are the same answer, and the scoped
         // repository has already made them so — `find` returned null either way.
         if ($attachment === null || $attachment->subscriptionId !== (int) $id) {
-            throw new HttpNotFoundException($request, 'No such attachment.');
+            throw new HttpNotFoundException($request, 'flash.attachment_missing');
         }
 
         $path = $this->attachments->absolutePath($attachment);
         if ($path === null) {
-            throw new HttpNotFoundException($request, 'That file is no longer stored.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.attachment_missing'));
         }
 
         return AttachmentResponse::stream($response, $this->streams, $attachment, $path);
@@ -108,7 +111,7 @@ final class AttachmentApiController extends ApiController
         $attachment = $this->attachments->find($scope, (int) $attachmentId);
 
         if ($attachment === null || $attachment->subscriptionId !== (int) $id) {
-            throw new HttpNotFoundException($request, 'No such attachment.');
+            throw new HttpNotFoundException($request, 'flash.attachment_missing');
         }
 
         $this->attachments->delete($scope, $this->user($request), $attachment->id);

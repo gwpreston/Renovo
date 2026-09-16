@@ -95,12 +95,43 @@ final class UserRepository extends AbstractRepository
         );
     }
 
-    public function updateTheme(int $userId, string $theme): void
+    /**
+     * Write a set of display preferences.
+     *
+     * Takes whichever the caller is changing rather than all of them: the
+     * theme switcher in the navigation bar sets one column, and the settings
+     * form sets five. The column names are checked against a fixed list here,
+     * so the keys of an array that arrived from a form cannot reach the SQL.
+     *
+     * @param array<string, string|int> $preferences
+     */
+    public function updatePreferences(int $userId, array $preferences): void
     {
+        $allowed = ['theme', 'locale', 'week_start', 'density', 'landing_view'];
+
+        $assignments = [];
+        $values = [];
+
+        foreach ($preferences as $column => $value) {
+            if (!in_array($column, $allowed, true)) {
+                continue;
+            }
+
+            $assignments[] = $this->quote($column) . ' = :' . $column;
+            $values[$column] = $value;
+        }
+
+        if ($assignments === []) {
+            return;
+        }
+
+        $values['now'] = (new DateTimeImmutable())->format('Y-m-d H:i:s');
+        $values['id'] = $userId;
+
         $this->db->execute(
-            'UPDATE ' . $this->quote('users') . ' SET ' . $this->quote('theme') . ' = :theme, '
+            'UPDATE ' . $this->quote('users') . ' SET ' . implode(', ', $assignments) . ', '
             . $this->quote('updated_at') . ' = :now WHERE ' . $this->quote('id') . ' = :id',
-            ['theme' => $theme, 'now' => (new DateTimeImmutable())->format('Y-m-d H:i:s'), 'id' => $userId],
+            $values,
         );
     }
 
@@ -182,6 +213,10 @@ final class UserRepository extends AbstractRepository
             webauthnHandle: isset($row['webauthn_handle']) && $row['webauthn_handle'] !== ''
                 ? (string) $row['webauthn_handle']
                 : null,
+            locale: (string) ($row['locale'] ?? ''),
+            weekStart: (int) ($row['week_start'] ?? 1),
+            density: (string) ($row['density'] ?? 'comfortable'),
+            landingView: (string) ($row['landing_view'] ?? 'dashboard'),
         );
     }
 }

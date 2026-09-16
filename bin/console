@@ -17,14 +17,18 @@ declare(strict_types=1);
  * already done rather than doing it again.
  */
 
+use App\I18n\CatalogChecker;
+use App\I18n\Translator;
 use App\Persistence\PdoSessionHandler;
 use App\Repository\AuditLogRepository;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\NotificationLogRepository;
 use App\Repository\TokenRepository;
+use App\Service\DemoSeedService;
 use App\Service\ExchangeRate\RateProviderException;
 use App\Service\ExchangeRateService;
 use App\Service\ImportService;
+use App\Service\InstanceSettingsService;
 use App\Service\Notification\ReminderRunner;
 use App\Support\Clock;
 use Psr\Container\ContainerInterface;
@@ -57,6 +61,12 @@ switch ($command) {
         // The scheduler's daily work: catch up each household's dates, find
         // what is due, dispatch it once, and re-evaluate every budget.
         $totals = $container->get(ReminderRunner::class)->run();
+
+        // Recorded after the run, not before: the readiness endpoint reports
+        // when the scheduler last *finished*, and a run that died halfway
+        // through should not look like a healthy one.
+        $container->get(InstanceSettingsService::class)
+            ->markSchedulerRun($container->get(Clock::class)->now());
 
         $out(sprintf(
             'Checked %d user(s); %d alert(s) found, %d message(s) sent.',
@@ -135,6 +145,77 @@ switch ($command) {
         ));
         exit(0);
 
+    case 'demo:seed':
+        // Builds the household a read-only demonstration shows. Safe to run
+        // twice: it does nothing at all if the demo account already exists.
+        $result = $container->get(DemoSeedService::class)->seed();
+
+        if (!$result['created']) {
+            $out(sprintf('The demo account (%s) already exists. Nothing was changed.', $result['email']));
+            exit(0);
+        }
+
+        $out(sprintf('Created %s with %d subscriptions.', $result['email'], $result['subscriptions']));
+        $out('Password: ' . (string) $result['password']);
+        $out('');
+        $out('This is shown once. Turn on "Read-only demonstration" under Settings → Instance');
+        $out('to close the instance to writes.');
+        exit(0);
+
+    case 'i18n:check':
+        // Every locale against the base, both directions. Runs in CI beside
+        // the linters: it needs no database, so a locale that has drifted is
+        // reported in seconds rather than after the full suite.
+        $reports = $container->get(CatalogChecker::class)->check();
+
+        if ($reports === []) {
+            $out(sprintf(
+                'Only the base locale (%s) is present. Nothing to compare.',
+                Translator::BASE_LOCALE,
+            ));
+            exit(0);
+        }
+
+        $drifted = 0;
+
+        foreach ($reports as $report) {
+            if ($report->isComplete()) {
+                $out(sprintf('%-8s OK   %d/%d keys', $report->locale, $report->translated(), $report->total));
+
+                continue;
+            }
+
+            $drifted++;
+
+            $out(sprintf(
+                '%-8s FAIL %d/%d keys, %d missing, %d not in the base catalogue',
+                $report->locale,
+                $report->translated(),
+                $report->total,
+                count($report->missing),
+                count($report->extra),
+            ));
+
+            foreach ($report->missing as $key) {
+                $out('           missing: ' . $key);
+            }
+
+            foreach ($report->extra as $key) {
+                $out('           extra:   ' . $key);
+            }
+        }
+
+        if ($drifted > 0) {
+            fwrite(STDERR, sprintf(
+                "\n%d locale(s) differ from the base catalogue translations/%s.php.\n",
+                $drifted,
+                Translator::BASE_LOCALE,
+            ));
+            exit(1);
+        }
+
+        exit(0);
+
     case 'list':
     case '--help':
     case '-h':
@@ -145,6 +226,8 @@ switch ($command) {
         $out('  reminders:run        Send due reminders, trial, cancel-by and budget alerts');
         $out('  rates:refresh        Fetch and cache exchange rates from the configured provider');
         $out('  maintenance:prune    Delete expired sessions, tokens, throttle, notification and audit records');
+        $out('  i18n:check           Compare every locale with the base catalogue and report any drift');
+        $out('  demo:seed            Create the demonstration household and its subscriptions');
         exit(0);
 
     default:

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
 use App\Service\AttachmentService;
@@ -29,6 +30,7 @@ final class SubscriptionMoneyController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly SubscriptionService $subscriptions,
         private readonly PriceHistoryService $priceHistory,
         private readonly SplitService $splits,
@@ -36,7 +38,7 @@ final class SubscriptionMoneyController extends Controller
         private readonly MembershipRepository $memberships,
         private readonly AttachmentService $attachments,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     /**
@@ -82,7 +84,7 @@ final class SubscriptionMoneyController extends Controller
             return $this->redirectWithErrors($request, $response, (int) $id, $exception);
         }
 
-        $this->flash('success', 'Price change scheduled.');
+        $this->flash('success', 'flash.price_change_scheduled');
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions/' . (int) $id . '/money');
     }
@@ -98,7 +100,7 @@ final class SubscriptionMoneyController extends Controller
             return $this->redirectWithErrors($request, $response, (int) $id, $exception);
         }
 
-        $this->flash('success', 'Cost split updated.');
+        $this->flash('success', 'flash.split_updated');
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions/' . (int) $id . '/money');
     }
@@ -129,7 +131,7 @@ final class SubscriptionMoneyController extends Controller
         string $id,
     ): ResponseInterface {
         $this->usage->reset($this->scope($request), (int) $id);
-        $this->flash('success', 'Usage count reset.');
+        $this->flash('success', 'flash.usage_reset');
 
         return $this->redirectAfterWrite($request, $response, $this->backTo($request, (int) $id));
     }
@@ -161,9 +163,7 @@ final class SubscriptionMoneyController extends Controller
         int $id,
         ValidationException $exception,
     ): ResponseInterface {
-        foreach ($exception->errors() as $message) {
-            $this->flash('error', $message);
-        }
+        $this->flashErrors($exception);
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions/' . $id . '/money');
     }

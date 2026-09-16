@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Api;
 
+use App\I18n\Translator;
 use App\Application\Api\Resource;
 use App\Application\Api\SubscriptionPayload;
 use App\Application\Middleware\TokenAuthenticationMiddleware;
@@ -38,10 +39,12 @@ final class SubscriptionApiController extends ApiController
     private const MAX_PER_PAGE = 100;
 
     public function __construct(
+        Translator $translator,
         private readonly SubscriptionService $subscriptions,
         private readonly LogoStorage $logos,
         private readonly Clock $clock,
     ) {
+        parent::__construct($translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -96,7 +99,7 @@ final class SubscriptionApiController extends ApiController
     ): ResponseInterface {
         $subscription = $this->subscriptions->find($this->scope($request), (int) $id);
         if ($subscription === null) {
-            throw new HttpNotFoundException($request, 'No such subscription.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
         return $this->json($response, ['data' => Resource::subscription($subscription, $this->clock->today())]);
@@ -114,7 +117,7 @@ final class SubscriptionApiController extends ApiController
         $created = $this->subscriptions->find($scope, $id);
         if ($created === null) {
             // Only reachable if the row vanished between the two statements.
-            throw new HttpNotFoundException($request, 'The subscription could not be read back.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_unreadable'));
         }
 
         return $this->json(
@@ -137,7 +140,7 @@ final class SubscriptionApiController extends ApiController
 
         $existing = $this->subscriptions->find($scope, $id);
         if ($existing === null) {
-            throw new HttpNotFoundException($request, 'No such subscription.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
         $this->subscriptions->update(
@@ -148,7 +151,7 @@ final class SubscriptionApiController extends ApiController
 
         $updated = $this->subscriptions->find($scope, $id);
         if ($updated === null) {
-            throw new HttpNotFoundException($request, 'No such subscription.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
         return $this->json($response, ['data' => Resource::subscription($updated, $this->clock->today())]);
@@ -163,7 +166,7 @@ final class SubscriptionApiController extends ApiController
         $id = (int) $id;
 
         if ($this->subscriptions->find($scope, $id) === null) {
-            throw new HttpNotFoundException($request, 'No such subscription.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
         $this->subscriptions->delete($scope, $id);
@@ -188,7 +191,7 @@ final class SubscriptionApiController extends ApiController
 
         $existing = $this->subscriptions->find($scope, $id);
         if ($existing === null) {
-            throw new HttpNotFoundException($request, 'No such subscription.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
         $file = $request->getUploadedFiles()['logo'] ?? null;
@@ -205,7 +208,7 @@ final class SubscriptionApiController extends ApiController
 
         $updated = $this->subscriptions->find($scope, $id);
         if ($updated === null) {
-            throw new HttpNotFoundException($request, 'No such subscription.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
         return $this->json($response, ['data' => Resource::subscription($updated, $this->clock->today())]);
@@ -221,7 +224,7 @@ final class SubscriptionApiController extends ApiController
 
         $existing = $this->subscriptions->find($scope, $id);
         if ($existing === null) {
-            throw new HttpNotFoundException($request, 'No such subscription.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
         $this->subscriptions->setLogo($scope, $id, null);

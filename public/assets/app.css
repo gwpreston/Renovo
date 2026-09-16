@@ -494,3 +494,244 @@ tr.is-passed > td { background: var(--error-bg); }
 .row-warning td:first-child { border-left: 3px solid var(--warning); padding-left: 0.5rem; }
 
 .pagination { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-top: 1rem; }
+
+/* ------------------------------------------------------- phase 6: polish */
+
+/*
+    The skip link. Off-screen until focused, which is the only time it is of
+    use to anybody: a keyboard user should not have to tab through the whole
+    navigation bar on every page to reach the content.
+*/
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 10;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) 0;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+/* The main region takes focus from the skip link but never shows an outline
+   for a click, which would look like an error. */
+main:focus { outline: none; }
+
+/*
+    Density. One attribute on <html>, and the difference is padding and type
+    scale — no template renders a different table, so a compact list is the
+    same markup a screen reader already knows how to read.
+*/
+:root[data-density="compact"] {
+    --row-padding-y: 0.3rem;
+    --card-padding: 0.75rem;
+    --stack-gap: 0.75rem;
+}
+
+:root[data-density="compact"] .table th,
+:root[data-density="compact"] .table td {
+    padding: var(--row-padding-y) 0.5rem;
+}
+
+:root[data-density="compact"] .card { padding: var(--card-padding); }
+:root[data-density="compact"] .table { font-size: 0.875rem; }
+:root[data-density="compact"] .renewals li { padding: 0.2rem 0; }
+:root[data-density="compact"] .cell-name .logo { display: none; }
+
+/* --------------------------------------------------------------- calendar */
+
+.calendar-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: baseline;
+    justify-content: space-between;
+}
+
+.calendar-header h2 { margin: 0; }
+.calendar-nav { display: flex; gap: 0.5rem; }
+
+.calendar-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+
+.calendar-grid th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 0.35rem 0.25rem;
+    text-align: left;
+}
+
+.calendar-grid abbr { text-decoration: none; }
+
+.calendar-day {
+    vertical-align: top;
+    border: 1px solid var(--border);
+    padding: 0.35rem;
+    /* A month is five or six rows; a fixed minimum keeps the grid from
+       collapsing into strips on a quiet month. */
+    height: 5.5rem;
+    width: 14.28%;
+}
+
+.calendar-day.is-empty { background: var(--bg); border-color: transparent; }
+.calendar-day.is-today { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.calendar-date { font-size: 0.8rem; color: var(--text-muted); display: block; }
+.calendar-day.is-today .calendar-date { color: var(--accent); font-weight: 600; }
+
+.calendar-events { list-style: none; margin: 0.25rem 0 0; padding: 0; display: grid; gap: 0.2rem; }
+
+.calendar-event {
+    font-size: 0.75rem;
+    line-height: 1.3;
+    padding: 0.2rem 0.3rem;
+    border-radius: 6px;
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+}
+
+.calendar-event.is-trial { border-left-color: var(--warning); }
+.calendar-event a { display: block; color: inherit; text-decoration: none; font-weight: 600; }
+.calendar-event a:hover { text-decoration: underline; }
+.calendar-amount { color: var(--text-muted); }
+
+/*
+    On a phone a seven-column grid is unreadable, so the same markup becomes a
+    list: each day that has something on it is a block, and the empty cells are
+    dropped entirely.
+*/
+@media (max-width: 720px) {
+    .calendar-grid, .calendar-grid tbody, .calendar-grid tr, .calendar-grid td { display: block; width: auto; }
+    .calendar-grid thead { display: none; }
+    .calendar-day { height: auto; border: 0; border-bottom: 1px solid var(--border); padding: 0.5rem 0; }
+    .calendar-day.is-empty { display: none; }
+    .calendar-date::after { content: ' ' attr(data-weekday); }
+}
+
+/* ----------------------------------------------------------- saved views */
+
+.saved-views { display: grid; gap: 0.6rem; }
+.saved-view-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.saved-view-list a { text-decoration: none; }
+
+.button-icon {
+    background: none;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0.15rem;
+}
+
+.button-icon:hover { color: var(--danger); }
+
+/* ------------------------------------------------- dashboard card layout */
+
+.card-layout { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+
+.card-layout-row {
+    display: grid;
+    grid-template-columns: 1fr 4.5rem auto;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.card-layout-name { font-weight: 400; }
+.card-layout-row input[type="number"] { width: 100%; }
+
+/* ---------------------------------------------------------------- dialogs */
+
+.dialog {
+    width: min(42rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 4rem);
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    padding: 1rem;
+    box-shadow: var(--shadow);
+}
+
+.dialog::backdrop { background: rgba(16, 24, 40, 0.45); }
+
+.dialog-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.dialog-header h2 { margin: 0; }
+.dialog .card { box-shadow: none; border: 0; padding: 0; }
+
+.shortcut-list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.4rem 1rem;
+    margin: 0;
+    align-items: baseline;
+}
+
+.shortcut-list dt { margin: 0; }
+.shortcut-list dd { margin: 0; color: var(--text-muted); }
+
+kbd {
+    font-family: inherit;
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0.05rem 0.35rem;
+    background: var(--bg);
+}
+
+/* A button that reads as a link — the shortcut help in the footer. */
+.button-link {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--text-muted);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.footer { display: flex; gap: 1rem; justify-content: space-between; flex-wrap: wrap; }
+
+/* ---------------------------------------------------- accessibility notes */
+
+/*
+    Motion. Nothing here animates much, but htmx applies transitions during a
+    swap and a dialog opens with one; a reader who has asked their system for
+    less motion should get none.
+*/
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/*
+    Forced-colours mode replaces the palette wholesale, and an outline drawn
+    with a custom property disappears with it. `currentColor` survives.
+*/
+@media (forced-colors: active) {
+    input:focus-visible, select:focus-visible, textarea:focus-visible,
+    button:focus-visible, a:focus-visible {
+        outline: 2px solid currentColor;
+    }
+
+    .calendar-day.is-today { outline: 2px solid currentColor; }
+}

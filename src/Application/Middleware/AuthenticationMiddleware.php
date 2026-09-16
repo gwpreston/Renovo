@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Middleware;
 
+use App\I18n\LocaleContext;
+use App\I18n\Locales;
 use App\Repository\UserRepository;
 use App\Security\ScopeFactory;
 use App\Security\SessionInterface;
@@ -33,6 +35,8 @@ final class AuthenticationMiddleware implements MiddlewareInterface
         private readonly UserRepository $users,
         private readonly ScopeFactory $scopeFactory,
         private readonly ResponseFactoryInterface $responseFactory,
+        private readonly LocaleContext $locale,
+        private readonly Locales $locales,
     ) {
     }
 
@@ -47,6 +51,12 @@ final class AuthenticationMiddleware implements MiddlewareInterface
 
             return $this->redirectToLogin($request);
         }
+
+        // A stated preference outranks the Accept-Language header that
+        // LocaleMiddleware acted on, and it is only knowable here: the user is
+        // not loaded until this point. An empty or withdrawn preference
+        // resolves back to the instance default.
+        $this->locale->set($this->locales->resolve($user->locale));
 
         $householdId = $this->session->get(self::SESSION_HOUSEHOLD_ID);
         $scope = $this->scopeFactory->forUser($user, is_int($householdId) ? $householdId : null);

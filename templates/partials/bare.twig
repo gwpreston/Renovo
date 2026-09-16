@@ -1,0 +1,8 @@
+{#
+    A layout that is not one: the content block and nothing else.
+
+    Used when htmx (or the quick-add dialog) asks for a page that would
+    otherwise arrive wrapped in a full document — a nested <html> swapped into
+    a corner of the page is the classic way to get one.
+#}
+{% block content %}{% endblock %}

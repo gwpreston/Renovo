@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Auth;
 
+use App\I18n\Translator;
 use App\Controller\Controller;
 use App\Security\SessionInterface;
 use App\Service\AuthService;
@@ -19,10 +20,11 @@ final class RegisterController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly AuthService $auth,
         private readonly InstanceSettingsService $settings,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function showForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -67,7 +69,7 @@ final class RegisterController extends Controller
     private function assertRegistrationOpen(ServerRequestInterface $request): void
     {
         if (!$this->settings->registrationAllowed()) {
-            throw new HttpNotFoundException($request, 'Registration is closed on this instance.');
+            throw new HttpNotFoundException($request, $this->translator->trans('error.auth.registration_closed'));
         }
     }
 }

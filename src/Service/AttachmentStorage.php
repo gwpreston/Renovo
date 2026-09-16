@@ -76,16 +76,16 @@ final class AttachmentStorage
     public function store(UploadedFileInterface $file, int $householdId): array
     {
         if ($file->getError() === UPLOAD_ERR_NO_FILE) {
-            throw ValidationException::field('file', 'Choose a file to upload.');
+            throw ValidationException::field('file', 'error.file.required');
         }
 
         if ($file->getError() !== UPLOAD_ERR_OK) {
-            throw ValidationException::field('file', 'The file could not be uploaded. Try again.');
+            throw ValidationException::field('file', 'error.upload.failed');
         }
 
         $size = $file->getSize();
         if ($size !== null && $size > $this->maxBytes) {
-            throw ValidationException::field('file', $this->tooLargeMessage());
+            throw $this->tooLarge();
         }
 
         $temporary = tempnam(sys_get_temp_dir(), 'attach');
@@ -101,14 +101,14 @@ final class AttachmentStorage
         if ($actualSize > $this->maxBytes) {
             @unlink($temporary);
 
-            throw ValidationException::field('file', $this->tooLargeMessage());
+            throw $this->tooLarge();
         }
 
         $mime = $this->detectType($temporary);
         if ($mime === null) {
             @unlink($temporary);
 
-            throw ValidationException::field('file', 'Upload a PDF, PNG, JPEG, WebP or GIF file.');
+            throw ValidationException::field('file', 'error.attachment.type');
         }
 
         return [
@@ -132,12 +132,12 @@ final class AttachmentStorage
     {
         $size = (int) @filesize($sourcePath);
         if ($size <= 0 || $size > $this->maxBytes) {
-            throw ValidationException::field('file', $this->tooLargeMessage());
+            throw $this->tooLarge();
         }
 
         $mime = $this->detectType($sourcePath);
         if ($mime === null) {
-            throw ValidationException::field('file', 'The archive contains a file of an unsupported type.');
+            throw ValidationException::field('file', 'error.attachment.archive_type');
         }
 
         $destination = $this->place($sourcePath, $householdId, self::ALLOWED_TYPES[$mime], copy: true);
@@ -219,8 +219,10 @@ final class AttachmentStorage
         return $detected;
     }
 
-    private function tooLargeMessage(): string
+    private function tooLarge(): ValidationException
     {
-        return sprintf('The file must be %d MB or smaller.', max(1, intdiv($this->maxBytes, 1024 * 1024)));
+        return ValidationException::field('file', 'error.attachment.too_large', [
+            'megabytes' => max(1, intdiv($this->maxBytes, 1024 * 1024)),
+        ]);
     }
 }

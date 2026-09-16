@@ -22,9 +22,13 @@ use App\Repository\InstanceSettingsRepository;
 use App\Service\MailerService;
 use App\Service\PasswordResetService;
 use App\Service\RateLimiter;
+use App\Service\ValidationError;
 use App\Service\ValidationException;
 use App\Support\FrozenClock;
+use App\I18n\CatalogLoader;
+use App\I18n\Locales;
 use App\Tests\Support\ArraySession;
+use App\Tests\Support\TestTranslator;
 use App\Tests\Support\RecordingMailer;
 use Psr\Log\NullLogger;
 
@@ -69,6 +73,8 @@ final class AuthFlowTest extends DatabaseTestCase
             new NullLogger(),
         );
 
+        $locales = new Locales(new CatalogLoader(dirname(__DIR__, 2) . '/translations'), 'en_GB');
+
         $this->auth = new AuthService(
             $this->users,
             new HouseholdRepository($this->db),
@@ -78,6 +84,8 @@ final class AuthFlowTest extends DatabaseTestCase
             $limiter,
             $mailService,
             $settings,
+            TestTranslator::create(),
+            $locales,
             $audit,
             $this->clock,
             'https://renovo.test',
@@ -92,6 +100,8 @@ final class AuthFlowTest extends DatabaseTestCase
             $mailService,
             $this->auth,
             $settings,
+            TestTranslator::create(),
+            $locales,
             $audit,
             new SessionDirectoryService(new SessionRepository($this->db), $audit, $this->clock),
             new ArraySession(),
@@ -114,7 +124,7 @@ final class AuthFlowTest extends DatabaseTestCase
             $this->auth->attemptLogin('new@example.test', self::PASSWORD, '10.0.0.1');
             self::fail('An unverified account must not be able to sign in.');
         } catch (ValidationException $exception) {
-            self::assertStringContainsString('Confirm your email', implode(' ', $exception->errors()));
+            self::assertSame(['error.auth.unverified'], self::keysOf($exception));
         }
 
         $token = $this->mailer->lastToken();
@@ -166,7 +176,7 @@ final class AuthFlowTest extends DatabaseTestCase
             $this->auth->attemptLogin('locked@example.test', self::PASSWORD, '10.0.0.99');
             self::fail('The account should be locked out.');
         } catch (ValidationException $exception) {
-            self::assertStringContainsString('Too many attempts', implode(' ', $exception->errors()));
+            self::assertSame(['error.auth.throttled'], self::keysOf($exception));
         }
     }
 
@@ -216,7 +226,7 @@ final class AuthFlowTest extends DatabaseTestCase
             $this->resets->request('spam@example.test', '198.51.100.9');
             self::fail('A fourth reset request should be refused.');
         } catch (ValidationException $exception) {
-            self::assertStringContainsString('Too many reset requests', implode(' ', $exception->errors()));
+            self::assertSame(['error.reset.throttled'], self::keysOf($exception));
         }
     }
 
@@ -235,7 +245,7 @@ final class AuthFlowTest extends DatabaseTestCase
             $resets->request('one@example.test', '198.51.100.50');
             self::fail('The address should be throttled regardless of which account is named.');
         } catch (ValidationException $exception) {
-            self::assertStringContainsString('Too many reset requests', implode(' ', $exception->errors()));
+            self::assertSame(['error.reset.throttled'], self::keysOf($exception));
         }
 
         // A different address is unaffected.
@@ -334,6 +344,8 @@ final class AuthFlowTest extends DatabaseTestCase
             new MailerService($this->mailer, new NullLogger(), 'noreply@example.test', 'Test'),
             $this->auth,
             new InstanceSettingsService(new InstanceSettingsRepository($this->db)),
+            TestTranslator::create(),
+            new Locales(new CatalogLoader(dirname(__DIR__, 2) . '/translations'), 'en_GB'),
             $this->audit(),
             new SessionDirectoryService(new SessionRepository($this->db), $this->audit(), $this->clock),
             new ArraySession(),
@@ -357,5 +369,22 @@ final class AuthFlowTest extends DatabaseTestCase
     {
         $user = $this->auth->register($email, 'Test User', self::PASSWORD, self::PASSWORD);
         $this->users->markEmailVerified($user->id, $this->clock->now());
+    }
+
+    /**
+     * The translation keys a validation failure carried.
+     *
+     * Asserting on keys rather than on English: the sentence is a property of
+     * the catalogue and may be reworded, while the key is the thing the code
+     * actually decided.
+     *
+     * @return list<string>
+     */
+    private static function keysOf(ValidationException $exception): array
+    {
+        return array_values(array_map(
+            static fn (ValidationError $error): string => $error->key,
+            $exception->errors(),
+        ));
     }
 }

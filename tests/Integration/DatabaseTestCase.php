@@ -94,6 +94,12 @@ abstract class DatabaseTestCase extends TestCase
         foreach (
             [
             'audit_log',
+            'http_metrics',
+            'logo_cache',
+            'saved_views',
+            'dashboard_cards',
+            'api_tokens',
+            'attachments',
             'webauthn_credentials',
             'recovery_codes',
             'user_totp',

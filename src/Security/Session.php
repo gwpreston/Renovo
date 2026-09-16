@@ -108,17 +108,17 @@ final class Session implements SessionInterface
         return session_id() ?: '';
     }
 
-    public function flash(string $type, string $message): void
+    public function flash(string $type, string $key, array $parameters = []): void
     {
-        /** @var list<array{type: string, message: string}> $flashes */
+        /** @var list<array{type: string, message: string, parameters: array<string, string|int|float>}> $flashes */
         $flashes = $this->get(self::FLASH_KEY, []);
-        $flashes[] = ['type' => $type, 'message' => $message];
+        $flashes[] = ['type' => $type, 'message' => $key, 'parameters' => $parameters];
         $this->set(self::FLASH_KEY, $flashes);
     }
 
     public function consumeFlashes(): array
     {
-        /** @var list<array{type: string, message: string}> $flashes */
+        /** @var list<array{type: string, message: string, parameters: array<string, string|int|float>}> $flashes */
         $flashes = $this->get(self::FLASH_KEY, []);
         $this->remove(self::FLASH_KEY);
 

@@ -41,9 +41,15 @@ final class GotifyNotifier extends HttpNotifier implements Notifier
     public function fields(): array
     {
         return [
-            ChannelField::url('url', 'Server URL', 'For example https://gotify.example.com'),
-            ChannelField::secret('token', 'Application token', 'Created under Apps in Gotify.'),
-            new ChannelField('priority', 'Priority', 'number', false, '0–10. Higher priorities ring.'),
+            ChannelField::url('url', 'channel_field.gotify.url', 'channel_field.gotify.url_hint'),
+            ChannelField::secret('token', 'channel_field.gotify.token', 'channel_field.gotify.token_hint'),
+            new ChannelField(
+                'priority',
+                'channel_field.gotify.priority',
+                'number',
+                false,
+                'channel_field.gotify.priority_hint',
+            ),
         ];
     }
 
@@ -59,12 +65,12 @@ final class GotifyNotifier extends HttpNotifier implements Notifier
         }
 
         if ($token === '') {
-            throw ValidationException::field('token', 'Enter the Gotify application token.');
+            throw ValidationException::field('token', 'error.gotify.token_required');
         }
 
         $priority = trim($input['priority'] ?? '');
         if ($priority !== '' && (!ctype_digit($priority) || (int) $priority > 10)) {
-            throw ValidationException::field('priority', 'Enter a priority between 0 and 10.');
+            throw ValidationException::field('priority', 'error.gotify.priority_range');
         }
 
         return [

@@ -45,13 +45,13 @@ final class SlackNotifier extends HttpNotifier implements Notifier
     public function fields(): array
     {
         return [
-            ChannelField::secret('token', 'Bot token', 'Starts with xoxb-. Needs the chat:write scope.'),
+            ChannelField::secret('token', 'channel_field.slack.token', 'channel_field.slack.token_hint'),
             new ChannelField(
                 'channel',
-                'Channel or user',
+                'channel_field.slack.channel',
                 'text',
                 true,
-                'A channel id (C0123…), a channel name (#bills) or a user id (U0123…) for a direct message.',
+                'channel_field.slack.channel_hint',
             ),
         ];
     }
@@ -64,16 +64,16 @@ final class SlackNotifier extends HttpNotifier implements Notifier
         }
 
         if ($token === '') {
-            throw ValidationException::field('token', 'Enter the Slack bot token.');
+            throw ValidationException::field('token', 'error.slack.token_required');
         }
 
         $channel = trim($input['channel'] ?? '');
         if ($channel === '') {
-            throw ValidationException::field('channel', 'Enter the channel or user to message.');
+            throw ValidationException::field('channel', 'error.slack.channel_required');
         }
 
         if (mb_strlen($channel) > 100) {
-            throw ValidationException::field('channel', 'That does not look like a channel or user id.');
+            throw ValidationException::field('channel', 'error.slack.channel_invalid');
         }
 
         return ['token' => $token, 'channel' => $channel];

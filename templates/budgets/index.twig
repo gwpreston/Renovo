@@ -1,27 +1,24 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Budgets — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('nav.budgets') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
     <div class="page-header">
-        <h1>Budgets</h1>
+        <h1>{{ t('nav.budgets') }}</h1>
         {% if can(scope, 'budget.manage') %}
-            <a class="button button-primary" href="/budgets/new">New budget</a>
+            <a class="button button-primary" href="/budgets/new">{{ t('budgets.new_budget') }}</a>
         {% endif %}
     </div>
 
     <p class="muted note">
-        A budget measures <strong>projected</strong> spend, not spend so far: scheduled price rises and trials
-        about to convert are counted before they happen, which is while there is still something you can do
-        about them. Each budget covers its owner's own share — their subscriptions, plus their portion of
-        anything split.
+        {{ t('budgets.intro') }}
     </p>
 
     {% if progress is empty %}
         <section class="card">
             <p class="muted empty">
-                No budgets yet.
-                {% if can(scope, 'budget.manage') %}<a href="/budgets/new">Set one up.</a>{% endif %}
+                {{ t('budgets.empty') }}
+                {% if can(scope, 'budget.manage') %}<a href="/budgets/new">{{ t('budgets.set_one_up') }}</a>{% endif %}
             </p>
         </section>
     {% else %}
@@ -32,46 +29,52 @@
                     <header class="budget-header">
                         <h2>{{ budget.name }}</h2>
                         {% if can(scope, 'budget.manage') %}
-                            <a class="button button-quiet" href="/budgets/{{ budget.id }}/edit">Edit</a>
+                            <a class="button button-quiet" href="/budgets/{{ budget.id }}/edit">{{ t('action.edit') }}</a>
                         {% endif %}
                     </header>
 
                     <p class="muted">
                         {{ budget_period_label(budget.period.value) }} ·
-                        {{ budget.isOverall ? 'All categories' : budget.categoryName }}
+                        {{ budget.isOverall ? t('budgets.all_categories') : budget.categoryName }}
                         {% if budget.ownerName %} · {{ budget.ownerName }}{% endif %}
                     </p>
 
                     {% if row.projected is null %}
                         <p class="stat-value">—</p>
                         <p class="field-error">
-                            Cannot be calculated: no exchange rate is available for
-                            {{ row.unconvertible|join(', ') }}. Rather than leave that spending out and show a
-                            figure that looks comfortable, no figure is shown.
+                            {{ t('budgets.unconvertible', {'currencies': row.unconvertible|join(', ')}) }}
                         </p>
                     {% else %}
                         <p class="stat-value">
                             {{ row.projected.amountMinor|money(row.projected.currency) }}
-                            <span class="stat-unit"> of {{ row.limit.amountMinor|money(row.limit.currency) }}</span>
+                            <span class="stat-unit">
+                                {{ t('budgets.of_limit', {'limit': row.limit.amountMinor|money(row.limit.currency)}) }}
+                            </span>
                         </p>
 
                         {# A meter rather than a bar: it carries the value and the limit to a screen reader. #}
                         <div class="meter" role="img"
-                             aria-label="{{ row.percent }} percent of the budget projected">
+                             aria-label="{{ t('budgets.meter_label', {'percent': row.percent}) }}">
                             <span class="meter-fill" style="width: {{ min(row.percent, 100) }}%"></span>
                         </div>
 
                         <p class="{{ row.is_over ? 'field-error' : 'muted' }}">
                             {% if row.is_over %}
-                                <strong>{{ row.percent }}% — over by
-                                    {{ (row.remaining.amountMinor * -1)|money(row.remaining.currency) }}.</strong>
+                                <strong>{{ t('budgets.over', {
+                                    'percent': row.percent,
+                                    'amount': (row.remaining.amountMinor * -1)|money(row.remaining.currency),
+                                }) }}</strong>
                             {% elseif row.is_warning %}
-                                <strong>{{ row.percent }}%</strong> — past the
-                                {{ budget.warnThresholdPercent }}% warning mark.
-                                {{ row.remaining.amountMinor|money(row.remaining.currency) }} left.
+                                {{ t('budgets.warning', {
+                                    'percent': row.percent,
+                                    'threshold': budget.warnThresholdPercent,
+                                    'remaining': row.remaining.amountMinor|money(row.remaining.currency),
+                                }) }}
                             {% else %}
-                                {{ row.percent }}% ·
-                                {{ row.remaining.amountMinor|money(row.remaining.currency) }} left.
+                                {{ t('budgets.remaining', {
+                                    'percent': row.percent,
+                                    'remaining': row.remaining.amountMinor|money(row.remaining.currency),
+                                }) }}
                             {% endif %}
                         </p>
                     {% endif %}
@@ -80,8 +83,7 @@
         </div>
 
         <p class="muted note">
-            Over-budget and approaching-budget states are shown here only. Sending an alert about them arrives
-            in a later version.
+            {{ t('budgets.alerts_note') }}
         </p>
     {% endif %}
 {% endblock %}

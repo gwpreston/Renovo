@@ -69,19 +69,20 @@ final class ImportService
     public function stage(UploadedFileInterface $file): string
     {
         if ($file->getError() === UPLOAD_ERR_NO_FILE) {
-            throw ValidationException::field('file', 'Choose a CSV or JSON file to import.');
+            throw ValidationException::field('file', 'error.import.file_required');
         }
 
         if ($file->getError() !== UPLOAD_ERR_OK) {
-            throw ValidationException::field('file', 'The file could not be uploaded. Try again.');
+            throw ValidationException::field('file', 'error.upload.failed');
         }
 
         $size = $file->getSize();
         if ($size !== null && $size > self::MAX_BYTES) {
-            throw ValidationException::field('file', sprintf(
-                'The file must be %d MB or smaller.',
-                intdiv(self::MAX_BYTES, 1024 * 1024),
-            ));
+            throw ValidationException::field(
+                'file',
+                'error.import.too_large',
+                ['megabytes' => intdiv(self::MAX_BYTES, 1024 * 1024)],
+            );
         }
 
         $this->ensureDirectory();
@@ -93,7 +94,7 @@ final class ImportService
         if ((int) filesize($this->dataPath($id)) > self::MAX_BYTES) {
             @unlink($this->dataPath($id));
 
-            throw ValidationException::field('file', 'That file is too large to import.');
+            throw ValidationException::field('file', 'error.import.too_large_absolute');
         }
 
         $name = (string) $file->getClientFilename();
@@ -116,7 +117,7 @@ final class ImportService
     {
         $path = $this->dataPath($id);
         if (!$this->isValidId($id) || !is_file($path)) {
-            throw ValidationException::field('file', 'That upload has expired. Upload the file again.');
+            throw ValidationException::field('file', 'error.import.expired');
         }
 
         return SourceFile::parse($path, $this->originalName($id));
@@ -151,7 +152,12 @@ final class ImportService
      * Translate and validate every row without writing anything.
      *
      * @param array<string, string> $mapping
-     * @return list<array{row: int, input: array<string, mixed>, category: string, errors: array<string, string>}>
+     * @return list<array{
+     *     row: int,
+     *     input: array<string, mixed>,
+     *     category: string,
+     *     errors: array<string, \App\Service\ValidationError>
+     * }>
      * @throws ValidationException
      */
     public function preview(Scope $scope, string $id, array $mapping, string $defaultCurrency): array

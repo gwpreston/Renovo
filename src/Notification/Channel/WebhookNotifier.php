@@ -44,13 +44,13 @@ final class WebhookNotifier extends HttpNotifier implements Notifier
     public function fields(): array
     {
         return [
-            ChannelField::url('url', 'Endpoint URL'),
+            ChannelField::url('url', 'channel_field.webhook.url'),
             new ChannelField(
                 'secret',
-                'Shared secret',
+                'channel_field.webhook.secret',
                 'password',
                 false,
-                'Optional. Sent as an HMAC-SHA256 signature of the body in X-Renovo-Signature.',
+                'channel_field.webhook.secret_hint',
                 true,
             ),
         ];

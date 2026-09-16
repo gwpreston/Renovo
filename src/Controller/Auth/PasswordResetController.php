@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Auth;
 
+use App\I18n\Translator;
 use App\Controller\Controller;
 use App\Security\SessionInterface;
 use App\Service\PasswordResetService;
@@ -17,9 +18,10 @@ final class PasswordResetController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly PasswordResetService $resets,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function showRequestForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -86,7 +88,7 @@ final class PasswordResetController extends Controller
             ]);
         }
 
-        $this->flash('success', 'Your password has been changed. Sign in with it now.');
+        $this->flash('success', 'flash.password_changed');
 
         return $this->redirect($response, '/login');
     }

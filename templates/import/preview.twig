@@ -1,20 +1,19 @@
 {% extends 'layout.twig' %}
 
-{% block title %}Preview import — {{ instance_name }}{% endblock %}
+{% block title %}{{ t('import_preview.title') }} — {{ instance_name }}{% endblock %}
 
 {% block content %}
-    <h1>Preview</h1>
+    <h1>{{ t('action.preview') }}</h1>
 
     <p class="muted">
         <strong>{{ filename }}</strong> —
-        {{ valid_count }} row{{ valid_count == 1 ? '' : 's' }} will be imported{% if invalid_count %},
-        {{ invalid_count }} will be skipped{% endif %}.
+        {{ t('import_preview.summary', {'valid': valid_count}) }}
+        {%- if invalid_count %} {{ t('import_preview.skipped', {'invalid': invalid_count}) }}{% endif %}
     </p>
 
     {% if invalid_count %}
         <div class="callout callout-warning">
-            Rows with a problem are marked below. Importing goes ahead without them — or go back
-            and change the mapping.
+            {{ t('import_preview.intro') }}
         </div>
     {% endif %}
 
@@ -23,13 +22,13 @@
             <table class="table">
                 <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Name</th>
-                    <th>Price</th>
-                    <th>Cycle</th>
-                    <th>Next payment</th>
-                    <th>Category</th>
-                    <th>Problem</th>
+                    <th scope="col">#</th>
+                    <th scope="col">{{ t('field.name') }}</th>
+                    <th scope="col">{{ t('field.price') }}</th>
+                    <th scope="col">{{ t('field.cycle') }}</th>
+                    <th scope="col">{{ t('field.next_payment') }}</th>
+                    <th scope="col">{{ t('field.category') }}</th>
+                    <th scope="col">{{ t('import_preview.problem') }}</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -43,9 +42,9 @@
                         <td>{{ row.category ?: '—' }}</td>
                         <td>
                             {%- if row.errors is empty -%}
-                                <span class="pill pill-success">Ready</span>
+                                <span class="pill pill-success">{{ t('import_preview.ready') }}</span>
                             {%- else -%}
-                                {{ row.errors|join(' ') }}
+                                {% for error in row.errors %}{{ error_message(error) }} {% endfor %}
                             {%- endif -%}
                         </td>
                     </tr>
@@ -59,15 +58,15 @@
         <form method="post" action="/import/commit" class="inline">
             {{ csrf_field() }}
             <button type="submit" class="button button-primary" {{ valid_count == 0 ? 'disabled' : '' }}>
-                Import {{ valid_count }} subscription{{ valid_count == 1 ? '' : 's' }}
+                {{ t('import_preview.commit', {'count': valid_count}) }}
             </button>
         </form>
 
-        <a href="/import/map" class="button">Back to mapping</a>
+        <a href="/import/map" class="button">{{ t('import_preview.back_to_mapping') }}</a>
 
         <form method="post" action="/import/cancel" class="inline">
             {{ csrf_field() }}
-            <button type="submit" class="button button-quiet">Cancel</button>
+            <button type="submit" class="button button-quiet">{{ t('action.cancel') }}</button>
         </form>
     </div>
 {% endblock %}

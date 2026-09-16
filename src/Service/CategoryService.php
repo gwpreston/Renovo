@@ -55,10 +55,10 @@ final class CategoryService
     private function assertValid(Scope $scope, string $name, ?string $colour, ?int $ignoreId = null): void
     {
         if ($name === '') {
-            throw ValidationException::field('name', 'Enter a category name.');
+            throw ValidationException::field('name', 'error.category.name_required');
         }
         if (mb_strlen($name) > 60) {
-            throw ValidationException::field('name', 'Name must be 60 characters or fewer.');
+            throw ValidationException::field('name', 'error.name.too_long_60');
         }
 
         $existing = $this->categories->findByName($scope, $name);
@@ -67,11 +67,11 @@ final class CategoryService
             && mb_strtolower($existing->name) === mb_strtolower($name);
 
         if ($isDuplicate) {
-            throw ValidationException::field('name', 'A category with that name already exists.');
+            throw ValidationException::field('name', 'error.category.duplicate');
         }
 
         if ($colour !== null && $colour !== '' && preg_match('/^#[0-9a-fA-F]{6}$/', $colour) !== 1) {
-            throw ValidationException::field('colour', 'Choose a colour.');
+            throw ValidationException::field('colour', 'error.category.colour_required');
         }
     }
 

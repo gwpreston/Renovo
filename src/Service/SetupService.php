@@ -65,10 +65,10 @@ final class SetupService
         $confirm = $this->str($input, 'password_confirm');
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors['email'] = 'Enter a valid email address.';
+            $errors['email'] = 'error.email.invalid';
         }
         if ($displayName === '') {
-            $errors['display_name'] = 'Enter your name.';
+            $errors['display_name'] = 'error.name.required_yours';
         }
 
         $errors += $this->auth->validatePassword($password, $confirm);

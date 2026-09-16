@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Security\ScopeViolationException;
 use App\Security\SessionInterface;
 use App\Service\CategoryService;
@@ -18,10 +19,11 @@ final class CategoryController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly CategoryService $categories,
         private readonly TagService $tags,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -56,7 +58,7 @@ final class CategoryController extends Controller
             ]);
         }
 
-        $this->flash('success', 'Category added.');
+        $this->flash('success', 'flash.category_added');
 
         return $this->redirectAfterWrite($request, $response, '/categories');
     }
@@ -84,7 +86,7 @@ final class CategoryController extends Controller
             throw $this->notFound($request);
         }
 
-        $this->flash('success', 'Category renamed.');
+        $this->flash('success', 'flash.category_renamed');
 
         return $this->redirectAfterWrite($request, $response, '/categories');
     }
@@ -97,7 +99,7 @@ final class CategoryController extends Controller
             throw $this->notFound($request);
         }
 
-        $this->flash('success', 'Category deleted.');
+        $this->flash('success', 'flash.category_deleted');
 
         return $this->redirectAfterWrite($request, $response, '/categories');
     }
@@ -113,7 +115,7 @@ final class CategoryController extends Controller
             throw $this->notFound($request);
         }
 
-        $this->flash('success', 'Tag deleted.');
+        $this->flash('success', 'flash.tag_deleted');
 
         return $this->redirectAfterWrite($request, $response, '/categories');
     }

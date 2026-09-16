@@ -70,13 +70,13 @@ final class ApiTokenService
     ): string {
         $name = trim($name);
         if ($name === '') {
-            throw ValidationException::field('name', 'Give the token a name so you can recognise it later.');
+            throw ValidationException::field('name', 'error.token.name_required');
         }
         if (mb_strlen($name) > 100) {
-            throw ValidationException::field('name', 'Name must be 100 characters or fewer.');
+            throw ValidationException::field('name', 'error.name.too_long_100');
         }
         if ($expiresAt !== null && $expiresAt <= $this->clock->now()) {
-            throw ValidationException::field('expires_at', 'Choose an expiry date in the future.');
+            throw ValidationException::field('expires_at', 'error.token.expiry_past');
         }
 
         $publicId = bin2hex(random_bytes(self::PUBLIC_ID_BYTES));

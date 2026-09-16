@@ -6,6 +6,7 @@ namespace App\Support;
 
 use App\Domain\Currency;
 use App\Domain\Money;
+use App\I18n\LocaleContext;
 use NumberFormatter;
 
 /**
@@ -19,13 +20,19 @@ final class MoneyFormatter
     /** @var array<string, NumberFormatter> */
     private array $formatters = [];
 
-    public function __construct(private readonly string $locale = 'en_GB')
+    /**
+     * The locale is read per call rather than fixed at construction: a user
+     * who reads the application in German sees German thousands separators,
+     * and the scheduler formats each recipient's figures in their own locale
+     * while building their digest.
+     */
+    public function __construct(private readonly LocaleContext $locale)
     {
     }
 
     public function format(Money $money): string
     {
-        $formatter = $this->formatter($this->locale);
+        $formatter = $this->formatter($this->locale->get());
         $exponent = Currency::exponent($money->currency);
 
         // intl expects a major-unit value. The division happens here, at the

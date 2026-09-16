@@ -48,10 +48,10 @@ final class EmailNotifier implements Notifier
         return [
             new ChannelField(
                 'address',
-                'Email address',
+                'channel_field.email.address',
                 'email',
                 false,
-                'Leave blank to use your account address.',
+                'channel_field.email.address_hint',
             ),
         ];
     }
@@ -61,7 +61,7 @@ final class EmailNotifier implements Notifier
         $address = trim($input['address'] ?? '');
 
         if ($address !== '' && !filter_var($address, FILTER_VALIDATE_EMAIL)) {
-            throw ValidationException::field('address', 'Enter a valid email address.');
+            throw ValidationException::field('address', 'error.email.invalid');
         }
 
         return ['address' => $address];

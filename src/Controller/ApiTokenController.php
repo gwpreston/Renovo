@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\I18n\Translator;
 use App\Domain\TokenAbility;
 use App\Service\ApiTokenService;
 use App\Service\ValidationException;
@@ -33,9 +34,10 @@ final class ApiTokenController extends Controller
     public function __construct(
         Twig $view,
         SessionInterface $session,
+        Translator $translator,
         private readonly ApiTokenService $tokens,
     ) {
-        parent::__construct($view, $session);
+        parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -66,15 +68,13 @@ final class ApiTokenController extends Controller
                 $this->expiry($body),
             );
         } catch (ValidationException $exception) {
-            foreach ($exception->errors() as $message) {
-                $this->flash('error', $message);
-            }
+            $this->flashErrors($exception);
 
             return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
         }
 
         $this->session->set(self::FLASH_NEW_TOKEN, $token);
-        $this->flash('success', 'Token created. Copy it now — it is not shown again.');
+        $this->flash('success', 'flash.token_created');
 
         return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
     }
@@ -88,7 +88,7 @@ final class ApiTokenController extends Controller
 
         $this->flash(
             $revoked ? 'success' : 'error',
-            $revoked ? 'Token revoked.' : 'That token could not be revoked.',
+            $revoked ? 'flash.token_revoked' : 'flash.token_revoke_failed',
         );
 
         return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
