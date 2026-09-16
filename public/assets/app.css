@@ -225,7 +225,7 @@ main.container { padding-top: 1.5rem; padding-bottom: 3rem; }
 label { font-weight: 600; font-size: 0.9rem; }
 
 input[type='text'], input[type='email'], input[type='password'], input[type='search'],
-input[type='number'], input[type='date'], input[type='file'], select, textarea {
+input[type='number'], input[type='date'], input[type='file'], input[type='url'], select, textarea {
     width: 100%;
     padding: 0.5rem 0.6rem;
     font: inherit;
