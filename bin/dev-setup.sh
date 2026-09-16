@@ -484,10 +484,6 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "email=$ADMIN_EMAIL" \
             -d "password=$ADMIN_PASSWORD" \
             -d "password_confirm=$ADMIN_PASSWORD" \
-            -d "instance_name=Renovo (dev)" \
-            -d "household_name=Home" \
-            -d "base_currency=GBP" \
-            -d "isolation_mode=shared" \
             "$BASE_URL/setup" || echo 000)"
 
         if [ "$setup_status" != "302" ]; then

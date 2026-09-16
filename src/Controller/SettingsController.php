@@ -77,7 +77,6 @@ final class SettingsController extends Controller
                 'currency_count' => count($this->rates->availableCurrencies()),
             ],
             'instance' => [
-                'name' => $this->settings->instanceName(),
                 'base_currency' => $this->settings->baseCurrency(),
                 'isolation_mode' => $this->settings->isolationMode()->value,
                 'allow_registration' => $this->settings->registrationAllowed(),
@@ -128,7 +127,6 @@ final class SettingsController extends Controller
         $body = $this->body($request);
 
         $this->instanceAdmin->apply($this->user($request), [
-            'instance_name' => is_scalar($body['instance_name'] ?? null) ? (string) $body['instance_name'] : '',
             'base_currency' => is_scalar($body['base_currency'] ?? null) ? (string) $body['base_currency'] : '',
             'isolation_mode' => is_scalar($body['isolation_mode'] ?? null) ? (string) $body['isolation_mode'] : '',
             'allow_registration' => ($body['allow_registration'] ?? '0') === '1',

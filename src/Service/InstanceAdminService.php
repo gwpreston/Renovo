@@ -35,7 +35,6 @@ final class InstanceAdminService
 
     /**
      * @param array{
-     *     instance_name?: string,
      *     base_currency?: string,
      *     isolation_mode?: string,
      *     allow_registration?: bool,
@@ -48,12 +47,6 @@ final class InstanceAdminService
     public function apply(User $actor, array $input): array
     {
         $changes = [];
-
-        $name = trim($input['instance_name'] ?? '');
-        if ($name !== '' && $name !== $this->settings->instanceName()) {
-            $this->settings->setInstanceName(mb_substr($name, 0, 100));
-            $changes[] = 'instance_name';
-        }
 
         $currency = Currency::normalise($input['base_currency'] ?? '');
         $baseCurrencyChanged = Currency::isValidCode($currency) && $currency !== $this->settings->baseCurrency();

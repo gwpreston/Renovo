@@ -5,12 +5,9 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\Middleware\AuthenticationMiddleware;
-use App\Domain\Currency;
-use App\Domain\IsolationMode;
 use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
 use App\Notification\NotifierRegistry;
-use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\InstanceSettingsService;
 use App\Service\Notification\NotificationSettingsService;
 use App\Service\SetupService;
@@ -31,7 +28,6 @@ final class SetupController extends Controller
         SessionInterface $session,
         private readonly SetupService $setup,
         private readonly MembershipRepository $memberships,
-        private readonly ExchangeRateProviderRegistry $rateProviders,
         private readonly NotificationSettingsService $notifications,
         private readonly NotifierRegistry $notifiers,
         private readonly InstanceSettingsService $instance,
@@ -44,10 +40,7 @@ final class SetupController extends Controller
 
     public function showForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->render($request, $response, 'setup/wizard.twig', $this->formData([
-            'base_currency' => 'GBP',
-            'isolation_mode' => IsolationMode::Shared->value,
-        ]));
+        return $this->render($request, $response, 'setup/wizard.twig', $this->formData([]));
     }
 
     public function submit(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -172,10 +165,6 @@ final class SetupController extends Controller
     private function formData(array $values, array $errors = []): array
     {
         return [
-            'currencies' => Currency::common(),
-            'isolation_modes' => IsolationMode::cases(),
-            'rate_providers' => $this->rateProviders->all(),
-            'default_rate_provider' => $this->rateProviders->default()->key(),
             'values' => $values,
             'errors' => $errors,
         ];

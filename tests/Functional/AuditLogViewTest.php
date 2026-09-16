@@ -135,7 +135,6 @@ final class AuditLogViewTest extends DatabaseTestCase
         $this->signIn($this->adminId, null);
 
         $this->request('POST', '/settings/instance', [
-            'instance_name' => 'Renamed instance',
             'base_currency' => 'GBP',
             'isolation_mode' => IsolationMode::Isolated->value,
             'allow_registration' => '1',
@@ -145,7 +144,6 @@ final class AuditLogViewTest extends DatabaseTestCase
 
         self::assertNotNull($entry);
         self::assertSame(AuditAction::InstanceSettingsChanged->value, $entry['action']);
-        self::assertStringContainsString('instance_name', (string) $entry['context']);
         self::assertStringContainsString('isolation_mode', (string) $entry['context']);
     }
 

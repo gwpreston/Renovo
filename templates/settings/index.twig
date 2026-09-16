@@ -95,9 +95,6 @@
             <form method="post" action="/settings/instance" class="stack">
                 {{ csrf_field() }}
 
-                <label for="instance_name">Instance name</label>
-                <input type="text" id="instance_name" name="instance_name" value="{{ instance.name }}">
-
                 <label for="base_currency">Base currency</label>
                 <select id="base_currency" name="base_currency">
                     {% for code in currencies %}

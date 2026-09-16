@@ -339,13 +339,6 @@ return static function (ContainerBuilder $builder, array $settings): void {
                 factory(static fn (ContainerInterface $c): string => $c->get('settings')['mail']['from_address']),
             ),
 
-        // The wizard needs to know whether an environment key is already
-        // present, so that it does not demand one the operator has supplied.
-        SetupService::class => autowire()->constructorParameter(
-            'environmentApiKey',
-            factory(static fn (ContainerInterface $c): string => $c->get('settings')['rates']['api_key']),
-        ),
-
         LogoStorage::class => static function (ContainerInterface $c): LogoStorage {
             $uploads = $c->get('settings')['uploads'];
 
