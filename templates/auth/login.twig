@@ -41,7 +41,7 @@
         </p>
     </section>
 
-    <script src="/assets/webauthn.js" defer></script>
+    <script src="{{ asset('/assets/webauthn.js') }}" defer></script>
     <script type="module">
         window.renovoWebAuthn.bindAuthentication({
             button: document.getElementById('passkey-button'),

@@ -603,14 +603,18 @@ main:focus { outline: none; }
 
 /*
     On a phone a seven-column grid is unreadable, so the same markup becomes a
-    list: each day that has something on it is a block, and the empty cells are
-    dropped entirely.
+    list: each day that has something on it is a block, and every other cell —
+    the padding days of a neighbouring month and the days with nothing due —
+    is dropped, because a column of thirty bare numbers is not a calendar.
+
+    With the headings gone, each remaining day carries its own weekday in
+    `data-weekday`, which the template fills from the reader's locale.
 */
 @media (max-width: 720px) {
     .calendar-grid, .calendar-grid tbody, .calendar-grid tr, .calendar-grid td { display: block; width: auto; }
     .calendar-grid thead { display: none; }
     .calendar-day { height: auto; border: 0; border-bottom: 1px solid var(--border); padding: 0.5rem 0; }
-    .calendar-day.is-empty { display: none; }
+    .calendar-day.is-empty, .calendar-day.is-quiet { display: none; }
     .calendar-date::after { content: ' ' attr(data-weekday); }
 }
 

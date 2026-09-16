@@ -168,7 +168,7 @@
         {% endif %}
     </section>
 
-    <script src="/assets/webauthn.js" defer></script>
+    <script src="{{ asset('/assets/webauthn.js') }}" defer></script>
     <script type="module">
         window.renovoWebAuthn.bindRegistration({
             button: document.getElementById('passkey-register'),

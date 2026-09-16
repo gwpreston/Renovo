@@ -66,6 +66,7 @@ use App\Service\SetupService;
 use App\Service\MailerService;
 use App\Service\PasswordResetService;
 use App\Service\RateLimiter;
+use App\Support\AssetVersion;
 use App\Support\Clock;
 use App\Support\MoneyFormatter;
 use App\Support\SystemClock;
@@ -392,6 +393,10 @@ return static function (ContainerBuilder $builder, array $settings): void {
         ),
 
         MoneyFormatter::class => autowire(MoneyFormatter::class),
+
+        AssetVersion::class => static fn (ContainerInterface $c): AssetVersion => new AssetVersion(
+            $c->get('settings')['paths']['public'],
+        ),
 
         // The logo fetcher takes the *guarded* client, never the plain one:
         // the address comes from a form, which is the whole reason the guard

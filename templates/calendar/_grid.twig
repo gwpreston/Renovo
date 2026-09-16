@@ -59,8 +59,17 @@
                         {% if day.date is null %}
                             <td class="calendar-day is-empty"></td>
                         {% else %}
-                            <td class="calendar-day {{ day.is_today ? 'is-today' : '' }}">
-                                <span class="calendar-date">
+                            <td class="calendar-day{{ day.is_today ? ' is-today' : '' }}{{
+                                day.events ? '' : ' is-quiet' }}">
+                                {#
+                                    The weekday rides on the element rather
+                                    than in it: the phone layout drops the
+                                    column headings, so each day has to name
+                                    its own, and it comes from the reader's
+                                    locale like every other date on the page.
+                                #}
+                                <span class="calendar-date"
+                                      data-weekday="{{ day.date|local_date('EEE') }}">
                                     {{ day.date|local_date('d') }}
                                     {%- if day.is_today %}
                                         <span class="visually-hidden">({{ t('state.today') }})</span>
