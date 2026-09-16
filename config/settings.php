@@ -161,6 +161,9 @@ return [
 
     'paths' => [
         'root' => dirname(__DIR__),
+        // The web root. Only what lives here is reachable over HTTP, and
+        // AssetVersion stats files relative to it to build cache-busted URLs.
+        'public' => dirname(__DIR__) . '/public',
         'templates' => dirname(__DIR__) . '/templates',
         'cache' => dirname(__DIR__) . '/var/cache',
         'logs' => dirname(__DIR__) . '/var/log',

@@ -22,6 +22,7 @@ use App\Security\CsrfTokenManager;
 use App\Security\PermissionService;
 use App\Security\Scope;
 use App\Service\ValidationError;
+use App\Support\AssetVersion;
 use App\Support\MoneyFormatter;
 use DateTimeImmutable;
 use DateTimeInterface;
@@ -54,6 +55,7 @@ final class AppExtension extends AbstractExtension
         private readonly NotifierRegistry $notifiers,
         private readonly Translator $translator,
         private readonly LocaleContext $locale,
+        private readonly AssetVersion $assets,
     ) {
     }
 
@@ -61,6 +63,7 @@ final class AppExtension extends AbstractExtension
     {
         return [
             new TwigFunction('t', $this->translate(...)),
+            new TwigFunction('asset', $this->assets->url(...)),
             new TwigFunction('locale_tag', fn (): string => $this->locale->tag()),
             new TwigFunction('js_translations', $this->jsTranslations(...)),
             new TwigFunction('error_message', $this->errorMessage(...)),

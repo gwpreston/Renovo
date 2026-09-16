@@ -40,6 +40,11 @@ services:
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-renovo@localhost}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Renovo}
     volumes:
+      # The same web root nginx serves. Without this the app would stat the
+      # copy baked into the image while nginx served the one on disk, and the
+      # two would disagree about how old a stylesheet is — which is exactly
+      # the question AssetVersion exists to answer.
+      - ./public:/var/www/html/public:ro
       - logos:/var/www/html/public/assets/logos
       - appvar:/var/www/html/var
 

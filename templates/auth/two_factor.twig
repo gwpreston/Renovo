@@ -63,7 +63,7 @@
     </section>
 
     {% if methods.passkey %}
-        <script src="/assets/webauthn.js" defer></script>
+        <script src="{{ asset('/assets/webauthn.js') }}" defer></script>
         <script type="module">
             document.addEventListener('DOMContentLoaded', () => {
                 window.renovoWebAuthn.bindAuthentication({
