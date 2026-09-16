@@ -275,6 +275,37 @@ final class MoneyPagesTest extends DatabaseTestCase
         self::assertStringContainsString('30 days', $body);
     }
 
+    public function testTheNewSubscriptionFormPrefillsOnlyTheStartDate(): void
+    {
+        $body = (string) $this->get('/subscriptions/new', $this->ownerId)->getBody();
+
+        self::assertSame(
+            date('Y-m-d'),
+            self::dateInputValue($body, 'start_date'),
+            'the start date should default to today',
+        );
+        self::assertSame(
+            '',
+            self::dateInputValue($body, 'next_payment_date'),
+            'the next payment date should be left for the user to choose',
+        );
+    }
+
+    /**
+     * The value attribute of a date input, read out of the rendered page.
+     *
+     * Matched on the tag rather than asserted as a substring: today's date also
+     * appears elsewhere on the form, so a plain assertStringContainsString
+     * would pass whether or not the field itself carried it.
+     */
+    private static function dateInputValue(string $html, string $name): string
+    {
+        $pattern = sprintf('/<input[^>]*name="%s"[^>]*>/', preg_quote($name, '/'));
+        self::assertSame(1, preg_match($pattern, $html, $tag), $name . ' was not on the form');
+
+        return preg_match('/value="([^"]*)"/', $tag[0], $value) === 1 ? $value[1] : '';
+    }
+
     private function get(string $path, int $userId): ResponseInterface
     {
         $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $userId);

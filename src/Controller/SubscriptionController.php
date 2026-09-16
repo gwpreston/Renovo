@@ -118,7 +118,12 @@ final class SubscriptionController extends Controller
             'subscription_type' => SubscriptionType::Recurring->value,
             'billing_cycle' => BillingCycle::Monthly->value,
             'is_active' => '1',
-            'next_payment_date' => date('Y-m-d'),
+            // Today is a safe guess for when a subscription began — it is
+            // usually being added because it has just been taken out. The next
+            // payment is not guessable in the same way: the cycle has not been
+            // chosen yet, so any date offered would be arbitrary, and one that
+            // is silently accepted is worse than one the user has to enter.
+            'start_date' => date('Y-m-d'),
         ]));
     }
 
