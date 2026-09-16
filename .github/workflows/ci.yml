@@ -35,6 +35,16 @@ jobs:
       - name: PHPStan
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
 
+      # The OpenAPI document is the API's contract, so it is checked against the
+      # application's own route table in both directions: an endpoint that is
+      # not described fails here, and so does a description with no endpoint
+      # behind it. It needs no database — only the route table — so it runs in
+      # this job and fails in seconds rather than after the full suite.
+      - name: OpenAPI spec matches the routes
+        env:
+          SESSION_KEY: ci-session-key-not-a-secret-0000000000000000
+        run: vendor/bin/phpunit --no-coverage tests/Unit/OpenApiCoverageTest.php
+
   # The full suite runs against both engines: portable SQL is only portable if
   # somebody checks.
   tests:

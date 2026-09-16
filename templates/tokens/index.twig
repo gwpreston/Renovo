@@ -1,0 +1,135 @@
+{% extends 'layout.twig' %}
+
+{% block title %}API tokens — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <h1>API tokens</h1>
+
+    <p class="muted">
+        A token lets a script, a calendar app or another machine reach this instance without a
+        password. It can never do more than you can: a token issued by a Viewer reads what a
+        Viewer reads and writes nothing.
+    </p>
+
+    {% if issued_token %}
+        <section class="card callout">
+            <h2>Your new token</h2>
+            <p>
+                Copy it now. Only a hash of it is stored, so this is the one and only time it can
+                be shown.
+            </p>
+            <p><code class="token">{{ issued_token }}</code></p>
+        </section>
+    {% endif %}
+
+    <section class="card">
+        <h2>Issue a token</h2>
+
+        <form method="post" action="/settings/api-tokens" class="stack">
+            {{ csrf_field() }}
+
+            <label for="token-name">What it is for</label>
+            <input type="text" id="token-name" name="name" maxlength="100" required
+                   placeholder="Home Assistant, my calendar, a backup script">
+
+            <label for="token-abilities">What it may do</label>
+            <select id="token-abilities" name="abilities">
+                {% for ability in abilities %}
+                    <option value="{{ ability.value }}">{{ ability.label() }}</option>
+                {% endfor %}
+            </select>
+            <p class="field-hint">
+                Choose read-only unless something genuinely needs to make changes. The calendar
+                feed accepts read-only tokens only.
+            </p>
+
+            <label for="token-expires">Expires (optional)</label>
+            <input type="date" id="token-expires" name="expires_at">
+
+            <button type="submit" class="button button-primary">Create token</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Your tokens</h2>
+
+        {% if tokens is empty %}
+            <p class="muted">None yet.</p>
+        {% else %}
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Identifier</th>
+                        <th>Can</th>
+                        <th>Last used</th>
+                        <th>Status</th>
+                        <th><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for token in tokens %}
+                        <tr>
+                            <td>{{ token.name }}</td>
+                            <td><code>{{ token.publicId }}</code></td>
+                            <td>{{ token.abilities.label() }}</td>
+                            <td>
+                                {%- if token.lastUsedAt -%}
+                                    {{ token.lastUsedAt|date('j M Y, H:i') }}
+                                {%- else -%}
+                                    <span class="muted">Never</span>
+                                {%- endif -%}
+                            </td>
+                            <td>
+                                {% if token.isRevoked() %}
+                                    <span class="pill pill-danger">Revoked</span>
+                                {% elseif token.expiresAt and token.expiresAt < date() %}
+                                    <span class="pill">Expired</span>
+                                {% elseif token.expiresAt %}
+                                    Expires {{ token.expiresAt|date('j M Y') }}
+                                {% else %}
+                                    <span class="pill pill-success">Active</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not token.isRevoked() %}
+                                    <form method="post"
+                                          action="/settings/api-tokens/{{ token.id }}/revoke"
+                                          class="inline"
+                                          onsubmit="return confirm('Revoke this token? Anything using it stops working straight away.')">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-quiet">Revoke</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Using them</h2>
+
+        <p>Send the token as a bearer credential:</p>
+        <pre class="code-block">curl -H "Authorization: Bearer rnv_..." \
+     {{ feed_url|replace({'/calendar.ics': '/subscriptions'}) }}</pre>
+
+        <p>
+            The full reference is at
+            <a href="/api/v1/openapi.yaml">/api/v1/openapi.yaml</a>
+            (or <a href="/api/v1/openapi.json">as JSON</a>).
+        </p>
+
+        <h3>Calendar feed</h3>
+        <p>
+            Subscribe to this URL in your calendar app, with a read-only token in place of the
+            placeholder. It shows renewals, trial conversions and the last day to cancel each
+            subscription.
+        </p>
+        <pre class="code-block">{{ feed_url }}?token=rnv_...</pre>
+    </section>
+{% endblock %}

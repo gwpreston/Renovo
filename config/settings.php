@@ -138,6 +138,13 @@ return [
     'uploads' => [
         'logo_directory' => dirname(__DIR__) . '/public/assets/logos',
         'logo_max_bytes' => (int) $env('UPLOAD_MAX_LOGO_BYTES', '1048576'),
+        // Under var/, not public/. A logo is a public-ish image; an invoice has
+        // an address and a card number on it, so nothing serves these directly
+        // and the only way to read one is the permission-scoped route.
+        'attachment_directory' => $env('ATTACHMENT_DIRECTORY', dirname(__DIR__) . '/var/attachments'),
+        // 10 MB: a scanned multi-page invoice, comfortably, and far short of
+        // anything that would make a self-hosted instance's disk a concern.
+        'attachment_max_bytes' => (int) $env('UPLOAD_MAX_ATTACHMENT_BYTES', '10485760'),
     ],
 
     'paths' => [
@@ -145,5 +152,11 @@ return [
         'templates' => dirname(__DIR__) . '/templates',
         'cache' => dirname(__DIR__) . '/var/cache',
         'logs' => dirname(__DIR__) . '/var/log',
+        // Staging for an in-progress import. Cleared when the import commits or
+        // is abandoned, and swept by the scheduler.
+        'imports' => dirname(__DIR__) . '/var/imports',
+        // The API's contract, served as-is and validated against the routes
+        // in CI.
+        'openapi' => dirname(__DIR__) . '/openapi/openapi.yaml',
     ],
 ];

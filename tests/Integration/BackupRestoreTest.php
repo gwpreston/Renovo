@@ -1,0 +1,548 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Integration;
+
+use App\Domain\IsolationMode;
+use App\Domain\Role;
+use App\Repository\HouseholdRepository;
+use App\Repository\MembershipRepository;
+use App\Repository\UserRepository;
+use App\Security\Scope;
+use App\Service\AttachmentService;
+use App\Service\AttachmentStorage;
+use App\Service\BackupService;
+use App\Service\BudgetService;
+use App\Service\CategoryService;
+use App\Service\SubscriptionService;
+use App\Service\ValidationException;
+use App\Support\Clock;
+use App\Support\FrozenClock;
+use App\Tests\Support\FakeUpload;
+use DateTimeImmutable;
+use DI\ContainerBuilder;
+use Psr\Container\ContainerInterface;
+use ZipArchive;
+
+use function DI\autowire;
+use function DI\factory;
+
+/**
+ * Export a household, restore it somewhere else, and compare.
+ *
+ * Fidelity is the point of a backup, so the test restores into a *different*
+ * household with different user ids and asserts the result matches. Restoring
+ * into the same one would pass even if the code were quietly relying on ids
+ * that a real disaster-recovery run would not have.
+ *
+ * The other half is that the archive is treated as hostile. A backup file is
+ * untrusted input however it was produced — it has been off the server, and
+ * anybody can rename a zip.
+ */
+final class BackupRestoreTest extends DatabaseTestCase
+{
+    private ContainerInterface $container;
+    private BackupService $backups;
+    private SubscriptionService $subscriptions;
+    private CategoryService $categories;
+    private BudgetService $budgets;
+    private AttachmentService $attachments;
+
+    private Scope $source;
+    private Scope $target;
+    private \App\Domain\Entity\User $sourceUser;
+    private \App\Domain\Entity\User $targetUser;
+
+    private string $attachmentDirectory;
+    private string $logoDirectory;
+    private FrozenClock $clock;
+
+    /** @var list<string> */
+    private array $temporaryFiles = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->clock = new FrozenClock(new DateTimeImmutable('2026-06-01 09:00:00'));
+        $this->attachmentDirectory = sys_get_temp_dir() . '/renovo-backup-attach-' . bin2hex(random_bytes(6));
+        $this->logoDirectory = sys_get_temp_dir() . '/renovo-backup-logos-' . bin2hex(random_bytes(6));
+
+        $this->container = $this->buildContainer();
+        $this->backups = $this->container->get(BackupService::class);
+        $this->subscriptions = $this->container->get(SubscriptionService::class);
+        $this->categories = $this->container->get(CategoryService::class);
+        $this->budgets = $this->container->get(BudgetService::class);
+        $this->attachments = $this->container->get(AttachmentService::class);
+
+        $users = new UserRepository($this->db);
+        $households = new HouseholdRepository($this->db);
+        $memberships = new MembershipRepository($this->db);
+
+        // The source household has two members, so owner remapping by email has
+        // something to remap.
+        $ownerId = $users->create('owner@example.test', 'Owner', 'hash', false, $this->clock->now());
+        $partnerId = $users->create('partner@example.test', 'Partner', 'hash', false, $this->clock->now());
+        $sourceHousehold = $households->create('Source household', $ownerId);
+        $memberships->create($sourceHousehold, $ownerId, Role::OwnerAdmin);
+        $memberships->create($sourceHousehold, $partnerId, Role::Editor);
+
+        // The destination has the same two people — different user ids in a real
+        // restore, but here the same, which is enough for the email lookup to be
+        // doing the work rather than luck.
+        $targetOwnerId = $users->create('new-owner@example.test', 'New owner', 'hash', false, $this->clock->now());
+        $targetHousehold = $households->create('Target household', $targetOwnerId);
+        $memberships->create($targetHousehold, $targetOwnerId, Role::OwnerAdmin);
+        $memberships->create($targetHousehold, $partnerId, Role::Editor);
+
+        $this->sourceUser = $users->findById($ownerId);
+        $this->targetUser = $users->findById($targetOwnerId);
+
+        $this->source = Scope::forMember($ownerId, false, $sourceHousehold, Role::OwnerAdmin, IsolationMode::Shared);
+        $this->target = Scope::forMember(
+            $targetOwnerId,
+            false,
+            $targetHousehold,
+            Role::OwnerAdmin,
+            IsolationMode::Shared,
+        );
+
+        $this->partnerId = $partnerId;
+    }
+
+    private int $partnerId = 0;
+
+    protected function tearDown(): void
+    {
+        FakeUpload::cleanUp();
+
+        foreach ($this->temporaryFiles as $path) {
+            @unlink($path);
+        }
+
+        $this->removeDirectory($this->attachmentDirectory);
+        $this->removeDirectory($this->logoDirectory);
+
+        parent::tearDown();
+    }
+
+    public function testASourceHouseholdSurvivesTheRoundTrip(): void
+    {
+        $categoryId = $this->categories->create($this->source, 'Entertainment', '#112233');
+
+        $subscriptionId = $this->subscriptions->create($this->source, [
+            'name' => 'Streaming',
+            'price' => '10.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'start_date' => '2024-03-01',
+            'notes' => 'Shared with the house',
+            'category_id' => $categoryId,
+            'owner_user_id' => $this->partnerId,
+            'notice_period_amount' => '30',
+            'notice_period_unit' => 'days',
+            'tags' => 'video,family',
+        ]);
+
+        $this->subscriptions->create($this->source, [
+            'name' => 'Annual insurance',
+            'price' => '240.00',
+            'currency' => 'EUR',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'yearly',
+            'next_payment_date' => '2027-03-01',
+        ]);
+
+        $this->budgets->create($this->source, [
+            'name' => 'Fun money',
+            'amount' => '50.00',
+            'currency' => 'GBP',
+            'period' => 'monthly',
+            'category_id' => $categoryId,
+            'warn_threshold_percent' => '80',
+        ]);
+
+        $this->attachments->upload(
+            $this->source,
+            $this->sourceUser,
+            $subscriptionId,
+            FakeUpload::pdf('December invoice.pdf'),
+            '2026-12-01',
+        );
+
+        $archive = $this->export();
+
+        $summary = $this->backups->restore($this->target, $this->targetUser, $archive);
+
+        self::assertSame(2, $summary['subscriptions']);
+        self::assertSame(1, $summary['categories']);
+        self::assertSame(1, $summary['budgets']);
+        self::assertSame(1, $summary['attachments']);
+        self::assertSame(0, $summary['skipped']);
+
+        $restored = [];
+        foreach ($this->subscriptions->allForStats($this->target, activeOnly: false) as $subscription) {
+            $restored[$subscription->name] = $subscription;
+        }
+
+        self::assertArrayHasKey('Streaming', $restored);
+        self::assertArrayHasKey('Annual insurance', $restored);
+
+        $streaming = $restored['Streaming'];
+        self::assertSame(1099, $streaming->price->amountMinor);
+        self::assertSame('GBP', $streaming->price->currency);
+        self::assertSame('monthly', $streaming->billingCycle?->value);
+        self::assertSame('2026-12-01', $streaming->nextPaymentDate?->format('Y-m-d'));
+        self::assertSame('2024-03-01', $streaming->startDate?->format('Y-m-d'));
+        self::assertSame('Shared with the house', $streaming->notes);
+        self::assertSame('Entertainment', $streaming->categoryName);
+        self::assertSame(30, $streaming->noticePeriod->amount);
+        self::assertSame('days', $streaming->noticePeriod->unit);
+        self::assertEqualsCanonicalizing(
+            ['video', 'family'],
+            array_map(static fn ($tag): string => $tag->name, $streaming->tags),
+        );
+
+        // The member who exists in both households keeps their rows.
+        self::assertSame($this->partnerId, $streaming->ownerUserId);
+
+        self::assertSame(24000, $restored['Annual insurance']->price->amountMinor);
+        self::assertSame('EUR', $restored['Annual insurance']->price->currency);
+
+        $budgets = $this->budgets->all($this->target, activeOnly: false);
+        self::assertCount(1, $budgets);
+        self::assertSame('Fun money', $budgets[0]->name);
+        self::assertSame(5000, $budgets[0]->amount->amountMinor);
+        self::assertSame(80, $budgets[0]->warnThresholdPercent);
+        self::assertSame('Entertainment', $budgets[0]->categoryName);
+
+        // The file came back, with its name and its contents.
+        $attachments = $this->attachments->forSubscription($this->target, $streaming->id);
+        self::assertCount(1, $attachments);
+        self::assertSame('December invoice.pdf', $attachments[0]->originalFilename);
+        self::assertSame('application/pdf', $attachments[0]->mimeType);
+        self::assertSame('2026-12-01', $attachments[0]->periodDate?->format('Y-m-d'));
+
+        $path = $this->attachments->absolutePath($attachments[0]);
+        self::assertNotNull($path);
+        self::assertStringStartsWith('%PDF', (string) file_get_contents($path));
+    }
+
+    public function testAMemberWhoIsNoLongerHereHandsTheirRowsToTheRestorer(): void
+    {
+        $this->subscriptions->create($this->source, [
+            'name' => 'Partner only',
+            'price' => '5.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'owner_user_id' => $this->partnerId,
+        ]);
+
+        // A third household, which the partner is not a member of.
+        $elsewhere = $this->householdWithoutThePartner();
+
+        $this->backups->restore($elsewhere, $this->targetUser, $this->export());
+
+        $restored = $this->subscriptions->allForStats($elsewhere, activeOnly: false);
+
+        self::assertCount(1, $restored);
+        self::assertSame($elsewhere->userId, $restored[0]->ownerUserId);
+    }
+
+    public function testTheExportIsScopedToWhatTheExporterCanSee(): void
+    {
+        // The claim that makes a backup safe to offer to a household Owner: it
+        // is built through the scoping layer, not by dumping tables.
+        $this->subscriptions->create($this->target, [
+            'name' => 'Not in the source household',
+            'price' => '1.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ]);
+
+        $data = $this->readArchiveJson($this->export(), 'data.json');
+
+        self::assertSame([], $data['subscriptions']);
+    }
+
+    public function testAnArchiveWithAnEscapingEntryNameIsRefusedWholesale(): void
+    {
+        $this->subscriptions->create($this->source, [
+            'name' => 'Streaming',
+            'price' => '9.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ]);
+
+        $archive = $this->export();
+
+        // The classic zip-slip payload, added to an otherwise valid backup.
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($archive) === true);
+        $zip->addFromString('../../../../tmp/renovo-escaped.txt', 'pwned');
+        $zip->close();
+
+        try {
+            $this->backups->restore($this->target, $this->targetUser, $archive);
+            self::fail('An archive with an escaping entry name must be refused.');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey('file', $exception->errors());
+        }
+
+        // Refused wholesale: not one row of the otherwise-valid archive was
+        // written, and nothing was extracted.
+        self::assertSame([], $this->subscriptions->allForStats($this->target, activeOnly: false));
+        self::assertFileDoesNotExist('/tmp/renovo-escaped.txt');
+    }
+
+    public function testAnArchiveThatIsNotABackupIsRefused(): void
+    {
+        $path = $this->temporary();
+        $zip = new ZipArchive();
+        $zip->open($path, ZipArchive::OVERWRITE);
+        $zip->addFromString('manifest.json', json_encode(['format' => 'something-else'], JSON_THROW_ON_ERROR));
+        $zip->addFromString('data.json', '{}');
+        $zip->close();
+
+        $this->expectException(ValidationException::class);
+
+        $this->backups->restore($this->target, $this->targetUser, $path);
+    }
+
+    public function testAFileThatIsNotAZipIsRefused(): void
+    {
+        $path = $this->temporary();
+        file_put_contents($path, 'this is not a zip archive');
+
+        $this->expectException(ValidationException::class);
+
+        $this->backups->restore($this->target, $this->targetUser, $path);
+    }
+
+    public function testAnAttachmentInTheArchiveIsRevalidatedByItsContents(): void
+    {
+        $subscriptionId = $this->subscriptions->create($this->source, [
+            'name' => 'Streaming',
+            'price' => '9.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ]);
+
+        $this->attachments->upload(
+            $this->source,
+            $this->sourceUser,
+            $subscriptionId,
+            FakeUpload::pdf('invoice.pdf'),
+        );
+
+        $archive = $this->export();
+
+        // Swap the stored PDF for something that is not one, keeping the entry
+        // name. An archive is untrusted input however it was produced.
+        $zip = new ZipArchive();
+        $zip->open($archive);
+        $entry = null;
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = (string) $zip->getNameIndex($index);
+            if (str_starts_with($name, 'files/attachments/')) {
+                $entry = $name;
+            }
+        }
+        self::assertNotNull($entry);
+        $zip->addFromString($entry, "<?php echo 'not a pdf';");
+        $zip->close();
+
+        $summary = $this->backups->restore($this->target, $this->targetUser, $archive);
+
+        // The subscription comes back; the file does not.
+        self::assertSame(1, $summary['subscriptions']);
+        self::assertSame(0, $summary['attachments']);
+        self::assertSame(1, $summary['skipped']);
+    }
+
+    public function testTheTagVocabularyComesBackIncludingUnusedTags(): void
+    {
+        $this->subscriptions->create($this->source, [
+            'name' => 'Tagged',
+            'price' => '9.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'tags' => 'applied',
+        ]);
+
+        // A label made but not yet used. It has no subscription to travel with,
+        // so only the tag list carries it.
+        (new \App\Repository\TagRepository($this->db))->resolveOrCreate($this->source, ['unused']);
+
+        $summary = $this->backups->restore($this->target, $this->targetUser, $this->export());
+
+        self::assertSame(2, $summary['tags']);
+
+        $names = array_map(
+            static fn ($tag): string => $tag->name,
+            $this->container->get(\App\Service\TagService::class)->all($this->target),
+        );
+
+        self::assertEqualsCanonicalizing(['applied', 'unused'], $names);
+    }
+
+    public function testTheHouseholdNameIsExportedButNotImposedOnRestore(): void
+    {
+        // Deliberate: a restore lands in a household that already exists and
+        // already has a name its members chose.
+        $this->subscriptions->create($this->source, [
+            'name' => 'Anything',
+            'price' => '1.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ]);
+
+        $archive = $this->export();
+
+        self::assertSame('Source household', $this->readArchiveJson($archive, 'data.json')['household']['name']);
+
+        $this->backups->restore($this->target, $this->targetUser, $archive);
+
+        $households = new HouseholdRepository($this->db);
+        self::assertSame('Target household', $households->findById((int) $this->target->householdId)?->name);
+    }
+
+    public function testRestoringIsAdditiveAndNeverDeletes(): void
+    {
+        $this->subscriptions->create($this->target, [
+            'name' => 'Already here',
+            'price' => '1.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ]);
+
+        $this->subscriptions->create($this->source, [
+            'name' => 'From the archive',
+            'price' => '2.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ]);
+
+        $this->backups->restore($this->target, $this->targetUser, $this->export());
+
+        $names = array_map(
+            static fn ($subscription): string => $subscription->name,
+            $this->subscriptions->allForStats($this->target, activeOnly: false),
+        );
+
+        self::assertEqualsCanonicalizing(['Already here', 'From the archive'], $names);
+    }
+
+    private function export(): string
+    {
+        $path = $this->backups->export($this->source, $this->sourceUser, 'Test instance');
+        $this->temporaryFiles[] = $path;
+
+        return $path;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function readArchiveJson(string $archive, string $entry): array
+    {
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($archive) === true);
+        $contents = $zip->getFromName($entry);
+        $zip->close();
+
+        self::assertIsString($contents);
+
+        $decoded = json_decode($contents, true);
+        self::assertIsArray($decoded);
+
+        return $decoded;
+    }
+
+    private function householdWithoutThePartner(): Scope
+    {
+        $users = new UserRepository($this->db);
+        $households = new HouseholdRepository($this->db);
+        $memberships = new MembershipRepository($this->db);
+
+        $id = $users->create('solo@example.test', 'Solo', 'hash', false, $this->clock->now());
+        $householdId = $households->create('Solo household', $id);
+        $memberships->create($householdId, $id, Role::OwnerAdmin);
+
+        return Scope::forMember($id, false, $householdId, Role::OwnerAdmin, IsolationMode::Shared);
+    }
+
+    private function temporary(): string
+    {
+        $path = (string) tempnam(sys_get_temp_dir(), 'renovo-test-zip');
+        $this->temporaryFiles[] = $path;
+
+        return $path;
+    }
+
+    private function buildContainer(): ContainerInterface
+    {
+        $settings = require dirname(__DIR__, 2) . '/config/settings.php';
+        $settings['database'] = [
+            'driver' => $this->env('DB_DRIVER', 'pgsql'),
+            'host' => $this->env('DB_HOST', '127.0.0.1'),
+            'port' => (int) $this->env('DB_PORT', $this->env('DB_DRIVER', 'pgsql') === 'mysql' ? '3306' : '5432'),
+            'name' => $this->env('DB_NAME', 'renovo'),
+            'user' => $this->env('DB_USER', 'renovo'),
+            'password' => $this->env('DB_PASSWORD', 'renovo'),
+            'charset' => $this->env('DB_CHARSET', 'utf8'),
+        ];
+        $settings['uploads']['attachment_directory'] = $this->attachmentDirectory;
+        $settings['uploads']['logo_directory'] = $this->logoDirectory;
+
+        $builder = new ContainerBuilder();
+        (require dirname(__DIR__, 2) . '/config/container.php')($builder, $settings);
+
+        $builder->addDefinitions([
+            Clock::class => $this->clock,
+            AttachmentStorage::class => factory(
+                fn (): AttachmentStorage => new AttachmentStorage($this->attachmentDirectory, 1024 * 1024),
+            ),
+            BackupService::class => autowire(BackupService::class)
+                ->constructorParameter('logoDirectory', factory(fn (): string => $this->logoDirectory)),
+        ]);
+
+        return $builder->build();
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        foreach ((array) glob($directory . '/*') as $path) {
+            if (!is_string($path)) {
+                continue;
+            }
+
+            is_dir($path) ? $this->removeDirectory($path) : @unlink($path);
+        }
+
+        @rmdir($directory);
+    }
+}

@@ -12,9 +12,21 @@
 
 declare(strict_types=1);
 
+use App\Application\Api\ApiPath;
+use App\Application\Middleware\ApiAuthenticationMiddleware;
 use App\Application\Middleware\AuthenticationMiddleware;
+use App\Application\Middleware\FeedAuthenticationMiddleware;
 use App\Application\Middleware\RequirePermissionMiddleware;
+use App\Controller\Api\AttachmentApiController;
+use App\Controller\Api\CalendarApiController;
+use App\Controller\Api\MeApiController;
+use App\Controller\Api\OpenApiController;
+use App\Controller\Api\SubscriptionApiController;
+use App\Controller\Api\TaxonomyApiController;
+use App\Controller\ApiTokenController;
+use App\Controller\AttachmentController;
 use App\Controller\AuditLogController;
+use App\Controller\BackupController;
 use App\Controller\Auth\LoginController;
 use App\Controller\Auth\PasskeyLoginController;
 use App\Controller\Auth\PasswordResetController;
@@ -26,6 +38,7 @@ use App\Controller\CancellationController;
 use App\Controller\CategoryController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
+use App\Controller\ImportController;
 use App\Controller\NotificationController;
 use App\Controller\SecurityController;
 use App\Controller\SettingsController;
@@ -290,6 +303,68 @@ return static function (App $app): void {
         $group->post('/settings/trusted-hosts/{id:[0-9]+}/delete', [SettingsController::class, 'deleteTrustedHost'])
             ->add($requires(Permission::ManageInstance));
 
+        // ------------------------------------------------------------------
+        // Phase 5: interoperability
+        //
+        // Tokens are per-user, like notification channels and passkeys, so they
+        // name no permission — a token can never exceed the role of the account
+        // that issued it. Importing is an ordinary bulk write. Backups are not:
+        // an export is the whole household in one file and a restore adds rows
+        // wholesale, so both take the household-management role.
+        // ------------------------------------------------------------------
+        $group->get('/settings/api-tokens', [ApiTokenController::class, 'index'])
+            ->setName('api-tokens');
+
+        $group->post('/settings/api-tokens', [ApiTokenController::class, 'create']);
+
+        $group->post('/settings/api-tokens/{id:[0-9]+}/revoke', [ApiTokenController::class, 'revoke']);
+
+        $group->get('/import', [ImportController::class, 'start'])
+            ->setName('import')
+            ->add($requires(Permission::ImportData));
+
+        $group->post('/import', [ImportController::class, 'upload'])
+            ->add($requires(Permission::ImportData));
+
+        $group->get('/import/map', [ImportController::class, 'map'])
+            ->setName('import-map')
+            ->add($requires(Permission::ImportData));
+
+        $group->post('/import/preview', [ImportController::class, 'preview'])
+            ->add($requires(Permission::ImportData));
+
+        $group->post('/import/commit', [ImportController::class, 'commit'])
+            ->add($requires(Permission::ImportData));
+
+        $group->post('/import/cancel', [ImportController::class, 'cancel'])
+            ->add($requires(Permission::ImportData));
+
+        $group->get('/settings/backup', [BackupController::class, 'index'])
+            ->setName('backup')
+            ->add($requires(Permission::ManageBackups));
+
+        $group->post('/settings/backup/export', [BackupController::class, 'export'])
+            ->add($requires(Permission::ManageBackups));
+
+        $group->post('/settings/backup/restore', [BackupController::class, 'restore'])
+            ->add($requires(Permission::ManageBackups));
+
+        $group->post('/subscriptions/{id:[0-9]+}/attachments', [AttachmentController::class, 'upload'])
+            ->add($requires(Permission::ManageAttachments));
+
+        // A download is a read. What decides whether this caller may make it is
+        // the scoped lookup inside the controller, not this permission: another
+        // household's attachment id returns 404 from the repository.
+        $group->get(
+            '/subscriptions/{id:[0-9]+}/attachments/{attachmentId:[0-9]+}',
+            [AttachmentController::class, 'download'],
+        )->add($requires(Permission::ViewSubscriptions));
+
+        $group->post(
+            '/subscriptions/{id:[0-9]+}/attachments/{attachmentId:[0-9]+}/delete',
+            [AttachmentController::class, 'delete'],
+        )->add($requires(Permission::ManageAttachments));
+
         // The wizard's second step. Inside the authenticated group because it
         // runs after the administrator account exists — see
         // SetupGuardMiddleware for why this one /setup path stays open.
@@ -300,4 +375,93 @@ return static function (App $app): void {
 
         $group->post('/setup/notifications/finish', [SetupController::class, 'finishNotifications']);
     })->add(AuthenticationMiddleware::class);
+
+    // ----------------------------------------------------------------------
+    // Phase 5: the versioned API
+    //
+    // Mounted outside the authenticated group, because it authenticates
+    // differently: a bearer token and never a session cookie. That is what lets
+    // CsrfMiddleware skip these paths — with no ambient credential there is
+    // nothing for a forged request to ride on. See TokenAuthenticationMiddleware.
+    //
+    // Every route below still names the permission it needs, and the scope it
+    // runs under is built by the same ScopeFactory the browser uses, so roles
+    // and isolation are enforced here by exactly the same code.
+    // ----------------------------------------------------------------------
+
+    // The description of the API is public: a client needs it in order to learn
+    // how to authenticate, and it contains no instance data.
+    $app->get(ApiPath::PREFIX . '/openapi.yaml', [OpenApiController::class, 'asYaml'])->setName('openapi-yaml');
+    $app->get(ApiPath::PREFIX . '/openapi.json', [OpenApiController::class, 'asJson'])->setName('openapi-json');
+
+    // The calendar feed, and only the calendar feed, accepts its token in the
+    // query string — a calendar client cannot send a header. It is a separate
+    // middleware rather than a condition inside the shared one, so a route
+    // cannot end up accepting URL credentials by being added in the wrong place.
+    $app->get(ApiPath::PREFIX . '/calendar.ics', [CalendarApiController::class, 'feed'])
+        ->setName('calendar-feed')
+        ->add($requires(Permission::ViewSubscriptions))
+        ->add(FeedAuthenticationMiddleware::class);
+
+    $app->group(ApiPath::PREFIX, function (RouteCollectorProxy $group) use ($requires): void {
+        $group->get('/me', [MeApiController::class, 'show']);
+
+        $group->get('/subscriptions', [SubscriptionApiController::class, 'index'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post('/subscriptions', [SubscriptionApiController::class, 'create'])
+            ->add($requires(Permission::CreateSubscription));
+
+        $group->get('/subscriptions/{id:[0-9]+}', [SubscriptionApiController::class, 'show'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        // Full replace. There is no PATCH: the service's input is
+        // absence-sensitive, so a partial body is the one shape that could
+        // half-write a row. See SubscriptionPayload.
+        $group->put('/subscriptions/{id:[0-9]+}', [SubscriptionApiController::class, 'update'])
+            ->add($requires(Permission::UpdateSubscription));
+
+        $group->delete('/subscriptions/{id:[0-9]+}', [SubscriptionApiController::class, 'delete'])
+            ->add($requires(Permission::DeleteSubscription));
+
+        $group->post('/subscriptions/{id:[0-9]+}/logo', [SubscriptionApiController::class, 'uploadLogo'])
+            ->add($requires(Permission::UpdateSubscription));
+
+        $group->delete('/subscriptions/{id:[0-9]+}/logo', [SubscriptionApiController::class, 'deleteLogo'])
+            ->add($requires(Permission::UpdateSubscription));
+
+        $group->get('/subscriptions/{id:[0-9]+}/attachments', [AttachmentApiController::class, 'index'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post('/subscriptions/{id:[0-9]+}/attachments', [AttachmentApiController::class, 'upload'])
+            ->add($requires(Permission::ManageAttachments));
+
+        $group->get(
+            '/subscriptions/{id:[0-9]+}/attachments/{attachmentId:[0-9]+}',
+            [AttachmentApiController::class, 'download'],
+        )->add($requires(Permission::ViewSubscriptions));
+
+        $group->delete(
+            '/subscriptions/{id:[0-9]+}/attachments/{attachmentId:[0-9]+}',
+            [AttachmentApiController::class, 'delete'],
+        )->add($requires(Permission::ManageAttachments));
+
+        $group->get('/categories', [TaxonomyApiController::class, 'categories'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post('/categories', [TaxonomyApiController::class, 'createCategory'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->put('/categories/{id:[0-9]+}', [TaxonomyApiController::class, 'updateCategory'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->delete('/categories/{id:[0-9]+}', [TaxonomyApiController::class, 'deleteCategory'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->get('/tags', [TaxonomyApiController::class, 'tags'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->delete('/tags/{id:[0-9]+}', [TaxonomyApiController::class, 'deleteTag'])
+            ->add($requires(Permission::ManageTags));
+    })->add(ApiAuthenticationMiddleware::class);
 };

@@ -18,6 +18,10 @@
                class="{{ current_path starts with '/categories' ? 'is-active' : '' }}">Categories</a>
             <a href="/settings/notifications"
                class="{{ current_path starts with '/settings/notifications' ? 'is-active' : '' }}">Alerts</a>
+            {% if can(scope, 'data.import') %}
+                <a href="/import"
+                   class="{{ current_path starts with '/import' ? 'is-active' : '' }}">Import</a>
+            {% endif %}
             {% if can(scope, 'audit.view') %}
                 <a href="/audit"
                    class="{{ current_path starts with '/audit' ? 'is-active' : '' }}">Audit</a>

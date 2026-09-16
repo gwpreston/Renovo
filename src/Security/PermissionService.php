@@ -32,9 +32,15 @@ final class PermissionService
             Permission::ManagePrices,
             Permission::ManageSplits,
             Permission::RecordUsage,
-            Permission::BulkEdit => $scope->canWrite(),
+            Permission::BulkEdit,
+            Permission::ManageAttachments,
+            Permission::ImportData => $scope->canWrite(),
 
-            Permission::ManageHousehold => $scope->canManageHousehold(),
+            // Restoring a backup replaces what the household holds, so it asks
+            // for the role that may manage the household rather than the one
+            // that may edit a row in it.
+            Permission::ManageHousehold,
+            Permission::ManageBackups => $scope->canManageHousehold(),
 
             // Two independent routes to the log, and the repository decides
             // which rows each one gets: instance-wide for an administrator,

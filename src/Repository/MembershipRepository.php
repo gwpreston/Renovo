@@ -75,12 +75,13 @@ final class MembershipRepository extends AbstractRepository
     /**
      * Members of a household, for the owner/payer pick-lists.
      *
-     * @return list<array{id: int, display_name: string, role: string}>
+     * @return list<array{id: int, display_name: string, email: string, role: string}>
      */
     public function findMembersOfHousehold(int $householdId): array
     {
         $rows = $this->db->fetchAll(
             'SELECT u.' . $this->quote('id') . ' AS id, u.' . $this->quote('display_name') . ' AS display_name,'
+            . ' u.' . $this->quote('email') . ' AS email,'
             . ' m.' . $this->quote('role') . ' AS role'
             . ' FROM ' . $this->quote('household_memberships') . ' m'
             . ' INNER JOIN ' . $this->quote('users') . ' u ON u.' . $this->quote('id')
@@ -94,6 +95,9 @@ final class MembershipRepository extends AbstractRepository
             static fn (array $row): array => [
                 'id' => (int) $row['id'],
                 'display_name' => (string) $row['display_name'],
+                // Carried because a backup identifies members by address: ids
+                // mean nothing in the instance an archive is restored into.
+                'email' => (string) $row['email'],
                 'role' => (string) $row['role'],
             ],
             $rows,

@@ -29,6 +29,14 @@ enum Permission: string
 
     case ManageHousehold = 'household.manage';
 
+    // Phase 5. Attaching an invoice and importing a file are both ordinary
+    // writes to household data, so they sit with the other write permissions.
+    // Restoring a backup is not: it rewrites the household wholesale, which is
+    // a household-management act however it is dressed up.
+    case ManageAttachments = 'attachment.manage';
+    case ImportData = 'data.import';
+    case ManageBackups = 'backup.manage';
+
     // Reading the audit log. Not a household-data permission: what it grants is
     // sight of who did what, which an instance administrator has instance-wide
     // and a household Owner has for their own household.

@@ -1,0 +1,58 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Backup and restore — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <h1>Backup and restore</h1>
+
+    <section class="card">
+        <h2>Export</h2>
+
+        <p>
+            Downloads a ZIP containing everything this household has: its subscriptions,
+            categories, tags, budgets, logos and attached invoices, as JSON plus the original
+            files. Nothing in it needs a database to read.
+        </p>
+
+        <p class="muted">
+            It contains what <em>you</em> can see. If this instance keeps members' data separate,
+            your export has your own subscriptions and not other members'.
+        </p>
+
+        <p class="muted">
+            Not included: user accounts, passwords, API tokens, the audit log and instance-wide
+            settings. Those belong to the server rather than to this household.
+        </p>
+
+        <form method="post" action="/settings/backup/export" class="inline">
+            {{ csrf_field() }}
+            <button type="submit" class="button button-primary">Download backup</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Restore</h2>
+
+        <p>
+            Reads a backup archive back into this household. It <strong>adds</strong> — nothing is
+            deleted or overwritten, so restoring the same file twice leaves two copies of
+            everything.
+        </p>
+
+        <p class="muted">
+            Members are matched by email address. A subscription whose owner is no longer in this
+            household comes back owned by you, and every file in the archive is re-checked before
+            it is stored.
+        </p>
+
+        <form method="post" action="/settings/backup/restore" enctype="multipart/form-data" class="stack"
+              onsubmit="return confirm('Restore this archive into the current household?')">
+            {{ csrf_field() }}
+
+            <label for="restore-archive">Backup archive (format {{ format_version }})</label>
+            <input type="file" id="restore-archive" name="archive" accept=".zip,application/zip" required>
+
+            <button type="submit" class="button">Restore</button>
+        </form>
+    </section>
+{% endblock %}

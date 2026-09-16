@@ -50,8 +50,13 @@ FROM base AS app
 COPY --from=vendor /var/www/html/vendor ./vendor
 COPY . .
 
+# var/attachments and var/imports are created here rather than left to the
+# application so their mode is set once, at build time. Both hold user files
+# that are never web-served — invoices and receipts in the first, in-progress
+# uploads in the second — so they are 0750 rather than the 0755 a cache wants.
 RUN composer dump-autoload --no-dev --optimize --no-interaction \
-    && mkdir -p var/cache var/log public/assets/logos \
+    && mkdir -p var/cache var/log var/attachments var/imports public/assets/logos \
+    && chmod 750 var/attachments var/imports \
     && chown -R www-data:www-data var public/assets/logos
 
 USER www-data

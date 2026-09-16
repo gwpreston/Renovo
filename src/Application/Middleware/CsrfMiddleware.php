@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Middleware;
 
+use App\Application\Api\ApiPath;
 use App\Security\CsrfTokenManager;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -20,6 +21,15 @@ use Slim\Exception\HttpBadRequestException;
  *
  * Applied globally rather than per route: a new POST route is protected the
  * moment it exists, instead of when somebody remembers to protect it.
+ *
+ * The one exemption is a bearer-token request to the API, and it is safe for
+ * one reason only: TokenAuthenticationMiddleware never reads the session, so
+ * such a request cannot be authenticated by a cookie the browser attached on
+ * its own. That is what CSRF protects against, and with no ambient credential
+ * there is nothing to forge. Note that the exemption needs *both* conditions —
+ * a cookie-authenticated POST to an API path still has to carry a token, so a
+ * route mounted there without the API middleware does not silently lose its
+ * protection.
  */
 final class CsrfMiddleware implements MiddlewareInterface
 {
@@ -32,6 +42,10 @@ final class CsrfMiddleware implements MiddlewareInterface
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         if (in_array(strtoupper($request->getMethod()), self::SAFE_METHODS, true)) {
+            return $handler->handle($request);
+        }
+
+        if (ApiPath::matches($request) && ApiPath::hasBearerCredential($request)) {
             return $handler->handle($request);
         }
 

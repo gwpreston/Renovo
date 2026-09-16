@@ -50,6 +50,19 @@ enum AuditAction: string
     case TrustedHostAdded = 'trusted_host.added';
     case TrustedHostRemoved = 'trusted_host.removed';
 
+    // Phase 5. A token is a standing credential, so both ends of its life are
+    // recorded; what is deliberately absent is a "token used" event, which
+    // would write a row on every API call and drown the log it belongs to.
+    case ApiTokenIssued = 'api_token.issued';
+    case ApiTokenRevoked = 'api_token.revoked';
+
+    case DataImported = 'data.imported';
+    case BackupExported = 'backup.exported';
+    case BackupRestored = 'backup.restored';
+
+    case AttachmentUploaded = 'attachment.uploaded';
+    case AttachmentDeleted = 'attachment.deleted';
+
     /**
      * A short description for the log view. Kept here rather than in a template
      * because the API phase will want the same wording.
@@ -80,6 +93,13 @@ enum AuditAction: string
             self::RoleChanged => 'Household role changed',
             self::TrustedHostAdded => 'Trusted host added',
             self::TrustedHostRemoved => 'Trusted host removed',
+            self::ApiTokenIssued => 'API token issued',
+            self::ApiTokenRevoked => 'API token revoked',
+            self::DataImported => 'Data imported',
+            self::BackupExported => 'Backup exported',
+            self::BackupRestored => 'Backup restored',
+            self::AttachmentUploaded => 'Attachment uploaded',
+            self::AttachmentDeleted => 'Attachment deleted',
         };
     }
 

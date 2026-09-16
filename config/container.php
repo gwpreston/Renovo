@@ -48,6 +48,10 @@ use App\Service\Notification\NotificationDispatcher;
 use App\Service\Notification\NotificationRateLimiter;
 use App\Service\Notification\ReminderRunner;
 use App\Service\TrustedHostService;
+use App\Application\Api\OpenApiDocument;
+use App\Service\AttachmentStorage;
+use App\Service\BackupService;
+use App\Service\ImportService;
 use App\Service\LogoStorage;
 use App\Service\SetupService;
 use App\Service\MailerService;
@@ -344,6 +348,39 @@ return static function (ContainerBuilder $builder, array $settings): void {
 
             return new LogoStorage($uploads['logo_directory'], $uploads['logo_max_bytes']);
         },
+
+        // ------------------------------------------------------------------
+        // Phase 5: interoperability
+        //
+        // Each of these takes a filesystem path from configuration, which is
+        // the only reason it is listed here rather than autowired.
+        // ------------------------------------------------------------------
+        AttachmentStorage::class => static function (ContainerInterface $c): AttachmentStorage {
+            $uploads = $c->get('settings')['uploads'];
+
+            return new AttachmentStorage(
+                $uploads['attachment_directory'],
+                $uploads['attachment_max_bytes'],
+            );
+        },
+
+        ImportService::class => autowire(ImportService::class)
+            ->constructorParameter(
+                'directory',
+                factory(static fn (ContainerInterface $c): string => $c->get('settings')['paths']['imports']),
+            ),
+
+        BackupService::class => autowire(BackupService::class)
+            ->constructorParameter(
+                'logoDirectory',
+                factory(
+                    static fn (ContainerInterface $c): string => $c->get('settings')['uploads']['logo_directory'],
+                ),
+            ),
+
+        OpenApiDocument::class => static fn (ContainerInterface $c): OpenApiDocument => new OpenApiDocument(
+            $c->get('settings')['paths']['openapi'],
+        ),
 
         MoneyFormatter::class => static fn (ContainerInterface $c): MoneyFormatter => new MoneyFormatter(
             $c->get('settings')['app']['locale'],

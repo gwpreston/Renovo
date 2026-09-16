@@ -121,6 +121,34 @@ final class SubscriptionService
     }
 
     /**
+     * Check an input without writing anything.
+     *
+     * The importer's preview needs to tell a user which of four hundred rows
+     * will fail *before* any of them is written. It could not do that by
+     * reimplementing the rules — they would drift within a release — and it must
+     * not do it by attempting the writes and rolling back, which on MySQL would
+     * not roll back the auto-increment and on either engine would fire the
+     * price-history writes. So the same `validate()` the real write uses is
+     * offered here with its result caught.
+     *
+     * @param array<string, mixed> $input
+     * @return array<string, string> Field errors; empty when the row is valid.
+     */
+    public function validationErrors(Scope $scope, array $input): array
+    {
+        try {
+            // Tags are not resolved on a dry run. `validate()` creates any tag
+            // it does not recognise, and a preview that invented forty tags the
+            // user then decided not to import would leave them behind.
+            $this->validate($scope, $input, resolveTags: false);
+        } catch (ValidationException $exception) {
+            return $exception->errors();
+        }
+
+        return [];
+    }
+
+    /**
      * Validate the trial fields.
      *
      * A trial is only meaningful on something that recurs: a one-off purchase
@@ -256,6 +284,19 @@ final class SubscriptionService
         $this->subscriptions->delete($scope, $id);
     }
 
+    /**
+     * Attach or clear a subscription's logo.
+     *
+     * Separate from `update()` because the logo is a file: the form sends it as
+     * a multipart part and the API has an endpoint of its own, so neither one
+     * carries it in the field set that `validate()` sees. The stored path only
+     * ever comes from LogoStorage, which chose the name itself.
+     */
+    public function setLogo(Scope $scope, int $id, ?string $logoPath): void
+    {
+        $this->subscriptions->update($scope, $id, ['logo_path' => $logoPath], $this->currentTagIds($scope, $id));
+    }
+
     public function setActive(Scope $scope, int $id, bool $active): void
     {
         $this->subscriptions->update($scope, $id, ['is_active' => $active], $this->currentTagIds($scope, $id));
@@ -366,8 +407,12 @@ final class SubscriptionService
      * @return array{0: array<string, mixed>, 1: list<int>}
      * @throws ValidationException
      */
-    private function validate(Scope $scope, array $input, ?int $existingId = null): array
-    {
+    private function validate(
+        Scope $scope,
+        array $input,
+        ?int $existingId = null,
+        bool $resolveTags = true,
+    ): array {
         $errors = [];
 
         $name = trim($this->str($input, 'name'));
@@ -480,7 +525,7 @@ final class SubscriptionService
         }
 
         /** @var Money $price */
-        $tagIds = $this->tags->resolveOrCreate($scope, $this->tagNames($input));
+        $tagIds = $resolveTags ? $this->tags->resolveOrCreate($scope, $this->tagNames($input)) : [];
 
         $data = [
             'name' => $name,

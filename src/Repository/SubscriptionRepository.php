@@ -514,6 +514,24 @@ final class SubscriptionRepository extends AbstractScopedRepository
         return $row === null ? null : $this->hydrateAll($scope, [$row])[0];
     }
 
+    /**
+     * Whether this scope may *change* the subscription, as opposed to see it.
+     *
+     * The two differ by exactly one case, and it is the case that matters here:
+     * a member listed on a shared-cost split can read a subscription they do
+     * not own, because `readVisibilityPredicate()` widens the read predicate for
+     * them. The write predicate is not widened, so this returns false for them.
+     *
+     * Exposed because attaching a document to a subscription is a change to its
+     * record rather than a read of it, and the attachment service has no other
+     * way to ask. Everything else in this class asks the same question
+     * internally through `assertInScope()`.
+     */
+    public function isWritable(Scope $scope, int $id): bool
+    {
+        return $this->existsForWrite($scope, $id);
+    }
+
     private function assertInScope(Scope $scope, int $id): void
     {
         if (!$this->existsForWrite($scope, $id)) {

@@ -1,0 +1,67 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Map columns — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <h1>Map the columns</h1>
+
+    <p class="muted">
+        <strong>{{ filename }}</strong> — {{ row_count }} row{{ row_count == 1 ? '' : 's' }}.
+        Suggested using “{{ preset_label }}”. Change anything that looks wrong; “Do not import”
+        leaves a field empty.
+    </p>
+
+    <form method="post" action="/import/preview" class="stack">
+        {{ csrf_field() }}
+
+        <section class="card">
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Column in your file</th>
+                        <th>Example</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for field in fields %}
+                        {% set chosen = mapping[field.value] ?? '' %}
+                        <tr>
+                            <td>
+                                <label for="map-{{ field.value }}">
+                                    {{ field.label() }}{{ field.isRequired() ? ' *' : '' }}
+                                </label>
+                                {% if field.hint() %}
+                                    <span class="field-hint">{{ field.hint() }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <select id="map-{{ field.value }}" name="mapping[{{ field.value }}]">
+                                    <option value="">Do not import</option>
+                                    {% for header in headers %}
+                                        <option value="{{ header }}"
+                                                {{ chosen == header ? 'selected' : '' }}>{{ header }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td class="muted">
+                                {%- if chosen and sample|length > 0 -%}
+                                    {{ sample[0][chosen]|default('')|slice(0, 40) }}
+                                {%- endif -%}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="field-hint">* Name and price are required. A row missing either is skipped.</p>
+        </section>
+
+        <div class="form-actions">
+            <button type="submit" class="button button-primary">Preview</button>
+            <button type="submit" class="button button-quiet" formaction="/import/cancel">Cancel</button>
+        </div>
+    </form>
+{% endblock %}

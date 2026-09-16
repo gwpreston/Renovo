@@ -3,7 +3,8 @@
 A self-hosted tracker for subscriptions and recurring bills. Multi-user,
 permission-scoped, with multi-currency totals, budgets, a twelve-month forecast,
 price history, free-trial tracking, shared-cost splitting, upcoming-renewal
-windows, notice periods and a light/dark interface.
+windows, notice periods, a versioned JSON API, CSV/JSON import, whole-household
+backups, a calendar feed, attached invoices and a light/dark interface.
 
 Built in phases:
 
@@ -28,8 +29,21 @@ Built in phases:
   second factor), an audit log an administrator or household Owner can read, and
   a list of active sessions you can revoke one at a time or all at once. See
   [Signing in](#signing-in).
+- **Phase 5 — API, interoperability and files — complete.** A versioned
+  `/api/v1` with full subscription CRUD including edit, authenticated by tokens
+  you issue and revoke yourself; an OpenAPI 3 document that is the contract
+  rather than a description of it, checked against the routes in CI; a CSV/JSON
+  importer that maps columns and previews every row before writing any of them;
+  whole-household backup and restore, files included, without touching the
+  database; a read-only iCalendar feed of renewals, trial conversions and
+  cancellation deadlines; and invoices or receipts attached to a subscription,
+  stored outside the web root. See [The API](#the-api),
+  [Importing](#importing), [Backup and restore](#backup-and-restore),
+  [Calendar feed](#calendar-feed) and
+  [Invoices and receipts](#invoices-and-receipts).
 
-Still to come: OIDC/SSO, a versioned JSON API, and internationalisation.
+Still to come: OIDC/SSO, internationalisation, a calendar *view*, and UX
+polish.
 
 See `PHASE.md` for what is in scope now and `SPEC.md` for the whole plan.
 
@@ -191,7 +205,8 @@ vendor/bin/phinx seed:run    # a few starter categories (run after setup)
 php bin/console list
 php bin/console reminders:run       # send due reminders and budget alerts
 php bin/console rates:refresh       # fetch and cache exchange rates
-php bin/console maintenance:prune   # expired sessions, tokens, throttle, notification and audit records
+php bin/console maintenance:prune   # expired sessions, tokens, throttle, notification and audit
+                                    # records, plus abandoned import uploads
 ```
 
 The `scheduler` container runs `reminders:run` and `maintenance:prune` once a
@@ -266,7 +281,11 @@ CI runs the whole suite against **both** PostgreSQL and MySQL.
 public/       Web root. index.php and static assets, nothing else.
 src/
   Controller/ Thin. Translate HTTP to a service call and back.
-  Service/    All business logic. The API in a later phase calls these too.
+  Controller/Api/  The same, for JSON. Calls the identical services.
+  Application/Api/ The API's representation, its JSON input translation,
+              and the OpenAPI document reader.
+  Service/    All business logic. Web controllers and API endpoints share it.
+  Service/Import/  Parsing a CSV or JSON upload and mapping its columns.
   Repository/ All persistence. The only place SQL is written.
   Security/   Scope, permissions, password hashing, CSRF, sessions.
   Persistence/ PDO wrapper and the PostgreSQL/MySQL differences.
@@ -279,6 +298,10 @@ src/
 templates/    Twig. No logic.
 config/       Settings, container, middleware, routes.
 migrations/   Phinx migrations and seeds.
+openapi/      The API contract. Hand-written, served as-is, checked against
+              the route table in CI.
+var/          Not web-accessible. Caches, logs, attached invoices, and
+              in-progress imports. Back this up alongside the database.
 ```
 
 Four rules hold the design together:
@@ -570,6 +593,187 @@ the reset may well have been prompted by somebody else having one.
 
 ---
 
+## The API
+
+Everything the web interface can do to a subscription, `/api/v1` can do too —
+including editing, field by field, rather than delete-and-recreate. Both call
+the same services, so the billing-cycle rules, the trial checks and the
+ISOLATED-mode owner override behave identically whichever door a request comes
+through.
+
+### Tokens
+
+Issue one under **Settings → API tokens**. A token looks like
+`rnv_<public id>_<secret>`; only a hash of the secret is stored, so it is shown
+once and cannot be recovered. Choose **read-only** unless something genuinely
+needs to make changes.
+
+A token narrows and never grants. The request runs under the household role of
+the account that issued it, so a Viewer's "read and write" token still cannot
+write — it fails the same permission check the browser would. A read-only token
+is refused any unsafe method outright, before a route runs.
+
+```bash
+curl -H "Authorization: Bearer rnv_..." http://localhost:8080/api/v1/subscriptions
+```
+
+Session cookies are **not** accepted. That is deliberate rather than an
+oversight: because no ambient browser credential can authenticate an API
+request, there is nothing for a cross-site request to forge, which is what makes
+it safe for these paths to be exempt from CSRF tokens.
+
+### The contract
+
+`openapi/openapi.yaml` is the source of truth — written by hand, served verbatim
+at **/api/v1/openapi.yaml** (and converted at **/api/v1/openapi.json**), and
+checked against the application's own route table in CI **in both directions**.
+Add an endpoint without describing it and the build fails; describe one that does
+not exist and the build fails too.
+
+A few things worth knowing before writing a client:
+
+- **Money is an integer in minor units** beside its currency: `price_minor:
+  1999` with `currency: "GBP"` is £19.99. Never a decimal — 19.99 is not
+  representable as a binary float, which is most of the reason this application
+  stores integers everywhere.
+- **`PUT` replaces; there is no `PATCH`.** To change one field, `GET` the
+  resource, edit the representation and `PUT` it back. A partial body would
+  clear the fields it omitted.
+- **`reminder_days` has three states**, and they are all different: omitted or
+  `null` means "use my notification preference", `[]` means "never remind me
+  about this one", and `[30, 7, 1]` sets lead times for this subscription alone.
+- **A 404 means "no such row, or not yours"**, deliberately indistinguishable,
+  so probing for another household's ids tells you nothing.
+- Errors are JSON: `{"error": {"status", "title", "message", "errors"}}`, where
+  `errors` maps a field name to a message and appears on a 422.
+
+Start with `GET /api/v1/me`, which reports the role, the isolation mode and the
+resolved permission list for the token you are holding.
+
+**Not in version 1:** shared-cost splits, scheduled price changes and the usage
+counter. All three are editable in the web interface, and all three are
+sub-resources with rules of their own — a split has to total its shares, a
+scheduled price has an effective date that interacts with the price history —
+so rather than fix a shape now that would be awkward to change once clients
+depend on it, they read as part of a subscription (`split_mode`, `usage_count`,
+`usage_rating`) and are written through the web interface. The OpenAPI document
+says so too.
+
+---
+
+## Importing
+
+**Import** in the navigation takes a CSV or JSON file through four steps: upload,
+map the columns, preview, commit. Nothing is written until the last one.
+
+The preview is the point. Every other tracker's export uses different column
+names and different words for a billing cycle, so the mapping screen shows what
+was guessed and lets you correct it, and the preview then shows every row as it
+will be created — with any row that cannot be imported marked and explained.
+Validation there is the *same* code that validates the form, so a row the
+preview calls valid is one that will be written.
+
+- CSV (comma, semicolon or tab separated, with or without a byte-order mark) and
+  JSON, up to 2000 rows.
+- Presets for this application's own export, Wallos and a generic spreadsheet,
+  plus automatic detection that handles most files on its own. A preset is only
+  a starting point — you confirm the mapping before anything happens.
+- Prices go through the same parser as the form, which knows that `1,234.56` and
+  `1.234,56` are the same number and how many decimal places a currency has.
+- Dates: `YYYY-MM-DD` is tried first because it is unambiguous. `01/03/2026` is
+  read **day-first**, so a file written the American way will import dates that
+  are wrong — which the preview shows you before you commit.
+- Categories are created by name if they do not already exist; so are tags.
+
+Imported rows land in your household with the ordinary owner rules, exactly as if
+you had typed them in.
+
+---
+
+## Backup and restore
+
+**Settings → Backup and restore** downloads a ZIP of everything the household
+has: subscriptions, categories, tags, budgets, logos and attached invoices, as
+JSON plus the original files. Nothing in it needs a database to read.
+
+It is built through the scoping layer rather than by dumping tables, which means
+it contains what *you* can see — on an ISOLATED instance, your own subscriptions
+and not other members'. Deliberately **not** included: user accounts, passwords,
+API tokens, the audit log and instance-wide settings. Those belong to the server
+rather than to the household, and a household Owner who could round-trip them
+would be able to reconfigure the instance through the backup screen. Members are
+referenced by email address, which is enough to restore a subscription to the
+right owner and not enough to create an account.
+
+Restoring is **additive**: it creates rows and never deletes or overwrites any,
+so restoring the same file twice leaves two of everything. A member who is still
+in the household keeps their rows; one who has gone hands theirs to whoever is
+doing the restore. The household's own name is in the archive but is not applied
+— you are restoring into a household that already exists and already has a name
+somebody chose.
+
+An archive is treated as hostile input however it was produced. Entry names are
+checked against a strict pattern before anything is extracted — an archive
+containing a `../` path is refused whole, not sanitised — and every logo and
+invoice inside it is re-validated by its magic bytes exactly as an upload is.
+
+Both routes need the household-management role. An export is every price and
+note in the household in one file, and a restore adds rows in bulk.
+
+> A backup archive is not a substitute for backing up the database and the
+> `var/` directory. It is what makes a household portable between instances.
+
+---
+
+## Calendar feed
+
+Subscribe to **/api/v1/calendar.ics?token=…** in any calendar application and
+you get renewals for the next year, the day each trial converts, and the last
+day to cancel each subscription before its notice period makes that impossible.
+The third is the one a calendar is genuinely better at than a notification: it
+is a deadline, and seeing it a fortnight out is the whole point.
+
+The URL is shown, ready to copy, under **Settings → API tokens**.
+
+Every event is a whole-day event — a billing date is a date, not an instant —
+and its identifier is stable, so a client that refetches on a timer recognises
+what it already has instead of duplicating it.
+
+This is the one endpoint that takes its credential in the URL, because a calendar
+client cannot send an `Authorization` header. It compensates by accepting
+**read-only tokens only**: a write-capable token is refused rather than quietly
+downgraded, because a credential that can change data does not belong in a URL
+that will sit in a calendar application for years.
+
+---
+
+## Invoices and receipts
+
+Attach a PDF or an image to a subscription from its **money** page, optionally
+tagged with the billing period it covers. Attaching needs the same access as
+*editing* the subscription, not merely seeing it — which on an ISOLATED instance
+means its owner, since an attachment inherits the subscription's visibility and
+one you could not see would be of no use to anybody.
+
+Unlike logos, these are **not** under `public/`. An invoice has an address and a
+card number on it, so the files live outside the web root — under `var/` by
+default, which docker-compose already keeps on a persistent volume — and the only
+way to read one is a route that asks the same questions about the subscription
+that every other read asks. Another household gets a 404; so does a member who
+cannot see the subscription on an ISOLATED instance.
+
+What a file *is* comes from its contents, never from its name or the type the
+browser declared: PDF, PNG, JPEG, WebP and GIF are accepted and everything else
+is rejected, so a `.pdf` full of PHP does not get stored. The name on disk is
+chosen by the application, the original is kept for display and for the download
+filename, and files are served with the detected type, `nosniff` and
+`Content-Disposition: attachment`.
+
+Set the ceiling with `UPLOAD_MAX_ATTACHMENT_BYTES` (10 MB by default) and the
+location with `ATTACHMENT_DIRECTORY`.
+
+---
+
 ## Security
 
 - Passwords hashed with **argon2id**, falling back to bcrypt only where the PHP
@@ -610,6 +814,28 @@ the reset may well have been prompted by somebody else having one.
 - Logos are **uploaded, never fetched**: the image type is detected from the
   file itself, the name is replaced with a random one, and nginx refuses to
   execute anything in the upload directory.
+- **API tokens are stored as hashes**, split into a public identifier and a
+  secret so that verifying one is a single indexed read rather than a scan. They
+  can be given an expiry, revoked at any moment, and can only ever be weaker
+  than the account that issued them.
+- The **API refuses session cookies**. No ambient browser credential can
+  authenticate an API request, which is what makes the CSRF exemption on those
+  paths safe rather than a hole; the exemption itself additionally requires a
+  bearer token to be present.
+- The **calendar feed** is the only endpoint that takes a credential from the
+  URL, because a calendar client cannot send a header. It is wired to its own
+  middleware, is read-only, and refuses a write-capable token outright.
+- **Invoices and receipts live outside the web root** and are streamed only
+  through a permission-scoped route. Their type is read from the file's magic
+  bytes rather than from its name or declared type, the stored name is chosen by
+  the application, and they are served with `nosniff` and as an attachment.
+- A **backup archive is untrusted input**. Entry names are validated against an
+  allow-list before anything is extracted — a `../` path is refused whole rather
+  than sanitised — and every file inside is re-validated by its contents exactly
+  as an upload is.
+- An **imported file is staged under an id held in the session**, never in a URL
+  or a form field, so one user cannot step through another's upload. The preview
+  writes nothing at all, including the tags it would otherwise create.
 - Every outbound request goes through **one HTTP client** with enforced
   timeouts, a response-size cap and proxy support; requests to URLs a *user*
   supplied additionally go through an **SSRF guard** that refuses private and

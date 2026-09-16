@@ -1,0 +1,38 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Import — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <h1>Import subscriptions</h1>
+
+    <p class="muted">
+        Bring in a CSV or JSON file from a spreadsheet or another tracker. You choose which
+        column feeds which field, and you see exactly what will be created before anything is
+        written.
+    </p>
+
+    <section class="card">
+        <form method="post" action="/import" enctype="multipart/form-data" class="stack">
+            {{ csrf_field() }}
+
+            <label for="import-file">File</label>
+            <input type="file" id="import-file" name="file" accept=".csv,.json,.txt,text/csv,application/json"
+                   required>
+            <p class="field-hint">
+                CSV (comma, semicolon or tab separated) or JSON, up to {{ max_rows }} rows.
+            </p>
+
+            <label for="import-preset">It came from</label>
+            <select id="import-preset" name="preset">
+                {% for key, label in presets %}
+                    <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+            <p class="field-hint">
+                Only a starting point for the column mapping — you confirm it on the next screen.
+            </p>
+
+            <button type="submit" class="button button-primary">Continue</button>
+        </form>
+    </section>
+{% endblock %}

@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
+use App\Service\AttachmentService;
 use App\Service\PriceHistoryService;
 use App\Service\SplitService;
 use App\Service\SubscriptionService;
@@ -33,6 +34,7 @@ final class SubscriptionMoneyController extends Controller
         private readonly SplitService $splits,
         private readonly UsageService $usage,
         private readonly MembershipRepository $memberships,
+        private readonly AttachmentService $attachments,
     ) {
         parent::__construct($view, $session);
     }
@@ -64,6 +66,7 @@ final class SubscriptionMoneyController extends Controller
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],
             'max_rating' => UsageService::MAX_RATING,
+            'attachments' => $this->attachments->forSubscription($scope, $subscription->id),
             'errors' => [],
         ]);
     }

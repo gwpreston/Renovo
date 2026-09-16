@@ -1,0 +1,73 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Preview import — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <h1>Preview</h1>
+
+    <p class="muted">
+        <strong>{{ filename }}</strong> —
+        {{ valid_count }} row{{ valid_count == 1 ? '' : 's' }} will be imported{% if invalid_count %},
+        {{ invalid_count }} will be skipped{% endif %}.
+    </p>
+
+    {% if invalid_count %}
+        <div class="callout callout-warning">
+            Rows with a problem are marked below. Importing goes ahead without them — or go back
+            and change the mapping.
+        </div>
+    {% endif %}
+
+    <section class="card">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>Cycle</th>
+                    <th>Next payment</th>
+                    <th>Category</th>
+                    <th>Problem</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr class="{{ row.errors is not empty ? 'row-invalid' : '' }}">
+                        <td class="muted">{{ row.row }}</td>
+                        <td>{{ row.input.name }}</td>
+                        <td>{{ row.input.price }} {{ row.input.currency }}</td>
+                        <td>{{ row.input.billing_cycle|replace({'_': ' '}) }}</td>
+                        <td>{{ row.input.next_payment_date ?: '—' }}</td>
+                        <td>{{ row.category ?: '—' }}</td>
+                        <td>
+                            {%- if row.errors is empty -%}
+                                <span class="pill pill-success">Ready</span>
+                            {%- else -%}
+                                {{ row.errors|join(' ') }}
+                            {%- endif -%}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <form method="post" action="/import/commit" class="inline">
+            {{ csrf_field() }}
+            <button type="submit" class="button button-primary" {{ valid_count == 0 ? 'disabled' : '' }}>
+                Import {{ valid_count }} subscription{{ valid_count == 1 ? '' : 's' }}
+            </button>
+        </form>
+
+        <a href="/import/map" class="button">Back to mapping</a>
+
+        <form method="post" action="/import/cancel" class="inline">
+            {{ csrf_field() }}
+            <button type="submit" class="button button-quiet">Cancel</button>
+        </form>
+    </div>
+{% endblock %}

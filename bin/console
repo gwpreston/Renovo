@@ -24,6 +24,7 @@ use App\Repository\NotificationLogRepository;
 use App\Repository\TokenRepository;
 use App\Service\ExchangeRate\RateProviderException;
 use App\Service\ExchangeRateService;
+use App\Service\ImportService;
 use App\Service\Notification\ReminderRunner;
 use App\Support\Clock;
 use Psr\Container\ContainerInterface;
@@ -117,14 +118,20 @@ switch ($command) {
         $auditEntries = $container->get(AuditLogRepository::class)
             ->purgeOlderThan($clock->now()->modify(sprintf('-%d days', max(1, $auditRetention))));
 
+        // An import that was uploaded and never finished leaves a file in the
+        // staging directory. The importer clears its own on commit or cancel;
+        // this catches the ones nobody came back for.
+        $imports = $container->get(ImportService::class)->purgeStale();
+
         $out(sprintf(
             'Pruned %d expired session(s), %d expired token(s), %d old auth attempt(s), '
-            . '%d notification record(s), %d audit entr(ies).',
+            . '%d notification record(s), %d audit entr(ies), %d abandoned import(s).',
             is_int($sessions) ? $sessions : 0,
             $tokens,
             $attempts,
             $notifications,
             $auditEntries,
+            $imports,
         ));
         exit(0);
 

@@ -94,6 +94,46 @@ final class LogoStorage
     }
 
     /**
+     * File away an image that is already on disk — the restore path.
+     *
+     * Identical validation to an upload, deliberately: a logo out of a backup
+     * archive is untrusted input however the archive was produced, so it gets
+     * the same `getimagesize()` check and the same application-chosen name. An
+     * image that does not pass returns null and the subscription restores
+     * without it, rather than failing the whole run over a picture.
+     *
+     * @return string|null The web-relative path, or null when it is not an image.
+     */
+    public function storeFile(string $sourcePath): ?string
+    {
+        $size = @filesize($sourcePath);
+        if ($size === false || $size <= 0 || $size > $this->maxBytes) {
+            return null;
+        }
+
+        $info = @getimagesize($sourcePath);
+        $detectedType = is_array($info) ? $info[2] : 0;
+
+        if (!isset(self::ALLOWED_TYPES[$detectedType])) {
+            return null;
+        }
+
+        if (!is_dir($this->directory) && !mkdir($this->directory, 0o775, true) && !is_dir($this->directory)) {
+            throw new RuntimeException(sprintf('Logo directory "%s" is not writable.', $this->directory));
+        }
+
+        $name = bin2hex(random_bytes(16)) . '.' . self::ALLOWED_TYPES[$detectedType];
+
+        if (!copy($sourcePath, rtrim($this->directory, '/') . '/' . $name)) {
+            return null;
+        }
+
+        @chmod(rtrim($this->directory, '/') . '/' . $name, 0o644);
+
+        return 'assets/logos/' . $name;
+    }
+
+    /**
      * Remove a stored logo. Paths that did not come from `store()` are
      * ignored rather than trusted.
      */

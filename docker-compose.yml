@@ -131,6 +131,12 @@ services:
       SMTP_ENCRYPTION: ${SMTP_ENCRYPTION:-none}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-renovo@localhost}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Renovo}
+    # The same var/ volume as the app. `maintenance:prune` clears staged
+    # imports that were uploaded and never finished, and those files are written
+    # by the app container — without this the scheduler would be tidying its own
+    # empty directory and the real ones would accumulate for ever.
+    volumes:
+      - appvar:/var/www/html/var
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |

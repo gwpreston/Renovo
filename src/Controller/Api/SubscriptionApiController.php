@@ -1,0 +1,265 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controller\Api;
+
+use App\Application\Api\Resource;
+use App\Application\Api\SubscriptionPayload;
+use App\Application\Middleware\TokenAuthenticationMiddleware;
+use App\Domain\Entity\ApiToken;
+use App\Domain\SubscriptionFilter;
+use App\Security\Scope;
+use App\Service\LogoStorage;
+use App\Service\SubscriptionService;
+use App\Support\Clock;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
+use Slim\Exception\HttpBadRequestException;
+use Slim\Exception\HttpNotFoundException;
+
+/**
+ * Subscriptions over HTTP as JSON.
+ *
+ * Every method here is the web controller's method with a different renderer.
+ * They share `SubscriptionService`, so the billing-cycle rules, the trial
+ * checks, the ISOLATED-mode owner override and the price-history write all
+ * happen identically whichever door the request came through — which is the
+ * property that makes the API worth having rather than a second implementation
+ * to keep in step.
+ *
+ * There is no PATCH. See SubscriptionPayload for why: the service's input is
+ * absence-sensitive, so a partial body is the one shape that could half-write a
+ * row. PUT replaces, and a client changing one field GETs, edits and PUTs back.
+ */
+final class SubscriptionApiController extends ApiController
+{
+    private const MAX_PER_PAGE = 100;
+
+    public function __construct(
+        private readonly SubscriptionService $subscriptions,
+        private readonly LogoStorage $logos,
+        private readonly Clock $clock,
+    ) {
+    }
+
+    public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $scope = $this->scope($request);
+        $query = $request->getQueryParams();
+
+        // The same lazy catch-up the web list performs. Without it a client
+        // polling this endpoint would read a next-payment date in the past —
+        // and a negative days-until — until somebody happened to open the
+        // subscriptions page in a browser, which is precisely the kind of
+        // divergence between the two doors that this phase exists to avoid.
+        $this->advanceDuePayments($request, $scope);
+
+        $filter = SubscriptionFilter::fromQueryParams($query);
+        $perPage = $this->perPage($query);
+        $filter = new SubscriptionFilter(
+            search: $filter->search,
+            categoryId: $filter->categoryId,
+            tagIds: $filter->tagIds,
+            ownerUserId: $filter->ownerUserId,
+            currency: $filter->currency,
+            type: $filter->type,
+            includeInactive: $filter->includeInactive,
+            sort: $filter->sort,
+            direction: $filter->direction,
+            page: $filter->page,
+            perPage: $perPage,
+        );
+
+        $today = $this->clock->today();
+        $total = $this->subscriptions->count($scope, $filter);
+
+        return $this->json($response, [
+            'data' => array_map(
+                fn ($subscription): array => Resource::subscription($subscription, $today),
+                $this->subscriptions->list($scope, $filter),
+            ),
+            'meta' => [
+                'page' => $filter->page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $perPage > 0 ? (int) ceil($total / $perPage) : 0,
+            ],
+        ]);
+    }
+
+    public function show(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $subscription = $this->subscriptions->find($this->scope($request), (int) $id);
+        if ($subscription === null) {
+            throw new HttpNotFoundException($request, 'No such subscription.');
+        }
+
+        return $this->json($response, ['data' => Resource::subscription($subscription, $this->clock->today())]);
+    }
+
+    public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $scope = $this->scope($request);
+
+        $id = $this->subscriptions->create(
+            $scope,
+            SubscriptionPayload::toServiceInput($this->payload($request)),
+        );
+
+        $created = $this->subscriptions->find($scope, $id);
+        if ($created === null) {
+            // Only reachable if the row vanished between the two statements.
+            throw new HttpNotFoundException($request, 'The subscription could not be read back.');
+        }
+
+        return $this->json(
+            $response,
+            ['data' => Resource::subscription($created, $this->clock->today())],
+            201,
+        )->withHeader('Location', sprintf('/api/v1/subscriptions/%d', $id));
+    }
+
+    /**
+     * Replace a subscription.
+     */
+    public function update(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $scope = $this->scope($request);
+        $id = (int) $id;
+
+        $existing = $this->subscriptions->find($scope, $id);
+        if ($existing === null) {
+            throw new HttpNotFoundException($request, 'No such subscription.');
+        }
+
+        $this->subscriptions->update(
+            $scope,
+            $id,
+            SubscriptionPayload::toServiceInput($this->payload($request), $existing),
+        );
+
+        $updated = $this->subscriptions->find($scope, $id);
+        if ($updated === null) {
+            throw new HttpNotFoundException($request, 'No such subscription.');
+        }
+
+        return $this->json($response, ['data' => Resource::subscription($updated, $this->clock->today())]);
+    }
+
+    public function delete(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $scope = $this->scope($request);
+        $id = (int) $id;
+
+        if ($this->subscriptions->find($scope, $id) === null) {
+            throw new HttpNotFoundException($request, 'No such subscription.');
+        }
+
+        $this->subscriptions->delete($scope, $id);
+
+        return $this->noContent($response);
+    }
+
+    /**
+     * Replace a subscription's logo.
+     *
+     * Its own endpoint rather than a field on the resource, because it is a
+     * file. The path is chosen by LogoStorage from the detected image type, so
+     * a client cannot name it, and the JSON representation reports it read-only.
+     */
+    public function uploadLogo(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $scope = $this->scope($request);
+        $id = (int) $id;
+
+        $existing = $this->subscriptions->find($scope, $id);
+        if ($existing === null) {
+            throw new HttpNotFoundException($request, 'No such subscription.');
+        }
+
+        $file = $request->getUploadedFiles()['logo'] ?? null;
+        if (!$file instanceof UploadedFileInterface) {
+            throw new HttpBadRequestException($request, 'Send the image as multipart form data in a "logo" part.');
+        }
+
+        $stored = $this->logos->store($file);
+        $this->subscriptions->setLogo($scope, $id, $stored);
+
+        if ($existing->logoPath !== null && $existing->logoPath !== $stored) {
+            $this->logos->delete($existing->logoPath);
+        }
+
+        $updated = $this->subscriptions->find($scope, $id);
+        if ($updated === null) {
+            throw new HttpNotFoundException($request, 'No such subscription.');
+        }
+
+        return $this->json($response, ['data' => Resource::subscription($updated, $this->clock->today())]);
+    }
+
+    public function deleteLogo(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $scope = $this->scope($request);
+        $id = (int) $id;
+
+        $existing = $this->subscriptions->find($scope, $id);
+        if ($existing === null) {
+            throw new HttpNotFoundException($request, 'No such subscription.');
+        }
+
+        $this->subscriptions->setLogo($scope, $id, null);
+        $this->logos->delete($existing->logoPath);
+
+        return $this->noContent($response);
+    }
+
+    /**
+     * Roll overdue recurring subscriptions forward, if this caller may.
+     *
+     * Two conditions, not one. The service already refuses to write for a role
+     * that cannot — a Viewer's GET never advances anything. The extra check
+     * here is on the *token*: a read-only token performing a write, even a
+     * housekeeping one nobody asked for, is not what "read-only" means to the
+     * person who chose it.
+     */
+    private function advanceDuePayments(ServerRequestInterface $request, Scope $scope): void
+    {
+        $token = $request->getAttribute(TokenAuthenticationMiddleware::ATTRIBUTE_TOKEN);
+
+        if ($token instanceof ApiToken && $token->abilities->allowsWrites()) {
+            $this->subscriptions->advanceDuePayments($scope);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     */
+    private function perPage(array $query): int
+    {
+        $raw = $query['per_page'] ?? null;
+        if (!is_scalar($raw)) {
+            return SubscriptionFilter::DEFAULT_PER_PAGE;
+        }
+
+        $value = (int) $raw;
+
+        return $value > 0 ? min($value, self::MAX_PER_PAGE) : SubscriptionFilter::DEFAULT_PER_PAGE;
+    }
+}

@@ -16,6 +16,33 @@
     </section>
 
     <section class="card">
+        <h2>API and calendar</h2>
+        <p class="muted">
+            Tokens for scripts, other machines and calendar apps. A token can never do more than
+            you can.
+        </p>
+        <a class="button" href="/settings/api-tokens">API tokens</a>
+    </section>
+
+    {% if can(scope, 'data.import') or can(scope, 'backup.manage') %}
+        <section class="card">
+            <h2>Your data</h2>
+            <p class="muted">
+                Bring subscriptions in from a file, or take everything out again — including the
+                attached invoices — in a format that needs no database to read.
+            </p>
+            <div class="form-actions">
+                {% if can(scope, 'data.import') %}
+                    <a class="button" href="/import">Import a file</a>
+                {% endif %}
+                {% if can(scope, 'backup.manage') %}
+                    <a class="button" href="/settings/backup">Backup and restore</a>
+                {% endif %}
+            </div>
+        </section>
+    {% endif %}
+
+    <section class="card">
         <h2>Appearance</h2>
         <form method="post" action="/settings/theme" class="stack">
             {{ csrf_field() }}

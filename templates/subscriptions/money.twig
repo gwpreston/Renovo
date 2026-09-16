@@ -204,4 +204,69 @@
             </div>
         {% endif %}
     </section>
+
+    <section class="card">
+        <h2>Invoices and receipts</h2>
+
+        {% if attachments is empty %}
+            <p class="muted">Nothing attached yet.</p>
+        {% else %}
+            <div class="table-wrap">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Period</th>
+                        <th>Size</th>
+                        <th>Added</th>
+                        <th><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for attachment in attachments %}
+                        <tr>
+                            <td>
+                                <a href="/subscriptions/{{ subscription.id }}/attachments/{{ attachment.id }}">
+                                    {{ attachment.originalFilename }}
+                                </a>
+                            </td>
+                            <td>{{ attachment.periodDate ? attachment.periodDate|date('M Y') : '—' }}</td>
+                            <td class="muted">{{ attachment.humanSize() }}</td>
+                            <td class="muted">{{ attachment.createdAt|date('j M Y') }}</td>
+                            <td>
+                                {% if can(scope, 'attachment.manage') %}
+                                    <form method="post"
+                                          action="/subscriptions/{{ subscription.id }}/attachments/{{ attachment.id }}/delete"
+                                          class="inline"
+                                          onsubmit="return confirm('Delete this file?')">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-quiet">Delete</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        {% if can(scope, 'attachment.manage') %}
+            <form method="post" action="/subscriptions/{{ subscription.id }}/attachments"
+                  enctype="multipart/form-data" class="stack">
+                {{ csrf_field() }}
+
+                <label for="attachment-file">Attach a file</label>
+                <input type="file" id="attachment-file" name="file"
+                       accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,application/pdf,image/*" required>
+                <p class="field-hint">PDF or an image. Stored outside the web root and only
+                    readable by people who can see this subscription.</p>
+
+                <label for="attachment-period">Billing period it covers (optional)</label>
+                <input type="date" id="attachment-period" name="period_date">
+
+                <button type="submit" class="button">Upload</button>
+            </form>
+        {% endif %}
+    </section>
 {% endblock %}
