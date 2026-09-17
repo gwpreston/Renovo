@@ -26,10 +26,10 @@ use App\Service\NavigationService;
 use App\Service\ValidationError;
 use App\Support\AssetVersion;
 use App\Support\BuildManifest;
+use App\Support\DateFormatter;
 use App\Support\MoneyFormatter;
 use DateTimeImmutable;
 use DateTimeInterface;
-use IntlDateFormatter;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
@@ -61,6 +61,7 @@ final class AppExtension extends AbstractExtension
         private readonly AssetVersion $assets,
         private readonly BuildManifest $build,
         private readonly NavigationService $navigation,
+        private readonly DateFormatter $dates,
     ) {
     }
 
@@ -104,13 +105,18 @@ final class AppExtension extends AbstractExtension
      *
      * Twig's `date` filter formats with PHP's own names — "September", "Mon" —
      * whatever language the page is in, which is the one part of a translated
-     * page that stays stubbornly English. This hands the job to ICU, which
-     * knows that a French reader wants "septembre" and that a Japanese one
-     * wants the year first.
+     * page that stays stubbornly English. This hands the job to ICU through
+     * DateFormatter, which knows that a French reader wants "septembre" and
+     * that a Japanese one wants the year first.
      *
      * The patterns are ICU skeletons, not strftime: `d MMM y` is "4 Sep 2026"
      * in English and "4 sept. 2026" in French, with the order decided by the
      * locale rather than by this file.
+     *
+     * The formatting itself lives in the service rather than here because
+     * Phase 10's chart builds its axis labels before any template runs, and a
+     * label on the axis and a date in the table beneath it must be the same
+     * string for the same day.
      */
     public function formatDate(
         DateTimeInterface|string|null $value,
@@ -122,18 +128,7 @@ final class AppExtension extends AbstractExtension
 
         $date = $value instanceof DateTimeInterface ? $value : new DateTimeImmutable($value);
 
-        $formatter = new IntlDateFormatter(
-            $this->locale->get(),
-            IntlDateFormatter::NONE,
-            IntlDateFormatter::NONE,
-        );
-        $formatter->setPattern($pattern);
-
-        $formatted = $formatter->format($date);
-
-        // ICU can refuse a pattern it does not understand; the ISO date is a
-        // worse answer than the formatted one and a better one than nothing.
-        return $formatted === false ? $date->format('Y-m-d') : $formatted;
+        return $this->dates->format($date, $pattern);
     }
 
     public function formatMoney(?int $amountMinor, string $currency): string

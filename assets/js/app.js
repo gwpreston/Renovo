@@ -11,7 +11,8 @@
  * to load on every page, and an icon set that has to be tree-shaken to be worth
  * having. It exposes both on `window.Renovo`, and — since Phase 9 gave the
  * shell a navigation made of icons — fills in the icon slots the server marked
- * up. No page draws a chart yet; the screens that will are Phases 10 and 12.
+ * up. Phase 10 added the first page that draws a chart: the dashboard's
+ * twelve-month spend, from a payload the server rendered beside the canvas.
  *
  * Usage from a page's own script:
  *
@@ -20,6 +21,7 @@
  */
 
 import { renderChart } from './charts.js';
+import { drawSpendChart, watchTheme } from './dashboard.js';
 import { hydrateIcons, icon, iconNames } from './icons.js';
 
 /*
@@ -45,6 +47,10 @@ window.Renovo = {
  */
 function hydrate() {
     hydrateIcons(document);
+
+    /* A page with no spend chart on it returns immediately, so this costs a
+       querySelector; Chart.js itself is only fetched when there is one. */
+    drawSpendChart();
 }
 
 if (document.readyState === 'loading') {
@@ -56,3 +62,5 @@ if (document.readyState === 'loading') {
 document.addEventListener('htmx:afterSwap', (event) => {
     hydrateIcons(event.target instanceof Element ? event.target : document);
 });
+
+watchTheme();

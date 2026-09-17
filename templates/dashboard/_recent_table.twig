@@ -1,0 +1,103 @@
+{#
+    The chips and the rows they choose between, rendered on their own when a
+    chip asks for them and included by the card for a normal load, so the two
+    cannot drift apart.
+
+    The chips are inside the swapped fragment rather than in the card's header
+    because the answer to "which view am I looking at" changes with the rows;
+    a marker left outside would still be pointing at the previous one.
+#}
+<div id="dashboard-recent">
+    {#
+        The list's own filter, asked for by name: All includes the paused ones,
+        Active is the default, Expiring is the near window the renewals tile is
+        counted from. Each chip is a real link, so it works with the bundle
+        blocked; with htmx it swaps the rows alone, because swapping the card
+        would take the chart's canvas with it.
+    #}
+    <div class="chip-row" role="group" aria-label="{{ t('dashboard.filter_rows') }}">
+        {% for view in recent.views %}
+            <a class="chip chip-action {{ recent.view == view ? 'is-active' : '' }}"
+               href="/?show={{ view }}"
+               hx-get="/?show={{ view }}"
+               hx-target="#dashboard-recent"
+               hx-swap="outerHTML"
+               {{ recent.view == view ? 'aria-current="true"' : '' }}>
+                {{ t('dashboard.view_' ~ view) }}
+            </a>
+        {% endfor %}
+    </div>
+
+    {% if recent.rows is empty %}
+        <p class="muted empty">
+            {% if recent.view == 'expiring' %}
+                {{ t('dashboard.nothing_renewing') }}
+            {% else %}
+                {{ t('subscriptions_list.empty') }}
+            {% endif %}
+        </p>
+    {% else %}
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.reference') }}</th>
+                    <th scope="col">{{ t('field.name') }}</th>
+                    <th scope="col">{{ t('field.cycle') }}</th>
+                    <th scope="col">{{ t('field.next_charge') }}</th>
+                    <th scope="col" class="numeric">{{ t('field.price') }}</th>
+                    <th scope="col">{{ t('field.status') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for subscription in recent.rows %}
+                    {% set status = recent.statuses[subscription.id] %}
+                    <tr class="{{ subscription.isActive ? '' : 'is-paused' }}">
+                        {#
+                            The identifier the design's table carries, which
+                            here is the one the application already has: the
+                            number in the row's own URL, not a made-up
+                            reference.
+                        #}
+                        <td class="muted reference">#{{ subscription.id }}</td>
+                        <th scope="row">
+                            <div class="cell-name">
+                                {% if subscription.logoPath %}
+                                    <img class="logo" src="/{{ subscription.logoPath }}" alt=""
+                                         width="24" height="24">
+                                {% endif %}
+                                <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
+                            </div>
+                        </th>
+                        <td>
+                            {% if subscription.billingCycle %}
+                                {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays) }}
+                            {% else %}
+                                {{ type_label(subscription.type.value) }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ subscription.nextChargeDate
+                                ? subscription.nextChargeDate|local_date('d MMM y')
+                                : t('common.none_symbol') }}
+                        </td>
+                        <td class="numeric">
+                            {{ subscription.price.amountMinor|money(subscription.price.currency) }}
+                        </td>
+                        <td>
+                            {#
+                                Computed from the row's own state — the trial's
+                                conversion date, the near window, whether it is
+                                paused — rather than stored anywhere.
+                            #}
+                            <span class="badge badge-status badge-{{ status }}">
+                                {{ t('state.' ~ status) }}
+                            </span>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>

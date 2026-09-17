@@ -36,6 +36,230 @@
     white-space: nowrap;
 }
 
+/*
+ * The bento grid.
+ *
+ * Three columns, and each card says how many of them it wants — which is what
+ * puts the chart beside the usage widget without either of them being fixed in
+ * place. A card the account has moved keeps whatever span it declares, so the
+ * layout survives being rearranged.
+ *
+ * Auto-placement is deliberately not dense: a dense grid reflows tiles past one
+ * another to fill a hole, and an order somebody chose is not something to
+ * silently improve on.
+ */
+.bento {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
+.bento-item {
+    grid-column: span 3;
+    min-width: 0;
+}
+
+/*
+ * Some cards render nothing when they have nothing to say — no trials, no
+ * categories yet. The wrapper is emitted for every card in the list, so
+ * without this an empty one would be an invisible tile holding a gap open.
+ * `:empty` does not do it: Twig leaves whitespace inside the wrapper.
+ */
+.bento-item:not(:has(*)) {
+    display: none;
+}
+
+.bento-span-1 {
+    grid-column: span 1;
+}
+
+.bento-span-2 {
+    grid-column: span 2;
+}
+
+/*
+ * One column below the shell's own breakpoint, so the grid and the navigation
+ * change shape at the same width rather than at two widths near each other.
+ */
+@media (max-width: 767px) {
+    .bento-item,
+    .bento-span-1,
+    .bento-span-2 {
+        grid-column: span 3;
+    }
+}
+
+/* The metric row: four tiles, however many currencies they hold. */
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: 1rem;
+}
+
+.metric .stat-value {
+    line-height: 1.1;
+}
+
+/* Per-currency subtotals, when there is no honest total to head them with. */
+.stat-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.stat-line {
+    font-size: 1.75rem;
+}
+
+/* ------------------------------------------------------- dashboard tiles */
+
+.card-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.card-header h2 {
+    margin: 0;
+}
+
+.card-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/*
+ * The chart and its figures are alternatives, not a pair. The table is what
+ * the card shows until the bundle has actually drawn the chart, so a browser
+ * with no script — or one where the chunk never arrived — sees the numbers
+ * rather than an empty box.
+ */
+.chart-frame {
+    display: none;
+    position: relative;
+    height: 16rem;
+}
+
+.chart-card.is-drawn .chart-frame {
+    display: block;
+}
+
+/*
+ * A wrapper rather than the table itself: a table cannot be laid out narrower
+ * than its own content, so hiding one by shrinking it leaves a table-shaped
+ * hole pushing the page sideways. The wrapper is what shrinks, and it clips.
+ */
+.chart-card.is-drawn .chart-figures {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Until then it is a table on a narrow screen like any other. */
+.chart-figures {
+    overflow-x: auto;
+}
+
+.chart-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.chart-figures .is-peak th,
+.chart-figures .is-peak td {
+    color: var(--warning);
+}
+
+/* The chips that choose which rows the table shows. */
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.chip-action {
+    text-decoration: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.chip-action:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+}
+
+.chip-action.is-active {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: transparent;
+}
+
+/*
+ * A row's state, as a badge. Renewing soon takes the warm hue reserved for
+ * "money is about to move"; a trial takes the same, because it is the same
+ * fact seen earlier. Active and paused are quiet on purpose — a badge on every
+ * row in the strongest colour available says nothing.
+ */
+.badge-status {
+    margin-left: 0;
+}
+
+.badge-renewing,
+.badge-trial {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border-color: transparent;
+}
+
+.badge-active {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: transparent;
+}
+
+/* Where the money goes, as a share of the combined monthly total. */
+.distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.distribution-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.25rem 0.5rem;
+}
+
+.distribution-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.distribution-amount {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.distribution-row .meter {
+    grid-column: 1 / -1;
+}
+
 /* ---------------------------------------------------------------- budgets */
 
 .budget-grid {
@@ -94,11 +318,13 @@
     background: var(--gradient-brand);
 }
 
-.budget.is-warning .meter-fill {
+.budget.is-warning .meter-fill,
+.meter.is-warning .meter-fill {
     background: var(--warning);
 }
 
-.budget.is-over .meter-fill {
+.budget.is-over .meter-fill,
+.meter.is-over .meter-fill {
     background: var(--danger);
 }
 

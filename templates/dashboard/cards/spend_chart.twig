@@ -1,0 +1,74 @@
+{#
+    Twelve months of spend, drawn from the forecast.
+
+    The design's chart plotted income against expenses. A subscription tracker
+    has no income, so this is what it does have: each renewal in the month it
+    actually falls, with scheduled price changes and trial conversions applied
+    from their own dates. It is the same call the Forecast page makes, so the
+    two screens cannot disagree about a month.
+#}
+<section class="card chart-card">
+    <header class="card-header">
+        <h2>{{ t('dashboard.spend_chart') }}</h2>
+        <a class="button button-quiet" href="/forecast">{{ t('nav.forecast') }}</a>
+    </header>
+
+    {% if not chart.is_drawable %}
+        {#
+            A missing month total would be drawn as a short bar, which reads as
+            a cheap month rather than an unknown one. So there is no chart —
+            the Forecast page shows those months per currency instead.
+        #}
+        <p class="muted empty">
+            {{ t('dashboard.chart_unconvertible', {
+                'currencies': chart.unconvertible|join(', '),
+                'currency': chart.currency,
+            }) }}
+        </p>
+    {% else %}
+        <div class="chart-frame">
+            <canvas class="chart-canvas"
+                    data-chart="spend"
+                    data-chart-data="dashboard-spend-data"
+                    role="img"
+                    aria-label="{{ t('dashboard.spend_chart_alt', {'currency': chart.currency}) }}"></canvas>
+        </div>
+
+        {#
+            The figures themselves, for a screen reader and for a browser with
+            no script: the table is what the card shows until the bundle marks
+            the section as drawn, at which point CSS hides it from sight and
+            leaves it to assistive technology. The chart is drawn from this
+            same payload, so the table cannot describe a different set of
+            numbers than the picture.
+        #}
+        <script id="dashboard-spend-data" type="application/json">{{ chart.json|raw }}</script>
+
+        <div class="chart-figures">
+        <table class="table">
+            <caption class="visually-hidden">
+                {{ t('dashboard.spend_chart_alt', {'currency': chart.currency}) }}
+            </caption>
+            <thead>
+            <tr>
+                <th scope="col">{{ t('field.month') }}</th>
+                <th scope="col" class="numeric">{{ t('field.total') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for month in chart.months %}
+                <tr{{ loop.index0 == chart.peak_index ? ' class="is-peak"' : '' }}>
+                    <th scope="row">{{ month.label }}</th>
+                    <td class="numeric">
+                        {{ month.display }}
+                        {% if loop.index0 == chart.peak_index %}
+                            <span class="badge badge-warning">{{ t('dashboard.peak_month') }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    {% endif %}
+</section>
