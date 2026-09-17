@@ -210,16 +210,24 @@ final class SubscriptionRepository extends AbstractScopedRepository
      * money to: a trial that converts unnoticed is the whole reason for
      * tracking them.
      *
+     * A null `$to` means "every trial from here on" rather than a window: the
+     * my-subscriptions screen lists the trials that have not converted yet,
+     * however far off the conversion is, and a horizon chosen here would be an
+     * arbitrary one that screen would then have to explain.
+     *
      * @return list<Subscription>
      */
-    public function findTrialsEnding(Scope $scope, DateTimeImmutable $from, DateTimeImmutable $to): array
+    public function findTrialsEnding(Scope $scope, DateTimeImmutable $from, ?DateTimeImmutable $to = null): array
     {
         $criteria = Criteria::new()
             ->equals('is_active', true)
             ->equals('is_trial', true)
             ->where('trial_end_date', '>=', $from->format('Y-m-d'))
-            ->where('trial_end_date', '<=', $to->format('Y-m-d'))
             ->orderBy('trial_end_date', 'asc');
+
+        if ($to !== null) {
+            $criteria = $criteria->where('trial_end_date', '<=', $to->format('Y-m-d'));
+        }
 
         $params = [];
         $sql = $this->selectWithJoins()

@@ -18,6 +18,7 @@ use App\Service\LogoStorage;
 use App\Service\BulkActionService;
 use App\Service\CatchUpService;
 use App\Service\SavedViewService;
+use App\Service\SubscriptionScreenService;
 use App\Service\SubscriptionService;
 use App\Service\TagService;
 use App\Service\ValidationException;
@@ -44,6 +45,7 @@ final class SubscriptionController extends Controller
         private readonly CatchUpService $catchUp,
         private readonly BulkActionService $bulkActions,
         private readonly SavedViewService $savedViews,
+        private readonly SubscriptionScreenService $screen,
     ) {
         parent::__construct($view, $session, $translator);
     }
@@ -52,8 +54,22 @@ final class SubscriptionController extends Controller
     {
         $scope = $this->scope($request);
         $filter = SubscriptionFilter::fromQueryParams($request->getQueryParams());
+        $fragment = $this->isHtmx($request);
 
-        $this->catchUp->run($scope);
+        // The sections around the list are computed for a whole page and not
+        // for a filter keystroke. Both branches start by bringing the household
+        // up to date — the overview's first act is that same catch-up — so the
+        // list is always read after due price changes, ended trials and overdue
+        // payment dates have been applied. What an htmx request skips is the
+        // rest: recomputing the household's statistics to swap twenty-five rows
+        // would be a great deal of work to arrive at the figures already on the
+        // screen, which the filter has not changed.
+        $overview = [];
+        if ($fragment) {
+            $this->catchUp->run($scope);
+        } else {
+            $overview = $this->screen->overview($scope);
+        }
 
         $total = $this->subscriptions->count($scope, $filter);
         $items = $this->subscriptions->list($scope, $filter);
@@ -78,14 +94,13 @@ final class SubscriptionController extends Controller
             // would write it, rather than whatever is in the address bar.
             'current_query' => $filter->toQueryString(['page' => null]),
             'bulk_actions' => BulkActionService::actions(),
-        ];
+        ] + $overview;
 
         // htmx asks for just the table when filtering, sorting or paging.
-        return $this->renderMaybeFragment(
+        return $this->render(
             $request,
             $response,
-            'subscriptions/index.twig',
-            'subscriptions/_list.twig',
+            $fragment ? 'subscriptions/_list.twig' : 'subscriptions/index.twig',
             $data,
         );
     }

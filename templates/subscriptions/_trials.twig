@@ -1,0 +1,63 @@
+{#
+    Free trials, before they convert.
+
+    The trial's last day is the day the first charge falls, so the countdown
+    runs to that day and the amount is the price it converts to — never the zero
+    it costs today and never a placeholder. A trial is the subscription it will
+    become rather than a record of its own, which is why the action here is the
+    ordinary one: pausing it pauses the subscription, because they are the same
+    row.
+#}
+{% if trials.rows is not empty %}
+    <section class="card callout trials" id="free-trials" aria-labelledby="trials-heading">
+        <h2 id="trials-heading">{{ t('subscriptions.trials_heading') }}</h2>
+        <p class="muted">{{ t('subscriptions.trials_note') }}</p>
+
+        <ul class="plain deadlines">
+            {% for row in trials.rows %}
+                {% set subscription = row.subscription %}
+                <li class="deadline {{ row.is_urgent ? 'is-urgent' : '' }}">
+                    <div class="deadline-main">
+                        <div class="cell-name">
+                            {% if subscription.logoPath %}
+                                <img class="logo" src="/{{ subscription.logoPath }}" alt="" width="24" height="24">
+                            {% endif %}
+                            <div>
+                                <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
+                                <div class="hint">
+                                    {{ t('dashboard.converts_on', {'date': row.converts_on|local_date('d MMM y')}) }}
+                                    ·
+                                    {% if row.days_left == 0 %}
+                                        {{ t('state.today') }}
+                                    {% else %}
+                                        {{ t('cancellations.days_left', {'days': row.days_left}) }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="deadline-amount">
+                        {{ row.converts_to.amountMinor|money(row.converts_to.currency) }}
+                        <div class="hint">{{ t('subscriptions.then_costs') }}</div>
+                    </div>
+
+                    {% if row.can_act %}
+                        <form method="post" action="/subscriptions/{{ subscription.id }}/toggle"
+                              class="deadline-action">
+                            {{ csrf_field() }}
+                            <button type="submit" class="button button-quiet">{{ t('subscriptions_list.pause') }}</button>
+                        </form>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+
+        <p class="muted">
+            {% for total in trials.totals %}
+                {{ total.total_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
+            {% endfor %}
+            {{ t('dashboard.trials_total_note') }}
+        </p>
+    </section>
+{% endif %}

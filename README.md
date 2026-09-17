@@ -84,6 +84,16 @@ Built in phases:
   feature and moves nothing about permissions, money or scope. See
   [The application shell](#the-application-shell).
 
+- **Phase 11 — my subscriptions — complete.** The subscriptions screen in the
+  design's arrangement: a stats strip across the top, the list itself, the two
+  deadlines the application distinguishes — a charge inside the near window, and
+  the last day to give notice where a notice period exists — a section for
+  trials before they convert, and the category distribution as proportion bars
+  alongside. The list is the same list, so saved views, density, scope and
+  permissions are unchanged by the restyle; the figures are the ones the
+  Statistics page and the cancel-by view already produce. It adds no data and no
+  new query path. See [My subscriptions](#my-subscriptions).
+
 That is the v1 feature set, Phase 7 the toolchain under it and Phase 8 the
 design language on top. Deliberately not in it: OIDC/SSO, and bank or
 transaction sync — see the end of `PHASE.md` for what was deferred and why.
@@ -764,6 +774,60 @@ what sits beside the mark is the instance name, which is the operator's to set.
 where there is one, the top bar's otherwise — and `g` then a letter navigates
 (`d`, `s`, `c`, `b`, `f`, `t`, `a`). Every destination is also a link somebody
 can click, and a test reads the destinations out of the script to prove it.
+
+## My subscriptions
+
+The subscriptions screen carries the list and, around it, the four things a
+person opens it to find out.
+
+### The strip
+
+Active count, yearly spend and renewals in the near window. The yearly figure
+follows the rule the rest of the application follows — per-currency subtotals,
+with a combined total only when every currency in play converts — through the
+same partial the dashboard's tiles use, so the two screens cannot come to
+different conclusions about the same money. A single clean number is the common
+case, not the only one.
+
+### The list is the list
+
+It is the existing list fragment, restyled and rearranged rather than rebuilt,
+which is why **saved views** still store the query the list itself produced,
+**density** still tightens the same markup, and scope and permissions are
+exactly what the repository and the middleware already enforced. Filtering,
+sorting and paging still swap that fragment alone: the sections around it are
+computed for a whole page and not for a keystroke.
+
+### Two deadlines, not one
+
+- **Renewing soon** — a charge falling inside the near window, which is the
+  cancel-by view's fourteen days, referenced rather than re-chosen.
+- **Cancel by** — the last day notice can be given, shown only for a
+  subscription that *has* a notice period. Without one that deadline is the
+  renewal date, and a second card repeating it would be noise. A deadline
+  already missed is kept and marked: nothing can be done about it, but being
+  committed to another period is worth knowing.
+
+Each row offers Pause only to a member who could actually use it — their role
+may change a subscription **and** the isolation mode leaves that row writable.
+Under ISOLATED isolation a member can see a shared cost they contribute to
+without being able to change it, so the button that would be refused is not
+drawn. The refusal itself still lives in the repository.
+
+### Free trials
+
+Every trial that has not converted yet, not a window of them. **The last day of
+a trial is the day of its first charge**, so the countdown runs to that day and
+the amount shown is the price it converts to. A trial is the subscription it
+will become, so pausing it here pauses the subscription.
+
+### Category spending
+
+The Statistics page's category breakdown as proportion bars. What each bar is a
+share *of* is stated rather than assumed: the combined monthly total when every
+currency converts, and otherwise one group per currency against that currency's
+own total. Two currencies with no rate between them are never blended into one
+bar, because comparing them is precisely the claim a bar makes.
 
 ## Money features
 

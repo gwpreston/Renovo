@@ -4,180 +4,159 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 10 — the dashboard
+# Phase 11 — my subscriptions
 
-The landing screen, as a bento grid: a row of metric cards, a split middle
-section with a chart and a usage widget, and a table of recent activity beneath.
-Every tile binds to a figure a service already produces. Where the design named a
-figure the application does not have, Phase 8 already decided its fate; this phase
-builds only the tiles that bind to something real.
+The subscriptions screen, restyled to the design's layout: a stats strip across
+the top, the main list, and dedicated sections for what is expiring and what is
+still on trial, with a category-spending widget alongside. This is the existing
+list with a new arrangement and three pulled-forward sections — the data behind
+each already exists.
 
-## The metric cards
+## The stats strip
 
-The design's four-card row becomes cards Renovo can actually fill:
+Three figures the application already has: **active count**, **yearly spending**
+(per-currency, combined only when convertible), and **upcoming renewals** in the
+near window. The design shows single clean numbers; the yearly figure keeps the
+per-currency rule, so it may be more than one line, for the same reason as on the
+dashboard.
 
-- **Monthly spend** and **yearly spend**, each shown as **per-currency
-  subtotals** with a combined total alongside only when every currency converts —
-  the same rule the rest of the application follows. A single big number is the
-  design's instinct; a single big number that silently omits a currency is a
-  wrong number, so a card may show two lines, and that is correct rather than a
-  compromise.
-- **Upcoming renewals** — the count in the near window, the same figure the
-  cancel-by view is built from.
-- **A fourth card that is not a fake card.** The design's slot here was the
-  virtual card; in its place goes something true — active-subscription count, or
-  the next charge and its date. Not a masked PAN.
+## The list
 
-One-off and lifetime entries stay out of the recurring figures and are shown
-separately if at all, exactly as elsewhere: the headline is a recurring total and
-must keep meaning that.
+The main list is the existing subscriptions list, restyled — not a new list.
+That means it keeps, for free:
 
-## Cash flow chart
+- **Saved views** — a named filter appears above the list as a link, stored as
+  the query string the list itself produced and re-parsed through the same value
+  object, so a saved or tampered view can no more reach the database than a
+  tampered URL can.
+- **Density** — comfortable or compact, the same markup with less padding, so a
+  screen reader sees no difference between them.
+- **Scope and permissions** — enforced in the repository and middleware, unchanged
+  by the restyle.
 
-The design's income-vs-expenses chart becomes a **twelve-month spend chart drawn
-from the existing forecast** — each renewal in the month it actually falls, with
-scheduled price changes and trial conversions applied from their own dates. There
-is no income series, so the chart is spend over time, with the current or peak
-month picked out in amber. It reads the forecast the Forecast page and the
-budgets read, so the dashboard and those pages cannot disagree.
+## Expiring soon
 
-The chart is **Chart.js**, the charting library chosen in Phase 8 and bundled by
-the Phase 7 pipeline — nothing is fetched at runtime. It is fed
-integers-as-minor-units converted for display at the boundary; it never receives
-a float currency value.
+The design's highlight cards for near-term items become cards for the two
+deadlines Renovo actually distinguishes:
 
-## The usage widget
+- **Renewing soon** — a charge inside the near window.
+- **Cancel by** — the last day to give notice, shown only for a subscription that
+  has a notice period, since without one the deadline *is* the renewal date and a
+  second card would be noise. This is the deadline a person most needs surfaced,
+  and it is the one the calendar feed exists to carry.
 
-The design's "Subscription Usage — $1200 from $299 limit" becomes the real thing
-it was gesturing at: **a budget against its projected spend**, taken from the same
-forecast, for the signed-in member's own share. Beneath it, the category
-distribution bars the design shows, drawn from the category breakdown the
-Statistics page already computes. A member with no budget set sees a prompt to set
-one rather than an invented limit.
+Each card's action respects permissions: the trigger is present only for a member
+who could act on that subscription.
 
-## Recent / active subscriptions table
+## Free trials
 
-The bottom table lists subscriptions with the columns the design asks for, mapped
-to real fields: an identifier, the app (its cached logo and name), the amount in
-its own currency, the billing period, and a **status badge computed from real
-state** — active, renewing soon (inside the near window), or trial (before its
-conversion date). The filter chips (All, Active, Expiring) reuse the list's own
-filter mechanism, and Export reuses the existing export rather than a new path.
+A section for trials before their conversion, showing what each will cost and the
+day it converts — **the trial's last day is the day the first charge falls**, so
+"14 days left" counts to that day and the cost shown is the price it converts to,
+not a placeholder. A trial is the subscription it will become, not a separate
+record, so acting on it here is acting on the subscription.
 
-The table is scoped by the same repository layer as the list: on an ISOLATED
-instance it shows the member's own subscriptions plus any they help pay for, and a
-Viewer sees no mutating controls because the middleware, not the template, is what
-would refuse them.
+## Category spending widget
 
-## Rearrangeable cards
-
-Renovo already lets an account reorder dashboard cards and untick ones it does not
-want. The new tiles join that mechanism rather than being fixed, and a tile added
-by this phase appears in its default place for existing accounts rather than
-going missing.
+The breakdown the design shows in a sidebar (Entertainment, Music, Design, AI
+Tools, and so on) is the category distribution the Statistics page computes,
+rendered as the design's proportion bars. Percentages are of a per-currency total
+where currencies differ; the widget does not blend unconvertible currencies into
+one bar.
 
 ## Done when
 
-Every tile shows a real figure or is not present; the chart matches the Forecast
-page for the same data; per-currency behaviour is correct including the withheld
-combined total; badges reflect real state; the grid reflows to one column on
-narrow screens; both themes render; new strings are in the catalogue; the quality
-gates and `i18n:check` pass.
+The strip, list, expiring and trial sections and the category widget all bind to
+real data; saved views and density still work; the cancel-by card appears only
+where a notice period exists; trial dates and costs are correct; permissions gate
+every action; the screen reflows on narrow viewports; both themes render; new
+strings are catalogued; the quality gates and `i18n:check` pass.
 
----
+## Decisions and assumptions
 
-## Built — what actually landed
+- **The sections are computed for a page, not for a keystroke.** The list still
+  swaps through htmx, and that request takes a branch that runs the catch-up and
+  nothing else. Folding the strip into the shared data would have re-run the
+  household's statistics on every filter keystroke to arrive at figures the
+  filter cannot change — the same reason the dashboard refuses to recompute its
+  overview when a chip asks for eight rows.
 
-Every item above is done. Notes on the decisions that were open when the phase
-started:
+- **`#subscription-list` stays the outermost element of its fragment.** The new
+  arrangement wraps the list from the page, never from inside the partial,
+  because the filter form selects that id and swaps it whole. A layout wrapper
+  added inside the file would have been a working page and a broken filter.
 
-- **The metric row is four tiles, not one per currency.** Monthly and yearly
-  spend are a tile each, listing their per-currency subtotals with the combined
-  figure alongside only when every currency converts; a household in one
-  currency sees one big number, and one in two sees the combined total over the
-  subtotals it was computed from. When a currency has no rate the tile shows the
-  subtotals and no total at all, which is the same refusal the rest of the
-  application makes. The fourth tile — the design's virtual card — is the
-  active-subscription count with the next charge and its date beneath it, taken
-  from the forecast rather than from a payment date so that a trial converting
-  on Friday counts as the next charge, because it is.
+- **One near window, now four consumers.** Fourteen days, referenced from
+  `CancellationService::URGENT_DAYS` rather than declared again, so the strip's
+  count, the renewing card and the cancel-by card are three readings of one
+  query rather than three definitions waiting to disagree.
 
-- **The chart is the Forecast page's own call.** `ForecastService::monthly()`
-  with no member argument: the same household-wide figures `/forecast` renders,
-  so the two screens cannot disagree about a month. `DashboardTest` asserts that
-  by comparing the rendered payload against that call rather than against
-  remembered numbers.
+- **Cancel by is only where a notice period exists**, and that falls out of the
+  existing service rather than a test in a template: `CancellationService` has
+  always skipped a subscription without one, because without a notice period the
+  deadline *is* the renewal date and the card beside it already says so.
+  Deadlines already missed are kept and badged — nothing can be done about them,
+  but the user has just been committed to another period.
 
-- **Nothing about money is decided in the browser.** The payload carries integer
-  minor units for the bars and ICU-formatted strings for the tooltip; the
-  y-axis ticks are *pinned* to values the server named and labelled, because the
-  alternative — letting Chart.js invent tick values — would mean formatting
-  currency in JavaScript, and a second money formatter is a second set of
-  answers. The busiest month takes the amber that Phase 8 reserved for "money is
-  about to move".
+- **The trials section is not a window.** `stats['trials']` is trials ending
+  within thirty days, which answers a different question, so the repository's
+  trial query gained an optional-null upper bound and the screen asks for every
+  trial from today onwards. A trial converting in three months belongs to "what
+  am I on a trial of" exactly as much as one converting on Friday.
 
-- **A month that cannot be combined means no chart.** A missing total draws as a
-  short bar, which reads as a cheap month rather than an unknown one. The card
-  names the currencies without a rate and points at the Forecast page, which
-  shows those months per currency. Whether the horizon can be combined is asked
-  once, of the union of every currency in it, by the same `StatsService::combine`
-  everything else asks.
+- **An action is drawn only where it could be used.** Permission alone was not
+  enough: reads are wider than writes, so under ISOLATED isolation a member can
+  see a shared cost they contribute to without being able to change it.
+  `Scope::mayWriteRow()` asks the question the repository's write predicate asks
+  in SQL, and the cards consult it. It decides what to *draw*; the repository
+  still decides what is *allowed*, and a forged POST meets the same refusal it
+  always did. The list's own row controls are left as they were — this phase
+  restyles the list, it does not change what it enforces.
 
-- **The bento is a property of the cards.** The grid is three columns and each
-  card declares a `columnSpan()`; the chart asks for two and the usage widget
-  for one, which is what puts them side by side. Everything else asks for three.
-  So the design's split middle section survives being rearranged, and a narrow
-  screen collapses to one column at the width the shell already changes shape
-  at. Auto-placement is deliberately not dense: a dense grid reflows tiles past
-  one another to fill a hole, and an order somebody chose is not something to
-  improve on silently.
+- **The category widget states its denominator.** With every currency
+  convertible it is the combined monthly total, which is what lets two
+  categories be compared at all. With one currency lacking a rate it becomes a
+  group per currency against that currency's own total, rather than nothing or,
+  worse, one blended bar. The dashboard's version of the widget keeps the Phase
+  10 behaviour — it draws nothing in that case — because changing it was not
+  this phase's to decide; the *mechanics* they share (ordering, the top six, the
+  named tail, the percentages) moved into `Support\Distribution` so the two
+  cannot drift apart on the parts that are genuinely the same.
 
-- **One near window, three consumers.** "Renewing soon" is the cancel-by view's
-  fourteen days, and the renewals tile, the table's badge and the Expiring chip
-  are all derived from one query for it. It counts *renewals* in that window
-  rather than cancel-by deadlines: with a month's notice period a deadline can
-  be behind you while the renewal is weeks away, and a tile headed "renewing
-  soon" must count the renewals.
+- **The per-currency money rule is written once.** The strip's yearly figure and
+  the dashboard's spend tiles are the same rule — one line for one currency, a
+  combined total when every currency converts, subtotals and no total when one
+  does not — so the macro moved to `templates/partials/spend.twig` and both
+  import it.
 
-- **The table's identifier is the one the application already has.** The design
-  carries a reference column; rather than invent a format for it, the column
-  shows the subscription's own number — the one in the URL of every link to it.
-  A card that renders nothing, meanwhile, no longer holds a gap open: the grid
-  wrapper is emitted for every card in the list, so a household with no trials
-  yet would otherwise have had an invisible tile between two visible ones.
+- **A fault found by looking at the running application, not by a test.** A
+  header cell's visually-hidden label is absolutely positioned at its static
+  place; on a table wider than the screen that place is hundreds of pixels to
+  the right, and with no containing block on the scroll wrapper it resolved
+  against the card, escaped the clip and pushed a phone-width page 160px
+  sideways. `.table-scroll` and `.table-wrap` are now positioned, which fixes it
+  on every screen that uses them, not just this one.
 
-- **The chips are the list's own filter and swap the rows alone.** They are real
-  links, so they work with the bundle blocked; with htmx they replace the
-  fragment and nothing else, because swapping the card would take the canvas
-  with it. The chips live *inside* that fragment — a marker for "which view am I
-  looking at" left outside it would still be pointing at the previous one.
-  Export posts to the backup export that already exists, shown only to the role
-  that may use it.
+- **Urgency is one judgement, made once.** A cancel-by row is urgent when the
+  cancel-by view says it is — its `is_urgent` is carried across rather than
+  re-derived — so a row cannot be urgent on one screen and ordinary on the
+  other. A renewing row is never singled out, because every row in that card is
+  inside the near window already and marking them all would mark none. A trial
+  is urgent when it converts inside that same window, which is worth saying
+  because the trials section is not bounded by it.
 
-- **The usage widget shows one member's budget, chosen by a stated rule.** In
-  SHARED isolation an Owner can see everybody's, and only their own belongs on
-  their dashboard; somebody with several gets the overall before the
-  per-category, the shorter period before the longer, the older before the
-  newer. A member without one is invited to set one — but only if they may,
-  because offering a Viewer a link the middleware will refuse is worse than
-  offering nothing.
+- **Known cost: one extra walk of the household.** `CancellationService` reads
+  every subscription again after the statistics have already done so, because
+  its signature takes a scope rather than rows. Two full reads on a page that
+  was already doing one; worth fixing when something else touches that service,
+  not worth changing its API for a restyle.
 
-- **`DateFormatter` was extracted from the Twig extension.** The chart's axis
-  labels are built before any template runs, and a label on the axis and a date
-  in the table beneath it have to be the same string for the same day. It is the
-  counterpart to `MoneyFormatter`, which services already share with the
-  extension for exactly this reason.
+- **Assumption: the action on a card is Pause.** Renovo has no "cancel"
+  operation — pausing is how it records that you have stopped paying for
+  something — so that is the trigger on the deadline and trial cards, posting to
+  the endpoint that already exists rather than a new one.
 
-- **Two layout faults were found by looking at the running application**, not in
-  a test. The chart's table of figures — the screen-reader alternative and the
-  no-script fallback — pushed the page 23px sideways on a phone even while
-  "hidden", because a `<table>` cannot be laid out narrower than its own
-  content; it is now a wrapper that shrinks and clips. The By category card,
-  which predates this phase, overflowed the same way and is now wrapped like
-  every other table.
-
-- **An account that has already arranged its dashboard keeps its arrangement**
-  and finds the three new tiles appended, which is what `DashboardLayoutService`
-  has always done with a card it has not seen. Moving somebody's saved layout
-  around to match a redesign would be the worse surprise, and the case values
-  are unchanged because they are what `dashboard_cards.card_key` holds.
+- **Density needed no new mechanism** but did need the new rows to be built from
+  the primitives it tightens; a test renders the sections at both densities and
+  asserts the markup is identical, because "a screen reader sees no difference
+  between them" is only true if there is no difference to see.

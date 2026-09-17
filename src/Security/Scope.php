@@ -79,4 +79,29 @@ final class Scope
     {
         return $this->isolationMode->restrictsToOwner();
     }
+
+    /**
+     * Whether a row this scope can already see is also one it may *change*.
+     *
+     * The same rule `AbstractScopedRepository::scopePredicate()` compiles into
+     * SQL — the household, and the owner too when the instance is ISOLATED —
+     * asked here about a row that has already been read. It exists because
+     * reads are wider than writes: a member who is a participant in a shared
+     * cost can see the subscription they help pay for without being able to
+     * touch it, so a screen that offered them a Pause button would be offering
+     * an error message.
+     *
+     * This decides whether a control is *drawn*. It is not what refuses the
+     * request if one is forged — that is the repository, which applies the rule
+     * to the UPDATE itself, and it stays the only thing standing between a
+     * crafted POST and somebody else's row.
+     */
+    public function mayWriteRow(int $householdId, int $ownerUserId): bool
+    {
+        if ($this->householdId !== $householdId) {
+            return false;
+        }
+
+        return !$this->isOwnerRestricted() || $ownerUserId === $this->userId;
+    }
 }

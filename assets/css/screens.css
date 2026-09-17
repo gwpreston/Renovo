@@ -101,6 +101,11 @@
     line-height: 1.1;
 }
 
+/* "/ year" is one label: on a narrow tile it wraps as a unit or not at all. */
+.stat-unit {
+    white-space: nowrap;
+}
+
 /* Per-currency subtotals, when there is no honest total to head them with. */
 .stat-lines {
     display: flex;
@@ -694,6 +699,117 @@ tr.is-passed > td {
     }
 }
 
+/* ------------------------------------------------------- my subscriptions */
+
+/*
+ * The screen's shape: the list and the sections beneath it in one column, the
+ * category widget alongside on a wide screen and below on a narrow one.
+ *
+ * The gap is horizontal only. Cards space themselves vertically with their own
+ * margin, and a row gap on top of that would be a double space on every phone.
+ */
+.subscriptions-layout {
+    display: grid;
+    gap: 0 1rem;
+    align-items: start;
+}
+
+@media (min-width: 1100px) {
+    .subscriptions-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
+    }
+}
+
+/*
+ * Either column can hold a table, and a grid item defaults to refusing to be
+ * narrower than its content — which is how a wide table pushes a whole page
+ * sideways instead of scrolling inside its own wrapper.
+ */
+.subscriptions-main,
+.subscriptions-side {
+    min-width: 0;
+}
+
+.section-heading {
+    font-size: var(--size-heading);
+    margin: 0 0 0.75rem;
+}
+
+/*
+ * A deadline, on the expiring cards and the trials card: what it is, when, what
+ * it costs, and the one thing worth doing about it.
+ */
+.deadlines {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.5rem;
+}
+
+.deadline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.75rem;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.deadline:last-child {
+    border-bottom: 0;
+}
+
+.deadline-main {
+    min-width: 0;
+}
+
+.deadline-amount {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/*
+ * Narrow: the button drops onto its own line rather than squeezing the name to
+ * nothing. Wide: it sits in a third column beside the amount.
+ */
+.deadline-action {
+    grid-column: 1 / -1;
+    justify-self: end;
+}
+
+@media (min-width: 30rem) {
+    .deadline {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+
+    .deadline-action {
+        grid-column: auto;
+        justify-self: auto;
+    }
+}
+
+/*
+ * Urgency is a rule down the side rather than a filled row: these sit inside a
+ * card, where a background wash would read as a second card.
+ */
+.deadline.is-urgent {
+    border-left: 3px solid var(--warning);
+    padding-left: 0.5rem;
+}
+
+.deadline.is-passed {
+    border-left: 3px solid var(--error-text);
+    padding-left: 0.5rem;
+}
+
+/* Each currency's bars are a block of their own when they cannot be combined. */
+.category-widget h3 {
+    margin: 1rem 0 0;
+}
+
+.category-widget h3:first-of-type {
+    margin-top: 0.5rem;
+}
+
 /* ---------------------------------------------------------------- density */
 
 /*
@@ -725,6 +841,16 @@ tr.is-passed > td {
 
 :root[data-density='compact'] .cell-name .logo {
     display: none;
+}
+
+/* The my-subscriptions sections are rows like any other, and tighten with them. */
+:root[data-density='compact'] .deadline {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+:root[data-density='compact'] .distribution {
+    gap: 0.35rem;
 }
 
 /* ------------------------------------------------------- forced colours */

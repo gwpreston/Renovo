@@ -1,0 +1,40 @@
+{#
+    The stats strip.
+
+    Three figures the application already has, and not one of them computed for
+    this screen: the active count and the yearly total are the Statistics page's
+    own, and the renewal count is the near window the dashboard and the cancel-by
+    view are built from.
+
+    The yearly figure keeps the per-currency rule, through the same partial the
+    dashboard's tiles use — so it is a single clean number whenever there is an
+    honest single number to show, and two lines when there is not.
+#}
+{% import 'partials/spend.twig' as figure %}
+
+<section class="metric-grid" id="subscription-strip" aria-label="{{ t('subscriptions.strip') }}">
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('dashboard.active_subscriptions') }}</h2>
+        <p class="stat-value">{{ strip.active_count }}</p>
+        <p class="muted">{{ t('subscriptions.active_note') }}</p>
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('dashboard.yearly_spend') }}</h2>
+        {{ figure.spend(strip.yearly, t('dashboard.per_year_unit')) }}
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('dashboard.renewing_soon') }}</h2>
+        <p class="stat-value">{{ strip.renewals.count }}</p>
+        <p class="muted">{{ t('dashboard.renewing_soon_note', {'days': strip.renewals.days}) }}</p>
+        {% if strip.renewals.total is not empty %}
+            <p class="muted">
+                {% for total in strip.renewals.total %}
+                    {{ total.total_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
+                {% endfor %}
+                {{ t('dashboard.due_in_total') }}
+            </p>
+        {% endif %}
+    </article>
+</section>
