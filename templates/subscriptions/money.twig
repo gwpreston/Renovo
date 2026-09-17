@@ -51,8 +51,7 @@
                                 {{ entry.change.price.amountMinor|money(entry.change.price.currency) }}
                                 {% if entry.difference_minor is not null and entry.difference_minor != 0 %}
                                     <span class="{{ entry.difference_minor > 0 ? 'is-increase' : 'is-decrease' }}">
-                                        {{ entry.difference_minor > 0 ? '+' : '' }}{{
-                                            entry.difference_minor|money(entry.change.price.currency) }}
+                                        {{ entry.difference_minor|money(entry.change.price.currency, true) }}
                                     </span>
                                 {% endif %}
                             </div>
@@ -74,7 +73,7 @@
 
                     <label for="price">{{ t('subscriptions_money.new_price') }}</label>
                     <div class="field-row">
-                        <input type="text" id="price" name="price" inputmode="decimal" placeholder="12.99" required>
+                        <input type="text" id="price" name="price" inputmode="decimal" placeholder="{{ 12.99|decimal(2) }}" required>
                         <select name="currency" aria-label="{{ t('field.currency') }}">
                             <option value="{{ subscription.price.currency }}">{{ subscription.price.currency }}</option>
                         </select>
@@ -100,24 +99,26 @@
                     'owner': subscription.ownerName ?? t('subscriptions_money.its_owner'),
                 }) }}</p>
             {% else %}
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th scope="col">{{ t('field.member') }}</th>
-                        <th scope="col" class="numeric">{{ t('field.share') }}</th>
-                        <th scope="col" class="numeric">{{ t('field.amount') }}</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for share in shares %}
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead>
                         <tr>
-                            <td>{{ share.user_name ?? '—' }}</td>
-                            <td class="numeric">{{ share.share_units }}</td>
-                            <td class="numeric">{{ share.amount.amountMinor|money(share.amount.currency) }}</td>
+                            <th scope="col">{{ t('field.member') }}</th>
+                            <th scope="col" class="numeric">{{ t('field.share') }}</th>
+                            <th scope="col" class="numeric">{{ t('field.amount') }}</th>
                         </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                        {% for share in shares %}
+                            <tr>
+                                <td>{{ share.user_name ?? '—' }}</td>
+                                <td class="numeric">{{ share.share_units }}</td>
+                                <td class="numeric">{{ share.amount.amountMinor|money(share.amount.currency) }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
                 <p class="hint">{{ t('subscriptions_money.split_note') }}</p>
             {% endif %}
 
@@ -198,7 +199,7 @@
                 </form>
 
                 <form method="post" action="/subscriptions/{{ subscription.id }}/usage/reset" class="inline"
-                      onsubmit="return confirm('Reset the usage count to zero?')">
+                      onsubmit="return confirm('{{ t('confirm.reset_usage')|e('js') }}')">
                     {{ csrf_field() }}
                     <button type="submit" class="button button-quiet">{{ t('subscriptions_money.reset_count') }}</button>
                 </form>
@@ -239,7 +240,7 @@
                                     <form method="post"
                                           action="/subscriptions/{{ subscription.id }}/attachments/{{ attachment.id }}/delete"
                                           class="inline"
-                                          onsubmit="return confirm('Delete this file?')">
+                                          onsubmit="return confirm('{{ t('confirm.delete_attachment')|e('js') }}')">
                                         {{ csrf_field() }}
                                         <button type="submit" class="button button-quiet">{{ t('action.delete') }}</button>
                                     </form>

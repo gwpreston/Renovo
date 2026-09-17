@@ -30,7 +30,14 @@ final class MoneyFormatter
     {
     }
 
-    public function format(Money $money): string
+    /**
+     * `signed` prefixes a positive amount with the locale's own plus sign,
+     * which is what a change between two figures needs: a price that went up
+     * reads as "+£2.00" rather than as an amount that happens to be printed in
+     * red. The sign comes from ICU rather than from a `+` in a template, for
+     * the same reason the grouping separator does.
+     */
+    public function format(Money $money, bool $signed = false): string
     {
         $formatter = $this->formatter($this->locale->get());
         $exponent = Currency::exponent($money->currency);
@@ -43,14 +50,22 @@ final class MoneyFormatter
 
         $formatted = $formatter->formatCurrency($major, $money->currency);
 
-        return $formatted === false
-            ? $money->currency . ' ' . $money->toDecimalString()
-            : $formatted;
+        if ($formatted === false) {
+            $formatted = $money->currency . ' ' . $money->toDecimalString();
+        }
+
+        if ($signed && $money->amountMinor > 0) {
+            $plus = $formatter->getSymbol(NumberFormatter::PLUS_SIGN_SYMBOL);
+
+            return ($plus === false ? '+' : $plus) . $formatted;
+        }
+
+        return $formatted;
     }
 
-    public function formatMinor(int $amountMinor, string $currency): string
+    public function formatMinor(int $amountMinor, string $currency, bool $signed = false): string
     {
-        return $this->format(Money::of($amountMinor, $currency));
+        return $this->format(Money::of($amountMinor, $currency), $signed);
     }
 
     private function formatter(string $locale): NumberFormatter

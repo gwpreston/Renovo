@@ -27,7 +27,7 @@
     {% endif %}
 
     {% if can(scope, 'subscription.create') %}
-        <a class="button button-primary topbar-add" href="/subscriptions/new"
+        <a class="button topbar-add" href="/subscriptions/new"
            data-opens-dialog="quick-add">
             <span class="nav-icon" data-icon="add" aria-hidden="true"></span>
             <span class="topbar-add-label">{{ t('subscriptions.add_subscription') }}</span>

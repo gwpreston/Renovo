@@ -122,7 +122,7 @@
                             {% endif %}
                             {% if can(scope, 'subscription.delete') %}
                                 <form method="post" action="/subscriptions/{{ subscription.id }}/delete" class="inline"
-                                      onsubmit="return confirm('Delete {{ subscription.name|e('js') }}?')">
+                                      onsubmit="return confirm('{{ t('confirm.delete_subscription', {'name': subscription.name})|e('js') }}')">
                                     {{ csrf_field() }}
                                     <button type="submit" class="button button-danger">{{ t('action.delete') }}</button>
                                 </form>

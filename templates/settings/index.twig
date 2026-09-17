@@ -153,41 +153,43 @@
                     <input type="text" id="household_name" name="name" value="{{ household.name }}">
 
                     <h3>{{ t('settings.members') }}</h3>
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th scope="col">{{ t('field.member') }}</th>
-                            <th scope="col">{{ t('field.role') }}</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for member in members %}
+                    <div class="table-scroll">
+                        <table class="table">
+                            <thead>
                             <tr>
-                                <td>{{ member.display_name }}</td>
-                                <td>
-                                    {% if member.id == current_user.id %}
-                                        {{ role_label(member.role) }}
-                                        <span class="hint">{{ t('settings.you') }}</span>
-                                    {% else %}
-                                        <select name="roles[{{ member.id }}]"
-                                                aria-label="{{ t('settings.role_for', {
-                                                    'name': member.display_name,
-                                                }) }}">
-                                            {% for role in roles %}
-                                                <option value="{{ role.value }}"
-                                                        {{ member.role == role.value ? 'selected' : '' }}>
-                                                    {{ role_label(role.value) }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
-                                    {% endif %}
-                                </td>
+                                <th scope="col">{{ t('field.member') }}</th>
+                                <th scope="col">{{ t('field.role') }}</th>
                             </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                            {% for member in members %}
+                                <tr>
+                                    <td>{{ member.display_name }}</td>
+                                    <td>
+                                        {% if member.id == current_user.id %}
+                                            {{ role_label(member.role) }}
+                                            <span class="hint">{{ t('settings.you') }}</span>
+                                        {% else %}
+                                            <select name="roles[{{ member.id }}]"
+                                                    aria-label="{{ t('settings.role_for', {
+                                                        'name': member.display_name,
+                                                    }) }}">
+                                                {% for role in roles %}
+                                                    <option value="{{ role.value }}"
+                                                            {{ member.role == role.value ? 'selected' : '' }}>
+                                                        {{ role_label(role.value) }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
 
-                    <button type="submit" class="button button-primary">{{ t('settings.save_household') }}</button>
+                    <button type="submit" class="button">{{ t('settings.save_household') }}</button>
                 </form>
             {% else %}
                 <p><strong>{{ household.name }}</strong></p>
@@ -283,7 +285,7 @@
                 </label>
                 <p class="hint">{{ t('settings.demo_mode_hint') }}</p>
 
-                <button type="submit" class="button button-primary">{{ t('settings.save_instance_settings') }}</button>
+                <button type="submit" class="button">{{ t('settings.save_instance_settings') }}</button>
             </form>
         </section>
 

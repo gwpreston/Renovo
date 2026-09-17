@@ -248,12 +248,25 @@ final class DesignTokensTest extends TestCase
     // -------------------------------------------------------------- contrast
 
     /**
-     * Every text colour clears AA on the surface it is used against.
+     * Every text colour clears AA on every surface it is actually drawn on.
      *
      * The palette is the thing that decides whether the application is
      * readable, so it is the thing worth locking down. A token nudged a few
      * points darker to "look better" is exactly the change that passes review
      * and fails a reader.
+     *
+     * The matrix is the point. Checking each ink against `--surface` alone
+     * proves the card and nothing else, and the places contrast quietly fails
+     * are the ones nobody pictures while choosing a colour: the quiet text in
+     * the footer, which sits on the page rather than on a card; the same text
+     * in a hovered row, which is a surface lighter than the one it was chosen
+     * against; and the ordinary ink in a row tinted for urgency, where the
+     * background was picked to carry the warning colour and then has to carry
+     * the name of the subscription too.
+     *
+     * Every pair below is one a rule in `components.css` or `screens.css`
+     * genuinely produces. A pair that stops being real should be deleted from
+     * here rather than left to pass.
      *
      * @return iterable<string, array{string, string, string}>
      */
@@ -261,21 +274,44 @@ final class DesignTokensTest extends TestCase
     {
         $themes = [':root' => 'light', ':root[data-theme=dark]' => 'dark'];
 
+        /*
+         * The surfaces ordinary text is set on: the page itself, a card, the
+         * raised chrome (rail, top bar, bottom bar, drawer), the sunken fill
+         * (fields, chips, `kbd`, a calendar entry), the hover lift a table row
+         * and a nav item take, and the two tints a row wears when a deadline
+         * is close or past.
+         */
+        $everySurface = [
+            '--bg',
+            '--surface',
+            '--surface-raised',
+            '--surface-sunken',
+            '--surface-hover',
+            '--warning-bg',
+            '--error-bg',
+            '--success-bg',
+        ];
+
+        /* The coloured inks are used inside cards and on controls, not on a tint. */
+        $plainSurfaces = ['--bg', '--surface', '--surface-raised', '--surface-sunken', '--surface-hover'];
+
         $pairs = [
-            '--text' => '--surface',
-            '--text-muted' => '--surface',
-            '--accent' => '--surface',
-            '--danger' => '--surface',
-            '--increase' => '--surface',
-            '--decrease' => '--surface',
-            '--warning' => '--warning-bg',
-            '--error-text' => '--error-bg',
-            '--success-text' => '--success-bg',
+            '--text' => $everySurface,
+            '--text-muted' => $everySurface,
+            '--accent' => $plainSurfaces,
+            '--danger' => $plainSurfaces,
+            '--increase' => ['--surface'],
+            '--decrease' => ['--surface'],
+            '--warning' => [...$plainSurfaces, '--warning-bg'],
+            '--error-text' => ['--error-bg'],
+            '--success-text' => ['--success-bg'],
         ];
 
         foreach ($themes as $selector => $theme) {
-            foreach ($pairs as $ink => $ground) {
-                yield sprintf('%s: %s on %s', $theme, $ink, $ground) => [$selector, $ink, $ground];
+            foreach ($pairs as $ink => $grounds) {
+                foreach ($grounds as $ground) {
+                    yield sprintf('%s: %s on %s', $theme, $ink, $ground) => [$selector, $ink, $ground];
+                }
             }
         }
     }
