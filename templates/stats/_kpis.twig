@@ -1,0 +1,33 @@
+{#
+    The KPI row.
+
+    Monthly spend, annual spend, active subscriptions — three figures the
+    Statistics page already produced, arranged as the design's row of headline
+    numbers.
+
+    The two money figures go through the partial the dashboard's tiles and the
+    my-subscriptions strip use, which is the per-currency rule written once: a
+    single clean number when there is an honest single number, the combined
+    total with its subtotals when everything converts, and the subtotals alone
+    when one currency has no rate. A headline that quietly dropped a currency
+    would be a wrong number rather than a tidy one.
+#}
+{% import 'partials/spend.twig' as figure %}
+
+<section class="metric-grid" id="analytics-kpis" aria-label="{{ t('dashboard.metrics') }}">
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('dashboard.monthly_spend') }}</h2>
+        {{ figure.spend(kpis.monthly, t('dashboard.per_month_unit')) }}
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('dashboard.yearly_spend') }}</h2>
+        {{ figure.spend(kpis.yearly, t('dashboard.per_year_unit')) }}
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('dashboard.active_subscriptions') }}</h2>
+        <p class="stat-value">{{ kpis.active_count }}</p>
+        <p class="muted">{{ t('subscriptions.active_note') }}</p>
+    </article>
+</section>

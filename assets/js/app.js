@@ -13,6 +13,9 @@
  * shell a navigation made of icons — fills in the icon slots the server marked
  * up. Phase 10 added the first page that draws a chart: the dashboard's
  * twelve-month spend, from a payload the server rendered beside the canvas.
+ * Phase 12 added the second kind and the first page carrying two — the
+ * analytics screen's spending trajectory beside its category donut — which is
+ * why the drawing below is a list rather than a call.
  *
  * Usage from a page's own script:
  *
@@ -21,8 +24,9 @@
  */
 
 import { renderChart } from './charts.js';
-import { drawSpendChart, watchTheme } from './dashboard.js';
+import { drawCategoryDonuts } from './category-donut.js';
 import { hydrateIcons, icon, iconNames } from './icons.js';
+import { drawSpendCharts } from './spend-chart.js';
 
 /*
  * Assigned, not merged: this is the only thing that writes window.Renovo, and
@@ -36,6 +40,17 @@ window.Renovo = {
     hydrateIcons,
 };
 
+/**
+ * Every kind of chart this application draws.
+ *
+ * Each returns immediately on a page that has none of its kind, so a page with
+ * no chart pays for two `querySelectorAll` calls and nothing else; Chart.js is
+ * fetched only when there is something to draw with it.
+ */
+function drawCharts(root = document) {
+    return Promise.all([drawSpendCharts(root), drawCategoryDonuts(root)]);
+}
+
 /*
  * The shell's icons, drawn once the document is there to draw them into.
  *
@@ -47,10 +62,7 @@ window.Renovo = {
  */
 function hydrate() {
     hydrateIcons(document);
-
-    /* A page with no spend chart on it returns immediately, so this costs a
-       querySelector; Chart.js itself is only fetched when there is one. */
-    drawSpendChart();
+    drawCharts();
 }
 
 if (document.readyState === 'loading') {
@@ -63,4 +75,16 @@ document.addEventListener('htmx:afterSwap', (event) => {
     hydrateIcons(event.target instanceof Element ? event.target : document);
 });
 
-watchTheme();
+/*
+ * Redraw when the system flips between light and dark.
+ *
+ * A chart's colours are read from the design tokens at the moment it is drawn,
+ * so one drawn in light mode keeps light-mode ink until something asks for it
+ * again. An account that has chosen a theme explicitly is unaffected: its
+ * tokens do not move.
+ */
+if (typeof window.matchMedia === 'function') {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        drawCharts();
+    });
+}

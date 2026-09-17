@@ -1,0 +1,29 @@
+{#
+    The spending trajectory.
+
+    The design's orange gradient bars are the twelve-month view, and they are
+    the dashboard's chart: the same `ForecastService::monthly()` call, the same
+    `SpendChartService` payload, the same partial. The two screens agree about
+    March by construction rather than by coincidence, which is the whole reason
+    this reuses the Phase 10 chart instead of adding a second one.
+
+    Each renewal falls in the month it actually falls; a scheduled price change
+    or a trial conversion applies from its own date, so a bar does not move when
+    the change eventually lands.
+#}
+{% import 'partials/spend_chart.twig' as trend %}
+
+<section class="card chart-card" id="analytics-trajectory">
+    <header class="card-header">
+        <h2>{{ t('stats.trajectory') }}</h2>
+        <a class="button button-quiet" href="/forecast">{{ t('nav.forecast') }}</a>
+    </header>
+
+    <p class="muted">{{ t('stats.trajectory_note') }}</p>
+
+    {{ trend.spend_chart(
+        trajectory,
+        'analytics-trajectory-data',
+        t('dashboard.spend_chart_alt', {'currency': trajectory.currency})
+    ) }}
+</section>

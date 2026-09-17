@@ -1,0 +1,152 @@
+{#
+    The category donut.
+
+    A donut implies one whole: its centre states that whole as a number and
+    every segment claims to be a share of it. So when the categories span
+    currencies that cannot all be converted to one base, there is no donut —
+    the screen shows the per-currency figures instead, each set against its own
+    total. Degrading to the honest view is the behaviour here, not an edge case
+    to paper over: a centre label reading a total that silently omitted a
+    currency would be worse than no picture at all.
+
+    The breakdown is `CategoryBreakdownService`'s, the same one the
+    my-subscriptions widget draws as proportion bars. Two pictures of one set of
+    figures.
+#}
+<section class="card chart-card donut-card" id="analytics-categories"
+         aria-labelledby="analytics-categories-heading">
+    <header class="card-header">
+        <h2 id="analytics-categories-heading">{{ t('dashboard.where_it_goes') }}</h2>
+    </header>
+
+    {% if categories.groups is empty %}
+        <p class="muted empty">{{ t('subscriptions.categories_empty') }}</p>
+
+    {% elseif categories.donut is null %}
+        {#
+            No single whole to draw. The figures, per currency, with each
+            category against the total for its own currency.
+        #}
+        <p class="hint">
+            {{ t('stats.donut_per_currency', {
+                'currencies': categories.unconvertible|join(', '),
+            }) }}
+        </p>
+
+        {% for group in categories.groups %}
+            <h3 class="stat-label">{{ group.currency }}</h3>
+
+            <ul class="plain distribution">
+                {% for row in group.rows %}
+                    <li class="distribution-row">
+                        <span class="distribution-name">{{ row.name }}</span>
+                        <span class="distribution-amount">{{ row.amount_minor|money(group.currency) }}</span>
+                        <div class="meter meter-slim" role="img"
+                             aria-label="{{ t('dashboard.share_of_spend', {
+                                 'name': row.name,
+                                 'percent': row.percent,
+                             }) }}">
+                            <span class="meter-fill" style="width: {{ min(row.percent, 100) }}%"></span>
+                        </div>
+                    </li>
+                {% endfor %}
+
+                {% if group.other %}
+                    {% set other_name = t('dashboard.other_categories', {'count': group.other.count}) %}
+                    <li class="distribution-row">
+                        <span class="distribution-name muted">{{ other_name }}</span>
+                        <span class="distribution-amount">
+                            {{ group.other.amount_minor|money(group.currency) }}
+                        </span>
+                        <div class="meter meter-slim" role="img"
+                             aria-label="{{ t('dashboard.share_of_spend', {
+                                 'name': other_name,
+                                 'percent': group.other.percent,
+                             }) }}">
+                            <span class="meter-fill" style="width: {{ min(group.other.percent, 100) }}%"></span>
+                        </div>
+                    </li>
+                {% endif %}
+            </ul>
+
+            <p class="hint">
+                {{ t('subscriptions.categories_total', {
+                    'total': group.total_minor|money(group.currency),
+                }) }}
+            </p>
+        {% endfor %}
+
+    {% else %}
+        {% set donut = categories.donut %}
+        {% set alt = t('stats.donut_alt', {'currency': donut.currency}) %}
+        {#
+            The tail's name is the one string in the payload that needs
+            translating, so it is resolved here — once — and handed to the
+            canvas as an attribute beside the aria-label already there. The
+            catalogue stays the single source of it.
+        #}
+        {% set tail = categories.groups[0].other %}
+        {% set tail_name = tail ? t('dashboard.other_categories', {'count': tail.count}) : '' %}
+
+        <div class="chart-frame donut-frame">
+            <canvas class="chart-canvas"
+                    data-chart="donut"
+                    data-chart-data="analytics-donut-data"
+                    data-other-label="{{ tail_name }}"
+                    role="img"
+                    aria-label="{{ alt }}"></canvas>
+
+            {#
+                The centre label is the total this donut represents — the claim
+                the picture makes, stated. It is HTML over the canvas rather
+                than something the chart library draws, so it is the server's
+                ICU string like every other figure on the page. It lives inside
+                the frame, which is hidden until the chart is actually drawn, so
+                a browser with no script never sees a number floating over an
+                empty box.
+            #}
+            <p class="donut-centre" aria-hidden="true">
+                <span class="donut-centre-value">{{ donut.total_display }}</span>
+                <span class="donut-centre-label">{{ t('dashboard.per_month_unit') }}</span>
+            </p>
+        </div>
+
+        <script id="analytics-donut-data" type="application/json">{{ donut.json|raw }}</script>
+
+        {#
+            The figures, for a screen reader and for a browser with no script.
+            The donut is drawn from this same payload, so the table cannot
+            describe a different set of numbers than the picture.
+        #}
+        <div class="chart-figures">
+            <table class="table">
+                <caption class="visually-hidden">{{ alt }}</caption>
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.category') }}</th>
+                    <th scope="col" class="numeric">{{ t('dashboard.per_month_unit') }}</th>
+                    <th scope="col" class="numeric">{{ t('field.share') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for slice in donut.slices %}
+                    <tr>
+                        <th scope="row">
+                            {{ slice.is_other ? tail_name : slice.name }}
+                        </th>
+                        <td class="numeric">{{ slice.display }}</td>
+                        <td class="numeric">{{ slice.percent }}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                <tr>
+                    <th scope="row">{{ t('field.total') }}</th>
+                    <td class="numeric">{{ donut.total_display }}</td>
+                    <td class="numeric">100%</td>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+    {% endif %}
+</section>

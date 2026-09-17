@@ -10,7 +10,6 @@ use App\Domain\Permission;
 use App\Security\PermissionService;
 use App\Security\Scope;
 use App\Support\Clock;
-use App\Support\Distribution;
 use DateTimeImmutable;
 
 /**
@@ -50,14 +49,11 @@ final class SubscriptionScreenService
     /** The near window, in days: the one the cancel-by view calls urgent. */
     public const NEAR_WINDOW_DAYS = CancellationService::URGENT_DAYS;
 
-    /** Distribution bars past this many are a legend, not a picture. */
-    private const CATEGORY_BARS = 6;
-
     public function __construct(
         private readonly StatsService $stats,
         private readonly SubscriptionService $subscriptions,
         private readonly CancellationService $cancellations,
-        private readonly ExchangeRateService $rates,
+        private readonly CategoryBreakdownService $breakdown,
         private readonly PermissionService $permissions,
         private readonly Clock $clock,
     ) {
@@ -259,112 +255,17 @@ final class SubscriptionScreenService
     /**
      * Where the recurring spend goes, as proportion bars.
      *
-     * The rows are the Statistics page's category breakdown, and the only
-     * decision made here is what each bar is a share *of*. When every currency
-     * converts, that is the combined monthly total in the base currency, and
-     * the bars compare categories across the household. When one does not, the
-     * widget shows a group per currency, each bar a share of that currency's
-     * own monthly total — because a bar drawn across currencies with no rate
-     * between them would be a comparison nobody can make. Unconvertible
-     * currencies are separated, never blended.
+     * The rows, the ordering and the denominator are all
+     * `CategoryBreakdownService`'s — the same breakdown the analytics screen
+     * draws as a donut. Two pictures of one set of figures, which is the only
+     * arrangement in which they cannot disagree.
      *
      * @param array<string, mixed> $stats
      * @return array<string, mixed>
      */
     private function categories(array $stats): array
     {
-        /** @var array{currency: string, amount_minor: int|null, unconvertible: list<string>} $combined */
-        $combined = $stats['combined_monthly'];
-        /** @var list<array{name: string, currency: string, monthly_minor: int, count: int}> $byCategory */
-        $byCategory = $stats['by_category'];
-        /** @var list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring */
-        $recurring = $stats['recurring'];
-
-        if ($combined['amount_minor'] !== null) {
-            return [
-                'is_combined' => true,
-                'unconvertible' => [],
-                'groups' => $this->combinedGroup($byCategory, $combined['currency'], $combined['amount_minor']),
-            ];
-        }
-
-        return [
-            'is_combined' => false,
-            'unconvertible' => $combined['unconvertible'],
-            'groups' => $this->perCurrencyGroups($byCategory, $recurring),
-        ];
-    }
-
-    /**
-     * One group: every category converted into the base currency.
-     *
-     * @param list<array{name: string, currency: string, monthly_minor: int, count: int}> $byCategory
-     * @return list<array<string, mixed>>
-     */
-    private function combinedGroup(array $byCategory, string $currency, int $total): array
-    {
-        if ($total <= 0) {
-            return [];
-        }
-
-        $byName = [];
-        foreach ($byCategory as $row) {
-            $byName[$row['name']][$row['currency']] = ($byName[$row['name']][$row['currency']] ?? 0)
-                + $row['monthly_minor'];
-        }
-
-        $rows = [];
-        foreach ($byName as $name => $amounts) {
-            $rows[] = [
-                'name' => (string) $name,
-                'amount_minor' => $this->rates->combine($amounts, $currency) ?? 0,
-            ];
-        }
-
-        return [
-            Distribution::bars($rows, $total, self::CATEGORY_BARS) + [
-                'currency' => $currency,
-                'total_minor' => $total,
-            ],
-        ];
-    }
-
-    /**
-     * A group per currency, each against its own monthly total.
-     *
-     * The denominators are the per-currency subtotals the strip shows, so a
-     * share here and a total up there are two readings of one figure.
-     *
-     * @param list<array{name: string, currency: string, monthly_minor: int, count: int}> $byCategory
-     * @param list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring
-     * @return list<array<string, mixed>>
-     */
-    private function perCurrencyGroups(array $byCategory, array $recurring): array
-    {
-        $rowsByCurrency = [];
-        foreach ($byCategory as $row) {
-            $rowsByCurrency[$row['currency']][] = [
-                'name' => $row['name'],
-                'amount_minor' => $row['monthly_minor'],
-            ];
-        }
-
-        $groups = [];
-        foreach ($recurring as $subtotal) {
-            $currency = $subtotal['currency'];
-            $rows = $rowsByCurrency[$currency] ?? [];
-
-            if ($rows === [] || $subtotal['monthly_minor'] <= 0) {
-                continue;
-            }
-
-            $groups[] = Distribution::bars($rows, $subtotal['monthly_minor'], self::CATEGORY_BARS) + [
-                'currency' => $currency,
-                'total_minor' => $subtotal['monthly_minor'],
-            ];
-        }
-
-        return $groups;
+        return $this->breakdown->fromStats($stats);
     }
 
     /**

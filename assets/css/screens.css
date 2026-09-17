@@ -810,6 +810,125 @@ tr.is-passed > td {
     margin-top: 0.5rem;
 }
 
+/* ------------------------------------------------------------- analytics */
+
+/*
+ * The trajectory and the donut side by side on a wide screen, stacked on a
+ * narrow one. Horizontal gap only: cards space themselves vertically with their
+ * own margin, and a row gap on top of that is a double space on every phone.
+ */
+.analytics-layout {
+    display: grid;
+    gap: 0 1rem;
+    align-items: start;
+}
+
+@media (min-width: 1100px) {
+    .analytics-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+    }
+}
+
+/* A grid item defaults to refusing to be narrower than its content, which is
+   how a wide table pushes a whole page sideways instead of scrolling inside
+   its own wrapper. */
+.analytics-main,
+.analytics-side {
+    min-width: 0;
+}
+
+/* Year over year and the notable card, as a pair that becomes a stack. */
+.analytics-pair {
+    display: grid;
+    gap: 0 1rem;
+    align-items: start;
+}
+
+@media (min-width: 60rem) {
+    .analytics-pair {
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    }
+}
+
+/*
+ * The donut needs more height than a bar chart at the same width: it is a
+ * circle with a legend beneath it rather than a band of bars.
+ */
+.donut-frame {
+    height: 20rem;
+}
+
+/*
+ * The centre label: the total this donut represents, stated.
+ *
+ * Positioned over the cut-out rather than drawn by the chart library, so it is
+ * the server's ICU string like every other figure on the page. It is inside
+ * `.chart-frame`, which stays hidden until the chart is actually drawn, so a
+ * browser with no script never sees a number floating over an empty box.
+ *
+ * The legend sits below the ring, so the centre of the ring is above the centre
+ * of the canvas; the translate accounts for the label's own size and the offset
+ * pulls it up to meet it.
+ */
+.donut-centre {
+    position: absolute;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    text-align: center;
+    /* The ring is what the pointer is for. */
+    pointer-events: none;
+}
+
+.donut-centre-value {
+    display: block;
+    font-size: var(--size-heading);
+    font-weight: var(--weight-semibold);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.donut-centre-label {
+    display: block;
+    font-size: var(--size-label);
+    color: var(--text-muted);
+}
+
+/* The most and the least expensive, one above the other. */
+.notable-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.5rem 0 0;
+}
+
+.notable-row {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.notable-row:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.notable-name {
+    margin: 0.1rem 0;
+}
+
+/*
+ * The per-period figures are a row inside a card rather than a grid of cards
+ * of their own: on this screen the cards are the KPI row above, and four more
+ * of them would say these four numbers are as important.
+ */
+.stat-grid-inline {
+    margin-bottom: 0.75rem;
+}
+
+.stat-grid-inline .stat {
+    padding: 0;
+}
+
 /* ---------------------------------------------------------------- density */
 
 /*
@@ -851,6 +970,10 @@ tr.is-passed > td {
 
 :root[data-density='compact'] .distribution {
     gap: 0.35rem;
+}
+
+:root[data-density='compact'] .notable-row {
+    padding-bottom: 0.4rem;
 }
 
 /* ------------------------------------------------------- forced colours */

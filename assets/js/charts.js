@@ -34,3 +34,40 @@ export async function renderChart(canvas, config) {
 
     return chart;
 }
+
+/**
+ * Read a design token, so a chart is drawn in the same colours as everything
+ * around it and follows the theme rather than restating it.
+ *
+ * @param {string} name The custom property, including its leading dashes.
+ * @param {string} fallback What to use when the stylesheet has not loaded.
+ * @returns {string} The resolved colour.
+ */
+export function token(name, fallback) {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+    return value === '' ? fallback : value;
+}
+
+/**
+ * The payload a canvas names, parsed.
+ *
+ * The server writes it into a non-executing <script> element beside the canvas
+ * and the canvas points at it by id, which is what lets one page carry two
+ * charts without either of them guessing which data is theirs.
+ *
+ * @param {HTMLCanvasElement} canvas The canvas whose payload to read.
+ * @returns {object|null} The payload, or null if it is missing or malformed.
+ */
+export function payloadFor(canvas) {
+    const element = document.getElementById(canvas.dataset.chartData);
+    if (element === null) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(element.textContent);
+    } catch (error) {
+        return null;
+    }
+}
