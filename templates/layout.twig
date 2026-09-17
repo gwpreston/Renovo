@@ -6,9 +6,32 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ instance_name }}{% endblock %}</title>
+    {#
+        Two stylesheets and two kinds of URL, deliberately.
+
+        `bundle()` looks a name up in the asset build's manifest and prints the
+        content-hashed file the build produced — Tailwind's theme and
+        utilities, and the @font-face rules for the vendored Inter. `asset()`
+        stamps a modification time onto a file that is served as written: the
+        hand-written stylesheet, the vendored htmx, the keyboard shortcuts.
+        Both answer the same question — what URL will a returning browser
+        treat as new after an upgrade — for files that are produced two
+        different ways.
+
+        The built stylesheet comes first so the hand-written one, whose rules
+        are unlayered and therefore beat anything in Tailwind's layers anyway,
+        reads in the order it wins in.
+
+        Every one of these URLs is served by this instance. Nothing on this
+        page comes from a third-party host, and `assets:offline-check` fails
+        the build if that stops being true.
+    #}
+    <link rel="stylesheet" href="{{ bundle('app.css') }}">
     <link rel="stylesheet" href="{{ asset('/assets/app.css') }}">
     <script src="{{ asset('/assets/htmx.min.js') }}" defer></script>
     <script src="{{ asset('/assets/app.js') }}" defer></script>
+    {# A module, so it is deferred already; `defer` on one is ignored. #}
+    <script src="{{ bundle('app.js') }}" type="module"></script>
 </head>
 {#
     The CSRF token rides on every htmx request via hx-headers, so a fragment

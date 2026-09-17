@@ -1,5 +1,17 @@
 # One-command start: `docker compose up`.
 #
+# This file runs the application as it ships: every container serves what its
+# own image contains, and nothing reaches the network for an asset or a package.
+# That is what an operator gets from `docker compose up`, on an air-gapped host
+# included.
+#
+# Development adds the working tree on top — a live web root and an asset
+# watcher — through a second file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# which is what `./bin/dev-setup.sh` does for you.
+#
 # PostgreSQL is the default engine. To run against MySQL instead, add the
 # override file: `docker compose -f docker-compose.yml -f docker-compose.mysql.yml up`.
 # Local development deliberately uses the same engine as production; SQLite is
@@ -39,25 +51,31 @@ services:
       SMTP_ENCRYPTION: ${SMTP_ENCRYPTION:-none}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-renovo@localhost}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Renovo}
+    # The web root comes from the image, and the `web` container is built from
+    # the same one, so the two agree about every asset's name and age without
+    # either of them reading the host. Development replaces both with the
+    # working tree, together, in docker-compose.dev.yml — the one thing that
+    # must never happen is for them to disagree.
     volumes:
-      # The same web root nginx serves. Without this the app would stat the
-      # copy baked into the image while nginx served the one on disk, and the
-      # two would disagree about how old a stylesheet is — which is exactly
-      # the question AssetVersion exists to answer.
-      - ./public:/var/www/html/public:ro
       - logos:/var/www/html/public/assets/logos
       - appvar:/var/www/html/var
 
   web:
-    image: nginx:1.27-alpine
+    # Built, not a bare nginx image: the web root it serves contains the
+    # compiled assets, and those exist only inside the image — `public/build/`
+    # is generated and not in git, so a bare nginx pointed at a fresh clone
+    # would have no stylesheet to serve and the app would have no manifest to
+    # resolve.
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: web
     restart: unless-stopped
     depends_on:
       - app
     ports:
       - "${APP_PORT:-8080}:80"
     volumes:
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./public:/var/www/html/public:ro
       - logos:/var/www/html/public/assets/logos:ro
     # Readiness, not liveness: this container is only useful once the thing
     # behind it can answer, and /readyz is the endpoint that knows whether the

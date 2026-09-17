@@ -1,0 +1,73 @@
+# Local development, layered on top of docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# which is what `./bin/dev-setup.sh` runs. The base file alone is the
+# application as it ships — every container serving its own image, reaching no
+# network for an asset or a package.
+#
+# What this file adds is the working tree's web root and an asset watcher, so
+# editing a stylesheet or a template shows up without rebuilding an image. The
+# PHP is not mounted, deliberately — `bin/dev-setup.sh` rebuilds the image on
+# every run, and mounting the source as well would be a second, quieter answer
+# to the question of which code is running.
+
+services:
+  # The web root, live from the host, mounted identically into both containers
+  # that read it.
+  #
+  # Identically is the point. nginx serves the static files and the application
+  # stats them to build cache-busted URLs, so a version stamped by one and
+  # served by the other has to come from the same file — the app container
+  # once read the copy in its image while nginx served the copy on disk, and
+  # the two disagreed about how old a stylesheet was. `public/build/` is inside
+  # this mount, so the app resolves names out of the same manifest the watcher
+  # below writes and nginx serves the same hashed files the app names.
+  app:
+    volumes:
+      - ./public:/var/www/html/public:ro
+
+  web:
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./public:/var/www/html/public:ro
+
+  # Rebuilds the front-end assets on change.
+  #
+  # `vite build --watch` rather than Vite's dev server: it writes the same
+  # content-hashed files to the same place a production build does, so
+  # development and production differ in when the build runs and in nothing
+  # else. There is no second origin to configure, no dev-only client script in
+  # the page, and no way for a CDN to creep in through a development path.
+  #
+  # Node is needed here and nowhere else — the running application never uses
+  # it, and this service exists only in this file, so `docker compose up` on a
+  # host with no route to the npm registry never tries to reach it.
+  assets:
+    image: node:22-alpine
+    restart: unless-stopped
+    working_dir: /app
+    # node_modules lives in a volume rather than on the host: it is large, it
+    # is platform-specific, and a macOS host's copy is not the one Alpine
+    # wants.
+    volumes:
+      - ./package.json:/app/package.json:ro
+      - ./package-lock.json:/app/package-lock.json:ro
+      - ./vite.config.js:/app/vite.config.js:ro
+      - ./assets:/app/assets:ro
+      # Tailwind scans the templates for the class names it has to generate, so
+      # editing a template rebuilds the stylesheet.
+      - ./templates:/app/templates:ro
+      - ./src/Application/Twig:/app/src/Application/Twig:ro
+      # The output, written back to the host web root that app and web both
+      # serve. Not read-only: this is the one service that writes it.
+      - ./public/build:/app/public/build
+      - node_modules:/app/node_modules
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        npm ci --no-audit --no-fund
+        npm run watch
+
+volumes:
+  node_modules:

@@ -104,7 +104,12 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-COMPOSE_FILES=(-f docker-compose.yml)
+# The development stack: the shipped one, plus the working tree's web root and
+# the asset watcher. Without the second file `docker compose` runs the
+# application as an operator gets it — every container serving its own image —
+# which is the right default for that command and the wrong one for editing a
+# stylesheet.
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.dev.yml)
 if [ "$ENGINE" = "mysql" ]; then
     COMPOSE_FILES+=(-f docker-compose.mysql.yml)
     DB_DRIVER="mysql"; DB_PORT="3306"; DEFAULT_PUBLISHED_PORT="3306"
@@ -114,8 +119,8 @@ fi
 
 compose() { docker compose "${COMPOSE_FILES[@]}" "$@"; }
 
-TOTAL_STEPS=7
-[ "$SAMPLE_DATA" -eq 1 ] && TOTAL_STEPS=8
+TOTAL_STEPS=8
+[ "$SAMPLE_DATA" -eq 1 ] && TOTAL_STEPS=9
 [ "$DO_STOP" -eq 1 ] && TOTAL_STEPS=2
 
 if [ "$DO_STOP" -eq 1 ]; then
@@ -315,6 +320,11 @@ if [ "$DO_RESET" -eq 1 ]; then
     ok "removed the existing stack and its volumes"
 fi
 
+# The asset watcher's output directory, created here so the bind mount has a
+# target the developer owns. Left to Docker it would be made by the daemon, and
+# on Linux that means a root-owned directory in your own checkout.
+mkdir -p public/build
+
 # A stale container from the other engine holds the same service name.
 build_log="$(mktemp -t renovo-build)"
 if ! compose up -d --build >"$build_log" 2>&1; then
@@ -417,6 +427,44 @@ if [ "$HOST_PHP" -eq 1 ]; then
     fi
 else
     info "skipped — run the gates with: docker compose exec app vendor/bin/phpunit"
+fi
+
+# ---------------------------------------------------------------------------
+step "Building front-end assets"
+# ---------------------------------------------------------------------------
+# The `assets` container started with the rest of the stack: it installs the JS
+# dependencies, compiles Tailwind, bundles the JavaScript, vendors the Inter
+# webfont, and then watches for changes. Every page needs the manifest that
+# build writes — the layout asks it for the stylesheet's hashed name — so wait
+# for it rather than letting the next step report a 500.
+#
+# Waited for rather than run separately: a second `npm run build` alongside the
+# watcher would have two processes emptying and rewriting one output directory.
+#
+# Node is not a prerequisite for any of this. It exists in that container and
+# nowhere else; the application itself never uses it.
+MANIFEST="public/build/manifest.json"
+
+if [ -f "$MANIFEST" ]; then
+    ok "assets already built — the watcher will rebuild them on change"
+else
+    info "installing JS dependencies and compiling — the first run takes a minute"
+    for attempt in $(seq 1 90); do
+        [ -f "$MANIFEST" ] && break
+        # A watcher that has died will never produce the file, and waiting the
+        # full 90 intervals to say so is not help.
+        if [ "$(compose ps -q assets | wc -l | tr -d ' ')" = "0" ]; then
+            compose logs assets 2>/dev/null | tail -20 | sed 's/^/      /'
+            die "The assets container is not running. See the output above."
+        fi
+        sleep 2
+    done
+
+    [ -f "$MANIFEST" ] || {
+        compose logs assets 2>/dev/null | tail -20 | sed 's/^/      /'
+        die "The asset build did not produce $MANIFEST. See the output above."
+    }
+    ok "assets built into public/build"
 fi
 
 # ---------------------------------------------------------------------------
@@ -573,6 +621,7 @@ fi
 
 printf '\n  %sUseful commands%s\n' "$BOLD" "$RESET"
 printf '    docker compose logs -f app        %sfollow the application log%s\n' "$DIM" "$RESET"
+printf '    docker compose logs -f assets     %swatch the asset build rebuild on change%s\n' "$DIM" "$RESET"
 printf '    ./bin/dev-setup.sh --stop         %sstop everything (data is kept)%s\n' "$DIM" "$RESET"
 printf '    ./bin/dev-setup.sh --reset        %sstart again from an empty database%s\n' "$DIM" "$RESET"
 if [ "$HOST_PHP" -eq 1 ]; then

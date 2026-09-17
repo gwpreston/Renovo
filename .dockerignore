@@ -7,10 +7,16 @@
 .gitignore
 .dockerignore
 
-# Dependencies are installed inside the image from composer.lock.
+# Dependencies are installed inside the image from composer.lock and
+# package-lock.json.
 vendor
 node_modules
 composer.phar
+
+# Built assets. Kept out of the context on purpose: the image's own assets
+# stage compiles them and copies them in, so a developer's half-finished local
+# build can never be what ships.
+public/build
 
 # Secrets. Configuration reaches the container as environment variables.
 .env

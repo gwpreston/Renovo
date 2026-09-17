@@ -1,0 +1,65 @@
+/*
+ * The compiled stylesheet.
+ *
+ * This file is the entry Vite compiles; it is not served. The output lands in
+ * `public/build/` under a content-hashed name, which is how a returning
+ * browser after an upgrade fetches the new stylesheet rather than serving last
+ * week's from cache.
+ *
+ * `public/assets/app.css` is still the stylesheet that dresses the
+ * application. It is hand-written, served directly, and untouched by this
+ * pipeline — Phase 8 moves it in here as part of the re-skin. Until then this
+ * file exists to make Tailwind's utilities and the vendored font available to
+ * the pages that will use them.
+ */
+
+/*
+ * Tailwind, imported layer by layer rather than as `@import "tailwindcss"`,
+ * which would also pull in Preflight.
+ *
+ * Preflight is Tailwind's own reset: it strips the browser's default heading
+ * sizes, list markers and margins on the assumption that every element will be
+ * dressed by a utility class. Every page here is dressed by `app.css`, which
+ * was written against those defaults, so turning Preflight on now would
+ * un-style the application — the re-skin that makes it safe is Phase 8's, and
+ * this is the line it changes.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+
+/*
+ * What Tailwind scans for class names. Listed explicitly, because the default
+ * is to crawl outwards from here and guess: it would read `vendor/`, the
+ * README and every migration looking for utilities, and it would miss nothing
+ * that these three lines do not already cover.
+ */
+@source '../../templates';
+@source '../js';
+@source '../../src/Application/Twig';
+
+/*
+ * Inter, installed from npm and served from this instance.
+ *
+ * Fontsource is Google Fonts' families repackaged for self-hosting, so "use a
+ * Google font" and "load nothing from Google" are both satisfied: the import
+ * emits @font-face rules, and Vite rewrites their URLs to the .woff2 files it
+ * copies into the web root. Nothing is fetched from fonts.googleapis.com, at
+ * build time or after it.
+ *
+ * `wght.css` is the upright weight axis — one variable file covering 100–900,
+ * which is every weight the interface needs without the italic axis nobody has
+ * asked for.
+ */
+@import '@fontsource-variable/inter/wght.css';
+
+/*
+ * The font is served but not yet applied: `public/assets/app.css` still sets
+ * the system stack on `body`, and changing what the application looks like is
+ * Phase 8's job, not the pipeline's. This token is the seam — Phase 8 points
+ * the body font at it.
+ */
+:root {
+    --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto,
+        Helvetica, Arial, sans-serif;
+}

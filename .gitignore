@@ -43,10 +43,22 @@ docker-compose.override.yml
 /public/uploads/
 
 # ---------------------------------------------------------------------------
-# Tooling caches
+# Built assets
 #
-# public/assets/htmx.min.js is deliberately vendored and committed: the app has
-# no build step and must run without a CDN.
+# public/build/ is produced by `npm run build` from assets/ and node_modules/:
+# compiled Tailwind, the bundled JavaScript, the vendored Inter font and the
+# manifest that maps a logical name to its hashed file. Generated, so not
+# committed — the production image builds its own copy and CI builds one to
+# check it.
+#
+# public/assets/htmx.min.js stays vendored and committed. It needs no bundling,
+# and the offline rule it was committed for is now the pipeline's rule too:
+# nothing the browser loads comes from a third-party host.
+# ---------------------------------------------------------------------------
+/public/build/
+
+# ---------------------------------------------------------------------------
+# Tooling caches
 # ---------------------------------------------------------------------------
 .phpunit.result.cache
 /.phpunit.cache/

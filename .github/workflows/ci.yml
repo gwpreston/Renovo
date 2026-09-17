@@ -120,6 +120,20 @@ jobs:
 
       - uses: ramsey/composer-install@v3
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Every rendered page names the built stylesheet through the asset
+      # manifest, so the functional tests need a build in place for the same
+      # reason a browser does. Built here rather than faked: a fixture manifest
+      # would let the tests pass while the real one was wrong.
+      - name: Build the assets
+        run: |
+          npm ci
+          npm run build
+
       - name: Apply migrations
         run: vendor/bin/phinx migrate --configuration phinx.php
 
@@ -131,6 +145,56 @@ jobs:
       - name: PHPUnit
         run: vendor/bin/phpunit
 
+  # The asset build, and the rule that makes it worth having: a self-hosted
+  # instance may have no route to a CDN, so nothing the browser loads may come
+  # from a third-party host. Both halves run here — the build has to succeed,
+  # and its output has to be free of external hosts. A check of the sources
+  # alone would miss a dependency that hardcodes a font CDN in its own
+  # @font-face, which is the failure most likely to happen and least likely to
+  # be noticed.
+  assets:
+    name: Asset build and the offline rule
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, pdo_pgsql, pdo_mysql, curl, zip, sodium, openssl
+          coverage: none
+          tools: composer:v2
+
+      - uses: ramsey/composer-install@v3
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build the assets
+        run: npm run build
+
+      - name: Nothing is loaded from a third-party host
+        env:
+          SESSION_KEY: ci-session-key-not-a-secret-0000000000000000
+        run: php bin/console assets:offline-check
+
+      # Checks the built output itself: that the manifest names the entries the
+      # layout asks for, and that the vendored font's @font-face points at a
+      # local hashed file that is actually there. Only meaningful once a build
+      # has run, so it runs here rather than in the test job.
+      - name: The build produced what the application expects
+        env:
+          SESSION_KEY: ci-session-key-not-a-secret-0000000000000000
+        # --fail-on-skipped, because BuiltAssetsTest skips itself when there is
+        # no build: without it, the one job that exists to check the build
+        # would go green on not having checked anything.
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Unit/BuiltAssetsTest.php
+
   docker:
     name: Docker image builds
     runs-on: ubuntu-latest
@@ -139,11 +203,26 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/build-push-action@v6
+      - name: The application image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/php/Dockerfile
           target: app
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The web image too: it carries the web root, compiled assets included,
+      # because those exist only inside the image. A stage that does not build
+      # is a stack that serves no stylesheet.
+      - name: The web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          target: web
           push: false
           load: false
           cache-from: type=gha

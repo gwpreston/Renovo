@@ -17,6 +17,8 @@
 
     <!-- Vendored third-party assets are not ours to restyle. -->
     <exclude-pattern>public/assets/*</exclude-pattern>
+    <!-- The asset build's output: generated, minified, and not PHP. -->
+    <exclude-pattern>public/build/*</exclude-pattern>
 
     <rule ref="PSR12"/>
 

@@ -31,6 +31,7 @@ use App\Service\ImportService;
 use App\Service\InstanceSettingsService;
 use App\Service\Notification\ReminderRunner;
 use App\Support\Clock;
+use App\Support\ExternalAssetScanner;
 use Psr\Container\ContainerInterface;
 use Slim\App;
 
@@ -216,6 +217,35 @@ switch ($command) {
 
         exit(0);
 
+    case 'assets:offline-check':
+        // The offline rule, enforced rather than reviewed: nothing the browser
+        // loads may come from a third-party host. Runs in CI after the asset
+        // build, because the build's *output* is as much a place a CDN can
+        // appear as the templates are — a dependency with a hardcoded font URL
+        // in its own @font-face would pass a check that only read our files.
+        $references = $container->get(ExternalAssetScanner::class)->scan();
+
+        if ($references === []) {
+            $out('OK   No third-party asset host referenced in ' . implode(
+                ', ',
+                ExternalAssetScanner::DIRECTORIES,
+            ) . '.');
+            exit(0);
+        }
+
+        foreach ($references as $reference) {
+            $out('FAIL ' . $reference->describe());
+        }
+
+        fwrite(STDERR, sprintf(
+            "\n%d external asset reference(s). A self-hosted instance may have no route to a CDN at\n"
+            . "all, so every byte the page loads must be served from this instance. Install the\n"
+            . "dependency from npm and let the build vendor it, or add the host to\n"
+            . "ExternalAssetScanner::ALLOWED_HOSTS if it is an identifier rather than an address.\n",
+            count($references),
+        ));
+        exit(1);
+
     case 'list':
     case '--help':
     case '-h':
@@ -227,6 +257,7 @@ switch ($command) {
         $out('  rates:refresh        Fetch and cache exchange rates from the configured provider');
         $out('  maintenance:prune    Delete expired sessions, tokens, throttle, notification and audit records');
         $out('  i18n:check           Compare every locale with the base catalogue and report any drift');
+        $out('  assets:offline-check Fail if any template or built asset references a third-party host');
         $out('  demo:seed            Create the demonstration household and its subscriptions');
         exit(0);
 

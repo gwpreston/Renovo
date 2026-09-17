@@ -55,9 +55,19 @@ Built in phases:
   [Making it yours](#making-it-yours),
   [Health and metrics](#health-and-metrics) and
   [Demonstration mode](#demonstration-mode).
+- **Phase 7 — the build pipeline and offline assets — complete.** Tailwind
+  compiled, a small JavaScript bundle (Chart.js lazily, tree-shaken Lucide
+  icons) and the Inter webfont vendored from npm rather than linked from
+  Google — all of it hashed into `public/build` with a manifest a Twig helper
+  resolves, built into the image so the running container fetches nothing, and
+  held to the rule that **nothing the browser loads comes from a third-party
+  host** by a check CI runs over the build's output as well as its sources. It
+  adds no feature; it is what a re-skin gets compiled by. See
+  [Building the front end](#building-the-front-end).
 
-That is the v1 feature set. Deliberately not in it: OIDC/SSO, and bank or
-transaction sync — see the end of `PHASE.md` for what was deferred and why.
+That is the v1 feature set, and Phase 7 the toolchain under it. Deliberately
+not in it: OIDC/SSO, and bank or transaction sync — see the end of `PHASE.md`
+for what was deferred and why.
 
 See `PHASE.md` for what was in scope for the last phase and `SPEC.md` for the
 conventions every phase followed.
@@ -70,10 +80,16 @@ conventions every phase followed.
 - **PHP 8.2+** with `pdo_pgsql` or `pdo_mysql`, `intl`, `curl`, `zip`, `openssl`
   and `sodium` (the last two are bundled with most builds; they encrypt stored
   two-factor secrets and verify passkeys), plus Composer and a
-  **PostgreSQL 14+** or **MySQL 8 / MariaDB 10.6+** server.
+  **PostgreSQL 14+** or **MySQL 8 / MariaDB 10.6+** server — and **Node 20+**
+  to compile the front-end assets, which the published image and the Compose
+  stack do for you.
 
 SQLite is not supported. Development and production run the same engine, so a
 query that works locally works in production.
+
+Node is a *build* dependency and nothing more: the running application never
+uses it, and a deployment from the published image never installs it. See
+[Building the front end](#building-the-front-end).
 
 ---
 
@@ -122,22 +138,62 @@ account you create there is the instance administrator.
 The `migrate` container applies the schema and then exits — seeing it as
 `Exited (0)` in `docker compose ps` is correct, not a failure.
 
-`docker compose up` starts five containers:
+`docker compose up` starts six containers:
 
 | Container   | What it does                                                       |
 |-------------|--------------------------------------------------------------------|
-| `web`       | nginx, serving `public/` on `${APP_PORT:-8080}`                    |
+| `web`       | nginx, serving the web root on `${APP_PORT:-8080}`                 |
 | `app`       | php-fpm running the application                                    |
 | `database`  | PostgreSQL 16, also published on `127.0.0.1:5432` for host tooling |
 | `migrate`   | Applies migrations once, then exits                                |
 | `scheduler` | Runs the daily console commands — see [Commands](#commands)        |
 | `mailpit`   | Catches outbound mail in development — http://localhost:8025       |
 
+### The two stacks
+
+`docker compose up` runs the application **as it ships**: each container serves
+what its own image contains, including the compiled assets, and nothing reaches
+the network for an asset or a package. That is what an operator wants, and it
+is what works on a host with no route to the npm registry.
+
+For development you want the working tree instead — edit a stylesheet and see
+it, without rebuilding an image. That is a second file:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+which mounts `public/` into both `app` and `web` and adds one more container:
+
+| Container | What it does                                                    |
+|-----------|-----------------------------------------------------------------|
+| `assets`  | Compiles the front-end assets and rebuilds them on change       |
+
+`./bin/dev-setup.sh` uses both files, so you get this stack by default when you
+use the script.
+
+The `assets` container is why Node is not something you have to install: it
+installs the JS dependencies into a volume, builds once, and then watches. The
+first build takes a minute or so; until it finishes, a page will report a
+missing asset manifest, because the mounted `public/` is shadowing the copy the
+image built. `./bin/dev-setup.sh` waits for it before telling you the app is
+ready.
+
+Both containers that read the web root are given the same one, always — either
+both from their images or both from the host. Letting them disagree is how a
+stale stylesheet gets served against markup that postdates it.
+
 ### Running against MySQL / MariaDB
 
 ```bash
 # Also set DB_DRIVER=mysql and DB_PORT=3306 in .env.
 docker compose -f docker-compose.yml -f docker-compose.mysql.yml up
+
+# In development, with the working tree on top:
+docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+               -f docker-compose.mysql.yml up
+
+# Or just: ./bin/dev-setup.sh --mysql
 ```
 
 ---
@@ -146,14 +202,25 @@ docker compose -f docker-compose.yml -f docker-compose.mysql.yml up
 
 ```bash
 composer install
+npm install && npm run build  # compile the front-end assets into public/build
 cp .env.example .env          # then edit DB_* and set SESSION_KEY
 
 vendor/bin/phinx migrate      # create the schema
 php -S localhost:8080 -t public
 ```
 
+The asset build is not optional: every page resolves its stylesheet through the
+manifest that build writes, so without it you get a clear error naming the
+command above rather than an unstyled page.
+
 Point a real web server at `public/` in production — nothing outside that
-directory should be reachable over HTTP.
+directory should be reachable over HTTP. `assets/`, `node_modules/` and
+`vite.config.js` deliberately sit outside it; only `public/build/` is served.
+
+PHP's built-in server does not serve `public/build/` with cache headers. That
+costs nothing — the filenames are content-hashed, so there is nothing stale to
+serve — but a real deployment should copy the `location /build/` block from
+`docker/nginx/default.conf`.
 
 ---
 
@@ -164,6 +231,11 @@ directory should be reachable over HTTP.
 ```bash
 docker compose pull && docker compose up -d --build
 ```
+
+The image builds its own assets, so an upgrade brings new hashed filenames with
+it and a returning browser fetches them rather than serving the previous
+version from cache. On a bare-metal install, run `npm ci && npm run build`
+after pulling.
 
 Migrations are applied automatically by the `migrate` container on start. To do
 it by hand:
@@ -214,6 +286,11 @@ vendor/bin/phpstan analyse   # static analysis, level 6
 
 composer check               # all three in one go
 
+# Front-end assets
+npm install                  # or `npm ci` for an exact install from the lockfile
+npm run build                # compile into public/build/
+npm run watch                # rebuild on change
+
 # Database
 vendor/bin/phinx migrate
 vendor/bin/phinx rollback
@@ -226,6 +303,7 @@ php bin/console rates:refresh       # fetch and cache exchange rates
 php bin/console maintenance:prune   # expired sessions, tokens, throttle, notification and audit
                                     # records, plus abandoned import uploads
 php bin/console i18n:check          # every locale against the base catalogue; non-zero on drift
+php bin/console assets:offline-check # non-zero if anything the browser loads names a third-party host
 php bin/console demo:seed           # the demonstration household, for read-only demo mode
 ```
 
@@ -271,6 +349,10 @@ The unit suite needs nothing:
 ```bash
 vendor/bin/phpunit --testsuite unit
 ```
+
+The functional suite renders real pages, so it needs the assets built once —
+`npm install && npm run build`, or just let `./bin/dev-setup.sh` do it. CI
+builds them before running the suite.
 
 The integration and functional suites need a real database, because the
 behaviour they check — scoping, isolation, permissions — is enforced in SQL.
@@ -380,6 +462,121 @@ Monthly and yearly figures are integer arithmetic throughout.
 Renewal dates clamp at month end: 31 January plus one month is 28 or 29
 February, and the original day of the month is restored as soon as a month is
 long enough, so a subscription billed on the 31st does not drift to the 28th.
+
+---
+
+## Building the front end
+
+Everything the browser loads is compiled here and served from your own
+instance. **Nothing comes from a CDN** — not the font, not the chart library,
+not a stylesheet. That is not a preference: an instance on a LAN or behind
+Tailscale may have no route to `fonts.googleapis.com` at all, and a page that
+quietly depends on one is a page that breaks in exactly the deployment this
+application is built for.
+
+The distinction that makes it workable is **build time versus run time**.
+Installing packages from npm to *produce* the bundle is fine, the same way
+Composer pulls PHP packages. What is forbidden is the *running* application
+reaching out, so the font, the chart library and the icons are compiled into
+local files once and served locally forever after.
+
+```bash
+npm install        # or `npm ci` for an exact install from the lockfile
+npm run build      # compile into public/build/
+npm run watch      # rebuild on change
+```
+
+### What it produces
+
+| Source                | Becomes                          | Loaded as                    |
+|-----------------------|----------------------------------|------------------------------|
+| `assets/css/app.css`  | `public/build/app-<hash>.css`    | `{{ bundle('app.css') }}`    |
+| `assets/js/app.js`    | `public/build/app-<hash>.js`     | `{{ bundle('app.js') }}`     |
+| Chart.js              | `public/build/chart-<hash>.js`   | fetched on first chart only  |
+| Inter (Fontsource)    | `public/build/inter-*.woff2`     | `@font-face` in the built CSS |
+
+Every filename contains a hash of the file's own contents, and
+`public/build/manifest.json` maps a logical name to the current one. A template
+asks for `app.css` and gets `app-C84PQZax.css`, so an upgrade changes the URL
+and a returning browser fetches the new file instead of serving last week's from
+a seven-day cache. nginx serves `/build/` with `immutable` and a one-year
+lifetime precisely because the URL can be trusted to change.
+
+Two helpers, because there are two kinds of file:
+
+- **`bundle('app.css')`** — anything the build produces. Resolved through the
+  manifest.
+- **`asset('/assets/app.css')`** — anything served as written: the hand-written
+  stylesheet, the vendored htmx, the keyboard-shortcut script. Cache-busted with
+  the file's modification time.
+
+`public/build/` is generated, so it is not in git. The published image builds
+its own copy; `.dockerignore` keeps a local build out of the build context so
+what ships is always what the image compiled. That is also why the `web`
+container is built rather than a bare nginx image: it has to carry the web root
+the assets are in — see [The two stacks](#the-two-stacks).
+
+### Tailwind
+
+Tailwind 4 is compiled through Vite's first-party plugin, with **Preflight
+turned off**. Preflight is Tailwind's reset, and `public/assets/app.css` — the
+stylesheet that actually dresses the application — was written against the
+browser's defaults, so enabling it now would un-style every page. The single
+line that changes is in `assets/css/app.css`.
+
+Tailwind scans `templates/`, `assets/js/` and the Twig extension for class
+names, listed explicitly rather than discovered, so it does not crawl `vendor/`
+looking for utilities. One quirk of `npm run watch`: a class you *add* appears
+immediately, but one you *delete* lingers in the compiled stylesheet until the
+watcher restarts. A one-shot `npm run build` is always exact, which is what
+production and CI use.
+
+### The webfont
+
+Inter comes from **Fontsource** — Google Fonts' families repackaged for
+self-hosting and installed from npm. The build copies the `.woff2` files into
+the web root and rewrites the `@font-face` rules to point at them, so "use a
+Google font" and "load nothing from Google" are both true at once. The SIL Open
+Font License is copied out of the package alongside it, as
+`public/build/inter-OFL.txt`.
+
+The font is *served* but not yet *applied*: the built stylesheet defines a
+`--font-sans` custom property and nothing sets `font-family` from it. Changing
+what the application looks like is a separate piece of work from being able to.
+
+### The JavaScript
+
+The bundle is deliberately small. Keyboard shortcuts, the quick-add dialog and
+passkey registration stay in `public/assets/`, hand-written and served
+directly, along with htmx — none of them needed bundling, so none of them were
+moved. What the bundle provides is the two things that did:
+
+```js
+// Chart.js, in a chunk of its own: fetched the first time this is called, and
+// never by a page that does not call it.
+await window.Renovo.chart(canvas, { type: 'line', data: … });
+
+// Lucide icons, tree-shaken down to the handful listed in assets/js/icons.js.
+element.append(window.Renovo.icon('calendar'));
+```
+
+### Keeping it honest
+
+```bash
+php bin/console assets:offline-check
+```
+
+This scans the templates, the build's sources **and the build's output** for an
+absolute `http(s)` URL, and exits non-zero on any it finds. The output matters
+most: our own files are easy to review, and the realistic failure is a
+dependency that hardcodes a font CDN in the stylesheet it compiles. CI runs it
+after every build, so the offline rule is enforced by the pipeline rather than
+trusted to review.
+
+Adding a front-end dependency therefore means installing it from npm — never
+adding a `<script>` or `<link>` that points somewhere else, not even
+temporarily. If a URL is an identifier rather than an address (`xmlns` on an
+`<svg>`, say), add its host to `ExternalAssetScanner::ALLOWED_HOSTS`.
 
 ---
 

@@ -1,6 +1,12 @@
 /*
- * Mobile-first styles. One stylesheet, no build step: the app is self-hosted
- * and an operator should be able to read and change this file directly.
+ * Mobile-first styles, served as written.
+ *
+ * There is an asset build now (`assets/` compiled into `public/build/` — see
+ * the README), and this file is deliberately not part of it: it is the
+ * stylesheet that dresses the application, and a self-hosted operator should
+ * be able to read it and change it without installing Node. The build handles
+ * what needs compiling — Tailwind's utilities, the bundled JavaScript, the
+ * vendored webfont — and leaves this alone.
  *
  * Colours are CSS custom properties defined once for light and once for dark.
  * "System" follows the OS through prefers-color-scheme; an explicit choice is

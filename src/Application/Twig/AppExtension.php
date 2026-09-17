@@ -23,6 +23,7 @@ use App\Security\PermissionService;
 use App\Security\Scope;
 use App\Service\ValidationError;
 use App\Support\AssetVersion;
+use App\Support\BuildManifest;
 use App\Support\MoneyFormatter;
 use DateTimeImmutable;
 use DateTimeInterface;
@@ -56,6 +57,7 @@ final class AppExtension extends AbstractExtension
         private readonly Translator $translator,
         private readonly LocaleContext $locale,
         private readonly AssetVersion $assets,
+        private readonly BuildManifest $build,
     ) {
     }
 
@@ -64,6 +66,7 @@ final class AppExtension extends AbstractExtension
         return [
             new TwigFunction('t', $this->translate(...)),
             new TwigFunction('asset', $this->assets->url(...)),
+            new TwigFunction('bundle', $this->build->url(...)),
             new TwigFunction('locale_tag', fn (): string => $this->locale->tag()),
             new TwigFunction('js_translations', $this->jsTranslations(...)),
             new TwigFunction('error_message', $this->errorMessage(...)),

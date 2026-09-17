@@ -45,10 +45,42 @@ RUN composer install --no-dev --no-interaction --no-progress --no-scripts --pref
     && composer clear-cache
 
 # ---------------------------------------------------------------------------
+# The front-end assets.
+#
+# Tailwind is compiled, the JavaScript bundled and the Inter webfont vendored
+# here, at build time, so the running container fetches nothing: an instance on
+# a LAN or behind a VPN may have no route to a CDN at all. This stage is the
+# only place in the image's life where the network is used for JavaScript — the
+# same bargain the vendor stage makes with Packagist.
+#
+# templates/ is copied because Tailwind scans it for the class names it has to
+# generate; a build without it would emit a stylesheet missing every utility
+# the application actually uses.
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY vite.config.js ./
+COPY assets ./assets
+COPY templates ./templates
+COPY src/Application/Twig ./src/Application/Twig
+
+RUN npm run build
+
+# ---------------------------------------------------------------------------
 FROM base AS app
 
 COPY --from=vendor /var/www/html/vendor ./vendor
 COPY . .
+
+# After `COPY . .`, so a host build cannot survive into the image: .dockerignore
+# keeps public/build out of the context, and this is the only thing that puts it
+# back. What ships is always what this image's own assets stage produced.
+COPY --from=assets /app/public/build ./public/build
 
 # var/attachments and var/imports are created here rather than left to the
 # application so their mode is set once, at build time. Both hold user files
@@ -64,3 +96,26 @@ USER www-data
 EXPOSE 9000
 
 CMD ["php-fpm"]
+
+# ---------------------------------------------------------------------------
+# The web server.
+#
+# nginx carries the web root in its own image rather than reading it from the
+# host, because the built assets only exist inside the image: `npm run build`
+# ran in the assets stage, and `public/build/` is generated and therefore not in
+# git. A plain nginx image pointed at a fresh clone would find no stylesheet at
+# all, and — since the app resolves its stylesheet through the build manifest —
+# no page either.
+#
+# So the two containers that have to agree about the web root are given the
+# same one: this copies it out of the app stage, assets and all. Nothing is
+# fetched at run time, on any network.
+#
+# Development mounts the working tree over the top of this (see
+# docker-compose.dev.yml), which is what makes editing a stylesheet show up
+# without a rebuild.
+# ---------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS web
+
+COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY --from=app /var/www/html/public /var/www/html/public

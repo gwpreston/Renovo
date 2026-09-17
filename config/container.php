@@ -67,6 +67,8 @@ use App\Service\MailerService;
 use App\Service\PasswordResetService;
 use App\Service\RateLimiter;
 use App\Support\AssetVersion;
+use App\Support\BuildManifest;
+use App\Support\ExternalAssetScanner;
 use App\Support\Clock;
 use App\Support\MoneyFormatter;
 use App\Support\SystemClock;
@@ -397,6 +399,19 @@ return static function (ContainerBuilder $builder, array $settings): void {
         AssetVersion::class => static fn (ContainerInterface $c): AssetVersion => new AssetVersion(
             $c->get('settings')['paths']['public'],
         ),
+
+        // The built assets' side of the same question. AssetVersion stamps a
+        // modification time onto a file it did not produce; BuildManifest
+        // reads the name the bundler already hashed. A template uses whichever
+        // matches the file it is asking for — `bundle()` for anything the
+        // build emits, `asset()` for the hand-written stylesheet and the
+        // vendored htmx that it does not.
+        BuildManifest::class => static fn (ContainerInterface $c): BuildManifest => new BuildManifest(
+            $c->get('settings')['paths']['build_manifest'],
+        ),
+
+        ExternalAssetScanner::class => static fn (ContainerInterface $c): ExternalAssetScanner
+            => new ExternalAssetScanner($c->get('settings')['paths']['root']),
 
         // The logo fetcher takes the *guarded* client, never the plain one:
         // the address comes from a form, which is the whole reason the guard

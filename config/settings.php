@@ -176,5 +176,12 @@ return [
         // One flat catalogue per locale. Adding a language is adding a file
         // here; nothing else has to be told about it.
         'translations' => dirname(__DIR__) . '/translations',
+        // The asset build's output: content-hashed CSS, JS, the vendored font
+        // and the manifest that says which hashed file is which. Written by
+        // `npm run build`, read by BuildManifest, and the only part of the
+        // front-end toolchain that is web-served — the sources and
+        // node_modules sit outside the web root.
+        'build' => dirname(__DIR__) . '/public/build',
+        'build_manifest' => dirname(__DIR__) . '/public/build/manifest.json',
     ],
 ];

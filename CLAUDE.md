@@ -16,6 +16,11 @@ below before adding anything.
 - **PHP 8.2+**, **Slim Framework 4** + **PHP-DI**.
 - **Twig** templates; **htmx** for filter/sort/pagination without full reloads.
   Responsive, mobile-first CSS. No SPA framework.
+- **Vite** builds the front-end assets: **Tailwind CSS 4**, a small JS bundle
+  (Chart.js lazily, a handful of Lucide icons) and the **Inter** webfont
+  vendored through Fontsource. Sources in `assets/`, output in `public/build/`
+  with a manifest a Twig helper reads. Node is a *build* dependency only — the
+  running application never uses it.
 - **PDO** through a thin abstraction that runs on **PostgreSQL and MySQL/MariaDB**.
   **Local development uses the same engine as production (via Docker); no SQLite.**
   Prepared statements everywhere.
@@ -41,6 +46,12 @@ bug, even if the code "works".
 6. **Permissions are enforced server-side on every route.** Hiding UI is not
    access control. A Viewer hitting a mutating endpoint gets **403**.
 7. **Secrets come from env vars only.** Never hardcode; never commit `.env`.
+8. **Nothing the browser loads comes from a third-party host.** No CDN link for
+   a font, a stylesheet or a script. An instance may be on a LAN or behind a
+   VPN with no route out, so every byte the page pulls is served from its own
+   web root. Build time may use the network (npm, Composer); run time may not.
+   `bin/console assets:offline-check` enforces this in CI over the templates,
+   the build's sources *and* its output.
 
 ## Security baseline
 
@@ -76,7 +87,11 @@ src/          Controllers (thin), Services (logic), Repositories (persistence),
 templates/    Twig templates. No logic here.
 translations/ One flat catalogue per locale; `en` is the base every other is
               measured against.
-public/       Web root (index.php, assets). Nothing else is web-accessible.
+assets/       Front-end build sources (Tailwind entry, JS entry). Outside the
+              web root and never served; only the build's output is.
+public/       Web root (index.php, assets, build). Nothing else is
+              web-accessible. `public/build/` is generated — never edit it, and
+              never commit it.
 migrations/   Phinx migrations + seeds.
 bin/          CLI entry points (e.g. the scheduler command).
 config/       DI, routes, settings.
@@ -91,9 +106,20 @@ intended commands — keep them working.
 ```bash
 # Dependencies
 composer install
+npm install                  # front-end build only; not needed at run time
 
-# Run the app (Docker — Postgres by default; MySQL variant documented in README)
-docker compose up            # app + database + scheduler
+# Front-end assets (required before a page will render — the layout resolves
+# its stylesheet through the build manifest)
+npm run build                # compile into public/build/
+npm run watch                # rebuild on change (the `assets` compose service)
+
+# Run the app as it ships (each container serves its own image; no npm at run
+# time). Postgres by default; MySQL variant documented in README.
+docker compose up
+
+# Run it for development — the working tree's web root plus the asset watcher
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+./bin/dev-setup.sh           # does the above, and everything around it
 
 # Database
 vendor/bin/phinx migrate     # apply migrations
@@ -104,6 +130,9 @@ vendor/bin/phinx seed:run    # seed data
 vendor/bin/phpunit           # tests
 vendor/bin/phpcs             # PSR-12 lint
 vendor/bin/phpstan analyse   # static analysis
+
+# Nothing is loaded from a third-party host (CI runs this after the build)
+php bin/console assets:offline-check
 
 # Scheduler (reminders, budget re-eval, rate refresh) — runs daily
 php bin/console reminders:run
@@ -133,6 +162,12 @@ completeness. Don't merge red CI.
   (it must pass in CI — no missing/extra keys).
 - **New migration:** one concern per migration, with a working `down()`; verify
   on Postgres and MySQL.
+- **New front-end dependency:** install it from npm and let the build vendor
+  it. Never add a `<script>` or `<link>` pointing at a CDN — not even
+  temporarily. A large library goes behind a dynamic `import()` so it becomes a
+  chunk of its own rather than weight on every page; see `assets/js/charts.js`.
+- **New icon:** add it to the map in `assets/js/icons.js`. Importing Lucide's
+  index instead would put a thousand icons in the bundle to use one.
 - **New feature touching data:** it must respect roles + isolation via the
   scoping layer, and be covered by tests, including a permission test.
 
@@ -149,6 +184,8 @@ private-IP rejection + allowlist override, and permission/isolation
 - Don't add floats for money, raw SQL in services, or logic in controllers/
   templates.
 - Don't fetch a URL outside the shared HTTP client.
+- Don't make the browser load anything from a third-party host, and don't edit
+  or commit `public/build/` — it is the build's output.
 - Don't add a query path that bypasses the scoping layer.
 - Don't build features from a later phase into an earlier one — leave clean
   seams instead of stubs.
