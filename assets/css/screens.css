@@ -895,6 +895,84 @@ tr.is-passed > td {
     color: var(--text-muted);
 }
 
+/*
+ * The spend-insight card.
+ *
+ * The one card on this screen that wears the brand gradient, which is what
+ * `.card-featured` is for and why it has waited until now to be used: the rule
+ * is one featured card per screen, and a card that tells the member to go and
+ * do something is the one that earns it here.
+ *
+ * Its own type scale is deliberately modest. The KPI row below states the
+ * figures; this states a sentence, and a sentence set at KPI size would shout
+ * over the numbers it was derived from.
+ */
+.insight-headline {
+    margin: 0.35rem 0 0;
+    font-size: var(--size-heading);
+    font-weight: var(--weight-semibold);
+}
+
+.insight-detail {
+    margin: 0.35rem 0 0;
+    max-width: 60ch;
+}
+
+.insight-action {
+    margin: 0.85rem 0 0;
+}
+
+/*
+ * The rest of the insights, folded away. `<details>` rather than a script:
+ * this is a disclosure and the browser has one, so the card works before any
+ * JavaScript loads and on a page where none does.
+ */
+.insight-more {
+    margin-top: 0.85rem;
+}
+
+.insight-more > summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: var(--size-label);
+}
+
+.insight-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.75rem 0 0;
+}
+
+.insight-row {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.insight-row:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.insight-row h3 {
+    /*
+     * A sentence, not a label. The eyebrow styling the KPI headings use sets
+     * its text in caps, and "A PRICE IS GOING UP" reads as shouting rather
+     * than as the heading of a paragraph.
+     */
+    margin: 0;
+    font-size: var(--size-body);
+    font-weight: var(--weight-semibold);
+}
+
+.insight-row p {
+    margin: 0.2rem 0 0;
+}
+
+/* The provenance line, kept off the last insight above it. */
+.insight-card > .hint {
+    margin-top: 0.85rem;
+}
+
 /* The most and the least expensive, one above the other. */
 .notable-list {
     display: grid;

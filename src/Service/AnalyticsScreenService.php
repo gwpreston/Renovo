@@ -23,7 +23,15 @@ use App\Support\MoneyFormatter;
  * The one thing it does decide is what "notable" means, because nothing
  * computed it before. See `notable()` for the ranking and what it leaves out.
  *
+ * Phase 13 put one exception beside that claim, and it is worth naming rather
+ * than leaving the paragraph above quietly untrue: the insight card is a
+ * genuinely new observation, not a restyle of an old one. It is assembled here
+ * because it reads the rows this screen has already loaded, but the rules and
+ * the figures are `SpendInsightService`'s.
+ *
  * @phpstan-import-type Breakdown from CategoryBreakdownService
+ * @phpstan-import-type Insight from SpendInsightService
+ * @phpstan-import-type ValueSignal from UsageService
  * @phpstan-type NotableRow array{subscription: Subscription, monthly_minor: int, comparable_minor: int}
  */
 final class AnalyticsScreenService
@@ -34,6 +42,8 @@ final class AnalyticsScreenService
         private readonly SpendChartService $spendChart,
         private readonly CategoryBreakdownService $breakdown,
         private readonly SubscriptionService $subscriptions,
+        private readonly UsageService $usage,
+        private readonly SpendInsightService $insights,
         private readonly ExchangeRateService $rates,
         private readonly InstanceSettingsService $settings,
         private readonly MoneyFormatter $money,
@@ -63,6 +73,8 @@ final class AnalyticsScreenService
      *     categories: array<string, mixed>,
      *     year_over_year: array<string, mixed>,
      *     notable: array{highest: NotableRow|null, lowest: NotableRow|null, excluded_count: int},
+     *     insights: list<Insight>,
+     *     value_signals: list<ValueSignal>,
      *     subscriptions: list<Subscription>
      * }
      */
@@ -82,12 +94,23 @@ final class AnalyticsScreenService
         $all = $this->subscriptions->allForStats($scope);
         $breakdown = $this->breakdown->fromStats($stats);
 
+        // Computed once and handed to both the insight rules and the ranking
+        // at the foot of the page. It is a pure read of the rows above, but two
+        // callers computing it separately is the arrangement this whole class
+        // exists to avoid.
+        $valueSignals = $this->usage->valueSignals($all);
+
         return [
             'kpis' => $this->kpis($stats),
             'trajectory' => $this->spendChart->fromMonths($months),
             'categories' => $breakdown + ['donut' => $this->donut($breakdown)],
             'year_over_year' => $this->stats->yearOverYear($scope),
             'notable' => $this->notable($all),
+            // After the catch-up, like everything else here: insights read
+            // prices and trial states that are already up to date, so the card
+            // cannot contradict the KPI row above it.
+            'insights' => $this->insights->insights($scope, $all, $valueSignals),
+            'value_signals' => $valueSignals,
             'subscriptions' => $all,
         ];
     }

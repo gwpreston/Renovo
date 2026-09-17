@@ -26,6 +26,14 @@
         place for: the same cost expressed over each period people think in, and
         the cost-per-use ranking.
     #}
+    {#
+        The insight card leads, when there is one. It is the only thing on this
+        screen that tells the member to go and do something, so burying it beneath
+        the figures it is drawn from would be the wrong way round; and when no
+        rule fired it is absent entirely and the page begins where it used to.
+    #}
+    {% include 'stats/_insight.twig' %}
+
     {% include 'stats/_kpis.twig' %}
 
     <div class="analytics-layout">

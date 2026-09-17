@@ -157,6 +157,44 @@ final class PriceHistoryRepository extends AbstractScopedRepository
     }
 
     /**
+     * Every recorded price in scope, grouped by subscription and oldest first
+     * within each group.
+     *
+     * One query for what `findForSubscription()` answers one subscription at a
+     * time. The insight rules ask "has this price moved, and is another move
+     * announced" of every subscription on the analytics screen at once, and
+     * asking per subscription would be a query per row on a page that already
+     * walks the household three times.
+     *
+     * It reads the whole history rather than a recent window because a rise is
+     * a comparison between two rows: a window that held the new price but not
+     * the one before it could not tell a rise from a first price. The table is
+     * append-only and a subscription accumulates a row per price change, so
+     * this is a handful of rows per subscription, not a ledger.
+     *
+     * @return array<int, list<PriceChange>> Keyed by subscription id.
+     */
+    public function findAllBySubscription(Scope $scope): array
+    {
+        $criteria = Criteria::new()
+            ->orderBy('subscription_id', 'asc')
+            ->orderBy('effective_from', 'asc')
+            ->orderBy('id', 'asc');
+
+        $params = [];
+        $sql = $this->selectWithAuthor()
+            . $this->scopedWhere($scope, $criteria, $params)
+            . $this->compileOrderBy($criteria);
+
+        $grouped = [];
+        foreach ($this->db->fetchAll($sql, $params) as $row) {
+            $grouped[(int) $row['subscription_id']][] = $this->hydrate($row);
+        }
+
+        return $grouped;
+    }
+
+    /**
      * Subscriptions whose effective price no longer matches the price stored on
      * the subscription row itself.
      *

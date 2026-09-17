@@ -15,14 +15,14 @@ use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
 
 /**
- * The analytics screen: the KPI row, the spending trajectory, the category
- * donut, year over year and the notable subscriptions — and, below them, the
- * cost-per-period figures and the "worth it?" ranking this page has always
- * carried.
+ * The analytics screen: the spend-insight card, the KPI row, the spending
+ * trajectory, the category donut, year over year and the notable subscriptions
+ * — and, below them, the cost-per-period figures and the "worth it?" ranking
+ * this page has always carried.
  *
  * Thin, like every controller here. `AnalyticsScreenService` assembles the
- * screen and the usage ranking is `UsageService`'s; this hands one the scope
- * and the other the rows the first already loaded.
+ * screen, insights and usage ranking included, so this hands it a scope and
+ * hands the template what comes back.
  */
 final class StatsController extends Controller
 {
@@ -32,7 +32,6 @@ final class StatsController extends Controller
         Translator $translator,
         private readonly AnalyticsScreenService $analytics,
         private readonly StatsService $stats,
-        private readonly UsageService $usage,
         private readonly InstanceSettingsService $settings,
     ) {
         parent::__construct($view, $session, $translator);
@@ -52,6 +51,9 @@ final class StatsController extends Controller
         $combinedYearly = $kpis['yearly']['combined'];
 
         return $this->render($request, $response, 'stats/index.twig', [
+            // Rule-based, and absent when no rule fired: the card states a
+            // figure only when it can name the subscriptions behind it.
+            'insights' => $overview['insights'],
             'kpis' => $kpis,
             'trajectory' => $overview['trajectory'],
             'categories' => $overview['categories'],
@@ -63,9 +65,9 @@ final class StatsController extends Controller
             'per_period' => $this->stats->perPeriod($combinedYearly['amount_minor']),
             'combined_yearly' => $combinedYearly,
             'yearly_by_currency' => $kpis['yearly']['totals'],
-            // The same rows the KPIs were counted from: the ranking walks the
-            // household's subscriptions, and it is not walking them twice.
-            'value_signals' => $this->usage->valueSignals($overview['subscriptions']),
+            // The same ranking the insight rules read, computed once by the
+            // assembler above rather than a second time here.
+            'value_signals' => $overview['value_signals'],
             'base_currency' => $this->settings->baseCurrency(),
             'max_rating' => UsageService::MAX_RATING,
         ]);

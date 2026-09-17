@@ -401,6 +401,108 @@ final class AnalyticsScreenTest extends DatabaseTestCase
     }
 
     /**
+     * The card states a figure and the rows it came from, in one sentence.
+     *
+     * This is the claim Phase 13 makes and the reason the card is rule-based
+     * rather than model-backed: "save £540 a year" is only worth printing if
+     * the member can see which subscriptions it refers to and check the
+     * arithmetic against their own bill.
+     */
+    public function testTheInsightCardNamesTheSubscriptionsBehindItsFigure(): void
+    {
+        $subscriptions = new SubscriptionRepository($this->db);
+        $owner = $this->scopeFor($this->ownerId);
+        $design = (new \App\Repository\CategoryRepository($this->db))->create($owner, 'Design', null);
+
+        foreach ([['Figma', 3000], ['Canva', 1200]] as [$name, $price]) {
+            $subscriptions->create($owner, [
+                'name' => $name,
+                'price_minor' => $price,
+                'currency' => 'GBP',
+                'subscription_type' => 'recurring',
+                'billing_cycle' => 'monthly',
+                'next_payment_date' => (new DateTimeImmutable('+15 days'))->format('Y-m-d'),
+                'start_date' => '2025-01-01',
+                'category_id' => $design,
+                'is_active' => true,
+            ], []);
+        }
+
+        $card = $this->section($this->body($this->get('/stats', $this->ownerId)), 'analytics-insight');
+
+        // Both are named, the cheaper is the one the figure is about, and
+        // £12 a month is stated as the £144 a year dropping it removes.
+        self::assertStringContainsString('Canva', $card);
+        self::assertStringContainsString('Figma', $card);
+        self::assertStringContainsString('Design', $card);
+        self::assertStringContainsString('£144.00', $card);
+
+        // And the action goes to that subscription rather than to a filter or
+        // a report of everything the rule looked at.
+        self::assertMatchesRegularExpression('#/subscriptions/\d+/money#', $card);
+    }
+
+    /**
+     * No rule fired, so there is no card.
+     *
+     * A featured card reading "nothing to report" would take the most
+     * prominent place on the screen to say nothing. The fixture household has
+     * no categories, no recorded usage and a trial three weeks off, which is
+     * exactly the household the rules have nothing to say about.
+     */
+    public function testTheCardIsAbsentRatherThanEmptyWhenNothingFired(): void
+    {
+        $body = $this->body($this->get('/stats', $this->ownerId));
+
+        self::assertStringNotContainsString('analytics-insight', $body);
+        // The page still starts where it always did.
+        self::assertStringContainsString('analytics-kpis', $body);
+    }
+
+    /**
+     * Insights are scoped like everything else, because they are made of rows
+     * that were.
+     *
+     * In ISOLATED mode a member sees their own subscriptions, so the rules see
+     * their own subscriptions, so the card cannot name somebody else's — there
+     * is no path in the insight service that loads a row by id.
+     */
+    public function testAMemberIsShownNoInsightAboutSomebodyElsesSubscriptions(): void
+    {
+        $container = $this->container();
+        $container->get(\App\Service\InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
+
+        $subscriptions = new SubscriptionRepository($this->db);
+        $owner = $this->scopeFor($this->ownerId);
+        $design = (new \App\Repository\CategoryRepository($this->db))->create($owner, 'Design', null);
+
+        foreach ([['Figma', 3000], ['Canva', 1200]] as [$name, $price]) {
+            $subscriptions->create($owner, [
+                'name' => $name,
+                'price_minor' => $price,
+                'currency' => 'GBP',
+                'subscription_type' => 'recurring',
+                'billing_cycle' => 'monthly',
+                'next_payment_date' => (new DateTimeImmutable('+15 days'))->format('Y-m-d'),
+                'start_date' => '2025-01-01',
+                'category_id' => $design,
+                'is_active' => true,
+            ], []);
+        }
+
+        // The owner's own overlap, which is what the other member must not be
+        // shown any part of.
+        $owned = $this->section($this->body($this->get('/stats', $this->ownerId)), 'analytics-insight');
+        self::assertStringContainsString('Canva', $owned);
+
+        $body = $this->body($this->get('/stats', $this->viewerId));
+
+        self::assertStringNotContainsString('analytics-insight', $body);
+        self::assertStringNotContainsString('Canva', $body);
+        self::assertStringNotContainsString('Figma', $body);
+    }
+
+    /**
      * One section of the page, by id, so an assertion about the donut cannot be
      * satisfied by the KPI row above it.
      */

@@ -78,6 +78,20 @@ final class PriceHistoryService
     }
 
     /**
+     * Every recorded price in scope, keyed by subscription id, oldest first.
+     *
+     * The bulk form of `historyFor()`, for a caller that has a page full of
+     * subscriptions and a question about each of them. One query rather than
+     * one per row.
+     *
+     * @return array<int, list<PriceChange>>
+     */
+    public function historyBySubscription(Scope $scope): array
+    {
+        return $this->history->findAllBySubscription($scope);
+    }
+
+    /**
      * Record the price a subscription was created with.
      *
      * Dated from the subscription's start date when it has one, so that a

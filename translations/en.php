@@ -751,6 +751,32 @@ return [
     'import_start.it_came_from' => 'It came from',
     'import_start.source_hint' => 'Only a starting point for the column mapping — you confirm it on the next screen.',
 
+    // insight
+    'insight.action' => 'Review subscription',
+    'insight.more' => '{count, plural, one {# more insight} other {# more insights}}',
+    'insight.note' =>
+        'Each of these is a rule over your own subscriptions, and every figure is one '
+        . 'subscription\'s own price. Nothing here is estimated, and nothing is converted.',
+    'insight.overlap.detail' =>
+        'Dropping {name} would remove {amount} a year. Also in this category: {others}.',
+    'insight.overlap.headline' =>
+        '{count, plural, one {# subscription} other {# subscriptions}} in {category}',
+    'insight.price_risen.detail' =>
+        '{name} went up by {difference} on {date} — {amount} a year more than before.',
+    'insight.price_risen.headline' => 'A price went up',
+    'insight.price_rising.detail' =>
+        '{name} goes up by {difference} on {date} — {amount} a year more than now.',
+    'insight.price_rising.headline' => 'A price is going up',
+    'insight.rarely_used.detail' =>
+        '{name} costs {amount} a year and has been used {count, plural, one {# time} other {# times}}.',
+    'insight.rarely_used.headline' => 'Paid for, barely used',
+    'insight.rarely_used.per_use' => 'That works out at {amount} a use.',
+    'insight.title' => 'Spend insights',
+    'insight.trial_converting.detail' =>
+        '{name} converts on {date}, {days, plural, =0 {today} one {# day away} other {# days away}}, '
+        . 'and starts costing {amount} a year.',
+    'insight.trial_converting.headline' => 'A free trial is about to convert',
+
     // js
     'js.dashboard.spend' => 'Spend',
     'js.quick_add_failed' => 'That form could not be loaded. Open the full page instead.',

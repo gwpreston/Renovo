@@ -20,6 +20,13 @@ use App\Support\Clock;
  * A subscription with no usage recorded is not "bad value" — it is unmeasured,
  * and saying so is more honest than ranking it worst. The two are kept
  * distinct throughout.
+ *
+ * @phpstan-type ValueSignal array{
+ *     subscription: Subscription,
+ *     cost_per_use_minor: int|null,
+ *     uses_per_month: float|null,
+ *     is_low_use: bool
+ * }
  */
 final class UsageService
 {
@@ -73,12 +80,7 @@ final class UsageService
      * used is unmeasured rather than unused.
      *
      * @param list<Subscription> $subscriptions
-     * @return list<array{
-     *     subscription: Subscription,
-     *     cost_per_use_minor: int|null,
-     *     uses_per_month: float|null,
-     *     is_low_use: bool
-     * }>
+     * @return list<ValueSignal>
      */
     public function valueSignals(array $subscriptions): array
     {

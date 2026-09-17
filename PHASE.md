@@ -4,121 +4,131 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 12 — analytics and insights
+# Phase 13 — spend insights (optional)
 
-The analytics screen restyles what is today the Statistics page, drawing also on
-the Forecast and year-over-year figures, into the design's KPI row, spending
-trajectory, category donut and notable-subscriptions card. No new computation is
-introduced here — the numbers exist; this is how they are shown. (The design's
-"AI Insight" hero is a separate concern and is Phase 13.)
+This is the one phase that adds capability rather than restyling it, and the only
+one that can slip without holding up the re-skin. The design's "AI Insight" hero
+card — *"cancel Adobe Stock, save $540/year"* — describes a feature the
+application does not have. This phase is where it is either built honestly or left
+out, and it is written so that leaving it out costs Phases 8–12 nothing.
 
-## The KPI row
+## Rule-based, not a model
 
-**Monthly spend**, **annual spend**, and **active subscriptions**, from the
-figures the Statistics page already produces. Money keeps the per-currency rule:
-each KPI is a real figure with a combined total only when every currency in it
-converts, and the missing currency named when one does not.
+The card is worth having; the word "AI" on it is not what makes it work. Every
+example the design gives is a deterministic observation about the household's own
+subscriptions — two tools in the same category, a trial about to convert, a price
+that has risen, spend that a cancellation would remove. A small set of rules over
+data the application already holds produces exactly these, with three properties a
+model would not give for free: it invents nothing, it can name the precise
+subscriptions behind every figure, and the "save $X/year" is a real arithmetic
+result the member can check. That is the version to build. A model-backed version
+can come later behind the same card; it must clear the same bar — no figure it
+cannot source, and every recommendation traceable to specific rows.
 
-## Spending trajectory
+## What the rules look for
 
-The design's orange gradient bars are the twelve-month view, same source as the
-dashboard chart, so the two agree by construction. Each renewal falls in its own
-month; scheduled changes and conversions apply from their own dates, so a bar does
-not move when the change eventually lands. Reuses the Phase 10 chart (Chart.js, from Phase 7)
-rather than adding a second.
+A first, defensible set — each a signal already latent in the data:
 
-## Category donut
+- **Overlap** — more than one active subscription in the same category (the
+  design's "multiple design tools"), surfaced with the cheaper-to-drop option and
+  the annual figure dropping it would remove.
+- **Trial converting soon** — already a notification; surfaced here as a decision
+  with its cost attached.
+- **Price risen** — a subscription whose price history shows an increase, or a
+  scheduled increase not yet in effect, so the member sees it before the charge.
+- **Rarely used** — only if the usage signal is present; absent it, this rule
+  stays silent rather than guessing.
 
-The category breakdown as a donut, with a centre label. The label is the total
-that donut represents — and here the per-currency rule bites hardest: a donut
-implies one whole, so when the categories span currencies that cannot all be
-converted to one base, the screen shows the per-currency figures rather than a
-donut whose centre would be a number that does not exist. Degrading to the honest
-view is the behaviour, not an edge case to paper over.
+Each insight states the figure and the subscriptions it came from. "Save
+$540/year" without the rows behind it is the kind of confident, unsourced number
+this application avoids everywhere else, and the card holds to that standard.
 
-## Year over year and notable subscriptions
+## The figures obey the money rules
 
-The comparative element uses the existing year-over-year figures, which are
-reconstructed from start dates, cycles and recorded price history — there is no
-payment ledger, so a subscription with no start date contributes nothing rather
-than an invented amount, and the page says how many were excluded for that reason.
-The design's "notable" card (highest and lowest cost) is a straight read of the
-subscription set, each shown in its own currency.
+A saving is money, so it is minor units until display and per-currency when the
+subscriptions it spans do not share one — an insight does not blend
+unconvertible currencies into a single headline saving. The "Review subscription"
+action links to the real subscription, permission-checked; a member sees insights
+only for subscriptions in their own scope.
 
-## Done when
+## Where it lives
 
-Every KPI, bar, donut and notable figure binds to an existing service; the
-trajectory matches the dashboard chart; the donut degrades to per-currency figures
-when it must rather than showing a false whole; the excluded-count note is
-present; both themes render; narrow viewports reflow; new strings are catalogued;
-the quality gates and `i18n:check` pass.
+The hero card sits on the analytics screen (Phase 12) and, optionally, as a
+dashboard tile. It reads through the existing services and adds a single
+insight-deriving service beside them; it writes nothing and schedules nothing, so
+it cannot misfire the way an alert could.
+
+## Done when — or not at all
+
+If built: every insight names its subscriptions and its arithmetic checks out;
+savings follow the per-currency rule; the action is permission-scoped; both themes
+render; strings are catalogued; the quality gates and `i18n:check` pass. If
+deferred: the card is simply absent, Phases 8–12 are unaffected, and this document
+records why it was the right thing to leave for later — a genuinely new feature has
+no place being rushed in behind a visual re-skin.
+
 ## Decisions and assumptions
 
-- **One chart payload, not two copies of one.** "Reuses the Phase 10 chart" is
-  not satisfied by a second `chart()` method, so `DashboardService`'s came out
-  into `SpendChartService` and both screens call it. A test compares the payload
-  the dashboard hands its canvas with the one this screen hands its own, month
-  for month — the claim asserted rather than described. The category logic came
-  out the same way into `CategoryBreakdownService`: the my-subscriptions widget
-  draws it as bars and this screen draws it as a donut, and two pictures of one
-  breakdown cannot disagree.
+Built, not deferred. The rules below all read data the application already held,
+so the card states figures a member can check rather than figures it invented.
 
-- **The donut is drawn or it is not drawn.** A donut implies one whole: its
-  centre states that whole and every segment claims to be a share of it. With a
-  currency that has no rate there is no such number, so the server sends no
-  payload at all and the screen shows the per-currency figures, each group
-  against its own total. There is no partial donut and no centre label standing
-  for a total nobody computed.
+- **It is not called "AI", because it is not one.** The design's hero is
+  re-pointed at `SpendInsightService`: a handful of rules over the household's
+  own rows, each naming the subscriptions behind its figure. That is what makes
+  "£299.88 a year" checkable, which is the property the card exists for. A
+  model-backed version can come later behind the same card if it clears the same
+  bar.
 
-- **The centre label is HTML, not something the chart library draws.** It is the
-  server's ICU string like every other figure on the page, so nothing
-  client-side divides a currency by a hundred — the contract the spend chart
-  already kept. It lives inside the frame, which stays hidden until the chart is
-  drawn, so a browser with no script never sees a number over an empty box.
+- **The figure is one subscription's own money, in its own currency.** There is
+  no headline totalling the insights, because that total would blend currencies
+  the rest of the application refuses to blend. Conversion happens once, to put
+  the list in an order, and appears nowhere on screen. An annual figure is
+  `yearlyMinor()` rather than twelve monthly ones, so a weekly plan's arithmetic
+  survives the multiplication.
 
-- **A categorical palette had to be invented.** Every other hue in `tokens.css`
-  carries a meaning — amber is money about to move, red is a problem, the accent
-  is the thing to press — and a donut's third segment is not more urgent than
-  its second. Six series and a tail, defined per theme, each held by test to 3:1
-  on the card it is drawn on, with both themes required to define the whole set
-  and no two entries allowed to resolve to the same colour.
+- **Urgency orders the list, not size.** A trial converting on Friday stops
+  being actionable on Friday; an overlap is as actionable next month as it is
+  today. Ranking on the amount would put a £4 trial below a £300 overlap and let
+  it convert. Within a kind the larger figure leads, unconvertible ones sort
+  last rather than being ranked on their digits, and name breaks the remaining
+  ties so the card does not shuffle between page loads.
 
-- **Assumption: "notable" ranks on cost per month, converted.** Nothing computed
-  it before, so the ranking is stated. Face value would make a yearly
-  subscription look expensive because of its cycle; comparing the digits across
-  currencies would rank 900 JPY above 50 GBP. So it is `monthlyMinor()`
-  converted to the base currency, and anything whose currency has no rate is
-  left out and counted — the answer year over year already gives to the same
-  kind of gap. Each result is shown in **its own currency**: the conversion
-  decides the order and nothing else.
+- **Assumption: the overlap names the cheaper of the pair**, as this phase's
+  brief asks. The application does not know which of two design tools somebody
+  actually uses, so it does not pretend to: it says how many are in the
+  category, names them, and attaches the annual cost of the cheaper — the least
+  that dropping one removes, and exact, which "save up to £360" would not be.
+  Uncategorised subscriptions are not an overlap: two rows sharing the *absence*
+  of a category share nothing, and the rule would otherwise fire on every
+  household that has not categorised anything.
 
-- **A one-off, a lifetime purchase and a running trial are not ranked.** The
-  first two have no monthly cost at all. The trial has none *yet*, and leaving
-  it in would hand it "least expensive" every time at £0.00 — the figure the
-  trials section on the subscriptions screen deliberately refuses to print.
-  Pricing it at what it converts to was the alternative and is worse: this card
-  and the KPI row would then report two different figures for one subscription
-  on one screen.
+- **Silence is a result.** Rarely-used says nothing without a usage signal —
+  unmeasured is not unused. A category whose currencies cannot be compared
+  produces no overlap, because there is no defensible "cheaper". A trial with no
+  cycle recorded for after conversion has no annual figure. And when no rule
+  fires there is no card at all: a featured card reading "nothing to report"
+  would take the most prominent place on the screen to say nothing.
 
-- **Nothing the page carried was dropped.** The four per-period figures, the
-  per-year-by-currency list and the cost-per-use ranking with its permission
-  gate keep their place below the new sections, and the route stays `/stats` —
-  the rail points Analytics at it, `g t` reaches it and the usage form returns
-  to it.
+- **A converted trial is not a price rise, and the flag cannot tell you that.**
+  Conversion clears `is_trial` and writes the paid price in the same
+  transaction, and the screen's catch-up runs before these rules read a row — so
+  by the time they see it, the last two history rows read "£0, then £12.99". The
+  guard is `PriceChangeSource::TrialConversion` on the current row, which is
+  what that column is recorded for. The next increase after the conversion
+  reports normally.
 
-- **A fault found by looking at the running application, not by a test.** A
-  canvas inside a `display: none` parent measures zero, and Chart.js writes that
-  onto the canvas as an inline `width: 0` it never revisits. The card's frame is
-  hidden until a chart has been drawn in it, so every chart was being built
-  against a box that did not exist. It survived Phase 10 because a resize
-  happened to follow; at 390px on this screen nothing did, and both canvases sat
-  at 0×0 with the figures hidden behind them. `drawInCard` now owns the order:
-  library first, then reveal, then construct, and the frame goes back if the
-  chart does not.
+- **One bulk read for price history.** `PriceHistoryRepository` gained
+  `findAllBySubscription()` rather than this asking per subscription on a page
+  that already walks the household three times. It reads whole histories rather
+  than a recent window because a rise is a comparison between two rows, and a
+  window holding the new price but not the old one cannot tell a rise from a
+  first price.
 
-- **Known cost: three walks of the household for one page.** The statistics read
-  every subscription, the screen service reads them again because the notable
-  card and the usage ranking both want the rows, and year over year reads them a
-  third time with its own argument. Sharing one read means changing what
-  `StatsService` hands back rather than what it computes — a change to a service
-  three screens depend on, and not a restyle's to make.
+- **The usage ranking is computed once.** `AnalyticsScreenService` now derives
+  the value signals and hands them to both the insight rules and the card at the
+  foot of the page, so the controller no longer computes them a second time and
+  "rarely used" means one thing on one screen.
+
+- **Deliberately left for later: the dashboard tile.** The brief makes it
+  optional, and a new feature is better judged on one screen before it is put on
+  two.
