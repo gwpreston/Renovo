@@ -1,0 +1,433 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit;
+
+use App\Support\BuildManifest;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * The design system, as the browser actually receives it.
+ *
+ * Phase 8's promises are mostly visual, but they are not untestable: they are
+ * claims about what the compiled stylesheet contains. This reads the real
+ * output of `npm run build` — the same file a page links — and checks the
+ * things that would otherwise only be noticed by a person looking at a screen,
+ * or worse, not noticed at all:
+ *
+ *   - the brand gradient is the logo's two stops, written down once;
+ *   - all three theme states exist, including the one an explicit "light"
+ *     setting needs on a dark machine;
+ *   - Inter is applied, with tabular figures on the money;
+ *   - every text colour the palette defines clears WCAG AA on the surface it
+ *     is used against, in both themes.
+ *
+ * Skipped when there is no build, so `vendor/bin/phpunit` still runs on a
+ * checkout where `npm install` has not been. CI runs the build first, so there
+ * it is never skipped.
+ */
+final class DesignTokensTest extends TestCase
+{
+    /** WCAG 2.1 AA: normal-sized body text against its background. */
+    private const AA_TEXT = 4.5;
+
+    /** WCAG 2.1 AA: the visible boundary of a user-interface component. */
+    private const AA_NON_TEXT = 3.0;
+
+    private string $css;
+
+    protected function setUp(): void
+    {
+        $buildPath = dirname(__DIR__, 2) . '/public/build';
+        $build = new BuildManifest($buildPath . '/manifest.json', '/build/');
+
+        if (!$build->isBuilt()) {
+            self::markTestSkipped('No asset build present. Run "npm install && npm run build".');
+        }
+
+        $file = $buildPath . '/' . basename($build->url('app.css'));
+        $this->css = (string) file_get_contents($file);
+    }
+
+    // ------------------------------------------------------------- the brand
+
+    /**
+     * The gradient stops are the logo's, and they are written down once.
+     *
+     * PHASE.md fixes the mark's teal-green and blue as the brand, and every
+     * gradient in the application composes from these two names. A literal
+     * colour appearing in a gradient somewhere else is how an interface ends
+     * up with three slightly different greens.
+     */
+    public function testTheBrandGradientStopsAreDefinedAsTokens(): void
+    {
+        self::assertSame('#1fae8f', $this->token(':root', '--brand-from'), 'The teal-green stop moved.');
+        self::assertSame('#2b74d6', $this->token(':root', '--brand-to'), 'The blue stop moved.');
+
+        self::assertStringContainsString(
+            'var(--brand-from)',
+            $this->css,
+            'The brand gradient must compose from the stop tokens, not repeat their values.',
+        );
+    }
+
+    /**
+     * The filled primary button is not painted with the logo gradient.
+     *
+     * White text on the mark's teal stop is 2.8:1, which is not readable. The
+     * action gradient is the same two hues darkened until white clears AA
+     * across both stops, and this is what notices if someone "fixes" the
+     * button to use the brand colours directly.
+     */
+    public function testTheActionGradientCarriesWhiteTextAtEveryStop(): void
+    {
+        $from = $this->token(':root', '--action-from');
+        $to = $this->token(':root', '--action-to');
+
+        self::assertNotNull($from);
+        self::assertNotNull($to);
+
+        foreach (['start' => $from, 'end' => $to, 'midpoint' => $this->mix($from, $to)] as $where => $colour) {
+            self::assertGreaterThanOrEqual(
+                self::AA_TEXT,
+                $this->contrast('#ffffff', $colour),
+                sprintf('White on the primary button fails AA at the %s (%s).', $where, $colour),
+            );
+        }
+    }
+
+    // ------------------------------------------------------------- the themes
+
+    /**
+     * All three theme states, which is one more than a media query provides.
+     *
+     * An account that has explicitly chosen light, on a machine set to dark,
+     * must get light. That needs the system-dark rule to exclude it — the
+     * `:not([data-theme=light])` guard — and it is the case that silently
+     * breaks, because the person who chose the setting is exactly the person
+     * whose machine disagrees with it.
+     */
+    public function testBothThemesAreDefinedAndAnExplicitChoiceBeatsTheSystem(): void
+    {
+        self::assertNotNull($this->token(':root', '--surface'), 'No light palette.');
+        self::assertNotNull($this->token(':root[data-theme=dark]', '--surface'), 'No explicit dark palette.');
+
+        self::assertMatchesRegularExpression(
+            '~@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root:not\(\[data-theme=["\']?light["\']?\]\)~',
+            $this->css,
+            'System-dark must not repaint an account that has explicitly chosen light.',
+        );
+    }
+
+    /** The two palettes are different, or one of them was not written. */
+    public function testTheTwoThemesAreActuallyDifferentPalettes(): void
+    {
+        self::assertNotSame(
+            $this->token(':root', '--surface'),
+            $this->token(':root[data-theme=dark]', '--surface'),
+            'Light and dark resolve to the same surface.',
+        );
+    }
+
+    // --------------------------------------------------------------- the type
+
+    /** Phase 7 vendored Inter and defined the token; Phase 8 applies it. */
+    public function testInterIsAppliedAndNotMerelyServed(): void
+    {
+        self::assertStringContainsString('Inter Variable', $this->css, 'Inter is not in the font stack.');
+        self::assertMatchesRegularExpression(
+            '~html\{[^}]*font-family:var\(--font-stack\)~',
+            $this->css,
+            'The font token is defined but nothing applies it.',
+        );
+    }
+
+    /**
+     * The reason the typeface is Inter.
+     *
+     * Proportional digits are different widths, so a column of amounts stops
+     * lining up as the values change. `tabular-nums` is what removes that, and
+     * a money application that lost it would be harder to read in a way nobody
+     * would think to file a bug about.
+     */
+    public function testFiguresAreTabular(): void
+    {
+        self::assertStringContainsString('font-variant-numeric:tabular-nums', $this->css);
+
+        preg_match_all('~([^{}]*)\{font-variant-numeric:tabular-nums\}~', $this->css, $matches);
+        $selectors = implode(',', $matches[1]);
+
+        foreach (['.table', '.stat-value', '.timeline-amount', '.calendar-amount', '.money'] as $selector) {
+            self::assertStringContainsString(
+                $selector,
+                $selectors,
+                sprintf('Figures in "%s" are not tabular.', $selector),
+            );
+        }
+    }
+
+    /**
+     * `font-feature-settings: "tnum"` would switch off every other feature in
+     * the font — Inter's subset also carries calt, frac, numr and dnom — so
+     * the high-level property is the correct one and the low-level one is a
+     * regression waiting to be pasted in from a blog post.
+     */
+    public function testTabularFiguresDoNotClobberTheFontsOtherFeatures(): void
+    {
+        // Preflight sets `font-feature-settings` from its own defaults, which is
+        // not what this is about: what must not appear is the numeric feature
+        // being driven by the low-level property.
+        self::assertDoesNotMatchRegularExpression(
+            '~font-feature-settings:[^;}]*tnum~',
+            $this->css,
+        );
+    }
+
+    // ------------------------------------------------------------- Preflight
+
+    /**
+     * Preflight is on, and the defaults the templates rely on came back.
+     *
+     * Turning the reset on without re-establishing these is how every heading
+     * on every page silently becomes body text.
+     */
+    public function testPreflightIsOnAndTheDefaultsItStripsAreRestored(): void
+    {
+        self::assertStringContainsString('*,:after,:before', $this->css, 'Preflight is not in the build.');
+
+        $restored = [
+            '~[,{}]h1\{font-size:~' => 'Headings lost their size.',
+            '~a\{[^}]*text-decoration:underline~' => 'Links lost their underline.',
+            '~:focus-visible\{[^}]*outline:~' => 'Nothing shows keyboard focus.',
+        ];
+
+        foreach ($restored as $pattern => $message) {
+            self::assertMatchesRegularExpression($pattern, $this->css, $message);
+        }
+    }
+
+    // -------------------------------------------------------------- contrast
+
+    /**
+     * Every text colour clears AA on the surface it is used against.
+     *
+     * The palette is the thing that decides whether the application is
+     * readable, so it is the thing worth locking down. A token nudged a few
+     * points darker to "look better" is exactly the change that passes review
+     * and fails a reader.
+     *
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function textPairs(): iterable
+    {
+        $themes = [':root' => 'light', ':root[data-theme=dark]' => 'dark'];
+
+        $pairs = [
+            '--text' => '--surface',
+            '--text-muted' => '--surface',
+            '--accent' => '--surface',
+            '--danger' => '--surface',
+            '--increase' => '--surface',
+            '--decrease' => '--surface',
+            '--warning' => '--warning-bg',
+            '--error-text' => '--error-bg',
+            '--success-text' => '--success-bg',
+        ];
+
+        foreach ($themes as $selector => $theme) {
+            foreach ($pairs as $ink => $ground) {
+                yield sprintf('%s: %s on %s', $theme, $ink, $ground) => [$selector, $ink, $ground];
+            }
+        }
+    }
+
+    /**
+     * @dataProvider textPairs
+     */
+    public function testEveryTextColourClearsAa(string $theme, string $ink, string $ground): void
+    {
+        $foreground = $this->token($theme, $ink);
+        $background = $this->token($theme, $ground);
+
+        self::assertNotNull($foreground, sprintf('%s is not defined for %s.', $ink, $theme));
+        self::assertNotNull($background, sprintf('%s is not defined for %s.', $ground, $theme));
+
+        $ratio = $this->contrast($foreground, $background);
+
+        self::assertGreaterThanOrEqual(
+            self::AA_TEXT,
+            $ratio,
+            sprintf('%s on %s is %.2f:1, under AA.', $foreground, $background, $ratio),
+        );
+    }
+
+    /**
+     * The edge of an input is a component boundary, which WCAG holds to 3:1.
+     *
+     * The hairline that separates cards is deliberately fainter than this and
+     * is not held to it — it separates things that are already distinct. The
+     * border on a field is the only thing telling a reader where to type.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function themes(): iterable
+    {
+        yield 'light' => [':root'];
+        yield 'dark' => [':root[data-theme=dark]'];
+    }
+
+    /**
+     * @dataProvider themes
+     */
+    public function testControlBordersAreVisibleEnoughToFindAField(string $theme): void
+    {
+        $border = $this->token($theme, '--border-control');
+        $surface = $this->token($theme, '--surface');
+
+        self::assertNotNull($border);
+        self::assertNotNull($surface);
+
+        $ratio = $this->contrast($border, $surface);
+
+        self::assertGreaterThanOrEqual(
+            self::AA_NON_TEXT,
+            $ratio,
+            sprintf('A field border at %.2f:1 is effectively invisible.', $ratio),
+        );
+    }
+
+    // ----------------------------------------------------------------- tools
+
+    /**
+     * The value of a custom property in a selector's blocks.
+     *
+     * The compiled stylesheet is minified and a selector may have several
+     * blocks — the tokens are grouped by what they are for, not crammed into
+     * one rule — so every block for the selector is read and the last
+     * assignment wins, which is what the cascade would do.
+     */
+    private function token(string $selector, string $property): ?string
+    {
+        $value = null;
+
+        foreach ($this->blocks($selector) as $block) {
+            if (preg_match('~(?:^|;)' . preg_quote($property, '~') . ':\s*([^;}]+)~', $block, $match) === 1) {
+                $value = strtolower(trim($match[1]));
+            }
+        }
+
+        return $value;
+    }
+
+    /**
+     * Every declaration block belonging to exactly this selector.
+     *
+     * Matched by walking braces rather than by a regular expression, so a
+     * nested block inside an `@media` rule cannot swallow the closing brace
+     * and return half the stylesheet.
+     *
+     * @return list<string>
+     */
+    private function blocks(string $selector): array
+    {
+        $blocks = [];
+        $offset = 0;
+        $needle = $selector . '{';
+
+        while (($start = strpos($this->css, $needle, $offset)) !== false) {
+            $offset = $start + strlen($needle);
+
+            // A selector list such as `:root,:host{` is not this selector, and
+            // neither is `:root[data-theme=dark]` when looking for `:root`.
+            // A space is excluded too: in `.dialog .card{` the `.card` is a
+            // descendant of something, not the selector being asked about.
+            $before = $start === 0 ? '' : $this->css[$start - 1];
+            if ($before !== '' && !in_array($before, ['}', ';', ',', '{'], true)) {
+                continue;
+            }
+
+            $depth = 1;
+            $i = $offset;
+
+            while ($i < strlen($this->css) && $depth > 0) {
+                $depth += match ($this->css[$i]) {
+                    '{' => 1,
+                    '}' => -1,
+                    default => 0,
+                };
+                $i++;
+            }
+
+            $blocks[] = substr($this->css, $offset, $i - $offset - 1);
+        }
+
+        return $blocks;
+    }
+
+    /** The WCAG 2.1 contrast ratio between two opaque colours. */
+    private function contrast(string $a, string $b): float
+    {
+        $first = $this->luminance($a);
+        $second = $this->luminance($b);
+
+        $lighter = max($first, $second);
+        $darker = min($first, $second);
+
+        return ($lighter + 0.05) / ($darker + 0.05);
+    }
+
+    /** Relative luminance, per the WCAG definition. */
+    private function luminance(string $hex): float
+    {
+        [$r, $g, $b] = $this->channels($hex);
+
+        $linear = static function (float $channel): float {
+            return $channel <= 0.04045
+                ? $channel / 12.92
+                : (($channel + 0.055) / 1.055) ** 2.4;
+        };
+
+        return 0.2126 * $linear($r) + 0.7152 * $linear($g) + 0.0722 * $linear($b);
+    }
+
+    /** The midpoint of a two-stop gradient, where a button's text often sits. */
+    private function mix(string $a, string $b): string
+    {
+        [$r1, $g1, $b1] = $this->channels($a);
+        [$r2, $g2, $b2] = $this->channels($b);
+
+        return sprintf(
+            '#%02x%02x%02x',
+            (int) round(($r1 + $r2) / 2 * 255),
+            (int) round(($g1 + $g2) / 2 * 255),
+            (int) round(($b1 + $b2) / 2 * 255),
+        );
+    }
+
+    /**
+     * A hex colour as three 0–1 channels.
+     *
+     * @return array{float, float, float}
+     */
+    private function channels(string $hex): array
+    {
+        $hex = ltrim(trim($hex), '#');
+
+        if (strlen($hex) === 3) {
+            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+        }
+
+        self::assertMatchesRegularExpression(
+            '~^[0-9a-f]{6}$~',
+            $hex,
+            'Only opaque hex colours can be checked for contrast.',
+        );
+
+        return [
+            hexdec(substr($hex, 0, 2)) / 255,
+            hexdec(substr($hex, 2, 2)) / 255,
+            hexdec(substr($hex, 4, 2)) / 255,
+        ];
+    }
+}

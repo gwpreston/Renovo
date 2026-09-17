@@ -1,0 +1,307 @@
+/*
+ * The design tokens.
+ *
+ * Every colour, radius and type size the interface uses is named here once.
+ * Nothing downstream writes a literal colour: a rule in `components.css` and a
+ * Tailwind utility in a template both resolve to the same custom property, so
+ * they cannot disagree about what "brand" or "card" means.
+ *
+ * Two layers, in this order:
+ *
+ *   1. Semantic custom properties, reassigned per theme. These are what carry
+ *      light and dark.
+ *   2. `@theme inline`, which hands the same properties to Tailwind so
+ *      `bg-surface` and `.card { background: var(--surface) }` are the same
+ *      colour by construction.
+ *
+ * The `inline` keyword on the theme block is what makes a runtime-swapped
+ * palette work. Without it Tailwind resolves a theme value at build time and
+ * bakes it into the utility, which would freeze every utility to whichever
+ * theme was compiled first. With it, `bg-surface` compiles to
+ * `background-color: var(--surface)` and follows the cascade like everything
+ * else.
+ */
+
+/* ------------------------------------------------------------------ brand */
+
+/*
+ * The logo's two gradient stops, sampled from the mark, and the single place
+ * they are written down. Every gradient in the application composes from these
+ * two names, so re-sampling the logo is a two-line edit rather than a search
+ * for hex codes.
+ *
+ * These are theme-independent: the brand is the brand on a light page and a
+ * dark one.
+ */
+:root {
+    --brand-from: #1fae8f;
+    --brand-to: #2b74d6;
+    --gradient-brand: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+
+    /*
+     * The same two hues, darkened, for a surface that carries white text.
+     *
+     * The logo gradient cannot: white on the teal stop is 2.8:1 and on the
+     * midpoint 3.6:1, both under the 4.5:1 that body-sized text needs, and
+     * dark ink fails at the blue end instead. There is no single ink that
+     * passes across the real mark. So the mark keeps its colours for the
+     * things that carry no text — the featured-card wash, the brand dot, the
+     * active rail — and a filled button uses these, which hold white at
+     * 5.3:1, 5.6:1 and 5.7:1 across the two stops and the middle.
+     */
+    --action-from: #0d7a63;
+    --action-to: #2b64bd;
+    --gradient-action: linear-gradient(135deg, var(--action-from), var(--action-to));
+}
+
+/* ------------------------------------------------------- the light palette */
+
+/*
+ * Light is the default assignment, which is what an account set to "system"
+ * gets on a browser that asks for light, and what `data-theme="light"` gets
+ * unconditionally.
+ *
+ * "Dark first" in PHASE.md means dark is the better-tuned of the two and the
+ * one the screenshots show. It does not mean light is dropped: an account can
+ * choose it under Settings → Appearance, and that choice wins over the
+ * browser's.
+ */
+:root {
+    color-scheme: light;
+
+    /* surfaces */
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-hover: #eef0f3;
+    --surface-sunken: #eef0f3;
+
+    /*
+     * Two borders, because they do two jobs. The hairline separates things
+     * that are already visibly distinct and may be faint; the control border
+     * is the visible edge of an input or a button, which WCAG holds to 3:1
+     * against what it sits on the way it holds text to 4.5:1.
+     */
+    --border: rgba(16, 24, 40, 0.12);
+    --border-control: #7d8794;
+
+    /* text */
+    --text: #14161c;
+    --text-muted: #5b6472;
+
+    /*
+     * The action colour, for links, focus rings, the active nav item and a
+     * meter fill. It is the brand's teal darkened until it holds 5.3:1 on
+     * white — the mark's own #1fae8f is 2.8:1 there, readable on the dark
+     * surface it was sampled against and not on this one.
+     */
+    --accent: #0d7a63;
+    --accent-text: #ffffff;
+
+    /* urgency: renewing soon, a cancel-by deadline, a budget projected over */
+    --warning: #b4430f;
+    --warning-bg: #fff1e8;
+
+    /* a genuine problem, distinct from the heads-up above */
+    --danger: #b3261e;
+    --error-bg: #fdecea;
+    --error-text: #b3261e;
+
+    --success-bg: #e6f4ea;
+    --success-text: #14683f;
+
+    /* a price moved: up is bad news in a bills app, down is good */
+    --increase: #b3261e;
+    --decrease: #14683f;
+
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+    --backdrop: rgba(16, 24, 40, 0.45);
+}
+
+/* -------------------------------------------------------- the dark palette */
+
+/*
+ * Written once and applied twice, because the theme has three states and only
+ * two of them are a media query's business.
+ *
+ * The `:not([data-theme='light'])` guard is the whole trick: an account that
+ * has explicitly chosen light, on a machine set to dark, must get light. Left
+ * out, the media query would repaint it dark and the setting would look
+ * broken on exactly the machines whose owners bothered to change it.
+ */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        color-scheme: dark;
+
+        --bg: #0b0b0e;
+        --surface: #1a1a20;
+        --surface-raised: #121215;
+        --surface-hover: #202028;
+        --surface-sunken: #121215;
+
+        --border: rgba(255, 255, 255, 0.08);
+        --border-control: #666674;
+
+        --text: #ffffff;
+        --text-muted: #9e9eab;
+
+        --accent: #1fae8f;
+        --accent-text: #05130f;
+
+        --warning: #ff784e;
+        --warning-bg: #3a1f10;
+
+        --danger: #ff6b63;
+        --error-bg: #3a1614;
+        --error-text: #ff8a82;
+
+        --success-bg: #0f2e1d;
+        --success-text: #57d18c;
+
+        --increase: #ff8a82;
+        --decrease: #57d18c;
+
+        /*
+         * No drop shadow. On a near-black page a shadow is invisible; what
+         * separates a card from the page here is its own faint top-edge
+         * highlight, applied in `components.css`.
+         */
+        --shadow: none;
+        --backdrop: rgba(0, 0, 0, 0.6);
+    }
+}
+
+:root[data-theme='dark'] {
+    color-scheme: dark;
+
+    --bg: #0b0b0e;
+    --surface: #1a1a20;
+    --surface-raised: #121215;
+    --surface-hover: #202028;
+    --surface-sunken: #121215;
+
+    --border: rgba(255, 255, 255, 0.08);
+    --border-control: #666674;
+
+    --text: #ffffff;
+    --text-muted: #9e9eab;
+
+    --accent: #1fae8f;
+    --accent-text: #05130f;
+
+    --warning: #ff784e;
+    --warning-bg: #3a1f10;
+
+    --danger: #ff6b63;
+    --error-bg: #3a1614;
+    --error-text: #ff8a82;
+
+    --success-bg: #0f2e1d;
+    --success-text: #57d18c;
+
+    --increase: #ff8a82;
+    --decrease: #57d18c;
+
+    --shadow: none;
+    --backdrop: rgba(0, 0, 0, 0.6);
+}
+
+/* ---------------------------------------------------- shape and type scale */
+
+:root {
+    /*
+     * 16px on a card, smaller on the things that sit inside one. A single
+     * radius everywhere makes a chip look like a card that failed to grow.
+     */
+    --radius: 16px;
+    --radius-control: 10px;
+    /*
+     * Rule-only, and deliberately not handed to Tailwind below. Their names
+     * sit in Tailwind's `--radius-*` namespace, so exposing them would create
+     * `rounded-small` and `rounded-pill`; `rounded-full` already covers the
+     * pill, and an 8px corner inside a card is a decision for the rule that
+     * draws it rather than something a template should reach for.
+     */
+    --radius-small: 8px;
+    --radius-pill: 999px;
+
+    /*
+     * Inter, vendored by the build. The stack behind it is what renders for
+     * the moment before the webfont arrives, and on the rare instance whose
+     * operator has stripped the font files out.
+     *
+     * Named `--font-stack` rather than `--font-sans` on purpose: `--font-sans`
+     * is Tailwind's own theme key, and a theme key assigned its own name — a
+     * `--font-sans: var(--font-sans)` — is a circular reference that CSS
+     * resolves to nothing at all. Every raw token here is named differently
+     * from the Tailwind key that exposes it, which is what keeps the two from
+     * colliding in `:root`.
+     */
+    --font-stack: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto,
+        Helvetica, Arial, sans-serif;
+
+    /*
+     * A small fixed scale rather than ad-hoc sizes, so a heading added in a
+     * hurry lands on one of four sizes that already exist.
+     */
+    --size-kpi: 2.5rem;
+    --size-heading: 1.25rem;
+    --size-body: 0.9375rem;
+    --size-label: 0.8125rem;
+
+    --weight-normal: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+}
+
+/* ------------------------------------------------------ handed to Tailwind */
+
+/*
+ * The same tokens, in Tailwind's namespaces, so a utility class is available
+ * for every one of them. `--color-surface` here is what makes `bg-surface`,
+ * `text-surface` and `border-surface` exist.
+ *
+ * Only the tokens a template might reasonably want as a utility are listed.
+ * A name that exists here but nowhere in `templates/` costs nothing — Tailwind
+ * emits a utility only where it finds the class used.
+ *
+ * Every key below is spelled differently from the property it points at. A key
+ * that referenced its own name would compile to `--x: var(--x)` in `:root`,
+ * which is circular and therefore invalid — the utility and the rule would
+ * both silently fall back to nothing.
+ */
+@theme inline {
+    --color-bg: var(--bg);
+    --color-surface: var(--surface);
+    --color-surface-raised: var(--surface-raised);
+    --color-surface-hover: var(--surface-hover);
+    --color-surface-sunken: var(--surface-sunken);
+
+    --color-line: var(--border);
+    --color-line-control: var(--border-control);
+
+    --color-ink: var(--text);
+    --color-ink-muted: var(--text-muted);
+
+    --color-brand: var(--accent);
+    --color-brand-from: var(--brand-from);
+    --color-brand-to: var(--brand-to);
+    --color-brand-ink: var(--accent-text);
+
+    --color-urgent: var(--warning);
+    --color-urgent-bg: var(--warning-bg);
+    --color-danger: var(--danger);
+    --color-increase: var(--increase);
+    --color-decrease: var(--decrease);
+
+    --font-sans: var(--font-stack);
+
+    --radius-card: var(--radius);
+    --radius-field: var(--radius-control);
+
+    --text-kpi: var(--size-kpi);
+    --text-heading: var(--size-heading);
+    --text-body: var(--size-body);
+    --text-label: var(--size-label);
+}

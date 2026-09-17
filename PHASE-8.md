@@ -178,3 +178,31 @@ logo; Inter renders with tabular figures on; both theme sets render; the built
 stylesheet resolves through the manifest; `phpcs`, `phpstan` and `phpunit` still
 pass; `i18n:check` is clean. No screen from Phases 9–14 is built yet — this phase
 and Phase 7 are the foundation they stand on.
+
+---
+
+## Built — what actually landed
+
+Every item above is done. Notes on the decisions that were open when the phase
+started:
+
+- **The logo was not in the repository**, so the gradient stops are PHASE.md's
+  own stated values, `#1fae8f` → `#2b74d6`. They are written down once, as
+  `--brand-from` and `--brand-to` in `assets/css/tokens.css`; re-sampling the
+  real mark is a two-line edit and nothing else has to move.
+- **The hand-written `public/assets/app.css` moved into the build** and was
+  deleted. The token guarantee — that a utility and a rule cannot disagree
+  about what "brand" or "card" means — needs one compilation to own both.
+  Preflight came on with it, and `assets/css/base.css` re-establishes each
+  browser default the templates actually rely on. The cost is that changing
+  how the application looks now needs `npm run build`, which is recorded in
+  the README.
+- **The logo gradient cannot carry white text**, so there are two: the mark's
+  own stops for surfaces nothing sits on, and `--gradient-action` — the same
+  hues darkened — for a filled button. White on the real mark is 2.8:1 at the
+  teal stop.
+- **Two Preflight regressions were found by looking at the running app** and
+  fixed: `<dialog>` lost the `margin: auto` that centres a modal, and a
+  checkbox filter stacked above its own label.
+- **Contrast is a test, not a judgement.** `DesignTokensTest` asserts every
+  text token clears AA on the surface it is used against, in both themes.

@@ -184,16 +184,21 @@ jobs:
         run: php bin/console assets:offline-check
 
       # Checks the built output itself: that the manifest names the entries the
-      # layout asks for, and that the vendored font's @font-face points at a
-      # local hashed file that is actually there. Only meaningful once a build
-      # has run, so it runs here rather than in the test job.
+      # layout asks for, that the vendored font's @font-face points at a local
+      # hashed file that is actually there, and that the compiled stylesheet
+      # carries the design tokens — both theme sets, tabular figures, and every
+      # text colour clearing AA on the surface it is used against. Only
+      # meaningful once a build has run, so it runs here rather than in the
+      # test job.
       - name: The build produced what the application expects
         env:
           SESSION_KEY: ci-session-key-not-a-secret-0000000000000000
-        # --fail-on-skipped, because BuiltAssetsTest skips itself when there is
-        # no build: without it, the one job that exists to check the build
+        # --fail-on-skipped, because both of these skip themselves when there
+        # is no build: without it, the one job that exists to check the build
         # would go green on not having checked anything.
-        run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Unit/BuiltAssetsTest.php
+        run: |
+          vendor/bin/phpunit --no-coverage --fail-on-skipped \
+            tests/Unit/BuiltAssetsTest.php tests/Unit/DesignTokensTest.php
 
   docker:
     name: Docker image builds
