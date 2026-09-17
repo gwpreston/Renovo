@@ -17,7 +17,7 @@
  * thing this file is arranged to avoid.
  */
 
-import { payloadFor, renderChart, token } from './charts.js';
+import { drawInCard, payloadFor, token } from './charts.js';
 
 /** Where the payload and the canvas describe each other. */
 const CANVAS = 'canvas[data-chart="spend"]';
@@ -95,10 +95,10 @@ function configFor(data) {
  * the analytics screen has one beside a donut, and a page is free to have two.
  * Each canvas names its own payload, so they do not have to be told apart.
  *
- * A card is marked as drawn only once the library has loaded and its chart
- * exists. Until then — and for good on a browser that never runs this — the
- * card shows the table of figures the server rendered, which is the same data
- * the picture would have been.
+ * A card's frame is revealed only once the library is here, and put back if the
+ * chart does not construct. Until then — and for good on a browser that never
+ * runs this — the card shows the table of figures the server rendered, which is
+ * the same data the picture would have been.
  */
 export async function drawSpendCharts(root = document) {
     const canvases = Array.from(root.querySelectorAll(CANVAS));
@@ -109,7 +109,6 @@ export async function drawSpendCharts(root = document) {
             return;
         }
 
-        await renderChart(canvas, configFor(data));
-        canvas.closest('.chart-card')?.classList.add('is-drawn');
+        await drawInCard(canvas, configFor(data));
     }));
 }

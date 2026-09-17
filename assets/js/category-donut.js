@@ -17,7 +17,7 @@
  * what a segment of an incomplete total would mean.
  */
 
-import { payloadFor, renderChart, token } from './charts.js';
+import { drawInCard, payloadFor, token } from './charts.js';
 
 /** Where the payload and the canvas describe each other. */
 const CANVAS = 'canvas[data-chart="donut"]';
@@ -108,10 +108,11 @@ function configFor(data, otherLabel) {
 /**
  * Draw every category donut on the page.
  *
- * The card is marked as drawn only once the library has loaded and the chart
- * exists, which is what reveals the centre label and hides the figures table
- * from sight. Until then — and for good on a browser that never runs this —
- * the card shows the table, which is the same data the picture would have been.
+ * Revealing the frame is what puts the centre label over the ring and hides the
+ * figures table from sight, and `drawInCard` is what keeps that in the right
+ * order. Until the library arrives — and for good on a browser that never runs
+ * this — the card shows the table, which is the same data the picture would
+ * have been.
  */
 export async function drawCategoryDonuts(root = document) {
     const canvases = Array.from(root.querySelectorAll(CANVAS));
@@ -125,7 +126,6 @@ export async function drawCategoryDonuts(root = document) {
         /* The tail's name is the one label that needed translating, so the
            server resolved it and put it on the canvas rather than sending a
            second copy of the catalogue. */
-        await renderChart(canvas, configFor(data, canvas.dataset.otherLabel ?? ''));
-        canvas.closest('.chart-card')?.classList.add('is-drawn');
+        await drawInCard(canvas, configFor(data, canvas.dataset.otherLabel ?? ''));
     }));
 }
