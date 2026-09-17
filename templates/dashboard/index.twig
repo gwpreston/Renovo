@@ -14,9 +14,18 @@
             order and the hiding are decided by DashboardLayoutService; this
             walks the list it produced and nothing else, so adding a card is
             adding a file and an enum case.
+
+            The grid is three columns wide and each card says how many it wants
+            — which is what puts the chart beside the usage widget without
+            fixing either of them in place. On a narrow screen every card is
+            one column, so the same list becomes a stack.
         #}
-        {% for card in dashboard_cards %}
-            {% include 'dashboard/cards/' ~ card.value ~ '.twig' %}
-        {% endfor %}
+        <div class="bento">
+            {% for card in dashboard_cards %}
+                <div class="bento-item bento-span-{{ card.columnSpan }}">
+                    {% include 'dashboard/cards/' ~ card.value ~ '.twig' %}
+                </div>
+            {% endfor %}
+        </div>
     {% endif %}
 {% endblock %}

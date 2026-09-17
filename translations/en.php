@@ -588,31 +588,60 @@ return [
     'categories.title' => 'Categories and tags',
 
     // dashboard
+    'dashboard.active_subscriptions' => 'Active subscriptions',
     'dashboard.by_category' => 'By category',
+    'dashboard.chart_unconvertible' =>
+        'The twelve-month chart is not drawn, because no exchange rate is available for {currencies} and '
+        . 'a month missing one of its currencies would be drawn as a cheap month rather than an unknown '
+        . 'one. The forecast shows those months per currency.',
     'dashboard.combined_in' => 'Combined · {currency}',
     'dashboard.combined_note' =>
         '{amount} per year, converted at the latest cached rates. The per-currency figures above are the '
         . 'amounts actually charged.',
     'dashboard.converts_on' => 'converts {date}',
     'dashboard.due_in_total' => 'due in total',
+    'dashboard.filter_rows' => 'Which subscriptions to list',
+    'dashboard.metrics' => 'Spending at a glance',
+    'dashboard.monthly_spend' => 'Monthly spend',
     'dashboard.next_30_days' => 'Next 30 days',
     'dashboard.next_7_days' => 'Next 7 days',
+    'dashboard.next_charge' => 'Next: {name}, {date} · {amount}',
+    'dashboard.no_budget' => 'No budget set for you yet, so there is nothing to measure this against.',
     'dashboard.no_household' => 'No household',
     'dashboard.no_household_note' =>
         'You are not a member of a household yet, so there is nothing to show. Instance administration '
         . 'does not by itself grant access to anybody\'s subscriptions.',
     'dashboard.nothing_due' => 'Nothing due.',
+    'dashboard.nothing_renewing' => 'Nothing renewing in the near window.',
+    'dashboard.other_categories' => '{count, plural, one {# other category} other {# other categories}}',
+    'dashboard.peak_month' => 'Busiest month',
     'dashboard.one_off_in' => 'One-off & lifetime · {currency}',
     'dashboard.one_off_note' => '{count, plural, one {# entry} other {# entries}}, not included in monthly totals',
     'dashboard.per_month_unit' => '/ month',
+    'dashboard.per_year_unit' => '/ year',
     'dashboard.per_year_and_count' =>
         '{amount} per year · {count, plural, one {# subscription} other {# subscriptions}}',
+    'dashboard.recent' => 'Subscriptions',
     'dashboard.recurring' => 'Recurring',
     'dashboard.recurring_empty' => 'No active recurring subscriptions yet.',
     'dashboard.recurring_in' => 'Recurring · {currency}',
+    'dashboard.renewing_soon' => 'Renewing soon',
+    'dashboard.renewing_soon_note' => 'in the next {days} days',
+    'dashboard.see_all' => 'All subscriptions',
+    'dashboard.share_of_spend' => '{name}: {percent}% of monthly spend',
+    'dashboard.spend_chart' => 'The next twelve months',
+    'dashboard.spend_chart_alt' =>
+        'Bar chart of spend per month for the next twelve months, in {currency}. The same figures are in '
+        . 'the table that follows.',
     'dashboard.trials_ending_soon' => 'Trials ending soon',
     'dashboard.trials_note' => 'Free today. About to stop being.',
     'dashboard.trials_total_note' => 'about to start being charged',
+    'dashboard.usage' => 'Budget and where it goes',
+    'dashboard.view_active' => 'Active',
+    'dashboard.view_all' => 'All',
+    'dashboard.view_expiring' => 'Expiring',
+    'dashboard.where_it_goes' => 'Where it goes',
+    'dashboard.yearly_spend' => 'Yearly spend',
     'dashboard.unconvertible' =>
         'Totals are shown per currency. They cannot be combined because no exchange rate is available '
         . 'for {currencies} — a total leaving that out would be a wrong number rather than an approximate '
@@ -652,6 +681,7 @@ return [
     'field.per_month' => 'Per month',
     'field.period' => 'Period',
     'field.price' => 'Price',
+    'field.reference' => 'Ref',
     'field.rating' => 'Rating',
     'field.result' => 'Result',
     'field.role' => 'Role',
@@ -722,6 +752,7 @@ return [
     'import_start.source_hint' => 'Only a starting point for the column mapping — you confirm it on the next screen.',
 
     // js
+    'js.dashboard.spend' => 'Spend',
     'js.quick_add_failed' => 'That form could not be loaded. Open the full page instead.',
     'js.passkey_generic_error' => 'That did not work. Try again.',
     'js.passkey_not_used' => 'No passkey was used.',
@@ -951,6 +982,7 @@ return [
     'state.never' => 'Never',
     'state.none' => 'None',
     'state.paused' => 'Paused',
+    'state.renewing' => 'Renewing soon',
     'state.revoked' => 'Revoked',
     'state.shared' => 'Shared',
     'state.today' => 'Today',
@@ -1211,9 +1243,12 @@ return [
     'channel_field.webhook.url' => 'Endpoint URL',
 
     // dashboard_card
+    'dashboard_card.budget_usage' => 'Budget and where it goes',
     'dashboard_card.by_category' => 'By category',
     'dashboard_card.per_period' => 'Per day, week, month and year',
-    'dashboard_card.totals' => 'Totals',
+    'dashboard_card.recent' => 'Subscriptions table',
+    'dashboard_card.spend_chart' => 'The next twelve months',
+    'dashboard_card.totals' => 'Spending at a glance',
     'dashboard_card.trials' => 'Trials ending soon',
     'dashboard_card.upcoming' => 'Upcoming charges',
 

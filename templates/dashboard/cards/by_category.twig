@@ -2,6 +2,8 @@
 {% if stats.by_category %}
     <section class="card">
         <h2>{{ t('dashboard.by_category') }}</h2>
+        {# Wrapped, like every other table: three columns of figures do not fit a phone. #}
+        <div class="table-scroll">
         <table class="table">
             <thead>
             <tr>
@@ -20,5 +22,6 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
     </section>
 {% endif %}

@@ -1,0 +1,108 @@
+{#
+    The usage widget.
+
+    The design showed "Subscription Usage — $1200 from $299 limit", which was a
+    made-up allowance. The real version of it is this member's budget against
+    the spend projected for it, from the same forecast the chart above is drawn
+    from — so the two tiles are two readings of one number rather than two
+    numbers. Beneath it, where the money goes.
+#}
+<section class="card usage-card">
+    <h2>{{ t('dashboard.usage') }}</h2>
+
+    {% if usage.budget is null %}
+        <p class="muted empty">
+            {{ t('dashboard.no_budget') }}
+            {% if can(scope, 'budget.manage') %}
+                <a href="/budgets/new">{{ t('budgets.set_one_up') }}</a>
+            {% endif %}
+        </p>
+    {% else %}
+        {% set row = usage.budget %}
+        <p class="stat-label">{{ row.budget.name }}</p>
+
+        {% if row.projected is null %}
+            <p class="stat-value">{{ t('common.none_symbol') }}</p>
+            <p class="field-error">
+                {{ t('budgets.unconvertible', {'currencies': row.unconvertible|join(', ')}) }}
+            </p>
+        {% else %}
+            <p class="stat-value">
+                {{ row.projected.amountMinor|money(row.projected.currency) }}
+                <span class="stat-unit">
+                    {{ t('budgets.of_limit', {'limit': row.limit.amountMinor|money(row.limit.currency)}) }}
+                </span>
+            </p>
+
+            {# A meter rather than a bar: it carries the value and the limit to a screen reader. #}
+            <div class="meter {{ row.is_over ? 'is-over' : (row.is_warning ? 'is-warning' : '') }}" role="img"
+                 aria-label="{{ t('budgets.meter_label', {'percent': row.percent}) }}">
+                <span class="meter-fill" style="width: {{ min(row.percent, 100) }}%"></span>
+            </div>
+
+            <p class="{{ row.is_over ? 'field-error' : 'muted' }}">
+                {% if row.is_over %}
+                    <strong>{{ t('budgets.over', {
+                        'percent': row.percent,
+                        'amount': (row.remaining.amountMinor * -1)|money(row.remaining.currency),
+                    }) }}</strong>
+                {% elseif row.is_warning %}
+                    {{ t('budgets.warning', {
+                        'percent': row.percent,
+                        'threshold': row.budget.warnThresholdPercent,
+                        'remaining': row.remaining.amountMinor|money(row.remaining.currency),
+                    }) }}
+                {% else %}
+                    {{ t('budgets.remaining', {
+                        'percent': row.percent,
+                        'remaining': row.remaining.amountMinor|money(row.remaining.currency),
+                    }) }}
+                {% endif %}
+            </p>
+        {% endif %}
+    {% endif %}
+
+    {#
+        The category distribution, as a share of the combined monthly total.
+        Drawn only when that total exists — comparing two categories in
+        different currencies is exactly the claim a bar makes, and it is one
+        that cannot be made without a rate for both.
+    #}
+    {% if usage.categories.rows is not empty %}
+        <h3 class="stat-label">{{ t('dashboard.where_it_goes') }}</h3>
+        <ul class="plain distribution">
+            {% for row in usage.categories.rows %}
+                <li class="distribution-row">
+                    <span class="distribution-name">{{ row.name }}</span>
+                    <span class="distribution-amount">
+                        {{ row.amount_minor|money(usage.categories.currency) }}
+                    </span>
+                    <div class="meter meter-slim" role="img"
+                         aria-label="{{ t('dashboard.share_of_spend', {
+                             'name': row.name,
+                             'percent': row.percent,
+                         }) }}">
+                        <span class="meter-fill" style="width: {{ min(row.percent, 100) }}%"></span>
+                    </div>
+                </li>
+            {% endfor %}
+            {% if usage.categories.other %}
+                <li class="distribution-row">
+                    <span class="distribution-name muted">
+                        {{ t('dashboard.other_categories', {'count': usage.categories.other.count}) }}
+                    </span>
+                    <span class="distribution-amount">
+                        {{ usage.categories.other.amount_minor|money(usage.categories.currency) }}
+                    </span>
+                    <div class="meter meter-slim" role="img"
+                         aria-label="{{ t('dashboard.share_of_spend', {
+                             'name': t('dashboard.other_categories', {'count': usage.categories.other.count}),
+                             'percent': usage.categories.other.percent,
+                         }) }}">
+                        <span class="meter-fill" style="width: {{ min(usage.categories.other.percent, 100) }}%"></span>
+                    </div>
+                </li>
+            {% endif %}
+        </ul>
+    {% endif %}
+</section>
