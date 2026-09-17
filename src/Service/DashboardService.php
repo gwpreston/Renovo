@@ -6,11 +6,11 @@ namespace App\Service;
 
 use App\Domain\Entity\Subscription;
 use App\Domain\Money;
-use App\Domain\Rounding;
 use App\Domain\SubscriptionFilter;
 use App\Security\Scope;
 use App\Support\Clock;
 use App\Support\DateFormatter;
+use App\Support\Distribution;
 use App\Support\MoneyFormatter;
 use DateTimeImmutable;
 
@@ -420,32 +420,12 @@ final class DashboardService
             ];
         }
 
-        usort($rows, static fn (array $a, array $b): int => $b['amount_minor'] <=> $a['amount_minor']
-            ?: strcmp($a['name'], $b['name']));
-
-        $shown = array_slice($rows, 0, self::CATEGORY_BARS);
-        $rest = array_slice($rows, self::CATEGORY_BARS);
-
-        $withPercent = array_map(
-            static fn (array $row): array => $row + [
-                'percent' => Rounding::multiplyDivide($row['amount_minor'], 100, $total),
-            ],
-            $shown,
-        );
-
-        $otherMinor = array_sum(array_column($rest, 'amount_minor'));
-
-        return [
+        // Ordering, the tail and the percentages are shared with the
+        // my-subscriptions widget, which draws the same bars against a
+        // denominator of its own choosing.
+        return Distribution::bars($rows, $total, self::CATEGORY_BARS) + [
             'currency' => $currency,
             'total_minor' => $total,
-            'rows' => $withPercent,
-            // Named rather than dropped: a bar chart that quietly leaves out
-            // the tail would misstate every share drawn beside it.
-            'other' => $rest === [] ? null : [
-                'count' => count($rest),
-                'amount_minor' => $otherMinor,
-                'percent' => Rounding::multiplyDivide((int) $otherMinor, 100, $total),
-            ],
         ];
     }
 

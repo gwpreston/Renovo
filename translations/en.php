@@ -1026,11 +1026,33 @@ return [
         . 'tracks what is due rather than keeping a ledger of payments taken.',
 
     // subscriptions
+    'subscriptions.active_note' => 'Running right now, paused ones aside.',
     'subscriptions.add_subscription' => 'Add subscription',
     'subscriptions.apply_filters' => 'Apply filters',
+    'subscriptions.cancel_by_empty' =>
+        'Nothing with a notice period is due. Add one to a subscription and its deadline appears here.',
+    'subscriptions.cancel_by_heading' => 'Cancel by',
+    'subscriptions.cancel_by_note' =>
+        'The last day to give notice and avoid the next charge. Shown only where a notice period is set — '
+        . 'without one the deadline is the renewal date itself.',
+    'subscriptions.categories_empty' => 'No recurring spend to break down yet.',
+    'subscriptions.categories_heading' => 'Category spending',
+    'subscriptions.categories_per_currency' =>
+        'No exchange rate for {currencies}, so each currency is shown against its own total rather than '
+        . 'blended into one bar.',
+    'subscriptions.categories_total' => 'of {total} a month',
+    'subscriptions.expiring_heading' => 'Expiring soon',
     'subscriptions.include_paused' => 'Include paused',
     'subscriptions.name_or_notes' => 'Name or notes',
+    'subscriptions.renewing_note' => 'A charge falling in the next {days, plural, one {# day} other {# days}}.',
     'subscriptions.search' => 'Search',
+    'subscriptions.strip' => 'Subscription totals',
+    'subscriptions.notice_of' => '{period} notice',
+    'subscriptions.then_costs' => 'when it converts',
+    'subscriptions.trials_heading' => 'Free trials',
+    'subscriptions.trials_note' =>
+        'The last day of a trial is the day of its first charge, so the countdown runs to the day it '
+        . 'converts and the amount shown is what it converts to.',
 
     // subscriptions_form
     'subscriptions_form.back_to_list' => 'Back to list',

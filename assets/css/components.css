@@ -606,8 +606,18 @@ main.container {
 
 /* ----------------------------------------------------------------- tables */
 
+/*
+ * A wide table scrolls inside its own wrapper rather than taking the page with
+ * it. `position: relative` is part of that and not decoration: a header cell's
+ * visually-hidden label is absolutely positioned at its static place, which on
+ * a table wider than the screen is hundreds of pixels to the right. Without a
+ * containing block here it resolves against the card instead, escapes the
+ * clip, and pushes a phone-width page sideways — an invisible element widening
+ * a page that looks fine.
+ */
 .table-scroll,
 .table-wrap {
+    position: relative;
     overflow-x: auto;
 }
 

@@ -1,0 +1,110 @@
+{#
+    Expiring soon.
+
+    The design's highlight cards, bound to the two deadlines this application
+    actually distinguishes. *Renewing soon* is a charge inside the near window.
+    *Cancel by* is the last day notice can still be given — the one that is easy
+    to miss, and the reason the calendar feed exists — and it appears only for a
+    subscription that has a notice period, because without one that deadline is
+    the renewal date and the card beside it already says so.
+
+    Each row's trigger is drawn only for a member who could actually use it. The
+    endpoint refuses the rest on its own; this is about not offering somebody a
+    button that would answer them with an error.
+#}
+{% import _self as ui %}
+
+<section class="expiring" aria-labelledby="expiring-heading">
+    <h2 id="expiring-heading" class="section-heading">{{ t('subscriptions.expiring_heading') }}</h2>
+
+    <div class="columns">
+        <section class="card" id="renewing-soon">
+            <h3>{{ t('dashboard.renewing_soon') }}</h3>
+            <p class="muted">{{ t('subscriptions.renewing_note', {'days': expiring.days}) }}</p>
+
+            {% if expiring.renewing is empty %}
+                <p class="muted empty">{{ t('dashboard.nothing_renewing') }}</p>
+            {% else %}
+                <ul class="plain deadlines">
+                    {% for row in expiring.renewing %}
+                        {{ ui.row(row, false) }}
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+
+        <section class="card" id="cancel-by">
+            <h3>{{ t('subscriptions.cancel_by_heading') }}</h3>
+            <p class="muted">{{ t('subscriptions.cancel_by_note') }}</p>
+
+            {% if expiring.cancel_by is empty %}
+                <p class="muted empty">{{ t('subscriptions.cancel_by_empty') }}</p>
+            {% else %}
+                <ul class="plain deadlines">
+                    {% for row in expiring.cancel_by %}
+                        {{ ui.row(row, true) }}
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+    </div>
+</section>
+
+{#
+    One deadline. `notice` distinguishes the two cards: a cancel-by row carries
+    the notice period that created the deadline, and can be in the past, which a
+    renewal inside the window cannot.
+#}
+{% macro row(row, notice) %}
+    {% set subscription = row.subscription %}
+    <li class="deadline {{ row.is_passed ? 'is-passed' : (row.is_urgent ? 'is-urgent' : '') }}">
+        <div class="deadline-main">
+            <div class="cell-name">
+                {% if subscription.logoPath %}
+                    <img class="logo" src="/{{ subscription.logoPath }}" alt="" width="24" height="24">
+                {% endif %}
+                <div>
+                    <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
+                    {% if subscription.isTrial %}
+                        <span class="badge badge-warning">{{ t('state.trial') }}</span>
+                    {% endif %}
+                    <div class="hint">
+                        <strong>{{ row.date|local_date('d MMM y') }}</strong> ·
+                        {% if row.is_passed %}
+                            <span class="badge badge-danger">{{ t('cancellations.deadline_passed') }}</span>
+                            {{ t('cancellations.passed_days', {'days': row.days * -1}) }}
+                        {% elseif row.days == 0 %}
+                            {{ t('state.today') }}
+                        {% else %}
+                            {{ t('cancellations.days_left', {'days': row.days}) }}
+                        {% endif %}
+                        {% if notice %}
+                            · {{ t('subscriptions.notice_of', {
+                                'period': notice_label(subscription.noticePeriod.amount,
+                                    subscription.noticePeriod.unit),
+                            }) }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="deadline-amount">
+            {{ subscription.price.amountMinor|money(subscription.price.currency) }}
+        </div>
+
+        {#
+            Pausing is how this application says "stop paying for that", so it is
+            the action on both cards. It is shown only where the member's role
+            may change a subscription *and* the isolation mode leaves this
+            particular row writable — seeing a shared cost you contribute to is
+            not the same as being able to change it.
+        #}
+        {% if row.can_act %}
+            <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="deadline-action">
+                {{ csrf_field() }}
+                <button type="submit" class="button button-quiet">{{ t('subscriptions_list.pause') }}</button>
+            </form>
+        {% endif %}
+    </li>
+{% endmacro %}

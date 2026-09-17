@@ -7,7 +7,8 @@
     lines tall, which is the correct answer rather than a compromise. A single
     big number that silently left out a currency would be a wrong number.
 #}
-{% import _self as metric %}
+{# The per-currency rule lives in one partial, shared with the my-subscriptions strip. #}
+{% import 'partials/spend.twig' as metric %}
 
 <section class="metric-grid" aria-label="{{ t('dashboard.metrics') }}">
     <article class="card stat metric">
@@ -69,41 +70,3 @@
         {% endfor %}
     </p>
 {% endif %}
-
-{#
-    A tile's figures, per currency, with the combined total when there is an
-    honest one to show.
-#}
-{% macro spend(figures, unit) %}
-    {% if figures.totals is empty %}
-        <p class="stat-value">{{ t('common.none_symbol') }}</p>
-        <p class="muted">{{ t('dashboard.recurring_empty') }}</p>
-    {% elseif figures.totals|length == 1 %}
-        <p class="stat-value">
-            {{ figures.totals[0].amount_minor|money(figures.totals[0].currency) }}
-            <span class="stat-unit">{{ unit }}</span>
-        </p>
-    {% elseif figures.combined.amount_minor is not null %}
-        <p class="stat-value">
-            {{ figures.combined.amount_minor|money(figures.combined.currency) }}
-            <span class="stat-unit">{{ unit }}</span>
-        </p>
-        <p class="muted">
-            {% for total in figures.totals %}
-                {{ total.amount_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
-            {% endfor %}
-        </p>
-    {% else %}
-        {# No rate for one of them, so there is no total — only the subtotals. #}
-        <ul class="plain stat-lines">
-            {% for total in figures.totals %}
-                <li class="stat-value stat-line">{{ total.amount_minor|money(total.currency) }}</li>
-            {% endfor %}
-        </ul>
-        <p class="hint">
-            {{ t('dashboard.unconvertible', {
-                'currencies': figures.combined.unconvertible|join(', '),
-            }) }}
-        </p>
-    {% endif %}
-{% endmacro %}

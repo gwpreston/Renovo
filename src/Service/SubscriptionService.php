@@ -377,6 +377,21 @@ final class SubscriptionService
     }
 
     /**
+     * Every trial that has not converted yet, soonest conversion first.
+     *
+     * Not a window, unlike `trialsEndingSoon()`: this answers "what am I on a
+     * trial of", which a trial three months out belongs to just as much as one
+     * ending on Friday. The catch-up run converts trials whose end date has
+     * passed, so what comes back is genuinely pre-conversion.
+     *
+     * @return list<Subscription>
+     */
+    public function trialsBeforeConversion(Scope $scope): array
+    {
+        return $this->subscriptions->findTrialsEnding($scope, $this->clock->today());
+    }
+
+    /**
      * @return list<Subscription>
      */
     public function upcoming(Scope $scope, int $days): array
