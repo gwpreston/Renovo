@@ -48,6 +48,15 @@ final class AnalyticsScreenService
      * second time for them would be two answers to one question waiting to
      * differ — the arrangement the dashboard uses for its near-window query.
      *
+     * **Known cost: three walks of the household for one page.** The statistics
+     * read every subscription, this reads them again because `notable` and the
+     * usage ranking both want the rows, and `yearOverYear` reads them a third
+     * time with its own argument. Sharing one read would mean changing what
+     * `StatsService` hands back rather than what it computes, which is a change
+     * to a service three screens depend on and not a restyle's to make. Worth
+     * fixing when something else touches it; stated here so it is a known cost
+     * rather than a surprise.
+     *
      * @return array{
      *     kpis: array<string, mixed>,
      *     trajectory: array<string, mixed>,
@@ -219,6 +228,14 @@ final class AnalyticsScreenService
      * the recurring totals for the reason that applies here: a lifetime licence
      * has no monthly cost to be the highest or lowest of.
      *
+     * **And a running trial is not ranked either.** Its price is zero until it
+     * converts, so it would take the "least expensive" line every time and
+     * report £0.00 — which is what the trial costs today and not what it costs.
+     * The trials section says what each one will convert to; this card would be
+     * contradicting it. Pricing it at `priceAfterConversion()` instead was the
+     * alternative and is worse: the same subscription would then be one figure
+     * here and another in the KPI row above, on one screen.
+     *
      * Each result is displayed in **its own currency** — the conversion decides
      * the order and nothing else, so nobody is shown a price they have never
      * been charged.
@@ -235,6 +252,12 @@ final class AnalyticsScreenService
 
         foreach ($all as $subscription) {
             if (!$subscription->isActive) {
+                continue;
+            }
+
+            // Free today, priced later: neither the cheapest thing in the
+            // household nor a comparison anybody can act on.
+            if ($subscription->isTrial) {
                 continue;
             }
 

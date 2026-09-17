@@ -145,6 +145,21 @@ final class AnalyticsScreenTest extends DatabaseTestCase
             'start_date' => '2025-06-01',
             'is_active' => true,
         ], []);
+
+        // Free until it converts. Its price today is zero, which would win
+        // "least expensive" outright and print a figure the trials section
+        // deliberately refuses to print.
+        $subscriptions->create($owner, [
+            'name' => 'Trial plan',
+            'price_minor' => 0,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'is_trial' => true,
+            'trial_end_date' => (new DateTimeImmutable('+20 days'))->format('Y-m-d'),
+            'converts_to_price_minor' => 1299,
+            'is_active' => true,
+        ], []);
     }
 
     public function testTheKpiRowShowsTheFiguresTheStatisticsServiceComputed(): void
@@ -278,6 +293,27 @@ final class AnalyticsScreenTest extends DatabaseTestCase
         self::assertStringNotContainsString('Lifetime licence', $card);
     }
 
+    /**
+     * A trial costs nothing today, and nothing is not a price.
+     *
+     * Left in, it would take "least expensive" every time and report £0.00 —
+     * the figure the trials section on the subscriptions screen refuses to
+     * print for exactly this reason. Pricing it at what it converts to was the
+     * alternative and is worse: this card and the KPI row would then disagree
+     * about one subscription on one page.
+     */
+    public function testARunningTrialIsNotTheCheapestThingInTheHousehold(): void
+    {
+        $card = $this->section($this->body($this->get('/stats', $this->ownerId)), 'analytics-notable');
+
+        self::assertStringNotContainsString('Trial plan', $card);
+        self::assertStringNotContainsString('£0.00', $card);
+
+        // The real cheapest is still named, so this is an exclusion rather than
+        // an empty card.
+        self::assertStringContainsString('Streaming', $card);
+    }
+
     public function testASubscriptionThatCannotBeComparedIsExcludedAndCounted(): void
     {
         (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
@@ -301,8 +337,8 @@ final class AnalyticsScreenTest extends DatabaseTestCase
 
     public function testYearOverYearSaysHowManySubscriptionsItCouldNotAccountFor(): void
     {
-        // The lifetime licence has a start date; this one deliberately has
-        // none, so there is no evidence of when it began.
+        // No start date, so there is no evidence of when it began and no
+        // charges can be reconstructed for it.
         (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
             'name' => 'No start date',
             'price_minor' => 500,
@@ -313,9 +349,19 @@ final class AnalyticsScreenTest extends DatabaseTestCase
             'is_active' => true,
         ], []);
 
+        // The count the service arrived at, not one this test worked out for
+        // itself: the point of the note is that the page reports what was
+        // actually left out.
+        $excluded = $this->container()
+            ->get(StatsService::class)
+            ->yearOverYear($this->scopeFor($this->ownerId))['excluded_count'];
+
+        self::assertGreaterThan(0, $excluded, 'the fixture should leave something out of the comparison');
+
         $card = $this->section($this->body($this->get('/stats', $this->ownerId)), 'analytics-year-over-year');
 
-        self::assertStringContainsString('1 subscription has no start date', $card);
+        self::assertStringContainsString($excluded . ' subscription', $card);
+        self::assertStringContainsString('no start date', $card);
     }
 
     /**

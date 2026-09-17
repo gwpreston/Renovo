@@ -1006,14 +1006,15 @@ return [
         . 'the last twelve months.',
     'stats.no_uses_recorded' => 'No uses recorded',
     'stats.notable' => 'Notable subscriptions',
-    'stats.notable_empty' => 'No active recurring subscriptions to rank.',
+    'stats.notable_empty' => 'Nothing with a monthly cost to compare yet.',
     'stats.notable_excluded' =>
         '{count, plural, one {# subscription is} other {# subscriptions are}} not ranked: no exchange '
         . 'rate is available to compare them with the rest.',
     'stats.notable_note' =>
         'Ranked on cost per month converted to the base currency, because two prices in different '
         . 'currencies have no order otherwise. Each is shown in the currency it is actually charged in. '
-        . 'One-off and lifetime entries have no monthly cost and are not ranked.',
+        . 'One-off and lifetime entries have no monthly cost, and a trial has none until it converts, so '
+        . 'none of them is ranked.',
     'stats.per_period' => 'The same cost, by period',
     'stats.per_year_heading' => 'Recurring cost per year, by currency',
     'stats.per_year_note' =>
