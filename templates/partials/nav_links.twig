@@ -1,0 +1,31 @@
+{#
+    One navigation list, wherever it is being drawn.
+
+    The rail draws it twice — the main group and the tools group — and the
+    narrow screen's drawer draws it once more. All three are the same markup
+    over lists `NavigationService` has already decided, so a change to how a
+    navigation item looks is one edit rather than three that drift.
+
+    `links`  the list of NavLink to draw
+
+    A list and not a landmark: whoever includes this owns the `<nav>` around it,
+    because the drawer's list sits inside the bottom bar's own and nesting one
+    navigation landmark in another tells a screen reader there are two.
+
+    The icon is an empty span the bundle fills in: see `assets/js/icons.js`. It
+    carries `aria-hidden`, because what says where the link goes is the text
+    beside it — which is also why a browser with the script blocked loses
+    nothing but the picture.
+#}
+<ul class="nav-list">
+    {% for link in links %}
+        <li>
+            <a class="nav-link{{ link.active ? ' is-active' : '' }}"
+               href="{{ link.href }}"
+               {{ link.active ? 'aria-current="page"' : '' }}>
+                <span class="nav-icon" data-icon="{{ link.icon }}" aria-hidden="true"></span>
+                <span class="nav-label">{{ t(link.labelKey) }}</span>
+            </a>
+        </li>
+    {% endfor %}
+</ul>

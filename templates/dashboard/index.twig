@@ -1,15 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('nav.dashboard') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('nav.dashboard') }}{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ t('nav.dashboard') }}</h1>
-        {% if can(scope, 'subscription.create') %}
-            <a class="button button-primary" href="/subscriptions/new">{{ t('subscriptions.add_subscription') }}</a>
-        {% endif %}
-    </div>
-
     {% if not scope.hasHousehold %}
         <section class="card">
             <h2>{{ t('dashboard.no_household') }}</h2>

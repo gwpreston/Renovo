@@ -2,9 +2,9 @@
 
 {% block title %}{{ t('import_map.title') }} — {{ instance_name }}{% endblock %}
 
-{% block content %}
-    <h1>{{ t('import_map.map_the_columns') }}</h1>
+{% block heading %}{{ t('import_map.map_the_columns') }}{% endblock %}
 
+{% block content %}
     <p class="muted">
         <strong>{{ filename }}</strong> —
         {{ t('import_map.summary', {'rows': row_count, 'preset': preset_label}) }}

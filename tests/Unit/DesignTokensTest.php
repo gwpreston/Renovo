@@ -55,15 +55,17 @@ final class DesignTokensTest extends TestCase
     /**
      * The gradient stops are the logo's, and they are written down once.
      *
-     * PHASE.md fixes the mark's teal-green and blue as the brand, and every
-     * gradient in the application composes from these two names. A literal
-     * colour appearing in a gradient somewhere else is how an interface ends
-     * up with three slightly different greens.
+     * These are the mark's real colours, sampled from `assets/brand/` in
+     * Phase 9 when the logo arrived — Phase 8 had to write down its own stated
+     * values because the file was not in the repository. Every gradient in the
+     * application composes from these two names. A literal colour appearing in
+     * a gradient somewhere else is how an interface ends up with three slightly
+     * different greens.
      */
     public function testTheBrandGradientStopsAreDefinedAsTokens(): void
     {
-        self::assertSame('#1fae8f', $this->token(':root', '--brand-from'), 'The teal-green stop moved.');
-        self::assertSame('#2b74d6', $this->token(':root', '--brand-to'), 'The blue stop moved.');
+        self::assertSame('#0daa9c', $this->token(':root', '--brand-from'), 'The teal-green stop moved.');
+        self::assertSame('#1069bb', $this->token(':root', '--brand-to'), 'The blue stop moved.');
 
         self::assertStringContainsString(
             'var(--brand-from)',
@@ -75,10 +77,10 @@ final class DesignTokensTest extends TestCase
     /**
      * The filled primary button is not painted with the logo gradient.
      *
-     * White text on the mark's teal stop is 2.8:1, which is not readable. The
-     * action gradient is the same two hues darkened until white clears AA
-     * across both stops, and this is what notices if someone "fixes" the
-     * button to use the brand colours directly.
+     * White text on the mark's teal stop is 2.9:1, which is not readable. The
+     * action gradient darkens that end until white clears AA across both stops
+     * and the middle, and this is what notices if someone "fixes" the button to
+     * use the brand colours directly.
      */
     public function testTheActionGradientCarriesWhiteTextAtEveryStop(): void
     {

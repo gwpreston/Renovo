@@ -75,6 +75,15 @@ Built in phases:
   screen; it is the vocabulary the re-skin in Phases 9–14 is written in. See
   [The design system](#the-design-system).
 
+- **Phase 9 — the application shell — complete.** One frame every screen sits
+  in: a fixed rail carrying the mark and the navigation, a top bar with the
+  page's name and the one action worth offering, and a bottom tab bar with a
+  no-JavaScript drawer below 768px. Every destination is declared once in a
+  service, the highlighted item is worked out on the server from the request
+  path, and the keyboard shortcuts still reach the same places. It adds no
+  feature and moves nothing about permissions, money or scope. See
+  [The application shell](#the-application-shell).
+
 That is the v1 feature set, Phase 7 the toolchain under it and Phase 8 the
 design language on top. Deliberately not in it: OIDC/SSO, and bank or
 transaction sync — see the end of `PHASE.md` for what was deferred and why.
@@ -629,16 +638,19 @@ from the property it points at — a key assigned its own name compiles to
 
 ### The brand, and why there are two gradients
 
-The logo is a **teal-green → blue** gradient mark. `--brand-from` (`#1fae8f`)
-and `--brand-to` (`#2b74d6`) are the only place those stops are written down,
-so re-sampling the logo is a two-line edit.
+The logo is a **teal-green → blue** gradient mark, kept in the repository at
+`assets/brand/renovo-logo.png`. `--brand-from` (`#0daa9c`) and `--brand-to`
+(`#1069bb`) are the only place those stops are written down, so re-sampling the
+logo is a two-line edit. They are the mark's real colours: Phase 9 projected
+every pixel of it onto the 135° axis the gradient runs along and averaged the
+first and last twentieth.
 
 They are used where nothing sits on top of them — the brand mark, the active
-nav rail, a featured card's wash. A filled button uses `--gradient-action`
-instead: the same two hues darkened, because white text on the real mark is
-2.8:1 at the teal stop and 3.6:1 at the midpoint, and no single ink passes
-across the actual logo gradient. The darkened pair holds white at 5.3:1, 5.6:1
-and 5.7:1.
+nav item, a featured card's wash. A filled button uses `--gradient-action`
+instead, because white text on the real mark is 2.9:1 at the teal stop and
+4.0:1 at the midpoint, and no single ink passes across the actual logo
+gradient. Only the teal end needs darkening: the blue stop carries white at
+5.6:1 as it stands. The pair holds white at 5.2:1, 5.4:1 and 5.6:1.
 
 Brand and urgency are deliberately **different hues**. Teal-green is "this is
 the action"; amber→orange is "money is about to move" — renewing soon, a
@@ -694,6 +706,62 @@ Changing how Renovo looks now needs `npm install && npm run build` rather than
 an editor and a reload — the cost of having one compilation own both the
 utilities and the rules. Most of what you would want to change is a handful of
 custom properties at the top of `assets/css/tokens.css`.
+
+## The application shell
+
+Every signed-in page is rendered in one frame, so a screen is about its own
+content and nothing else.
+
+### What it is made of
+
+- A fixed **240px rail** on the left: the mark, the primary destinations, and a
+  tools group pinned to the bottom. Each item is an existing route with a
+  tree-shaken Lucide icon.
+- A **top bar**: the page's `<h1>`, whatever that page offers (edit this, back
+  to the list), a search that goes to the subscriptions list, quick-add, and who
+  is signed in.
+- Below **768px** the rail becomes a **bottom tab bar** of the four most-used
+  destinations with the rest behind a `<details>` drawer. It is a disclosure
+  element rather than a scripted panel, so it opens with JavaScript off: a
+  narrow screen loses the layout and none of the reach.
+
+Two things from the design mock are deliberately absent. There is no **Upgrade
+Plan** card — Renovo is self-hosted and there is no plan to sell — and no
+**Manage Balance** pill, because the application tracks what is due rather than
+a balance. Quick-add takes the prominent-action slot instead.
+
+### One definition of the navigation
+
+`src/Service/NavigationService.php` declares every destination once: its label
+key, route, icon, the permission it needs, and the paths it claims. The rail,
+the tab bar and the drawer are three projections of that one list, so a page
+cannot be reachable on a desktop and missing on a phone — a test asserts the
+two sets are equal.
+
+**Which item is highlighted is decided on the server**, from the request path,
+so the highlight is correct in the HTML that arrives rather than being fixed up
+by script after the page has painted. The rule is most-specific-claim-wins,
+which is what keeps `/settings/notifications` on Notifications rather than
+lighting Settings as well.
+
+Items a user may not use are not shown to them — a Viewer is offered no import
+or audit link. That is a courtesy, not a control: `RequirePermissionMiddleware`
+is what answers 403.
+
+### The mark
+
+`templates/partials/brand_sprite.twig` holds the supplied logo traced to a
+single outline — under 2kB of path data — filled with the brand gradient
+through the tokens, so it recolours with the theme instead of carrying the
+wordmark's navy onto a near-black page. The wordmark itself is not recreated;
+what sits beside the mark is the instance name, which is the operator's to set.
+
+### Keyboard shortcuts
+
+`?` lists them, `n` opens quick-add, `/` focuses search — the page's own search
+where there is one, the top bar's otherwise — and `g` then a letter navigates
+(`d`, `s`, `c`, `b`, `f`, `t`, `a`). Every destination is also a link somebody
+can click, and a test reads the destinations out of the script to prove it.
 
 ## Money features
 

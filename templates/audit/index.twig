@@ -1,9 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('audit.title') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('audit.title') }}{% endblock %}
 
 {% block content %}
-    <h1>{{ t('audit.title') }}</h1>
     <p class="muted">
         {{ is_instance_view ? t('audit.scope_instance') : t('audit.scope_household') }}
         {{ t('audit.retention_note') }}

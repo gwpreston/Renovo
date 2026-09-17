@@ -9,8 +9,9 @@
  *
  * What this file provides is the two things that do: a chart library too large
  * to load on every page, and an icon set that has to be tree-shaken to be worth
- * having. It exposes them on `window.Renovo` and does nothing else — no page
- * draws a chart yet, and the view work that will is Phase 8's.
+ * having. It exposes both on `window.Renovo`, and — since Phase 9 gave the
+ * shell a navigation made of icons — fills in the icon slots the server marked
+ * up. No page draws a chart yet; the screens that will are Phases 10 and 12.
  *
  * Usage from a page's own script:
  *
@@ -19,7 +20,7 @@
  */
 
 import { renderChart } from './charts.js';
-import { icon, iconNames } from './icons.js';
+import { hydrateIcons, icon, iconNames } from './icons.js';
 
 /*
  * Assigned, not merged: this is the only thing that writes window.Renovo, and
@@ -30,4 +31,28 @@ window.Renovo = {
     chart: renderChart,
     icon,
     iconNames,
+    hydrateIcons,
 };
+
+/*
+ * The shell's icons, drawn once the document is there to draw them into.
+ *
+ * This is a module, so it is deferred and the markup already exists by the
+ * time it runs; the readyState test is for the case where it does not, which
+ * is a module fetched from cache faster than the parser. Running again after
+ * an htmx swap covers a fragment that arrived with icon slots of its own —
+ * `hydrateIcons` only fills empty ones, so doing it twice costs nothing.
+ */
+function hydrate() {
+    hydrateIcons(document);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', hydrate);
+} else {
+    hydrate();
+}
+
+document.addEventListener('htmx:afterSwap', (event) => {
+    hydrateIcons(event.target instanceof Element ? event.target : document);
+});

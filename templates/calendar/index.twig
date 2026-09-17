@@ -1,21 +1,19 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('nav.calendar') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('nav.calendar') }}{% endblock %}
+
+{% block page_actions %}
+    <form method="get" action="/calendar" class="inline-form">
+        <input type="hidden" name="month" value="{{ calendar.month|date('Y-m') }}">
+        <label class="choice">
+            <input type="checkbox" name="mine" value="1" {{ mine_only ? 'checked' : '' }}
+                   onchange="this.form.submit()">
+            <span>{{ t('calendar.just_mine') }}</span>
+        </label>
+    </form>
+{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ t('nav.calendar') }}</h1>
-
-        <form method="get" action="/calendar" class="inline-form">
-            <input type="hidden" name="month" value="{{ calendar.month|date('Y-m') }}">
-            <label class="choice">
-                <input type="checkbox" name="mine" value="1" {{ mine_only ? 'checked' : '' }}
-                       onchange="this.form.submit()">
-                <span>{{ t('calendar.just_mine') }}</span>
-            </label>
-        </form>
-    </div>
-
     <p class="muted note">{{ t('calendar.intro') }}</p>
 
     {% include 'calendar/_grid.twig' %}

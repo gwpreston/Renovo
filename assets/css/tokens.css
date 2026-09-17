@@ -30,27 +30,34 @@
  * two names, so re-sampling the logo is a two-line edit rather than a search
  * for hex codes.
  *
+ * Phase 8 wrote down its own stated values because the logo was not in the
+ * repository. Phase 9 received it, and these are the real ones: every pixel of
+ * the mark was projected onto the 135° axis the gradient runs along, and the
+ * first and last twentieth averaged. They are what `renovo-logo.png` in
+ * `assets/brand/` actually paints, not an approximation of it.
+ *
  * These are theme-independent: the brand is the brand on a light page and a
  * dark one.
  */
 :root {
-    --brand-from: #1fae8f;
-    --brand-to: #2b74d6;
+    --brand-from: #0daa9c;
+    --brand-to: #1069bb;
     --gradient-brand: linear-gradient(135deg, var(--brand-from), var(--brand-to));
 
     /*
-     * The same two hues, darkened, for a surface that carries white text.
+     * The same gradient, made safe for white text.
      *
-     * The logo gradient cannot: white on the teal stop is 2.8:1 and on the
-     * midpoint 3.6:1, both under the 4.5:1 that body-sized text needs, and
-     * dark ink fails at the blue end instead. There is no single ink that
-     * passes across the real mark. So the mark keeps its colours for the
-     * things that carry no text — the featured-card wash, the brand dot, the
-     * active rail — and a filled button uses these, which hold white at
-     * 5.3:1, 5.6:1 and 5.7:1 across the two stops and the middle.
+     * The mark's own cannot carry it at the teal end: white there is 2.9:1 and
+     * at the midpoint 4.0:1, both under the 4.5:1 body-sized text needs, while
+     * dark ink fails at the blue end instead — no single ink passes across the
+     * real mark. The blue stop, though, is dark enough as it stands (5.6:1), so
+     * only the teal is darkened. A filled button holds white at 5.2:1, 5.4:1
+     * and 5.6:1 across the two stops and the middle, and the mark keeps its own
+     * colours for the things that carry no text: the mark itself, the
+     * featured-card wash, the active rail marker.
      */
-    --action-from: #0d7a63;
-    --action-to: #2b64bd;
+    --action-from: #097a70;
+    --action-to: #1069bb;
     --gradient-action: linear-gradient(135deg, var(--action-from), var(--action-to));
 }
 
@@ -91,11 +98,11 @@
 
     /*
      * The action colour, for links, focus rings, the active nav item and a
-     * meter fill. It is the brand's teal darkened until it holds 5.3:1 on
-     * white — the mark's own #1fae8f is 2.8:1 there, readable on the dark
+     * meter fill. It is the brand's teal darkened until it holds 5.2:1 on
+     * white — the mark's own #0daa9c is 2.9:1 there, readable on the dark
      * surface it was sampled against and not on this one.
      */
-    --accent: #0d7a63;
+    --accent: #097a70;
     --accent-text: #ffffff;
 
     /* urgency: renewing soon, a cancel-by deadline, a budget projected over */
@@ -145,7 +152,7 @@
         --text: #ffffff;
         --text-muted: #9e9eab;
 
-        --accent: #1fae8f;
+        --accent: #0daa9c;
         --accent-text: #05130f;
 
         --warning: #ff784e;
@@ -186,7 +193,7 @@
     --text: #ffffff;
     --text-muted: #9e9eab;
 
-    --accent: #1fae8f;
+    --accent: #0daa9c;
     --accent-text: #05130f;
 
     --warning: #ff784e;

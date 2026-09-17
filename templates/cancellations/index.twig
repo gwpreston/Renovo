@@ -1,11 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('nav.cancellations') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('nav.cancellations') }}{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ t('nav.cancellations') }}</h1>
-    </div>
 
     <p class="muted note">
         {{ t('cancellations.intro') }}

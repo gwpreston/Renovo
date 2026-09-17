@@ -1,11 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('nav.settings') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('nav.settings') }}{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ t('nav.settings') }}</h1>
-    </div>
 
     <section class="card">
         <h2>{{ t('settings.signing_in') }}</h2>
@@ -40,7 +37,12 @@
         </section>
     {% endif %}
 
-    <section class="card">
+    {#
+        The navigation's Profile item is a link to this section — there is no
+        profile page, and what that row of the design describes is here. The id
+        is what makes it land.
+    #}
+    <section class="card" id="appearance">
         <h2>{{ t('settings.appearance') }}</h2>
         <form method="post" action="/settings/preferences" class="stack">
             {{ csrf_field() }}

@@ -1,0 +1,28 @@
+{#
+    The rail: the mark, where you can go, and the things you configure.
+
+    Fixed at 240px on anything wide enough for it and replaced by the bottom bar
+    in `mobile_nav.twig` below 768px. Both draw the same lists, so the narrow
+    screen loses the layout and none of the reach.
+
+    What is not here: the design's Upgrade Plan card. Renovo is self-hosted and
+    there is no plan to upgrade to, so the card would be an advertisement for
+    something that does not exist. The space goes to the tools group, which is
+    made of real destinations.
+#}
+<aside class="sidebar">
+    <a class="sidebar-brand" href="/">
+        <svg class="brand-mark" viewBox="0 0 460 427" aria-hidden="true" focusable="false">
+            <use href="#renovo-mark"></use>
+        </svg>
+        <span class="sidebar-brand-name">{{ instance_name }}</span>
+    </a>
+
+    <nav class="nav-group" aria-label="{{ t('nav.primary') }}">
+        {% include 'partials/nav_links.twig' with {'links': nav.primary} only %}
+    </nav>
+
+    <nav class="nav-group sidebar-tools" aria-label="{{ t('nav.tools') }}">
+        {% include 'partials/nav_links.twig' with {'links': nav.tools} only %}
+    </nav>
+</aside>

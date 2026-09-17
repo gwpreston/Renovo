@@ -7,16 +7,18 @@
 
 {% set is_edit = subscription_id is not null %}
 
-{% block title %}{{ is_edit ? t('subscriptions_form.edit_title') : t('subscriptions.add_subscription') }} — {{ instance_name }}{% endblock %}
+{#
+    The heading and the action are blocks the shell renders, so the dialog —
+    which extends `bare.twig` and renders neither — gets the form and only the
+    form, exactly as it did when they were behind an `is_htmx` test here.
+#}
+{% block heading %}{{ is_edit ? t('subscriptions_form.edit_title') : t('subscriptions.add_subscription') }}{% endblock %}
+
+{% block page_actions %}
+    <a class="button button-quiet" href="/subscriptions">{{ t('subscriptions_form.back_to_list') }}</a>
+{% endblock %}
 
 {% block content %}
-    {% if not is_htmx %}
-        <div class="page-header">
-            <h1>{{ is_edit ? t('subscriptions_form.edit_title') : t('subscriptions.add_subscription') }}</h1>
-            <a class="button button-quiet" href="/subscriptions">{{ t('subscriptions_form.back_to_list') }}</a>
-        </div>
-    {% endif %}
-
     {% include 'partials/errors.twig' %}
 
     <form class="card stack"

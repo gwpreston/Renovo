@@ -2,10 +2,10 @@
 
 {% block title %}{{ t('security_totp_setup.title') }} — {{ instance_name }}{% endblock %}
 
+{% block heading %}{{ t('security_totp_setup.heading') }}{% endblock %}
+
 {% block content %}
     <section class="card narrow">
-        <h1>{{ t('security_totp_setup.heading') }}</h1>
-
         <ol class="stack">
             <li>{{ t('security_totp_setup.scan') }}</li>
             <li>{{ t('security_totp_setup.enter_code') }}</li>

@@ -5,7 +5,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}{{ instance_name }}{% endblock %}</title>
+    {#
+        One page name, in one place. `heading` is what the top bar puts in the
+        <h1> and what this derives the tab's title from, so the two cannot drift
+        apart and a page cannot end up titled one thing and headed another. A
+        page with something else to say in the tab — a subscription's own name,
+        say — overrides `title` as before.
+    #}
+    <title>{% block title %}{{ block('heading') }} — {{ instance_name }}{% endblock %}</title>
     {#
         One stylesheet, and two kinds of URL for the scripts beside it.
 
@@ -37,8 +44,14 @@
 {#
     The CSRF token rides on every htmx request via hx-headers, so a fragment
     swap does not need a hidden field of its own.
+
+    `has-shell` is what tells the stylesheet to leave room for the rail and the
+    bottom bar. It is on the body rather than inferred from the presence of a
+    sidebar, so the offset and the thing being offset around are decided by one
+    condition — the same one that draws them.
 #}
-<body hx-headers='{"X-CSRF-Token": "{{ csrf_token() }}"}'>
+<body class="{{ current_user ? 'has-shell' : 'no-shell' }}"
+      hx-headers='{"X-CSRF-Token": "{{ csrf_token() }}"}'>
 {#
     The strings this page's JavaScript needs, from the same catalogue the
     server reads — see AppExtension::jsTranslations(). Rendered as JSON in a
@@ -75,8 +88,44 @@
 
 <a class="skip-link" href="#main">{{ t('nav.skip_to_content') }}</a>
 
+{#
+    The shell, for a signed-in page: the rail, the top bar over the content and
+    the bottom bar a narrow screen gets instead of the rail. Which item each of
+    them marks as current is decided here, once, from the request path — so the
+    highlight is right in the HTML that arrives rather than being corrected by
+    script after the page has painted.
+
+    Sign-in, registration and the setup wizard render without any of it. There
+    is nowhere to navigate to before there is an account.
+#}
 {% if current_user %}
-    {% include 'partials/nav.twig' %}
+    {% set nav = navigation(scope, current_path) %}
+
+    {% include 'partials/brand_sprite.twig' %}
+    {% include 'partials/sidebar.twig' %}
+
+    <header class="topbar">
+        <div class="topbar-lead">
+            {# The mark, for the widths where the rail that usually carries it is gone. #}
+            <a class="topbar-brand" href="/" aria-label="{{ instance_name }}">
+                <svg class="brand-mark" viewBox="0 0 460 427" aria-hidden="true" focusable="false">
+                    <use href="#renovo-mark"></use>
+                </svg>
+            </a>
+
+            <h1 class="topbar-title">{% block heading %}{{ instance_name }}{% endblock %}</h1>
+
+            {#
+                What this particular page offers: editing the thing being
+                viewed, going back to a list. The one action every page offers —
+                adding a subscription — is in the actions beside it and is not
+                repeated here.
+            #}
+            <div class="topbar-page-actions">{% block page_actions %}{% endblock %}</div>
+        </div>
+
+        {% include 'partials/topbar_actions.twig' %}
+    </header>
 {% endif %}
 
 <main class="container" id="main" tabindex="-1">
@@ -94,6 +143,7 @@
 </footer>
 
 {% if current_user %}
+    {% include 'partials/mobile_nav.twig' %}
     {% include 'partials/dialogs.twig' %}
 {% endif %}
 </body>

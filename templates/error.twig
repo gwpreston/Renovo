@@ -2,9 +2,19 @@
 
 {% block title %}{{ title }} — {{ instance_name }}{% endblock %}
 
+{#
+    The shell renders the <h1> for a signed-in page, and there is no shell on an
+    error a signed-out visitor sees — a bad reset link, a 404 before login. So
+    the heading is declared for the first case and repeated inside the card for
+    the second, never both: exactly one <h1> either way.
+#}
+{% block heading %}{{ title }}{% endblock %}
+
 {% block content %}
     <section class="card narrow">
-        <h1>{{ title }}</h1>
+        {% if not current_user %}
+            <h1>{{ title }}</h1>
+        {% endif %}
         <p class="muted">{{ message }}</p>
         {% if trace %}
             <pre class="trace">{{ trace }}</pre>

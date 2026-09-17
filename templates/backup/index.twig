@@ -1,10 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('backup.title') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('backup.title') }}{% endblock %}
 
 {% block content %}
-    <h1>{{ t('backup.title') }}</h1>
-
     <section class="card">
         <h2>{{ t('backup.export') }}</h2>
 

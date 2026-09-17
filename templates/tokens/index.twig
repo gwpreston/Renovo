@@ -1,10 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('tokens.title') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('tokens.title') }}{% endblock %}
 
 {% block content %}
-    <h1>{{ t('tokens.title') }}</h1>
-
     <p class="muted">
         {{ t('tokens.intro') }}
     </p>

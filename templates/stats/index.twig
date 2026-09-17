@@ -1,11 +1,19 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('stats.title') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('stats.title') }}{% endblock %}
+
+{#
+    Analytics is one rail item covering two screens: this one, which says what
+    has happened, and the forecast, which says what is about to. The forecast
+    has no rail entry of its own — the design gives Analytics one row — so this
+    is the link that keeps it one click away, and the keyboard's `g f` and this
+    button reach the same page.
+#}
+{% block page_actions %}
+    <a class="button button-quiet" href="/forecast">{{ t('nav.forecast') }}</a>
+{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ t('stats.title') }}</h1>
-    </div>
 
     <section class="stat-grid">
         {% for label, amount in per_period %}

@@ -677,6 +677,8 @@ return [
         . 'is a bill in one month. Scheduled price changes and trial conversions are applied from their '
         . 'own dates, so a figure here does not move when the change eventually happens.',
     'forecast.next_12_months' => 'Next 12 months',
+    'forecast.show_only_my_share' => 'Show only my share',
+    'forecast.show_whole_household' => 'Show the whole household',
     'forecast.no_rate' => 'No rate to combine these.',
     'forecast.nothing_due' => 'Nothing due',
 
@@ -730,21 +732,25 @@ return [
     'js.passkey_use_failed' => 'That passkey could not be used: {reason}',
 
     // nav
-    'nav.alerts' => 'Alerts',
+    'nav.analytics' => 'Analytics',
     'nav.audit' => 'Audit',
     'nav.budgets' => 'Budgets',
-    'nav.calendar' => 'Calendar',
+    'nav.calendar' => 'Billing Calendar',
     'nav.cancellations' => 'Cancel by',
     'nav.categories' => 'Categories',
     'nav.dashboard' => 'Dashboard',
     'nav.forecast' => 'Forecast',
     'nav.import' => 'Import',
+    'nav.more' => 'More',
+    'nav.notifications' => 'Notifications',
     'nav.primary' => 'Primary',
+    'nav.profile' => 'Profile',
+    'nav.search' => 'Search',
     'nav.settings' => 'Settings',
     'nav.sign_out' => 'Sign out',
     'nav.skip_to_content' => 'Skip to content',
-    'nav.stats' => 'Stats',
     'nav.subscriptions' => 'Subscriptions',
+    'nav.tools' => 'Tools',
 
     // notifications
     'notifications.add_a_channel' => 'Add a channel',

@@ -2,12 +2,13 @@
 
 {% block title %}{{ subscription.name }} — {{ t('subscriptions_money.title') }} — {{ instance_name }}{% endblock %}
 
-{% block content %}
-    <div class="page-header">
-        <h1>{{ subscription.name }}</h1>
-        <a class="button button-quiet" href="/subscriptions/{{ subscription.id }}/edit">{{ t('subscriptions_form.edit_title') }}</a>
-    </div>
+{% block heading %}{{ subscription.name }}{% endblock %}
 
+{% block page_actions %}
+    <a class="button button-quiet" href="/subscriptions/{{ subscription.id }}/edit">{{ t('subscriptions_form.edit_title') }}</a>
+{% endblock %}
+
+{% block content %}
     {% include 'partials/errors.twig' %}
 
     {% if subscription.isTrial and subscription.trialEndDate %}

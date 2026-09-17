@@ -1,11 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ budget_id ? t('budgets_form.edit_title') : t('budgets.new_budget') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ budget_id ? t('budgets_form.edit_title') : t('budgets.new_budget') }}{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ budget_id ? 'Edit budget' : 'New budget' }}</h1>
-    </div>
 
     {% include 'partials/errors.twig' %}
 

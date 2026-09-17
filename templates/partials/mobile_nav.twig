@@ -1,0 +1,39 @@
+{#
+    The rail, collapsed: a bottom tab bar for the four most-used destinations
+    and a disclosure holding everything else.
+
+    `<details>` rather than a scripted drawer on purpose. It opens and closes
+    with no JavaScript at all, the browser handles the keyboard, and what is
+    inside it is the same list of links the rail draws — so a phone with the
+    bundle blocked still reaches every page the desktop does.
+
+    The summary carries the active marker when the page you are on is one of the
+    ones it hides, so a narrow screen says where you are without being opened.
+#}
+<nav class="tabbar" aria-label="{{ t('nav.primary') }}">
+    <ul class="tabbar-list">
+        {% for link in nav.tabs %}
+            <li>
+                <a class="tabbar-link{{ link.active ? ' is-active' : '' }}"
+                   href="{{ link.href }}"
+                   {{ link.active ? 'aria-current="page"' : '' }}>
+                    <span class="nav-icon" data-icon="{{ link.icon }}" aria-hidden="true"></span>
+                    <span class="tabbar-label">{{ t(link.labelKey) }}</span>
+                </a>
+            </li>
+        {% endfor %}
+
+        <li>
+            <details class="tabbar-more{{ nav.drawerHoldsActive ? ' is-active' : '' }}">
+                <summary class="tabbar-link">
+                    <span class="nav-icon" data-icon="more" aria-hidden="true"></span>
+                    <span class="tabbar-label">{{ t('nav.more') }}</span>
+                </summary>
+
+                <div class="tabbar-drawer">
+                    {% include 'partials/nav_links.twig' with {'links': nav.drawer} only %}
+                </div>
+            </details>
+        </li>
+    </ul>
+</nav>

@@ -2,9 +2,9 @@
 
 {% block title %}{{ t('import_preview.title') }} — {{ instance_name }}{% endblock %}
 
-{% block content %}
-    <h1>{{ t('action.preview') }}</h1>
+{% block heading %}{{ t('action.preview') }}{% endblock %}
 
+{% block content %}
     <p class="muted">
         <strong>{{ filename }}</strong> —
         {{ t('import_preview.summary', {'valid': valid_count}) }}

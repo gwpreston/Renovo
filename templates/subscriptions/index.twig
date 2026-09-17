@@ -1,15 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('nav.subscriptions') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('nav.subscriptions') }}{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ t('field.subscriptions') }}</h1>
-        {% if can(scope, 'subscription.create') %}
-            <a class="button button-primary" href="/subscriptions/new">{{ t('subscriptions.add_subscription') }}</a>
-        {% endif %}
-    </div>
-
     {#
         The filter form drives the list through htmx: it replaces only the
         table, and pushes the query string so the view is bookmarkable and the

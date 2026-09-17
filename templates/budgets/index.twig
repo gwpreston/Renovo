@@ -1,15 +1,14 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('nav.budgets') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('nav.budgets') }}{% endblock %}
+
+{% block page_actions %}
+    {% if can(scope, 'budget.manage') %}
+        <a class="button button-primary" href="/budgets/new">{{ t('budgets.new_budget') }}</a>
+    {% endif %}
+{% endblock %}
 
 {% block content %}
-    <div class="page-header">
-        <h1>{{ t('nav.budgets') }}</h1>
-        {% if can(scope, 'budget.manage') %}
-            <a class="button button-primary" href="/budgets/new">{{ t('budgets.new_budget') }}</a>
-        {% endif %}
-    </div>
-
     <p class="muted note">
         {{ t('budgets.intro') }}
     </p>

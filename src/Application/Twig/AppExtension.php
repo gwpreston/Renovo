@@ -17,10 +17,12 @@ use App\Domain\SubscriptionType;
 use App\Domain\Entity\NotificationChannel;
 use App\I18n\LocaleContext;
 use App\I18n\Translator;
+use App\Domain\Navigation;
 use App\Notification\NotifierRegistry;
 use App\Security\CsrfTokenManager;
 use App\Security\PermissionService;
 use App\Security\Scope;
+use App\Service\NavigationService;
 use App\Service\ValidationError;
 use App\Support\AssetVersion;
 use App\Support\BuildManifest;
@@ -58,6 +60,7 @@ final class AppExtension extends AbstractExtension
         private readonly LocaleContext $locale,
         private readonly AssetVersion $assets,
         private readonly BuildManifest $build,
+        private readonly NavigationService $navigation,
     ) {
     }
 
@@ -73,6 +76,7 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('csrf_token', fn (): string => $this->csrf->token()),
             new TwigFunction('csrf_field', $this->csrfField(...), ['is_safe' => ['html']]),
             new TwigFunction('can', $this->can(...)),
+            new TwigFunction('navigation', $this->navigationFor(...)),
             new TwigFunction('cycle_label', $this->cycleLabel(...)),
             new TwigFunction('type_label', $this->typeLabel(...)),
             new TwigFunction('role_label', $this->roleLabel(...)),
@@ -229,6 +233,19 @@ final class AppExtension extends AbstractExtension
             CsrfTokenManager::FIELD_NAME,
             htmlspecialchars($this->csrf->token(), ENT_QUOTES, 'UTF-8'),
         );
+    }
+
+    /**
+     * The shell's navigation for this request.
+     *
+     * The template is handed a finished list — which items, in which groups,
+     * and which one is the page being rendered — because deciding any of that
+     * in Twig would put the answer in two places the first time the narrow
+     * layout wanted it too. See NavigationService.
+     */
+    public function navigationFor(?Scope $scope, string $path): Navigation
+    {
+        return $this->navigation->forPath($scope, $path);
     }
 
     public function can(?Scope $scope, string $permission): bool

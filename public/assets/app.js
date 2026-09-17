@@ -97,8 +97,17 @@
         return true;
     }
 
+    /**
+     * `/` goes to the page's own search before the shell's.
+     *
+     * The top bar carries a search on every page, and the subscriptions list
+     * carries a finer one that filters the table in place. On that page the
+     * page's own is what somebody pressing `/` means, so the one inside <main>
+     * wins and the bar's is the fallback everywhere else.
+     */
     function focusSearch() {
-        var search = document.querySelector('input[type="search"]');
+        var search = document.querySelector('main input[type="search"]')
+            || document.querySelector('input[type="search"]');
         if (!search) {
             return false;
         }
@@ -146,12 +155,18 @@
     document.addEventListener('click', function (event) {
         var opener = event.target.closest ? event.target.closest('[data-opens-dialog]') : null;
         if (opener) {
-            event.preventDefault();
+            /*
+             * Only swallow the click if a dialog actually opened. The top bar's
+             * quick-add is an <a href="/subscriptions/new">, so a browser with
+             * no <dialog> support follows it to the real form rather than
+             * having its navigation cancelled by a handler that did nothing.
+             */
+            var opened = opener.dataset.opensDialog === 'quick-add'
+                ? openQuickAdd()
+                : openDialog(opener.dataset.opensDialog);
 
-            if (opener.dataset.opensDialog === 'quick-add') {
-                openQuickAdd();
-            } else {
-                openDialog(opener.dataset.opensDialog);
+            if (opened) {
+                event.preventDefault();
             }
 
             return;

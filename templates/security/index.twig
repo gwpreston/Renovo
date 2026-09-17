@@ -1,10 +1,8 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('security.title') }} — {{ instance_name }}{% endblock %}
+{% block heading %}{{ t('security.title') }}{% endblock %}
 
 {% block content %}
-    <h1>{{ t('security.title') }}</h1>
-
     {% if recovery_codes is not empty %}
         <section class="card callout">
             <h2>{{ t('security.your_recovery_codes') }}</h2>

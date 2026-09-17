@@ -4,177 +4,82 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 8 — the design system
+# Phase 10 — the dashboard
 
-The first six phases built a complete application and a plain interface over it.
-This phase and the five after it re-skin that interface to the Renovo dashboard
-design — a dark, fintech-styled surface — **without moving any logic out of the
-services**. Every figure these screens show is already computed server-side; the
-work is presentation, not new capability. One exception is called out where it
-arises (a spend-insight signal in Phase 13); everything else is a new way to
-render numbers the application already knows.
+The landing screen, as a bento grid: a row of metric cards, a split middle
+section with a chart and a usage widget, and a table of recent activity beneath.
+Every tile binds to a figure a service already produces. Where the design named a
+figure the application does not have, Phase 8 already decided its fate; this phase
+builds only the tiles that bind to something real.
 
-This phase depends on **Phase 7**, which put the build pipeline and the
-self-hosted assets in place. It names the design language — colour, type,
-spacing, the component vocabulary — as Tailwind theme tokens the pipeline
-compiles. Phase 7 is *how* assets are built and served; this phase is *what* they
-express.
+## The metric cards
 
-Nothing here changes the four rules in `SPEC.md`. In particular: money reaches a
-template as an integer number of minor units and a currency, formatted by ICU at
-the very end; a combined total is shown only when every currency in it can be
-converted, and withheld with the missing currency named when one cannot; and
-every string a screen shows comes from a catalogue. A redesign that hardcoded a
-number, a currency symbol or an English label would break a guarantee the
-application makes, not merely look wrong.
+The design's four-card row becomes cards Renovo can actually fill:
 
-## The delivery model — decided
+- **Monthly spend** and **yearly spend**, each shown as **per-currency
+  subtotals** with a combined total alongside only when every currency converts —
+  the same rule the rest of the application follows. A single big number is the
+  design's instinct; a single big number that silently omits a currency is a
+  wrong number, so a card may show two lines, and that is correct rather than a
+  compromise.
+- **Upcoming renewals** — the count in the near window, the same figure the
+  cancel-by view is built from.
+- **A fourth card that is not a fake card.** The design's slot here was the
+  virtual card; in its place goes something true — active-subscription count, or
+  the next charge and its date. Not a masked PAN.
 
-**The interface stays server-rendered: new Twig templates and a compiled
-stylesheet extend the existing Twig/htmx interface. A separate single-page client
-against `/api/v1` was considered and rejected.**
+One-off and lifetime entries stay out of the recurring figures and are shown
+separately if at all, exactly as elsewhere: the headline is a recurring total and
+must keep meaning that.
 
-The reason is that the server already solves, once, the things a single-page
-client would have to re-solve in JavaScript: it formats money per locale, applies
-the SHARED/ISOLATED owner override, enforces permissions on every route, issues
-CSRF tokens, and renders the same figures the API returns. A single-page client
-would rebuild all of that — locale-aware money formatting, the visibility rules,
-the three-state `reminder_days`, auth without an ambient cookie — for a
-subscription tracker one household reads a few times a week. The design is a skin,
-and a skin does not need a second application underneath it.
+## Cash flow chart
 
-So every screen in Phases 9–14 is a Twig template extending the shell, styled by
-the token layer below, with htmx for the interactivity that needs it. The
-`/api/v1` surface is untouched and remains what it already is — for external
-clients, not for this interface.
+The design's income-vs-expenses chart becomes a **twelve-month spend chart drawn
+from the existing forecast** — each renewal in the month it actually falls, with
+scheduled price changes and trial conversions applied from their own dates. There
+is no income series, so the chart is spend over time, with the current or peak
+month picked out in amber. It reads the forecast the Forecast page and the
+budgets read, so the dashboard and those pages cannot disagree.
 
-## The colour system — reconciled with the brand
+The chart is **Chart.js**, the charting library chosen in Phase 8 and bundled by
+the Phase 7 pipeline — nothing is fetched at runtime. It is fed
+integers-as-minor-units converted for display at the boundary; it never receives
+a float currency value.
 
-The design mock specified an amber accent. The actual logo is a **teal-green →
-blue gradient** mark with a navy wordmark. An amber accent beside a green-and-blue
-logo reads as two brands in one window, so the palette is reconciled to the logo
-rather than the mock, and the amber is not discarded but **given a job it is
-actually suited to**:
+## The usage widget
 
-- **Brand / primary / active — the logo gradient.** Teal-green (`#1fae8f`-ish,
-  sampled from the mark) into blue (`#2b74d6`-ish). Used for the one primary
-  action per screen, the active nav item, the featured-card highlight and the
-  brand mark. This is the colour the eye should follow.
-- **Urgency / attention — amber→orange (`#ff5722`→`#ff784e`).** Reserved for the
-  states that genuinely warrant a warm warning: renewing soon, a cancel-by
-  deadline, a budget projected over. A warm colour for "money is about to move"
-  is the correct semantic, and it keeps the mock's amber working for something
-  real instead of competing with the brand for the same meaning.
-- **Error / overspend — a muted red**, distinct from amber, for a genuine problem
-  rather than a heads-up.
+The design's "Subscription Usage — $1200 from $299 limit" becomes the real thing
+it was gesturing at: **a budget against its projected spend**, taken from the same
+forecast, for the signed-in member's own share. Beneath it, the category
+distribution bars the design shows, drawn from the category breakdown the
+Statistics page already computes. A member with no budget set sees a prompt to set
+one rather than an invented limit.
 
-Because brand and urgency are now different hues, a screen can show "this is the
-action" and "this needs attention" at the same time without them fighting — which
-the single-accent mock could not.
+## Recent / active subscriptions table
 
-| Token group | Value |
-| --- | --- |
-| Surfaces | near-black page (`#0b0b0e`/`#121215`), slate cards (`#1a1a20`), hover (`#202028`) |
-| Brand / primary / active | logo gradient, teal-green → blue |
-| Urgency / attention | amber → orange (`#ff5722`→`#ff784e`) |
-| Error / overspend | muted red |
-| Text | white primary, muted grey (`#9e9eab`) secondary |
-| Surface treatment | 16px radius, 1px inner border at `rgba(255,255,255,0.08)`, gradient highlight on featured cards only |
+The bottom table lists subscriptions with the columns the design asks for, mapped
+to real fields: an identifier, the app (its cached logo and name), the amount in
+its own currency, the billing period, and a **status badge computed from real
+state** — active, renewing soon (inside the near window), or trial (before its
+conversion date). The filter chips (All, Active, Expiring) reuse the list's own
+filter mechanism, and Export reuses the existing export rather than a new path.
 
-Exact gradient stops are sampled from the supplied logo during this phase and
-fixed as tokens, so every gradient in the app is the same two colours as the mark
-rather than an approximation.
+The table is scoped by the same repository layer as the list: on an ISOLATED
+instance it shows the member's own subscriptions plus any they help pay for, and a
+Viewer sees no mutating controls because the middleware, not the template, is what
+would refuse them.
 
-## Typography — Inter, and why
+## Rearrangeable cards
 
-The typeface is **Inter**, self-hosted as a variable font by Phase 7. It is a
-deliberate choice rather than the mock's default, and the deciding reason is
-narrow and specific to this application: **Inter has true tabular figures**
-(`font-feature-settings: "tnum"`), so columns of currency line up digit under
-digit. In a money app that reads down tables of amounts all day, proportional
-figures that shift column width row to row are a real legibility cost, and this is
-the family that removes it. Tabular numerals are switched on for every figure —
-tables, KPIs, charts — and left off for running prose.
-
-The wordmark in the logo is its own rounded geometric form and is not recreated
-in a webfont; the logo carries the brand's character, and the interface type
-stays quiet underneath it so the data is what reads. A single family keeps the
-self-hosted bundle small, which matters more here because nothing loads from a
-CDN.
-
-A small, fixed scale rather than ad-hoc sizes:
-
-| Role | Size / weight |
-| --- | --- |
-| KPI value | 2.5rem+, 700, tabular |
-| Section heading | 1.25rem, 600 |
-| Body / table | 0.9375rem, 400–500, tabular for figures |
-| Label / caption | 0.8125rem, 500, muted grey |
-
-## The component library — decided
-
-Made once here so no later phase re-litigates it, and all three are bundled by
-Phase 7 with nothing fetched at runtime:
-
-- **Tailwind CSS**, not Bootstrap. The design is a bespoke dark surface with its
-  own tokens; Tailwind is utility-first and maps straight onto them, and its
-  build purges everything unused so the shipped stylesheet is small. Bootstrap
-  would impose a component look this design would spend effort overriding. The
-  design tokens above are Tailwind theme values, so a utility and a hand-written
-  rule cannot disagree about what "brand" or "card" means.
-- **Chart.js** for the dashboard and analytics charts (Phases 10 and 12). One
-  charting library, bundled, fed integers-converted-at-the-boundary — never a
-  float currency value.
-- **Lucide** icons, not Font Awesome. Lighter, MIT-licensed, tree-shaken to the
-  handful actually used, and its thin consistent stroke suits the dark minimal
-  surface. Only the icons a screen references are bundled.
-
-## Dark is a theme, not the application
-
-The design is "dark first", but Renovo already gives every account **system,
-light or dark** under Settings → Appearance, and that is not thrown away to match
-a mock. The tokens are defined for dark and for light; "dark first" means dark is
-the better-tuned of the two and the one the screenshots show, not that light
-stops existing. An account that has chosen light, or a browser that asks for it,
-gets the light token set. The brand gradient, the semantic hues and the layout
-are shared; only the surface and text tokens flip.
-
-## How the built stylesheet is served
-
-The compiled CSS and JS come out of the Phase 7 pipeline with content-hashed
-filenames and a manifest; templates resolve a logical name to the hashed file
-through that manifest, so a deploy can never leave a returning browser on last
-week's stylesheet — the filename itself changed. This supersedes, for built
-assets, the modification-time versioning the `asset()` helper does; `asset()`
-still covers any static file that does not go through the build.
-
-## Reconciling the design against real data
-
-The design borrows neo-bank furniture that this application has no data for, and
-this phase writes down the disposition of each so later phases do not stall
-mid-screen inventing numbers. Renovo tracks **what is due, not a ledger of what
-has been paid**, so anything that presumes a balance or a ledger is dropped or
-re-pointed rather than mocked:
-
-| In the design | Disposition |
-| --- | --- |
-| Total Revenue / Inflow | Dropped. There is no inflow in a subscription tracker. |
-| Total Savings | Dropped, unless re-pointed at a concrete figure (e.g. spend removed by cancellations) in a later phase. |
-| Virtual Card Preview (masked PAN, VISA) | Dropped. No card, no PAN. |
-| Manage Balance quick action | Dropped. No balance. |
-| Upgrade Plan sidebar card | Dropped. Self-hosted; no plans. |
-| "Subscription Usage — $1200 used from $299 limit" | Re-pointed at budget vs projected spend (Phase 10), which is the real version of this. |
-| AI Insight card | Re-pointed at a rule-based spend-insight signal (Phase 13), which needs no model and invents nothing. |
-
-The rule for the whole re-skin: a card either binds to a real figure or it does
-not ship. A dashboard with an invented number on it is worse than one card
-lighter.
+Renovo already lets an account reorder dashboard cards and untick ones it does not
+want. The new tiles join that mechanism rather than being fixed, and a tile added
+by this phase appears in its default place for existing accounts rather than
+going missing.
 
 ## Done when
 
-The tokens exist as Tailwind theme values and are consumed by the existing pages
-without regression; the brand gradient and the semantic hues are fixed from the
-logo; Inter renders with tabular figures on; both theme sets render; the built
-stylesheet resolves through the manifest; `phpcs`, `phpstan` and `phpunit` still
-pass; `i18n:check` is clean. No screen from Phases 9–14 is built yet — this phase
-and Phase 7 are the foundation they stand on.
+Every tile shows a real figure or is not present; the chart matches the Forecast
+page for the same data; per-currency behaviour is correct including the withheld
+combined total; badges reflect real state; the grid reflows to one column on
+narrow screens; both themes render; new strings are in the catalogue; the quality
+gates and `i18n:check` pass.
