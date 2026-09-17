@@ -669,6 +669,25 @@ the action"; amber→orange is "money is about to move" — renewing soon, a
 cancel-by deadline, a budget projected over; a muted red is a genuine problem.
 A single-accent palette cannot say two of those at once.
 
+### One filled button per screen
+
+The accent fill means "this is the thing to do here", so a screen carries at
+most one of it. Two of them says it twice, which is the same as not saying it:
+a reader scanning for the action finds a pair and has to read both.
+
+That is why the top bar's **quick-add is outlined rather than filled**. It is
+the one control on every single screen, and a global shortcut that is filled
+everywhere leaves no accent for the action a particular screen is about. It
+keeps the accent in its edge and its ink — still the strongest thing in the
+bar, never the strongest thing on the page. A screen with nothing to do on it —
+the dashboard, the calendar — then has no filled button at all, which is
+honest.
+
+`ShellTest` counts the accent on every rendered screen and
+`TemplateConventionsTest` counts it in every template, including the screens
+that are not rendered in a test. `.card-featured`, the brand wash, is counted
+the same way: one card per screen.
+
 ### Dark is a theme, not the application
 
 Three states, not two. An account picks system, light or dark under
@@ -711,6 +730,15 @@ every text token clears WCAG AA (4.5:1) on the surface it is used against, in
 both themes, and that control borders clear 3:1. The palette decides whether
 the application is readable, so a token nudged darker to "look better" fails
 the build rather than shipping.
+
+The matrix is the point, not the threshold. Checking each ink against `--surface`
+alone proves the card and nothing else, and the places contrast quietly fails
+are the ones nobody pictures while choosing a colour: the quiet text in the
+footer, which sits on the page rather than on a card; the same text in a hovered
+row, which is a lighter surface than the one it was chosen against; and ordinary
+text in a row tinted for urgency, where the background was picked to carry the
+warning colour and then has to carry a subscription's name as well. Every pair
+in the test is one a rule actually produces.
 
 ### A note for operators
 
@@ -774,6 +802,37 @@ what sits beside the mark is the instance name, which is the operator's to set.
 where there is one, the top bar's otherwise — and `g` then a letter navigates
 (`d`, `s`, `c`, `b`, `f`, `t`, `a`). Every destination is also a link somebody
 can click, and a test reads the destinations out of the script to prove it.
+
+### On a narrow screen
+
+The grid collapses to one column, the rail becomes the bottom bar, and a table
+scrolls inside its own card rather than taking the page with it. That last one
+is the failure worth naming: **a table cannot be laid out narrower than its
+content**, so one without a scrolling wrapper does not overflow tidily — it
+widens the whole page, and the reader is left dragging a phone-width screen
+sideways to read a heading. A `<pre>` behaves identically, which is how a
+`curl` example on the API tokens page once made that page 567px wide on a
+390px phone.
+
+`TemplateConventionsTest` asserts every `<table class="table">` sits inside a
+wrapper that scrolls. Every screen was then walked at 1440px, 390px and 320px
+in both themes, which is where the `<pre>` was found.
+
+The calendar is the one screen that changes shape rather than reflowing: below
+720px the seven-column grid becomes a list of the days that actually have
+something due, and because the column headings are gone, each day names its own
+weekday from `data-weekday` — filled from the reader's locale like every other
+date on the page.
+
+### Density is a coat of paint
+
+Comfortable and compact are the **same markup** with different padding. No
+template renders a different table for a compact list, so a reader on a screen
+reader hears the same page either way — and `PersonalisationTest` renders five
+screens at both settings and compares the HTML to keep it that way. The
+property is easy to lose the first time somebody tidies a compact list by
+dropping a column, and losing it would turn a visual preference into a
+different page.
 
 ## My subscriptions
 
@@ -1288,6 +1347,25 @@ Two things to know while translating:
 - **A regional catalogue may be partial.** `fr_CA.php` needs only what Canadian
   French says differently; anything it does not define falls back to `fr`, and
   then to `en`. Only `en` has to be complete.
+
+### What you do not translate
+
+Not one figure. Dates, money, percentages and the example amounts in field
+placeholders are all formatted by ICU from the value and the reader's locale, so
+`4 Sept 2026` is `4 sept. 2026` in French and `2026年9月4日` in Japanese — the
+arrangement and the separators, not only the words. `£12.99` becomes `12,99 €`
+for a French reader with a euro price, `50%` becomes `50 %`, and a price rise is
+signed with the locale's own plus sign rather than a `+` typed into a template.
+
+This is a rule the templates are held to rather than a convention.
+`tests/Unit/TemplateConventionsTest.php` reads every file in `templates/` and
+fails on a currency sign, a number written with its own decimal mark, a percent
+sign, or a question asked by a `confirm()` that never went through the
+catalogue. `tests/Unit/LocalisedFormattingTest.php` reads the same figures back
+in French, Japanese and Hungarian. A `9.99` in a placeholder looks exactly like
+the right answer in review, which is why it is a test and not a guideline.
+
+What that leaves a translator is the catalogue and nothing else.
 
 Nothing else needs changing. The language list on the settings page is the set
 of files in `translations/`.
