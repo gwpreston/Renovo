@@ -29,6 +29,17 @@ use PHPUnit\Framework\TestCase;
  */
 final class DesignTokensTest extends TestCase
 {
+    /**
+     * The colours a stylesheet other than `tokens.css` is allowed to write.
+     *
+     * One entry, and it is documented where it is written: the QR code's plate
+     * stays white on the dark theme because a camera reads dark modules on a
+     * light field.
+     *
+     * @var array<string, list<string>>
+     */
+    private const COLOUR_EXCEPTIONS = ['screens.css' => ['#ffffff']];
+
     /** WCAG 2.1 AA: normal-sized body text against its background. */
     private const AA_TEXT = 4.5;
 
@@ -369,6 +380,54 @@ final class DesignTokensTest extends TestCase
             $ratio,
             sprintf('A field border at %.2f:1 is effectively invisible.', $ratio),
         );
+    }
+
+    /**
+     * No stylesheet but the token file writes a colour of its own.
+     *
+     * This is what makes "viewed in light and in dark" a claim about every
+     * screen rather than about the screens somebody remembered to open. If a
+     * colour only ever arrives through a custom property, and both palettes
+     * assign every property, and the contrast matrix above covers both — then
+     * a screen cannot be right in one theme and wrong in the other. One hard
+     * `#hex` in a component rule breaks that chain silently: it looks correct
+     * on whichever theme its author had on screen.
+     *
+     * The single exception is the QR code's plate, which is white in both
+     * themes on purpose — a camera looks for dark modules on a light field,
+     * and inverting it makes the code unscannable.
+     *
+     * @dataProvider styleSheets
+     */
+    public function testOnlyTheTokenFileWritesAColour(string $file): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/assets/css/' . $file);
+
+        // Comments are where the palette is explained, hex codes and all.
+        $source = (string) preg_replace('~/\*.*?\*/~s', '', $source);
+
+        $matches = [];
+        preg_match_all('/#[0-9a-fA-F]{3,8}\b|rgba?\(/', $source, $matches);
+
+        self::assertSame(
+            self::COLOUR_EXCEPTIONS[$file] ?? [],
+            $matches[0],
+            sprintf(
+                '%s writes a colour literal. Every colour is a token in tokens.css, which is what '
+                . 'lets one set of rules carry both themes.',
+                $file,
+            ),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function styleSheets(): iterable
+    {
+        yield 'base.css' => ['base.css'];
+        yield 'components.css' => ['components.css'];
+        yield 'screens.css' => ['screens.css'];
     }
 
     // ------------------------------------------------------- the series palette
