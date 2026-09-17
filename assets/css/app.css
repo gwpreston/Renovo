@@ -1,31 +1,43 @@
 /*
- * The compiled stylesheet.
+ * The stylesheet.
  *
  * This file is the entry Vite compiles; it is not served. The output lands in
  * `public/build/` under a content-hashed name, which is how a returning
  * browser after an upgrade fetches the new stylesheet rather than serving last
  * week's from cache.
  *
- * `public/assets/app.css` is still the stylesheet that dresses the
- * application. It is hand-written, served directly, and untouched by this
- * pipeline — Phase 8 moves it in here as part of the re-skin. Until then this
- * file exists to make Tailwind's utilities and the vendored font available to
- * the pages that will use them.
+ * Phase 7 built the pipeline and left the application dressed by a separate
+ * hand-written `public/assets/app.css`. Phase 8 moved that file in here and
+ * re-skinned it, because the design tokens are Tailwind theme values and a
+ * utility in a template and a rule in a stylesheet can only be guaranteed to
+ * agree about what "brand" or "card" means if one build produces both. There
+ * is now one stylesheet on the page.
+ *
+ * The cost of that, stated plainly: changing how Renovo looks now needs
+ * `npm install && npm run build` rather than an editor and a reload. The
+ * tokens in `tokens.css` are arranged so that most of what an operator would
+ * want to change is a handful of custom properties at the top of one file.
  */
 
 /*
- * Tailwind, imported layer by layer rather than as `@import "tailwindcss"`,
- * which would also pull in Preflight.
- *
- * Preflight is Tailwind's own reset: it strips the browser's default heading
- * sizes, list markers and margins on the assumption that every element will be
- * dressed by a utility class. Every page here is dressed by `app.css`, which
- * was written against those defaults, so turning Preflight on now would
- * un-style the application — the re-skin that makes it safe is Phase 8's, and
- * this is the line it changes.
+ * Tailwind, imported layer by layer rather than as `@import "tailwindcss"`, so
+ * the order is explicit and Preflight can be seen rather than inferred.
  */
 @layer theme, base, components, utilities;
 @import 'tailwindcss/theme.css' layer(theme);
+
+/*
+ * Preflight, Tailwind's reset — on since Phase 8.
+ *
+ * It strips the browser's default heading sizes, list markers, link
+ * underlines and control borders on the assumption that everything is dressed
+ * explicitly. Through Phase 7 that assumption was false: the application was
+ * dressed by a stylesheet written against the browser's defaults, so turning
+ * this on would have un-styled every page. `base.css` is what makes it true —
+ * it re-establishes, deliberately and by name, each default the templates
+ * actually rely on.
+ */
+@import 'tailwindcss/preflight.css' layer(base);
 @import 'tailwindcss/utilities.css' layer(utilities) source(none);
 
 /*
@@ -49,17 +61,22 @@
  *
  * `wght.css` is the upright weight axis — one variable file covering 100–900,
  * which is every weight the interface needs without the italic axis nobody has
- * asked for.
+ * asked for. Its subset carries the `tnum` feature, which is the whole reason
+ * the typeface is Inter; `base.css` switches it on for figures.
  */
 @import '@fontsource-variable/inter/wght.css';
 
 /*
- * The font is served but not yet applied: `public/assets/app.css` still sets
- * the system stack on `body`, and changing what the application looks like is
- * Phase 8's job, not the pipeline's. This token is the seam — Phase 8 points
- * the body font at it.
+ * The application's own styles, in cascade order: what things are, then what
+ * they look like, then where a particular screen differs.
+ *
+ * These are unlayered, so they beat anything in Tailwind's layers regardless
+ * of specificity. That is the behaviour the previous arrangement had when the
+ * hand-written sheet was a second `<link>`, and keeping it means a utility
+ * added to a template in a later phase adjusts a component rather than
+ * silently losing to one.
  */
-:root {
-    --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto,
-        Helvetica, Arial, sans-serif;
-}
+@import './tokens.css';
+@import './base.css';
+@import './components.css';
+@import './screens.css';

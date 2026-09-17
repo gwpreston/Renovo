@@ -1,0 +1,902 @@
+/*
+ * The component vocabulary.
+ *
+ * The furniture every screen is built from: the shell, cards, tables, forms,
+ * buttons, badges and dialogs. Screen-specific pieces — the calendar grid, the
+ * price timeline, the budget meters — are in `screens.css`.
+ *
+ * No rule here writes a colour literal. Everything resolves to a token from
+ * `tokens.css`, which is what lets the same markup carry both themes.
+ */
+
+/* ------------------------------------------------------------------ layout */
+
+.container {
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+main.container {
+    padding-top: 1.5rem;
+    padding-bottom: 3rem;
+}
+
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.page-header h1 {
+    margin: 0;
+}
+
+.columns {
+    display: grid;
+    gap: 1rem;
+}
+
+@media (min-width: 860px) {
+    .columns {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.grid-2 {
+    display: grid;
+    gap: 1rem;
+}
+
+@media (min-width: 720px) {
+    .grid-2 {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.stack > h2,
+.stack > h3 {
+    margin: 0.75rem 0 0;
+}
+
+.block {
+    display: block;
+}
+
+.inline {
+    display: inline;
+}
+
+.plain {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.divider {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 1.25rem 0;
+}
+
+/* ------------------------------------------------------------------ cards */
+
+/*
+ * The surface everything sits on: a 16px radius and a single hairline border.
+ *
+ * On the dark theme the border is a 8%-white inner line rather than a drop
+ * shadow, because a shadow cast onto a near-black page is invisible. What
+ * separates a card from the page there is the light catching its top edge,
+ * which is what the `::before` highlight below imitates.
+ */
+.card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.card > h2:first-child,
+.card > h3:first-child {
+    margin-top: 0;
+}
+
+.card.narrow {
+    max-width: 30rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/*
+ * The featured card, and the only place the logo gradient is allowed to wash
+ * across a surface. PHASE.md reserves it for one card per screen: used on
+ * every card it would stop meaning "look here".
+ */
+.card-featured {
+    border-color: transparent;
+    background:
+        linear-gradient(var(--surface), var(--surface)) padding-box,
+        var(--gradient-brand) border-box;
+    border: 1px solid transparent;
+}
+
+.card-featured::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--gradient-brand);
+    opacity: 0.08;
+    pointer-events: none;
+}
+
+.card-featured > * {
+    position: relative;
+}
+
+/* ------------------------------------------------------------- navigation */
+
+.nav {
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+/*
+ * The brand mark carries the gradient as text, which is the one place the
+ * logo's own colours appear in the interface chrome.
+ *
+ * `color` is set as well as the clip, so a browser that does not support
+ * background-clip: text shows the accent rather than nothing at all.
+ */
+.nav-brand {
+    font-weight: var(--weight-bold);
+    font-size: 1.0625rem;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    color: var(--text);
+    background: var(--gradient-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+    .nav-brand {
+        color: transparent;
+    }
+}
+
+.nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    order: 3;
+    width: 100%;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: var(--size-body);
+    padding: 0.25rem 0;
+    border-bottom: 2px solid transparent;
+}
+
+.nav-links a:hover {
+    color: var(--text);
+}
+
+/*
+ * The active item is marked by the brand gradient, not a flat accent — it is
+ * the one piece of navigation the eye is meant to find.
+ */
+.nav-links a.is-active {
+    color: var(--text);
+    border-bottom-color: transparent;
+    background:
+        var(--gradient-brand) bottom left / 100% 2px no-repeat;
+}
+
+.nav-user {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nav-name {
+    color: var(--text-muted);
+    font-size: var(--size-label);
+}
+
+@media (min-width: 720px) {
+    .nav-links {
+        order: 0;
+        width: auto;
+        margin-left: 1.5rem;
+    }
+}
+
+.footer {
+    color: var(--text-muted);
+    font-size: var(--size-label);
+    padding-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+/*
+ * Off-screen until focused, which is the only time it is of use to anybody: a
+ * keyboard user should not have to tab through the whole navigation bar on
+ * every page to reach the content.
+ */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 10;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0 0 var(--radius-control) 0;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+/* ------------------------------------------------------------------ stats */
+
+.stat-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+    .stat-grid {
+        grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    }
+}
+
+.stat-label {
+    font-size: var(--size-label);
+    color: var(--text-muted);
+    margin: 0 0 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--weight-medium);
+}
+
+/*
+ * The KPI. Large, heavy and tight — the one number on the card that is meant
+ * to be read from across the room, and the reason the type scale starts at
+ * 2.5rem rather than growing out of the body size.
+ */
+.stat-value {
+    font-size: var(--size-kpi);
+    font-weight: var(--weight-bold);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.25rem;
+}
+
+.stat-unit {
+    font-size: var(--size-body);
+    font-weight: var(--weight-normal);
+    color: var(--text-muted);
+    letter-spacing: 0;
+}
+
+.stat-small .stat-value {
+    font-size: 1.375rem;
+}
+
+.note {
+    font-size: var(--size-label);
+}
+
+.muted {
+    color: var(--text-muted);
+}
+
+.hint,
+.field-hint {
+    color: var(--text-muted);
+    font-size: var(--size-label);
+    margin: 0;
+}
+
+.empty {
+    padding: 1rem 0;
+}
+
+/* ----------------------------------------------------------------- tables */
+
+.table-scroll,
+.table-wrap {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--size-body);
+}
+
+.table th,
+.table td {
+    text-align: left;
+    padding: 0.7rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+.table th {
+    font-size: var(--size-label);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: var(--weight-semibold);
+}
+
+.table th a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.table th a:hover {
+    color: var(--text);
+}
+
+.table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+    background: var(--surface-hover);
+}
+
+.table .numeric {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.table .actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.table tr.is-paused {
+    opacity: 0.55;
+}
+
+.cell-name {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+}
+
+/*
+ * The one image that is not block-level: it sits beside a name in a table
+ * cell, so it keeps its own box and does not push the text onto a new line.
+ */
+.logo {
+    display: inline-block;
+    border-radius: var(--radius-small);
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
+/* ------------------------------------------------------- badges and chips */
+
+.badge {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: var(--weight-medium);
+    padding: 0.1rem 0.45rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    color: var(--text-muted);
+    margin-left: 0.25rem;
+}
+
+/*
+ * Urgency, in the warm hue PHASE.md reserves for it: renewing soon, a
+ * cancel-by deadline, a budget projected over. A tint behind coloured text
+ * rather than a solid fill, because no single ink reads on the amber across
+ * both themes.
+ */
+.badge-warning {
+    background: var(--warning-bg);
+    color: var(--warning);
+    border-color: transparent;
+}
+
+.badge-danger {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border-color: transparent;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: var(--size-label);
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+}
+
+.chip input {
+    width: auto;
+}
+
+.chip-static {
+    color: var(--text-muted);
+}
+
+.tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.tag-manage {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.tag-manage li {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.swatch {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 0.35rem;
+}
+
+/* ------------------------------------------------------------------ forms */
+
+label {
+    font-weight: var(--weight-medium);
+    font-size: var(--size-label);
+}
+
+input[type='text'],
+input[type='email'],
+input[type='password'],
+input[type='search'],
+input[type='number'],
+input[type='date'],
+input[type='file'],
+input[type='url'],
+select,
+textarea {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+    font-size: var(--size-body);
+    color: var(--text);
+    background: var(--surface-sunken);
+    /*
+     * The control border is a heavier token than the hairline that separates
+     * cards. The edge of an input is a user-interface component boundary, and
+     * WCAG holds one to 3:1 against its surroundings the way it holds text to
+     * 4.5:1 — a 8%-white hairline would be about 1.2:1 and effectively
+     * borderless for anyone who needs the edge to find the field.
+     */
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-control);
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+}
+
+select {
+    /* Preflight removes the browser's arrow affordance along with the rest. */
+    appearance: auto;
+}
+
+.input-group {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.input-group > :first-child {
+    flex: 1 1 auto;
+}
+
+.input-group > select {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+.choice {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: var(--weight-normal);
+    font-size: var(--size-body);
+}
+
+.choice input {
+    width: auto;
+}
+
+/*
+ * Checkboxes and radios keep the browser's own control. Preflight strips their
+ * appearance, and an unstyled square of nothing is worse than the platform's.
+ */
+input[type='checkbox'],
+input[type='radio'] {
+    appearance: auto;
+    width: auto;
+    accent-color: var(--accent);
+}
+
+fieldset {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    padding: 0.85rem;
+    margin: 0;
+}
+
+legend {
+    font-weight: var(--weight-semibold);
+    font-size: var(--size-label);
+    padding: 0 0.25rem;
+}
+
+.field-error {
+    color: var(--danger);
+    font-size: var(--size-label);
+    margin: 0;
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+.inline-form {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.inline-form input[type='color'] {
+    width: 2.5rem;
+    padding: 0.1rem;
+}
+
+.field-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.field-row input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.field-label {
+    flex: 1 1 auto;
+}
+
+.field-suffix {
+    color: var(--text-muted);
+}
+
+.filters {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.filter-row {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+    .filter-row {
+        grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+        align-items: end;
+    }
+}
+
+.filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.filter-field.grow {
+    grid-column: span 2;
+}
+
+/*
+ * A filter that is a checkbox is both a `.filter-field` and a `.choice`, and
+ * the column direction the first one wants would stack the box above its own
+ * label. The control belongs beside the words it labels.
+ */
+.filter-field.choice {
+    flex-direction: row;
+    align-items: center;
+}
+
+.filter-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.button {
+    display: inline-block;
+    padding: 0.55rem 1rem;
+    font: inherit;
+    font-size: var(--size-body);
+    font-weight: var(--weight-medium);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.button:hover {
+    background: var(--surface-hover);
+    border-color: var(--accent);
+}
+
+/*
+ * The one primary action per screen, and the only filled gradient in the
+ * component set.
+ *
+ * It uses `--gradient-action` rather than `--gradient-brand`: the logo's own
+ * stops cannot hold white text at body size (2.8:1 at the teal end), and these
+ * are the same two hues darkened until they can — 5.3:1, 5.6:1 and 5.7:1
+ * across the two stops and the midpoint.
+ */
+.button-primary {
+    background: var(--gradient-action);
+    border-color: transparent;
+    color: #ffffff;
+}
+
+.button-primary:hover {
+    background: var(--gradient-action);
+    filter: brightness(1.08);
+    border-color: transparent;
+}
+
+.button-quiet {
+    background: transparent;
+}
+
+.button-danger {
+    color: var(--danger);
+    border-color: transparent;
+    background: transparent;
+}
+
+.button-danger:hover {
+    background: var(--error-bg);
+    border-color: transparent;
+}
+
+.button-icon {
+    background: none;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0.15rem;
+}
+
+.button-icon:hover {
+    color: var(--danger);
+}
+
+/* A button that reads as a link — the shortcut help in the footer. */
+.button-link {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--text-muted);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* ----------------------------------------------------------------- alerts */
+
+.flashes {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.flash,
+.alert {
+    padding: 0.7rem 0.9rem;
+    border-radius: var(--radius-control);
+    border: 1px solid transparent;
+    font-size: var(--size-body);
+}
+
+.flash-success {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.flash-error,
+.alert-error {
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+.alert p {
+    margin: 0;
+}
+
+/* A heads-up rather than a problem: the warm hue, as a leading rule. */
+.callout {
+    border-left: 4px solid var(--warning);
+}
+
+.trace {
+    overflow-x: auto;
+    font-size: 0.75rem;
+    background: var(--surface-sunken);
+    padding: 0.75rem;
+    border-radius: var(--radius-control);
+}
+
+/* --------------------------------------------------------------- dialogs */
+
+.dialog {
+    width: min(42rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 4rem);
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    padding: 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+.dialog::backdrop {
+    background: var(--backdrop);
+}
+
+.dialog-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.dialog-header h2 {
+    margin: 0;
+}
+
+.dialog .card {
+    box-shadow: none;
+    border: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.shortcut-list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.4rem 1rem;
+    margin: 0;
+    align-items: baseline;
+}
+
+.shortcut-list dt {
+    margin: 0;
+}
+
+.shortcut-list dd {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+kbd {
+    font-family: inherit;
+    font-size: var(--size-label);
+    border: 1px solid var(--border-control);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0.05rem 0.35rem;
+    background: var(--surface-sunken);
+}
+
+/* ------------------------------------------------------------- pagination */
+
+.pagination,
+.pager {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.pager {
+    padding-top: 0.75rem;
+    margin-top: 0;
+}
+
+/* ------------------------------------------------------- screen-reader only */
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}

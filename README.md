@@ -65,9 +65,19 @@ Built in phases:
   adds no feature; it is what a re-skin gets compiled by. See
   [Building the front end](#building-the-front-end).
 
-That is the v1 feature set, and Phase 7 the toolchain under it. Deliberately
-not in it: OIDC/SSO, and bank or transaction sync — see the end of `PHASE.md`
-for what was deferred and why.
+- **Phase 8 — the design system — complete.** The colour, type and spacing the
+  interface is built from, named once as Tailwind theme tokens the build
+  compiles: a brand gradient sampled from the logo, a separate warm hue for
+  urgency so "this is the action" and "this needs attention" stop competing,
+  Inter applied with tabular figures so columns of money line up, and both the
+  light and dark token sets. The stylesheet that dresses the application moved
+  into the build and Preflight came on with it. It adds no feature and no
+  screen; it is the vocabulary the re-skin in Phases 9–14 is written in. See
+  [The design system](#the-design-system).
+
+That is the v1 feature set, Phase 7 the toolchain under it and Phase 8 the
+design language on top. Deliberately not in it: OIDC/SSO, and bank or
+transaction sync — see the end of `PHASE.md` for what was deferred and why.
 
 See `PHASE.md` for what was in scope for the last phase and `SPEC.md` for the
 conventions every phase followed.
@@ -490,7 +500,7 @@ npm run watch      # rebuild on change
 
 | Source                | Becomes                          | Loaded as                    |
 |-----------------------|----------------------------------|------------------------------|
-| `assets/css/app.css`  | `public/build/app-<hash>.css`    | `{{ bundle('app.css') }}`    |
+| `assets/css/*.css`    | `public/build/app-<hash>.css`    | `{{ bundle('app.css') }}`    |
 | `assets/js/app.js`    | `public/build/app-<hash>.js`     | `{{ bundle('app.js') }}`     |
 | Chart.js              | `public/build/chart-<hash>.js`   | fetched on first chart only  |
 | Inter (Fontsource)    | `public/build/inter-*.woff2`     | `@font-face` in the built CSS |
@@ -506,9 +516,15 @@ Two helpers, because there are two kinds of file:
 
 - **`bundle('app.css')`** — anything the build produces. Resolved through the
   manifest.
-- **`asset('/assets/app.css')`** — anything served as written: the hand-written
-  stylesheet, the vendored htmx, the keyboard-shortcut script. Cache-busted with
-  the file's modification time.
+- **`asset('/assets/htmx.min.js')`** — anything served as written: the vendored
+  htmx, the keyboard-shortcut script, the passkey script. Cache-busted with the
+  file's modification time.
+
+There used to be a second `<link>` on every page for a hand-written
+`public/assets/app.css`. Phase 8 moved it into the build, because the design
+tokens are Tailwind theme values and a utility in a template can only be
+guaranteed to agree with a rule in a stylesheet if one compilation produces
+both — see [The design system](#the-design-system).
 
 `public/build/` is generated, so it is not in git. The published image builds
 its own copy; `.dockerignore` keeps a local build out of the build context so
@@ -518,11 +534,14 @@ the assets are in — see [The two stacks](#the-two-stacks).
 
 ### Tailwind
 
-Tailwind 4 is compiled through Vite's first-party plugin, with **Preflight
-turned off**. Preflight is Tailwind's reset, and `public/assets/app.css` — the
-stylesheet that actually dresses the application — was written against the
-browser's defaults, so enabling it now would un-style every page. The single
-line that changes is in `assets/css/app.css`.
+Tailwind 4 is compiled through Vite's first-party plugin, with **Preflight on**
+since Phase 8. Preflight is Tailwind's reset: it strips the browser's default
+heading sizes, list markers, link underlines and control borders on the
+assumption that everything is dressed explicitly. Through Phase 7 that
+assumption was false, because the application was dressed by a separate
+stylesheet written against those defaults. `assets/css/base.css` is what makes
+it true — it re-establishes, deliberately and by name, each default the
+templates actually rely on.
 
 Tailwind scans `templates/`, `assets/js/` and the Twig extension for class
 names, listed explicitly rather than discovered, so it does not crawl `vendor/`
@@ -540,9 +559,9 @@ Google font" and "load nothing from Google" are both true at once. The SIL Open
 Font License is copied out of the package alongside it, as
 `public/build/inter-OFL.txt`.
 
-The font is *served* but not yet *applied*: the built stylesheet defines a
-`--font-sans` custom property and nothing sets `font-family` from it. Changing
-what the application looks like is a separate piece of work from being able to.
+Phase 8 applies it. The deciding reason for Inter specifically is narrow: its
+subset carries the `tnum` OpenType feature, so a column of currency lines up
+digit under digit. See [The design system](#the-design-system).
 
 ### The JavaScript
 
@@ -579,6 +598,102 @@ temporarily. If a URL is an identifier rather than an address (`xmlns` on an
 `<svg>`, say), add its host to `ExternalAssetScanner::ALLOWED_HOSTS`.
 
 ---
+
+## The design system
+
+The colour, type and spacing every screen is built from. Phase 7 decided how
+assets are compiled and served; this is what they express.
+
+### One stylesheet, one definition of each token
+
+`assets/css/` compiles to the single stylesheet each page links:
+
+| File             | Holds                                                        |
+|------------------|--------------------------------------------------------------|
+| `tokens.css`     | every colour, radius and type size, and both theme sets       |
+| `base.css`       | element defaults, re-established after Preflight              |
+| `components.css` | the shell, cards, tables, forms, buttons, badges, dialogs     |
+| `screens.css`    | the calendar, budget meters, price timeline, density          |
+
+Nothing downstream writes a colour literal. Tokens are declared twice: once as
+semantic custom properties (`--surface`, `--text`, `--accent`), and once in an
+`@theme inline` block that hands the same properties to Tailwind. That is what
+makes `bg-surface` in a template and `.card { background: var(--surface) }` in
+a stylesheet the same colour by construction rather than by agreement.
+
+The `inline` keyword matters: without it Tailwind resolves a theme value at
+build time and bakes it into the utility, freezing every utility to whichever
+theme compiled first. Note also that every `@theme` key is spelled differently
+from the property it points at — a key assigned its own name compiles to
+`--x: var(--x)`, which is circular and resolves to nothing.
+
+### The brand, and why there are two gradients
+
+The logo is a **teal-green → blue** gradient mark. `--brand-from` (`#1fae8f`)
+and `--brand-to` (`#2b74d6`) are the only place those stops are written down,
+so re-sampling the logo is a two-line edit.
+
+They are used where nothing sits on top of them — the brand mark, the active
+nav rail, a featured card's wash. A filled button uses `--gradient-action`
+instead: the same two hues darkened, because white text on the real mark is
+2.8:1 at the teal stop and 3.6:1 at the midpoint, and no single ink passes
+across the actual logo gradient. The darkened pair holds white at 5.3:1, 5.6:1
+and 5.7:1.
+
+Brand and urgency are deliberately **different hues**. Teal-green is "this is
+the action"; amber→orange is "money is about to move" — renewing soon, a
+cancel-by deadline, a budget projected over; a muted red is a genuine problem.
+A single-accent palette cannot say two of those at once.
+
+### Dark is a theme, not the application
+
+Three states, not two. An account picks system, light or dark under
+Settings → Appearance, and an explicit choice beats the browser:
+
+```css
+:root { /* light */ }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) { /* dark */ }
+}
+:root[data-theme='dark'] { /* dark */ }
+```
+
+The `:not([data-theme='light'])` guard is the whole trick. Without it, someone
+who chose light on a machine set to dark gets repainted dark — breaking the
+setting for exactly the person who bothered to change it. This is also why the
+token layer uses no `dark:` variants: Tailwind's default `dark:` understands
+only the media query, so it would disagree with the setting in that same case.
+
+### Typography
+
+Inter, self-hosted, with **tabular figures on every number**. That is the
+deciding reason for the family: proportional digits are different widths, so a
+column of amounts shifts as its values change. Switched on with
+`font-variant-numeric: tabular-nums` rather than `font-feature-settings: "tnum"`,
+which would switch off the other features in the font, and left off for running
+prose.
+
+| Role            | Size / weight             |
+|-----------------|---------------------------|
+| KPI value       | 2.5rem, 700, tabular      |
+| Section heading | 1.25rem, 600              |
+| Body / table    | 0.9375rem, 400–500        |
+| Label / caption | 0.8125rem, 500, muted     |
+
+### Contrast is tested, not eyeballed
+
+`tests/Unit/DesignTokensTest.php` reads the compiled stylesheet and asserts
+every text token clears WCAG AA (4.5:1) on the surface it is used against, in
+both themes, and that control borders clear 3:1. The palette decides whether
+the application is readable, so a token nudged darker to "look better" fails
+the build rather than shipping.
+
+### A note for operators
+
+Changing how Renovo looks now needs `npm install && npm run build` rather than
+an editor and a reload — the cost of having one compilation own both the
+utilities and the rules. Most of what you would want to change is a handful of
+custom properties at the top of `assets/css/tokens.css`.
 
 ## Money features
 

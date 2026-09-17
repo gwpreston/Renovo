@@ -1,0 +1,232 @@
+/*
+ * Element defaults.
+ *
+ * Preflight — Tailwind's reset, turned on in `app.css` — strips the browser's
+ * built-in heading sizes, list markers, link underlines and control borders on
+ * the assumption that everything will be dressed explicitly. This file is that
+ * assumption being honoured: it re-establishes the defaults the templates
+ * actually rely on, and nothing else.
+ *
+ * What is re-established here was decided by reading the templates, not by
+ * guessing. Every list in `templates/` carries a class and is laid out by
+ * `components.css`, so no marker is restored; headings, links, `<code>`,
+ * `<abbr>` and `<summary>` are used bare and are restored.
+ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    /*
+     * Inter, at last. Phase 7 vendored the font and defined the token; this is
+     * the line that points the application at it.
+     */
+    font-family: var(--font-stack);
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.5;
+    font-weight: var(--weight-normal);
+}
+
+/* ------------------------------------------------------------- typography */
+
+/*
+ * Preflight zeroes heading size and weight so an `<h2>` looks like body text
+ * until a utility says otherwise. These pages use headings semantically and
+ * expect them to look like headings, so the scale from PHASE.md is applied to
+ * the elements themselves.
+ */
+h1,
+h2,
+h3,
+h4 {
+    margin: 0 0 0.5rem;
+    font-weight: var(--weight-semibold);
+    line-height: 1.25;
+    text-wrap: balance;
+}
+
+h1 {
+    font-size: 1.5rem;
+}
+
+h2 {
+    font-size: var(--size-heading);
+}
+
+h3 {
+    font-size: 1.0625rem;
+}
+
+h4 {
+    font-size: var(--size-body);
+}
+
+p {
+    margin: 0 0 0.75rem;
+}
+
+p:last-child {
+    margin-bottom: 0;
+}
+
+/*
+ * Links keep their underline. Preflight removes it, and colour alone is not
+ * enough to mark a link for a reader who cannot separate the two hues — the
+ * places that genuinely want a bare link (navigation, table sort headers,
+ * calendar entries) turn it off for themselves.
+ */
+a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+a:hover {
+    text-decoration-thickness: 2px;
+}
+
+strong,
+b {
+    font-weight: var(--weight-semibold);
+}
+
+small {
+    font-size: var(--size-label);
+}
+
+code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.875em;
+}
+
+/* The calendar's weekday headers abbreviate; the dotted underline is noise. */
+abbr[title] {
+    text-decoration: none;
+}
+
+/* Preflight hides the disclosure triangle's default cursor affordance. */
+summary {
+    cursor: pointer;
+}
+
+/*
+ * A modal dialog centres itself in the browser's own stylesheet with
+ * `margin: auto`, and Preflight's blanket `margin: 0` takes that away — the
+ * quick-add box and the shortcut help both open pinned to the top-left corner
+ * instead of the middle of the screen. Giving it back is the whole fix.
+ */
+dialog {
+    margin: auto;
+}
+
+/* -------------------------------------------------------- tabular figures */
+
+/*
+ * The reason the typeface is Inter.
+ *
+ * Proportional digits are different widths, so a column of amounts shifts left
+ * and right as the values change and the decimal points stop lining up. In an
+ * application that is read by scanning down columns of money that is a real
+ * legibility cost, and `tabular-nums` is what removes it: every digit takes
+ * the same advance width, so figures align without anything being padded.
+ *
+ * `font-variant-numeric` rather than `font-feature-settings: "tnum"`, which
+ * would switch off every other feature in the font — Inter's subset also
+ * carries `calt`, `frac`, `numr` and `dnom`, and the low-level property is
+ * all-or-nothing about them.
+ *
+ * Applied to figures and tables, and deliberately not to running prose: a
+ * paragraph reads better with digits that fit their own shapes.
+ */
+.table,
+.stat-value,
+.stat-unit,
+.kpi-value,
+.timeline-amount,
+.calendar-amount,
+.renewal-amount,
+.renewal-date,
+.budget-header,
+.money,
+.tabular,
+code {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ media */
+
+/*
+ * Preflight makes images block-level and bounded, which is right nearly
+ * everywhere and wrong for the subscription logo that sits inline beside a
+ * name. That one is laid out by its own rule in `components.css`; this keeps
+ * the sensible default for everything else.
+ */
+img,
+svg,
+video,
+canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+/* ------------------------------------------------------------------ focus */
+
+/*
+ * One focus treatment for everything that can take focus. Preflight removes
+ * the browser's, and a page with no visible focus ring is unusable from a
+ * keyboard.
+ */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/*
+ * The main region takes focus from the skip link, but should never show a ring
+ * for a mouse click — which would read as an error rather than a destination.
+ */
+main:focus {
+    outline: none;
+}
+
+/* ----------------------------------------------------------- reduced motion */
+
+/*
+ * Nothing here animates much, but htmx applies transitions during a swap and a
+ * dialog opens with one. A reader who has asked their system for less motion
+ * should get none.
+ */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ----------------------------------------------------------- forced colours */
+
+/*
+ * Forced-colours mode replaces the palette wholesale, and an outline drawn
+ * with a custom property disappears with it. `currentColor` survives.
+ */
+@media (forced-colors: active) {
+    :focus-visible {
+        outline: 2px solid currentColor;
+    }
+}

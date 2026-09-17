@@ -1,0 +1,510 @@
+/*
+ * The screen-specific pieces.
+ *
+ * Everything that belongs to one view rather than to the shared vocabulary:
+ * the renewals list, budget meters, the forecast, the price timeline, the
+ * calendar grid, the bulk-action bar and the density setting.
+ */
+
+/* -------------------------------------------------------------- dashboard */
+
+.renewals {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.renewals li {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.renewals li:last-child {
+    border-bottom: 0;
+}
+
+.renewal-name {
+    flex: 1 1 auto;
+}
+
+.renewal-date,
+.renewal-amount {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- budgets */
+
+.budget-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: 1rem;
+}
+
+.budget-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.budget-header h2 {
+    margin: 0;
+}
+
+/*
+ * Approaching and over, in the two hues PHASE.md separates. Amber is the
+ * heads-up — money is about to move, nothing is wrong yet — and red is the
+ * problem. Keeping them different hues is what lets a screen say "this is the
+ * action" and "this needs attention" without the two competing.
+ */
+.budget.is-warning {
+    border-left: 4px solid var(--warning);
+}
+
+.budget.is-over {
+    border-left: 4px solid var(--danger);
+}
+
+/*
+ * A meter, not a bar: the accessible name on the wrapper carries the number,
+ * so the fill is decoration and screen readers are told the percentage rather
+ * than being read a width.
+ */
+.meter {
+    height: 0.6rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.meter-slim {
+    height: 0.4rem;
+    margin: 0;
+}
+
+.meter-fill {
+    display: block;
+    height: 100%;
+    background: var(--gradient-brand);
+}
+
+.budget.is-warning .meter-fill {
+    background: var(--warning);
+}
+
+.budget.is-over .meter-fill {
+    background: var(--danger);
+}
+
+/* --------------------------------------------------------------- forecast */
+
+.forecast-events {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: var(--size-body);
+}
+
+.forecast-events li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+/* -------------------------------------------------------------- cancel-by */
+
+tr.is-urgent > td {
+    background: var(--warning-bg);
+}
+
+tr.is-passed > td {
+    background: var(--error-bg);
+}
+
+/* A failed sign-in should be findable by eye in a long log. */
+.row-warning td:first-child {
+    border-left: 3px solid var(--warning);
+    padding-left: 0.5rem;
+}
+
+/* ---------------------------------------------------------- price history */
+
+.timeline {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.timeline li {
+    border-left: 2px solid var(--border);
+    padding-left: 0.75rem;
+}
+
+.timeline li.is-scheduled {
+    border-left-style: dashed;
+    border-left-color: var(--warning);
+}
+
+.timeline-date {
+    font-size: var(--size-label);
+    color: var(--text-muted);
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.timeline-amount {
+    font-weight: var(--weight-semibold);
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+}
+
+/* A price going up is bad news in a bills application; going down is good. */
+.is-increase {
+    color: var(--increase);
+}
+
+.is-decrease {
+    color: var(--decrease);
+}
+
+/* ----------------------------------------------------------- bulk actions */
+
+.bulk-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    margin-top: 0.75rem;
+}
+
+/*
+ * The base form styles stretch every control to the width of its container,
+ * which is right in a stacked form and wrong in a toolbar. Overriding the
+ * width is what lets these sit on one line.
+ */
+.bulk-bar select,
+.bulk-bar input {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 8rem;
+}
+
+.select-column {
+    width: 2.5rem;
+}
+
+@media (max-width: 40rem) {
+    .bulk-bar select,
+    .bulk-bar input,
+    .bulk-bar button {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+}
+
+/* ------------------------------------------------- security and the audit log */
+
+/*
+ * The QR code is inline SVG with no intrinsic size, so it is bounded here
+ * rather than by the writer: a fixed pixel size would be wrong on a phone.
+ */
+.qr {
+    max-width: 15rem;
+    margin: 0.5rem 0;
+}
+
+/*
+ * The white plate stays white in both themes. A QR code is read by a camera
+ * looking for dark modules on a light field, and inverting it on the dark
+ * theme makes it unscannable on a good number of phones.
+ */
+.qr svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: #ffffff;
+    padding: 0.5rem;
+    border-radius: var(--radius-small);
+}
+
+.code-list {
+    list-style: none;
+    margin: 0.5rem 0;
+    padding: 0;
+    display: grid;
+    gap: 0.35rem;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+}
+
+.code-list code {
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+}
+
+/* ----------------------------------------------------------- notifications */
+
+/*
+ * Every list in the templates carries a class and is laid out here. This one
+ * relied on the browser's own list styling until Preflight removed it.
+ */
+.channel-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.channel-list > li {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.channel-list > li:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+/* ----------------------------------------------------------- saved views */
+
+.saved-views {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.saved-view-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.saved-view-list a {
+    text-decoration: none;
+}
+
+/* --------------------------------------------------- dashboard card layout */
+
+.card-layout {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.card-layout-row {
+    display: grid;
+    grid-template-columns: 1fr 4.5rem auto;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.card-layout-name {
+    font-weight: var(--weight-normal);
+}
+
+.card-layout-row input[type='number'] {
+    width: 100%;
+}
+
+/* --------------------------------------------------------------- calendar */
+
+.calendar-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: baseline;
+    justify-content: space-between;
+}
+
+.calendar-header h2 {
+    margin: 0;
+}
+
+.calendar-nav {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.calendar-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.calendar-grid th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: var(--weight-semibold);
+    padding: 0.35rem 0.25rem;
+    text-align: left;
+}
+
+.calendar-day {
+    vertical-align: top;
+    border: 1px solid var(--border);
+    padding: 0.35rem;
+    /*
+     * A month is five or six rows; a fixed minimum keeps the grid from
+     * collapsing into strips on a quiet month.
+     */
+    height: 5.5rem;
+    width: 14.28%;
+}
+
+.calendar-day.is-empty {
+    background: var(--surface-sunken);
+    border-color: transparent;
+}
+
+.calendar-day.is-today {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.calendar-date {
+    font-size: var(--size-label);
+    color: var(--text-muted);
+    display: block;
+}
+
+.calendar-day.is-today .calendar-date {
+    color: var(--accent);
+    font-weight: var(--weight-semibold);
+}
+
+.calendar-events {
+    list-style: none;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.2rem;
+}
+
+.calendar-event {
+    font-size: 0.75rem;
+    line-height: 1.3;
+    padding: 0.2rem 0.3rem;
+    border-radius: var(--radius-small);
+    background: var(--surface-sunken);
+    border-left: 3px solid var(--accent);
+}
+
+.calendar-event.is-trial {
+    border-left-color: var(--warning);
+}
+
+.calendar-event a {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    font-weight: var(--weight-semibold);
+}
+
+.calendar-event a:hover {
+    text-decoration: underline;
+}
+
+.calendar-amount {
+    color: var(--text-muted);
+}
+
+/*
+ * On a phone a seven-column grid is unreadable, so the same markup becomes a
+ * list: each day that has something on it is a block, and every other cell —
+ * the padding days of a neighbouring month and the days with nothing due — is
+ * dropped, because a column of thirty bare numbers is not a calendar.
+ *
+ * With the headings gone, each remaining day carries its own weekday in
+ * `data-weekday`, which the template fills from the reader's locale.
+ */
+@media (max-width: 720px) {
+    .calendar-grid,
+    .calendar-grid tbody,
+    .calendar-grid tr,
+    .calendar-grid td {
+        display: block;
+        width: auto;
+    }
+
+    .calendar-grid thead {
+        display: none;
+    }
+
+    .calendar-day {
+        height: auto;
+        border: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 0.5rem 0;
+    }
+
+    .calendar-day.is-empty,
+    .calendar-day.is-quiet {
+        display: none;
+    }
+
+    .calendar-date::after {
+        content: ' ' attr(data-weekday);
+    }
+}
+
+/* ---------------------------------------------------------------- density */
+
+/*
+ * One attribute on <html>, and the difference is padding and type scale — no
+ * template renders a different table, so a compact list is the same markup a
+ * screen reader already knows how to read.
+ */
+:root[data-density='compact'] {
+    --row-padding-y: 0.35rem;
+    --card-padding: 0.85rem;
+}
+
+:root[data-density='compact'] .table th,
+:root[data-density='compact'] .table td {
+    padding: var(--row-padding-y) 0.5rem;
+}
+
+:root[data-density='compact'] .card {
+    padding: var(--card-padding);
+}
+
+:root[data-density='compact'] .table {
+    font-size: 0.875rem;
+}
+
+:root[data-density='compact'] .renewals li {
+    padding: 0.25rem 0;
+}
+
+:root[data-density='compact'] .cell-name .logo {
+    display: none;
+}
+
+/* ------------------------------------------------------- forced colours */
+
+@media (forced-colors: active) {
+    .calendar-day.is-today {
+        outline: 2px solid currentColor;
+    }
+}
