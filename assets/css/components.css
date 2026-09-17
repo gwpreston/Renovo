@@ -970,22 +970,22 @@ legend {
 }
 
 /*
- * The one primary action per screen, and the only filled gradient in the
- * component set.
+ * The one primary action per screen, filled with a flat colour.
  *
- * It uses `--gradient-action` rather than `--gradient-brand`: the logo's own
- * stops cannot hold white text at body size (2.8:1 at the teal end), and these
- * are the same two hues darkened until they can — 5.3:1, 5.6:1 and 5.7:1
- * across the two stops and the midpoint.
+ * `--accent` is the action colour the rest of the interface already uses for a
+ * link and a focus ring, and `--accent-text` is the ink defined to sit on it,
+ * so the button follows the theme rather than restating it: a dark teal
+ * carrying white on a light page, the brighter teal carrying near-black on a
+ * dark one. The logo's gradient stays where nothing sits on top of it.
  */
 .button-primary {
-    background: var(--gradient-action);
+    background: var(--accent);
     border-color: transparent;
-    color: #ffffff;
+    color: var(--accent-text);
 }
 
 .button-primary:hover {
-    background: var(--gradient-action);
+    background: var(--accent);
     filter: brightness(1.08);
     border-color: transparent;
 }

@@ -646,11 +646,13 @@ every pixel of it onto the 135° axis the gradient runs along and averaged the
 first and last twentieth.
 
 They are used where nothing sits on top of them — the brand mark, the active
-nav item, a featured card's wash. A filled button uses `--gradient-action`
-instead, because white text on the real mark is 2.9:1 at the teal stop and
-4.0:1 at the midpoint, and no single ink passes across the actual logo
-gradient. Only the teal end needs darkening: the blue stop carries white at
-5.6:1 as it stands. The pair holds white at 5.2:1, 5.4:1 and 5.6:1.
+nav item, a featured card's wash. **A filled button is a flat colour, not a
+gradient**: `--accent`, the same action colour a link and a focus ring use,
+with `--accent-text` as its ink. Both are assigned per theme, so the button
+follows light and dark like everything else, and the ink has one contrast ratio
+to clear rather than a range of them. White text on the real mark would be
+2.9:1 at the teal stop, which is why a button was never painted with the logo's
+own colours.
 
 Brand and urgency are deliberately **different hues**. Teal-green is "this is
 the action"; amber→orange is "money is about to move" — renewing soon, a

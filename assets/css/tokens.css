@@ -45,20 +45,19 @@
     --gradient-brand: linear-gradient(135deg, var(--brand-from), var(--brand-to));
 
     /*
-     * The same gradient, made safe for white text.
+     * A filled button is a solid colour, not a gradient.
      *
-     * The mark's own cannot carry it at the teal end: white there is 2.9:1 and
-     * at the midpoint 4.0:1, both under the 4.5:1 body-sized text needs, while
-     * dark ink fails at the blue end instead — no single ink passes across the
-     * real mark. The blue stop, though, is dark enough as it stands (5.6:1), so
-     * only the teal is darkened. A filled button holds white at 5.2:1, 5.4:1
-     * and 5.6:1 across the two stops and the middle, and the mark keeps its own
-     * colours for the things that carry no text: the mark itself, the
-     * featured-card wash, the active rail marker.
+     * It used to be the gradient above, darkened until white could sit on it.
+     * A flat fill is the simpler thing and the more legible one: the ink meets
+     * one contrast ratio rather than a range of them, a row of buttons cannot
+     * disagree about where its gradient starts, and the brand still reads on
+     * the page from the mark, the active rail item and the featured card's
+     * wash — the places nothing sits on top of.
+     *
+     * The colour is `--accent`, the action colour already defined per theme,
+     * with `--accent-text` as its ink. Both are assigned in the palettes below,
+     * so a filled button follows light and dark like everything else.
      */
-    --action-from: #097a70;
-    --action-to: #1069bb;
-    --gradient-action: linear-gradient(135deg, var(--action-from), var(--action-to));
 }
 
 /* ------------------------------------------------------- the light palette */

@@ -75,29 +75,51 @@ final class DesignTokensTest extends TestCase
     }
 
     /**
-     * The filled primary button is not painted with the logo gradient.
+     * The filled primary button is a solid colour, and its ink is readable on
+     * it in both themes.
      *
-     * White text on the mark's teal stop is 2.9:1, which is not readable. The
-     * action gradient darkens that end until white clears AA across both stops
-     * and the middle, and this is what notices if someone "fixes" the button to
-     * use the brand colours directly.
+     * It was a gradient until the button was flattened, and the reason the
+     * gradient existed is the reason this test still does: white on the mark's
+     * teal stop is 2.9:1. The fill is `--accent` with `--accent-text` on it,
+     * and this is what notices if either is nudged towards the logo's own
+     * colours, where the pair would stop being readable.
      */
-    public function testTheActionGradientCarriesWhiteTextAtEveryStop(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('themes')]
+    public function testTheFilledButtonCarriesItsInk(string $theme): void
     {
-        $from = $this->token(':root', '--action-from');
-        $to = $this->token(':root', '--action-to');
+        $fill = $this->token($theme, '--accent');
+        $ink = $this->token($theme, '--accent-text');
 
-        self::assertNotNull($from);
-        self::assertNotNull($to);
+        self::assertNotNull($fill, 'No accent colour in this palette.');
+        self::assertNotNull($ink, 'No accent ink in this palette.');
 
-        foreach (['start' => $from, 'end' => $to, 'midpoint' => $this->mix($from, $to)] as $where => $colour) {
-            self::assertGreaterThanOrEqual(
-                self::AA_TEXT,
-                $this->contrast('#ffffff', $colour),
-                sprintf('White on the primary button fails AA at the %s (%s).', $where, $colour),
-            );
-        }
+        self::assertGreaterThanOrEqual(
+            self::AA_TEXT,
+            $this->contrast($ink, $fill),
+            sprintf('The primary button fails AA (%s on %s).', $ink, $fill),
+        );
     }
+
+    /**
+     * The filled button is flat: nothing paints it with a gradient.
+     *
+     * Asserted against the compiled stylesheet rather than the source, because
+     * what a browser receives is the only version that matters.
+     */
+    public function testTheFilledButtonIsNotAGradient(): void
+    {
+        self::assertMatchesRegularExpression(
+            '~\.button-primary\{[^}]*background:var\(--accent\)~',
+            $this->css,
+            'The primary button should be filled with the flat accent colour.',
+        );
+        self::assertDoesNotMatchRegularExpression(
+            '~\.button-primary\{[^}]*linear-gradient~',
+            $this->css,
+            'The primary button is a solid colour, not a gradient.',
+        );
+    }
+
 
     // ------------------------------------------------------------- the themes
 
@@ -393,19 +415,6 @@ final class DesignTokensTest extends TestCase
         return 0.2126 * $linear($r) + 0.7152 * $linear($g) + 0.0722 * $linear($b);
     }
 
-    /** The midpoint of a two-stop gradient, where a button's text often sits. */
-    private function mix(string $a, string $b): string
-    {
-        [$r1, $g1, $b1] = $this->channels($a);
-        [$r2, $g2, $b2] = $this->channels($b);
-
-        return sprintf(
-            '#%02x%02x%02x',
-            (int) round(($r1 + $r2) / 2 * 255),
-            (int) round(($g1 + $g2) / 2 * 255),
-            (int) round(($b1 + $b2) / 2 * 255),
-        );
-    }
 
     /**
      * A hex colour as three 0–1 channels.
