@@ -1,5 +1,9 @@
 /**
- * The dashboard's spend chart.
+ * The twelve-month spend chart.
+ *
+ * Drawn on the dashboard and, as the analytics screen's spending trajectory,
+ * on `/stats`. One payload builder on the server and one drawing routine here,
+ * so the two pictures cannot disagree about a month.
  *
  * The server has already done everything that involves money: the twelve
  * months arrive as integer minor units for the bars to be drawn from, and
@@ -13,33 +17,10 @@
  * thing this file is arranged to avoid.
  */
 
-import { renderChart } from './charts.js';
+import { drawInCard, payloadFor, token } from './charts.js';
 
 /** Where the payload and the canvas describe each other. */
 const CANVAS = 'canvas[data-chart="spend"]';
-
-/**
- * Read a design token, so the chart is drawn in the same colours as
- * everything around it and follows the theme rather than restating it.
- */
-function token(name, fallback) {
-    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
-    return value === '' ? fallback : value;
-}
-
-function payloadFor(canvas) {
-    const element = document.getElementById(canvas.dataset.chartData);
-    if (element === null) {
-        return null;
-    }
-
-    try {
-        return JSON.parse(element.textContent);
-    } catch (error) {
-        return null;
-    }
-}
 
 function configFor(data) {
     const values = data.months.map((month) => month.minor);
@@ -108,42 +89,26 @@ function configFor(data) {
 }
 
 /**
- * Draw the chart, if this page has one.
+ * Draw every spend chart on the page.
  *
- * The card is marked as drawn only once the library has loaded and the chart
- * exists. Until then — and for good on a browser that never runs this — the
- * card shows the table of figures the server rendered, which is the same data
- * the picture would have been.
- */
-export async function drawSpendChart(root = document) {
-    const canvas = root.querySelector(CANVAS);
-    if (canvas === null) {
-        return;
-    }
-
-    const data = payloadFor(canvas);
-    if (data === null || !Array.isArray(data.months) || data.months.length === 0) {
-        return;
-    }
-
-    await renderChart(canvas, configFor(data));
-    canvas.closest('.chart-card')?.classList.add('is-drawn');
-}
-
-/**
- * Redraw when the system flips between light and dark.
+ * `querySelectorAll`, not `querySelector`: the dashboard has one of these and
+ * the analytics screen has one beside a donut, and a page is free to have two.
+ * Each canvas names its own payload, so they do not have to be told apart.
  *
- * The colours above are read from the tokens at the moment of drawing, so a
- * chart drawn in light mode keeps light-mode ink until something asks for it
- * again. An account that has chosen a theme explicitly is unaffected: its
- * tokens do not move.
+ * A card's frame is revealed only once the library is here, and put back if the
+ * chart does not construct. Until then — and for good on a browser that never
+ * runs this — the card shows the table of figures the server rendered, which is
+ * the same data the picture would have been.
  */
-export function watchTheme() {
-    if (typeof window.matchMedia !== 'function') {
-        return;
-    }
+export async function drawSpendCharts(root = document) {
+    const canvases = Array.from(root.querySelectorAll(CANVAS));
 
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        drawSpendChart();
-    });
+    await Promise.all(canvases.map(async (canvas) => {
+        const data = payloadFor(canvas);
+        if (data === null || !Array.isArray(data.months) || data.months.length === 0) {
+            return;
+        }
+
+        await drawInCard(canvas, configFor(data));
+    }));
 }

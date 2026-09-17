@@ -35,6 +35,20 @@ final class DesignTokensTest extends TestCase
     /** WCAG 2.1 AA: the visible boundary of a user-interface component. */
     private const AA_NON_TEXT = 3.0;
 
+    /**
+     * The categorical palette: the colours a chart tells one series from
+     * another by. Six, plus the tail that "everything else" is drawn in.
+     */
+    private const SERIES = [
+        '--series-1',
+        '--series-2',
+        '--series-3',
+        '--series-4',
+        '--series-5',
+        '--series-6',
+        '--series-other',
+    ];
+
     private string $css;
 
     protected function setUp(): void
@@ -319,6 +333,86 @@ final class DesignTokensTest extends TestCase
             $ratio,
             sprintf('A field border at %.2f:1 is effectively invisible.', $ratio),
         );
+    }
+
+    // ------------------------------------------------------- the series palette
+
+    /**
+     * The categorical palette exists in both themes and is the same size in
+     * each.
+     *
+     * A chart reads its segment colours from these at the moment it is drawn,
+     * so a series defined in light and missing in dark is a donut that loses a
+     * segment when the machine flips at sunset — and loses it silently, because
+     * the fallback in the bundle keeps drawing *something*.
+     *
+     * @dataProvider themes
+     */
+    public function testTheSeriesPaletteIsCompleteInBothThemes(string $theme): void
+    {
+        foreach (self::SERIES as $name) {
+            self::assertNotNull(
+                $this->token($theme, $name),
+                sprintf('%s is not defined for %s.', $name, $theme),
+            );
+        }
+    }
+
+    /**
+     * No two series are the same colour.
+     *
+     * The entire job of a categorical palette is to tell one category from
+     * another. Two entries that resolve to the same value is a donut with a
+     * segment nobody can find, and it is the kind of thing a copied-and-pasted
+     * line produces without looking wrong in the source.
+     *
+     * @dataProvider themes
+     */
+    public function testEverySeriesIsDistinguishableFromEveryOther(string $theme): void
+    {
+        $seen = [];
+
+        foreach (self::SERIES as $name) {
+            $value = strtolower((string) $this->token($theme, $name));
+
+            self::assertNotContains(
+                $value,
+                $seen,
+                sprintf('%s repeats a colour already in the palette (%s).', $name, $value),
+            );
+
+            $seen[] = $value;
+        }
+    }
+
+    /**
+     * A segment is a graphical object, which WCAG holds to 3:1 against what it
+     * sits on.
+     *
+     * The donut is drawn on a card, so `--surface` is what each segment has to
+     * be findable against. A hue that fails this is one a reader cannot see is
+     * there at all, which is worse than a hue they cannot tell from its
+     * neighbour.
+     *
+     * @dataProvider themes
+     */
+    public function testEverySeriesIsVisibleAgainstTheCardItIsDrawnOn(string $theme): void
+    {
+        $surface = $this->token($theme, '--surface');
+        self::assertNotNull($surface);
+
+        foreach (self::SERIES as $name) {
+            $colour = $this->token($theme, $name);
+            self::assertNotNull($colour);
+
+            $ratio = $this->contrast($colour, $surface);
+
+            self::assertGreaterThanOrEqual(
+                self::AA_NON_TEXT,
+                $ratio,
+                sprintf('%s is %.2f:1 on the card and effectively invisible.', $name, $ratio),
+            );
+        }
     }
 
     // ----------------------------------------------------------------- tools

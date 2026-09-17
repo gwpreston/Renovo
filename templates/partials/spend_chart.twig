@@ -1,0 +1,69 @@
+{#
+    Twelve months of spend, as a chart with its figures beside it.
+
+    Shared by the dashboard's card and the analytics screen's spending
+    trajectory. Both are handed a payload from `SpendChartService`, so the two
+    pictures are the same picture and cannot disagree about a month. Written
+    once here for the same reason the payload is built once there.
+
+    `id` is what ties the canvas to its payload: two charts on one page need two
+    of them, and the canvas names the script element it reads.
+#}
+{% macro spend_chart(chart, id, alt) %}
+    {% if not chart.is_drawable %}
+        {#
+            A missing month total would be drawn as a short bar, which reads as
+            a cheap month rather than an unknown one. So there is no chart —
+            the Forecast page shows those months per currency instead.
+        #}
+        <p class="muted empty">
+            {{ t('dashboard.chart_unconvertible', {
+                'currencies': chart.unconvertible|join(', '),
+                'currency': chart.currency,
+            }) }}
+        </p>
+    {% else %}
+        <div class="chart-frame">
+            <canvas class="chart-canvas"
+                    data-chart="spend"
+                    data-chart-data="{{ id }}"
+                    role="img"
+                    aria-label="{{ alt }}"></canvas>
+        </div>
+
+        {#
+            The figures themselves, for a screen reader and for a browser with
+            no script: the table is what the card shows until the bundle marks
+            the section as drawn, at which point CSS hides it from sight and
+            leaves it to assistive technology. The chart is drawn from this
+            same payload, so the table cannot describe a different set of
+            numbers than the picture.
+        #}
+        <script id="{{ id }}" type="application/json">{{ chart.json|raw }}</script>
+
+        <div class="chart-figures">
+            <table class="table">
+                <caption class="visually-hidden">{{ alt }}</caption>
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.month') }}</th>
+                    <th scope="col" class="numeric">{{ t('field.total') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for month in chart.months %}
+                    <tr{{ loop.index0 == chart.peak_index ? ' class="is-peak"' : '' }}>
+                        <th scope="row">{{ month.label }}</th>
+                        <td class="numeric">
+                            {{ month.display }}
+                            {% if loop.index0 == chart.peak_index %}
+                                <span class="badge badge-warning">{{ t('dashboard.peak_month') }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endmacro %}

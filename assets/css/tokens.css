@@ -120,6 +120,29 @@
     --increase: #b3261e;
     --decrease: #14683f;
 
+    /*
+     * The categorical palette: the colours a segment or a series is told apart
+     * by, rather than a colour that means something.
+     *
+     * Every other hue in this file carries a meaning — amber is money about to
+     * move, red is a problem, the accent is the thing to press. These carry
+     * none, which is the point: a donut's third segment is not more urgent than
+     * its second. They are ordered by hue rather than by importance so that
+     * adjacent segments are distinguishable, and the tail is deliberately
+     * outside the sequence so "everything else" reads as everything else and
+     * not as a seventh category.
+     *
+     * Each clears 3:1 against the surface it is drawn on, which is what WCAG
+     * asks of a graphical object a reader has to tell from its background.
+     */
+    --series-1: #097a70;
+    --series-2: #1069bb;
+    --series-3: #7a4fbd;
+    --series-4: #b4430f;
+    --series-5: #8a6d1f;
+    --series-6: #0d6b8f;
+    --series-other: #6b7280;
+
     --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
     --backdrop: rgba(16, 24, 40, 0.45);
 }
@@ -167,6 +190,16 @@
         --increase: #ff8a82;
         --decrease: #57d18c;
 
+        /* The categorical palette again, lifted for a near-black page: the
+           light values are too dark to tell apart on it. */
+        --series-1: #2ec9b8;
+        --series-2: #5aa9f0;
+        --series-3: #b99bf5;
+        --series-4: #ff9d6e;
+        --series-5: #d9bd57;
+        --series-6: #5cc2e8;
+        --series-other: #9095a3;
+
         /*
          * No drop shadow. On a near-black page a shadow is invisible; what
          * separates a card from the page here is its own faint top-edge
@@ -207,6 +240,16 @@
 
     --increase: #ff8a82;
     --decrease: #57d18c;
+
+    /* The categorical palette again, lifted for a near-black page: the light
+       values are too dark to tell apart on it. */
+    --series-1: #2ec9b8;
+    --series-2: #5aa9f0;
+    --series-3: #b99bf5;
+    --series-4: #ff9d6e;
+    --series-5: #d9bd57;
+    --series-6: #5cc2e8;
+    --series-other: #9095a3;
 
     --shadow: none;
     --backdrop: rgba(0, 0, 0, 0.6);

@@ -14,80 +14,61 @@
 {% endblock %}
 
 {% block content %}
+    {#
+        The design's arrangement: the KPI row, the spending trajectory, the
+        category donut, and the comparative pair. Not one figure on any of them
+        is computed for this screen — the KPIs are the statistics this page
+        already reported, the trajectory is the dashboard's own chart payload,
+        the donut is the breakdown the my-subscriptions widget draws as bars,
+        and year over year is the reconstruction it has always performed.
 
-    <section class="stat-grid">
-        {% for label, amount in per_period %}
-            <article class="card stat">
-                <h2 class="stat-label">{{ t('period.per_' ~ label) }}</h2>
-                <p class="stat-value">
-                    {{ amount is not null ? amount|money(combined_yearly.currency) : '—' }}
-                </p>
-            </article>
-        {% endfor %}
-    </section>
+        Below them, what this page has always carried and the design has no
+        place for: the same cost expressed over each period people think in, and
+        the cost-per-use ranking.
+    #}
+    {% include 'stats/_kpis.twig' %}
 
-    {% if combined_yearly.amount_minor is null %}
-        <p class="muted note">
-            {{ t('stats.unconvertible', {
-                'currency': base_currency,
-                'currencies': combined_yearly.unconvertible|join(', '),
-            }) }}
-        </p>
-        <section class="card">
-            <h2>{{ t('stats.per_year_heading') }}</h2>
-            <ul class="plain">
-                {% for currency, amount in by_currency %}
-                    <li>{{ amount|money(currency) }}</li>
-                {% endfor %}
-            </ul>
-        </section>
-    {% else %}
-        <p class="muted note">
-            {{ t('stats.per_year_note') }}
-        </p>
-    {% endif %}
+    <div class="analytics-layout">
+        <div class="analytics-main">
+            {% include 'stats/_trajectory.twig' %}
+        </div>
+        <aside class="analytics-side">
+            {% include 'stats/_categories.twig' %}
+        </aside>
+    </div>
+
+    {% include 'stats/_comparison.twig' %}
 
     <section class="card">
-        <h2>{{ t('stats.year_over_year') }}</h2>
-        {% set yoy = year_over_year %}
+        <h2>{{ t('stats.per_period') }}</h2>
 
-        {% if yoy.current.amount_minor is null or yoy.previous.amount_minor is null %}
-            <p class="muted">{{ t('stats.year_over_year_empty') }}</p>
-        {% elseif yoy.previous.amount_minor == 0 %}
-            <p class="muted">
-                {{ t('stats.no_previous_year', {
-                    'amount': yoy.current.amount_minor|money(yoy.current.currency),
-                }) }}
-            </p>
-        {% else %}
-            <div class="columns">
-                <div>
-                    <h3 class="stat-label">{{ t('stats.last_12_months') }}</h3>
-                    <p class="stat-value">{{ yoy.current.amount_minor|money(yoy.current.currency) }}</p>
-                </div>
-                <div>
-                    <h3 class="stat-label">{{ t('stats.the_12_before_that') }}</h3>
-                    <p class="stat-value">{{ yoy.previous.amount_minor|money(yoy.previous.currency) }}</p>
-                </div>
-                <div>
-                    <h3 class="stat-label">{{ t('field.change') }}</h3>
-                    <p class="stat-value {{ yoy.change_minor > 0 ? 'is-increase' : 'is-decrease' }}">
-                        {{ yoy.change_minor > 0 ? '+' : '' }}{{ yoy.change_minor|money(yoy.current.currency) }}
-                        {% if yoy.change_percent is not null %}
-                            <span class="stat-unit">({{ yoy.change_percent > 0 ? '+' : '' }}{{
-                                yoy.change_percent }}%)</span>
-                        {% endif %}
+        <div class="stat-grid stat-grid-inline">
+            {% for label, amount in per_period %}
+                <div class="stat">
+                    <h3 class="stat-label">{{ t('period.per_' ~ label) }}</h3>
+                    <p class="stat-value">
+                        {{ amount is not null ? amount|money(combined_yearly.currency) : '—' }}
                     </p>
                 </div>
-            </div>
-        {% endif %}
+            {% endfor %}
+        </div>
 
-        <p class="hint">
-            {{ t('stats.year_over_year_note') }}
-            {% if yoy.excluded_count > 0 %}
-                {{ t('stats.year_over_year_excluded', {'count': yoy.excluded_count}) }}
-            {% endif %}
-        </p>
+        {% if combined_yearly.amount_minor is null %}
+            <p class="muted note">
+                {{ t('stats.unconvertible', {
+                    'currency': base_currency,
+                    'currencies': combined_yearly.unconvertible|join(', '),
+                }) }}
+            </p>
+            <h3 class="stat-label">{{ t('stats.per_year_heading') }}</h3>
+            <ul class="plain">
+                {% for total in yearly_by_currency %}
+                    <li>{{ total.amount_minor|money(total.currency) }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="hint">{{ t('stats.per_year_note') }}</p>
+        {% endif %}
     </section>
 
     <section class="card">

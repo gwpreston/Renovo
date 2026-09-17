@@ -991,11 +991,31 @@ return [
 
     // stats
     'stats.cost_per_use' => 'Cost per use',
+    'stats.donut_alt' =>
+        'Doughnut chart of recurring monthly spend by category, in {currency}. The same figures are in '
+        . 'the table that follows.',
+    'stats.donut_per_currency' =>
+        'Shown per currency rather than as one chart: no exchange rate is available for {currencies}, so '
+        . 'there is no single total for the categories to be shares of. Each figure below is a share of '
+        . 'its own currency\'s monthly total.',
     'stats.last_12_months' => 'Last 12 months',
+    'stats.least_expensive' => 'Least expensive',
+    'stats.most_expensive' => 'Most expensive',
     'stats.no_previous_year' =>
         'Nothing recorded for the year before last, so there is nothing to compare against. {amount} in '
         . 'the last twelve months.',
     'stats.no_uses_recorded' => 'No uses recorded',
+    'stats.notable' => 'Notable subscriptions',
+    'stats.notable_empty' => 'Nothing with a monthly cost to compare yet.',
+    'stats.notable_excluded' =>
+        '{count, plural, one {# subscription is} other {# subscriptions are}} not ranked: no exchange '
+        . 'rate is available to compare them with the rest.',
+    'stats.notable_note' =>
+        'Ranked on cost per month converted to the base currency, because two prices in different '
+        . 'currencies have no order otherwise. Each is shown in the currency it is actually charged in. '
+        . 'One-off and lifetime entries have no monthly cost, and a trial has none until it converts, so '
+        . 'none of them is ranked.',
+    'stats.per_period' => 'The same cost, by period',
     'stats.per_year_heading' => 'Recurring cost per year, by currency',
     'stats.per_year_note' =>
         'All four are derived from the yearly figure, so they always multiply up to one another. Days '
@@ -1004,7 +1024,11 @@ return [
     'stats.rarely_used' => 'Rarely used',
     'stats.rating_label' => '{rating} out of {max}',
     'stats.the_12_before_that' => 'The 12 before that',
-    'stats.title' => 'Statistics',
+    'stats.title' => 'Analytics',
+    'stats.trajectory' => 'Spending trajectory',
+    'stats.trajectory_note' =>
+        'Each renewal in the month it actually falls, with scheduled price changes and trial conversions '
+        . 'applied from their own dates. The same figures the dashboard chart and the forecast show.',
     'stats.unconvertible' =>
         'These cannot be combined into {currency}: no exchange rate is available for {currencies}. The '
         . 'per-currency figures below are the complete picture; a combined number leaving that spending '
