@@ -1176,6 +1176,11 @@ return [
         . 'Leave blank to use the schedule from',
     'subscriptions_form.reminders_hint_link' => 'your notification settings',
     'subscriptions_form.same_as_above' => 'Same as above',
+    'subscriptions_form.save_changes' => 'Save changes',
+    'subscriptions_form.section_billing' => 'When it’s billed',
+    'subscriptions_form.section_cost' => 'What it costs',
+    'subscriptions_form.section_identity' => 'What it is',
+    'subscriptions_form.section_ownership' => 'Who it’s for',
     'subscriptions_form.start_date_hint' =>
         'Used to reconstruct what you spent in previous years, and to date the first entry in the price '
         . 'history.',
