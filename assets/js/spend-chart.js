@@ -27,10 +27,10 @@ function configFor(data) {
     const displays = data.months.map((month) => month.display);
     const tickLabels = new Map(data.ticks.map((tick) => [tick.value, tick.label]));
 
-    const bar = token('--accent', '#097a70');
+    const bar = token('--accent', '#086f66');
     /* Amber is this application's "money is about to move"; the busiest month
        is the one worth looking at, so it is the one that gets it. */
-    const peak = token('--warning', '#b4430f');
+    const peak = token('--warning', '#a83f0e');
     const grid = token('--border', 'rgba(16, 24, 40, 0.12)');
     const text = token('--text-muted', '#5b6472');
 

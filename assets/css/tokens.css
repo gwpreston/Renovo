@@ -75,12 +75,25 @@
 :root {
     color-scheme: light;
 
-    /* surfaces */
-    --bg: #f4f5f7;
+    /*
+     * Surfaces.
+     *
+     * The page is a definite grey, not a hint of one. It used to be `#f4f5f7`,
+     * which put a white card on a 1.09:1 background — a 2% separation that the
+     * shadow could not rescue, so the whole screen read as one undifferentiated
+     * white sheet and the cards stopped looking like cards. `#e8eaee` roughly
+     * doubles that to 1.20:1, which is enough for a card to lift without the
+     * page turning into a second colour competing with the content.
+     *
+     * Hover and sunken must stay *darker* than the page, or a recessed surface
+     * sits lighter than what it is recessed into and the depth reads backwards.
+     * They moved with `--bg` for exactly that reason.
+     */
+    --bg: #e8eaee;
     --surface: #ffffff;
     --surface-raised: #ffffff;
-    --surface-hover: #eef0f3;
-    --surface-sunken: #eef0f3;
+    --surface-hover: #dde0e6;
+    --surface-sunken: #dde0e6;
 
     /*
      * Two borders, because they do two jobs. The hairline separates things
@@ -89,7 +102,12 @@
      * against what it sits on the way it holds text to 4.5:1.
      */
     --border: rgba(16, 24, 40, 0.12);
-    --border-control: #7d8794;
+    /*
+     * 3.36:1 on the page and 4.05:1 on a card. It was `#7d8794`, which landed
+     * at 3.02:1 once the page darkened — over the line by a rounding error,
+     * which is not over the line.
+     */
+    --border-control: #767f8c;
 
     /* text */
     --text: #14161c;
@@ -97,15 +115,28 @@
 
     /*
      * The action colour, for links, focus rings, the active nav item and a
-     * meter fill. It is the brand's teal darkened until it holds 5.2:1 on
-     * white — the mark's own #0daa9c is 2.9:1 there, readable on the dark
-     * surface it was sampled against and not on this one.
+     * meter fill. It is the brand's teal darkened until it clears 4.5:1 on
+     * *both* surfaces it is read on — 5.02:1 on the page, 6.04:1 on a card —
+     * and carries white at 6.04:1 when it is a filled button. The mark's own
+     * #0daa9c is 2.9:1 on white, readable on the dark surface it was sampled
+     * against and not on this one.
+     *
+     * It was #097a70, which held 5.21:1 on a card but only 4.33:1 once the page
+     * darkened — and a link in a card's margin is read against the page.
      */
-    --accent: #097a70;
+    --accent: #086f66;
     --accent-text: #ffffff;
 
-    /* urgency: renewing soon, a cancel-by deadline, a budget projected over */
-    --warning: #b4430f;
+    /*
+     * Urgency: renewing soon, a cancel-by deadline, a budget projected over.
+     *
+     * Darkened from #b4430f when the page did. It is read on four surfaces —
+     * the card, the page, its own tint and the hover/sunken grey — and the
+     * hover grey is the strict one: the old value held 4.23:1 there once that
+     * surface darkened, which `DesignTokensTest` fails on. This clears 4.5:1 on
+     * all four.
+     */
+    --warning: #a83f0e;
     --warning-bg: #fff1e8;
 
     /* a genuine problem, distinct from the heads-up above */
