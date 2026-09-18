@@ -7,8 +7,12 @@ namespace App\Service\Auth;
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Domain\AuditAction;
 use App\Domain\Entity\User;
+use App\Domain\LandingView;
+use App\Domain\Permission;
 use App\Repository\MembershipRepository;
 use App\Security\CsrfTokenManager;
+use App\Security\PermissionService;
+use App\Security\ScopeFactory;
 use App\Security\SessionInterface;
 use App\Service\AuditLogService;
 
@@ -45,6 +49,8 @@ final class SignInService
         private readonly CsrfTokenManager $csrf,
         private readonly MembershipRepository $memberships,
         private readonly AuditLogService $audit,
+        private readonly ScopeFactory $scopes,
+        private readonly PermissionService $permissions,
     ) {
     }
 
@@ -61,6 +67,54 @@ final class SignInService
         }
 
         $this->audit->record(AuditAction::LoginSucceeded, $user, ['method' => $method]);
+    }
+
+    /**
+     * Where a freshly signed-in browser should land.
+     *
+     * "Open on" is a preference about the *beginning of a session*, and this is
+     * the only place it is applied. It used to be applied on `/` itself, which
+     * made the preference behave as a permanent redirect: the navigation's
+     * Dashboard item points at `/`, so anyone whose preference was not the
+     * dashboard could not reach the dashboard from the rail, the phone tab bar
+     * or the drawer at all.
+     *
+     * **A deep link wins.** `AuthenticationMiddleware` turns an unauthenticated
+     * GET into `/login?next=/budgets`, and somebody who asked for the budgets
+     * screen and was made to sign in on the way wanted the budgets screen. The
+     * preference only decides where *nowhere in particular* is, which is why
+     * the only target it replaces is `/`.
+     *
+     * The target is assumed to have been through the caller's own same-site
+     * check already — this decides where to go, not whether a supplied target
+     * is safe to go to.
+     */
+    public function landingFor(User $user, string $target): string
+    {
+        if ($target !== '/') {
+            return $target;
+        }
+
+        $landing = $user->landingViewPreference();
+        if ($landing === LandingView::Dashboard) {
+            return '/';
+        }
+
+        // Every landing page but the dashboard is a view of subscription data,
+        // so a role that may not read it lands on the dashboard whatever it has
+        // chosen. Sending them to a screen that answers 403 would be a worse
+        // welcome than ignoring the preference.
+        if (
+            $landing->needsSubscriptionAccess()
+            && !$this->permissions->allows(
+                $this->scopes->forUser($user),
+                Permission::ViewSubscriptions,
+            )
+        ) {
+            return '/';
+        }
+
+        return $landing->path();
     }
 
     /**

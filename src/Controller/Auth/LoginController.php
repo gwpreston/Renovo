@@ -83,7 +83,10 @@ final class LoginController extends Controller
 
         $this->flash('success', 'flash.welcome_back', ['name' => $user->displayName]);
 
-        return $this->redirect($response, $next);
+        // The "Open on" preference applies here and only here — see
+        // SignInService::landingFor(). `$next` is already same-site-checked;
+        // a deep link survives, a bare `/` becomes the chosen screen.
+        return $this->redirect($response, $this->signIn->landingFor($user, $next));
     }
 
     public function logout(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

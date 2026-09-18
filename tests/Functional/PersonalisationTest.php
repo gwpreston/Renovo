@@ -12,6 +12,7 @@ use App\Repository\MembershipRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Security\CsrfTokenManager;
+use App\Security\PasswordHasher;
 use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Service\InstanceSettingsService;
@@ -35,6 +36,9 @@ use Symfony\Component\Mailer\MailerInterface;
  */
 final class PersonalisationTest extends DatabaseTestCase
 {
+    private const PASSWORD = 'correct horse battery staple';
+
+
     /** @var App<ContainerInterface> */
     private App $app;
     private ArraySession $session;
@@ -66,7 +70,13 @@ final class PersonalisationTest extends DatabaseTestCase
         $households = new HouseholdRepository($this->db);
         $memberships = new MembershipRepository($this->db);
 
-        $this->userId = $users->create('owner@example.test', 'Owner', 'hash', false, new DateTimeImmutable());
+        $this->userId = $users->create(
+            'owner@example.test',
+            'Owner',
+            (new PasswordHasher())->hash(self::PASSWORD),
+            false,
+            new DateTimeImmutable(),
+        );
         $this->householdId = $households->create('Household', $this->userId);
         $memberships->create($this->householdId, $this->userId, Role::OwnerAdmin);
 
@@ -265,14 +275,55 @@ final class PersonalisationTest extends DatabaseTestCase
         self::assertSame('dashboard', $row['landing_view'] ?? null);
     }
 
-    public function testTheLandingPreferenceRedirectsTheRoot(): void
+    /**
+     * "Open on" is about where a session begins, not a permanent redirect.
+     *
+     * It used to be applied on `/` itself, and the navigation's Dashboard item
+     * points at `/` — so choosing any other landing page made the dashboard
+     * unreachable from the rail, the phone tab bar and the drawer at once. The
+     * assertion that `/` redirects has not been dropped; it has moved to the
+     * sign-in below, which is where the preference is now applied.
+     */
+    public function testTheDashboardIsReachableWhateverTheLandingPreference(): void
     {
         $this->savePreferences(['landing_view' => 'calendar']);
 
         $response = $this->request('GET', '/');
 
+        self::assertSame(200, $response->getStatusCode(), 'The dashboard must still be reachable at /.');
+    }
+
+    public function testSigningInLandsOnTheChosenPage(): void
+    {
+        $this->savePreferences(['landing_view' => 'calendar']);
+        $this->session->clear();
+
+        $response = $this->request('POST', '/login', [
+            'email' => 'owner@example.test',
+            'password' => self::PASSWORD,
+        ]);
+
         self::assertSame(302, $response->getStatusCode());
         self::assertSame('/calendar', $response->getHeaderLine('Location'));
+    }
+
+    public function testADeepLinkBeatsTheLandingPreference(): void
+    {
+        $this->savePreferences(['landing_view' => 'calendar']);
+        $this->session->clear();
+
+        // What `AuthenticationMiddleware` does to an unauthenticated GET: it
+        // remembers where the person was going. Somebody who asked for the
+        // budgets screen and was made to sign in on the way wanted the budgets
+        // screen, so the preference must not overrule it.
+        $response = $this->request('POST', '/login', [
+            'email' => 'owner@example.test',
+            'password' => self::PASSWORD,
+            'next' => '/budgets',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/budgets', $response->getHeaderLine('Location'));
     }
 
     public function testTheDashboardStillRendersWhenItIsTheChosenLanding(): void

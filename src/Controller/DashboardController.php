@@ -6,9 +6,6 @@ namespace App\Controller;
 
 use App\I18n\Translator;
 use App\Security\SessionInterface;
-use App\Domain\LandingView;
-use App\Domain\Permission;
-use App\Security\PermissionService;
 use App\Service\DashboardLayoutService;
 use App\Service\DashboardService;
 use App\Service\InstanceSettingsService;
@@ -25,7 +22,6 @@ final class DashboardController extends Controller
         private readonly DashboardService $dashboard,
         private readonly InstanceSettingsService $settings,
         private readonly DashboardLayoutService $layout,
-        private readonly PermissionService $permissions,
     ) {
         parent::__construct($view, $session, $translator);
     }
@@ -35,18 +31,12 @@ final class DashboardController extends Controller
         $scope = $this->scope($request);
         $user = $this->user($request);
 
-        // "Open on" is honoured here rather than by a redirect rule somewhere
-        // in the middleware: this is the route that means "the beginning", and
-        // a user who has chosen another page should land on it.
-        $landing = $user->landingViewPreference();
-        if (
-            $landing !== LandingView::Dashboard
-            && (!$landing->needsSubscriptionAccess()
-                || $this->permissions->allows($scope, Permission::ViewSubscriptions))
-        ) {
-            return $this->redirect($response, $landing->path());
-        }
-
+        // No "Open on" redirect here. That preference is about where a *session*
+        // begins, so it is applied once, when the browser signs in — see
+        // SignInService::landingFor(). Applied on this route it behaved as a
+        // permanent redirect, and since the navigation's Dashboard item points
+        // at `/`, it made the dashboard unreachable for anyone whose preference
+        // was some other screen.
         $view = $this->requestedView($request);
 
         // A chip on the table asks for the table, and nothing else. Rendering

@@ -110,7 +110,9 @@ final class PasskeyLoginController extends Controller
 
         $this->flash('success', 'flash.welcome_back', ['name' => $user->displayName]);
 
-        return $this->json($response, ['redirect' => $this->safeTarget($request)]);
+        return $this->json($response, [
+            'redirect' => $this->signIn->landingFor($user, $this->safeTarget($request)),
+        ]);
     }
 
     private function safeTarget(ServerRequestInterface $request): string

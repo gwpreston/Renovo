@@ -179,7 +179,7 @@ final class TwoFactorController extends Controller
             $this->session->remove(self::CHALLENGE_SESSION_KEY);
         }
 
-        $target = $this->twoFactor->pendingTarget();
+        $target = $this->signIn->landingFor($user, $this->twoFactor->pendingTarget());
         $this->completeSignIn($user, SignInService::METHOD_PASSWORD_PASSKEY, $this->clientIp($request));
 
         return $this->json($response, ['redirect' => $target]);
@@ -202,7 +202,9 @@ final class TwoFactorController extends Controller
         string $method,
         string $ipAddress,
     ): ResponseInterface {
-        $target = $this->twoFactor->pendingTarget();
+        // Read before the challenge is cleared, and resolved through the same
+        // rule the one-factor path uses.
+        $target = $this->signIn->landingFor($user, $this->twoFactor->pendingTarget());
         $this->completeSignIn($user, $method, $ipAddress);
 
         $this->flash('success', 'flash.welcome_back', ['name' => $user->displayName]);
