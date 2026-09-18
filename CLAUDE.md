@@ -134,13 +134,18 @@ vendor/bin/phpstan analyse   # static analysis
 # Nothing is loaded from a third-party host (CI runs this after the build)
 php bin/console assets:offline-check
 
+# The API is described consistently in all three places it is described:
+# openapi/openapi.yaml against the route table, and docs/api.md against the
+# route table and PermissionService.
+vendor/bin/phpunit tests/Unit/OpenApiCoverageTest.php tests/Unit/ApiDocCoverageTest.php
+
 # Scheduler (reminders, budget re-eval, rate refresh) — runs daily
 php bin/console reminders:run
 ```
 
 CI runs lint + static analysis + tests + a Docker image build on every PR, and
-(from their respective phases) validates the OpenAPI spec and locale
-completeness. Don't merge red CI.
+(from their respective phases) validates the OpenAPI spec, the prose API
+reference and locale completeness. Don't merge red CI.
 
 ## Database rules
 
@@ -160,6 +165,10 @@ completeness. Don't merge red CI.
   User-URL channels must use the SSRF client; SMTP is exempt (not a URL fetch).
 - **New locale:** copy the `en` base, translate keys, run the completeness script
   (it must pass in CI — no missing/extra keys).
+- **New API endpoint:** describe it in `openapi/openapi.yaml` (the contract)
+  *and* in `docs/api.md` (the prose reference). Both are checked against the
+  route table in CI, in both directions, so neither can be skipped — and a new
+  `Permission` case has to reach the role matrix in `docs/api.md` too.
 - **New migration:** one concern per migration, with a working `down()`; verify
   on Postgres and MySQL.
 - **New front-end dependency:** install it from npm and let the build vendor

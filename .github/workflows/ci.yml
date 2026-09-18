@@ -55,6 +55,17 @@ jobs:
           SESSION_KEY: ci-session-key-not-a-secret-0000000000000000
         run: vendor/bin/phpunit --no-coverage tests/Unit/OpenApiCoverageTest.php
 
+      # The prose reference in docs/api.md describes the same API a third time,
+      # and prose is what rots: nothing breaks when an endpoint goes
+      # undocumented, so nobody notices. The endpoints it lists are checked
+      # against the route table the same way the spec is, and its role matrix
+      # and worked GET /me response against PermissionService, so the file
+      # cannot quietly stop being true. Route table only, no database.
+      - name: The API reference matches the routes and the permissions
+        env:
+          SESSION_KEY: ci-session-key-not-a-secret-0000000000000000
+        run: vendor/bin/phpunit --no-coverage tests/Unit/ApiDocCoverageTest.php
+
   # The full suite runs against both engines: portable SQL is only portable if
   # somebody checks.
   tests:
