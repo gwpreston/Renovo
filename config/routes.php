@@ -44,6 +44,7 @@ use App\Controller\ImportController;
 use App\Controller\NotificationController;
 use App\Controller\Ops\HealthController;
 use App\Controller\Ops\MetricsController;
+use App\Controller\ProfileController;
 use App\Controller\SavedViewController;
 use App\Controller\SecurityController;
 use App\Controller\SettingsController;
@@ -255,13 +256,15 @@ return static function (App $app): void {
         $group->post('/tags/{id:[0-9]+}/delete', [CategoryController::class, 'deleteTag'])
             ->add($requires(Permission::ManageTags));
 
-        $group->get('/settings', [SettingsController::class, 'index'])->setName('settings');
+        // Your own page. Changing how Renovo looks to you needs no permission
+        // beyond being signed in: it alters what one account sees and nothing
+        // that anybody else does, which is why it is not under /settings —
+        // everything that is needs somebody's authority.
+        $group->get('/profile', [ProfileController::class, 'index'])->setName('profile');
+        $group->post('/profile/theme', [ProfileController::class, 'updateTheme']);
+        $group->post('/profile/preferences', [ProfileController::class, 'updatePreferences']);
 
-        // Changing your own appearance settings needs no permission beyond
-        // being signed in: they alter what one account sees and nothing that
-        // anybody else does.
-        $group->post('/settings/theme', [SettingsController::class, 'updateTheme']);
-        $group->post('/settings/preferences', [SettingsController::class, 'updatePreferences']);
+        $group->get('/settings', [SettingsController::class, 'index'])->setName('settings');
 
         $group->post('/settings/household', [SettingsController::class, 'updateHousehold'])
             ->add($requires(Permission::ManageHousehold));

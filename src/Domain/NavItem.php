@@ -18,9 +18,8 @@ namespace App\Domain;
  * Longest match wins, and a match is a whole path segment — `/subscriptions`
  * matches `/subscriptions/12/edit` and not `/subscriptions-archive`.
  *
- * An item with no `matches` at all is reachable and never highlighted. Profile
- * is the one: it is a deep link into a section of Settings, and the fragment
- * that distinguishes it never reaches the server.
+ * An item with no `matches` at all is reachable and never highlighted, which is
+ * what an item that only links somewhere else wants.
  */
 final class NavItem
 {

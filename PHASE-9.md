@@ -123,7 +123,9 @@ started, and the three places this deviates from the design:
     page — what the design describes is the appearance section of Settings — so
     it goes to `/settings#appearance`, and the fragment that distinguishes it
     never reaches the server. Lighting Settings alone is true; lighting both
-    would not be.
+    would not be. *(Superseded in Phase 14: Profile is now a page of its own at
+    `/profile`, holding what one account sets for itself, and it claims that
+    path like any other destination.)*
 
 - **Which item is active is a service's answer, not a template's.**
   `NavigationService` declares each destination once with the paths it claims and

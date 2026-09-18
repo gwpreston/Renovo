@@ -55,6 +55,7 @@ final class NavigationTest extends TestCase
             'cancel-by' => ['/cancellations', 'nav.cancellations'],
             'categories' => ['/categories', 'nav.categories'],
             'settings' => ['/settings', 'nav.settings'],
+            'your own page' => ['/profile', 'nav.profile'],
             // The three below all start with "/settings" and only one of them
             // is Notifications. This is the collision the old hand-written
             // navigation had to special-case in the template.
@@ -104,20 +105,23 @@ final class NavigationTest extends TestCase
     }
 
     /**
-     * Profile is a link into a section of Settings, and the fragment that says
-     * which section never reaches the server. So it goes somewhere real and is
-     * never the highlighted item — the alternative is two items lit at once on
-     * the settings page.
+     * Profile and Settings are two pages, and the rail lights one of them at a
+     * time. Standing on Settings must not light Profile as well.
      */
-    public function testProfileIsReachableAndNeverTheActiveItem(): void
+    public function testProfileIsItsOwnDestination(): void
     {
         $tools = $this->navigation->forPath($this->owner(), '/settings')->tools;
 
         $profile = $this->byLabel($tools, 'nav.profile');
 
         self::assertNotNull($profile, 'The profile link is gone.');
-        self::assertSame('/settings#appearance', $profile->href);
-        self::assertFalse($profile->active);
+        self::assertSame('/profile', $profile->href);
+        self::assertFalse($profile->active, 'Settings is the page; Profile is not.');
+
+        $onProfile = $this->navigation->forPath($this->owner(), '/profile')->tools;
+
+        self::assertTrue($this->byLabel($onProfile, 'nav.profile')?->active);
+        self::assertFalse($this->byLabel($onProfile, 'nav.settings')?->active);
     }
 
     /**
@@ -183,6 +187,7 @@ final class NavigationTest extends TestCase
     public function testTheDrawerSaysWhenItHoldsThePageYouAreOn(): void
     {
         self::assertTrue($this->navigation->forPath($this->owner(), '/settings')->drawerHoldsActive());
+        self::assertTrue($this->navigation->forPath($this->owner(), '/profile')->drawerHoldsActive());
         self::assertFalse($this->navigation->forPath($this->owner(), '/')->drawerHoldsActive());
     }
 

@@ -6,13 +6,8 @@ namespace App\Controller;
 
 use App\I18n\Translator;
 use App\Domain\Currency;
-use App\Domain\Density;
 use App\Domain\IsolationMode;
-use App\Domain\LandingView;
 use App\Domain\Role;
-use App\Domain\Theme;
-use App\Domain\WeekStart;
-use App\I18n\Locales;
 use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
@@ -21,20 +16,23 @@ use App\Service\ExchangeRateService;
 use App\Service\HouseholdSettingsService;
 use App\Service\InstanceAdminService;
 use App\Service\InstanceSettingsService;
-use App\Service\DashboardLayoutService;
 use App\Service\TrustedHostService;
-use App\Service\UserPreferencesService;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
 
 /**
- * Personal, household and instance settings.
+ * Household and instance settings: the things somebody decides on everybody
+ * else's behalf.
  *
- * The three tiers are separate routes with separate permissions: changing a
- * theme needs nothing, renaming a household needs Owner/Admin, and the
- * isolation mode needs instance administration.
+ * One account's own preferences are not here — they are a page of their own,
+ * `ProfileController`, because nothing on this one can be changed without a
+ * permission and nothing on that one needs any.
+ *
+ * The two tiers here are separate routes with separate permissions: renaming a
+ * household needs Owner/Admin, and the isolation mode needs instance
+ * administration.
  */
 final class SettingsController extends Controller
 {
@@ -50,9 +48,6 @@ final class SettingsController extends Controller
         private readonly TrustedHostService $trustedHosts,
         private readonly HouseholdSettingsService $householdSettings,
         private readonly InstanceAdminService $instanceAdmin,
-        private readonly UserPreferencesService $preferences,
-        private readonly DashboardLayoutService $dashboard,
-        private readonly Locales $locales,
     ) {
         parent::__construct($view, $session, $translator);
     }
@@ -72,12 +67,6 @@ final class SettingsController extends Controller
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],
             'roles' => Role::assignable(),
-            'themes' => Theme::cases(),
-            'densities' => Density::cases(),
-            'week_starts' => WeekStart::cases(),
-            'landing_views' => LandingView::cases(),
-            'locale_choices' => $this->locales->choices(),
-            'dashboard_layout' => $this->dashboard->forUser($this->user($request)->id),
             'currencies' => Currency::common(),
             'isolation_modes' => IsolationMode::cases(),
             'rate_providers' => $this->rateProviders->all(),
@@ -96,68 +85,6 @@ final class SettingsController extends Controller
                 'demo_mode' => $this->settings->isDemoMode(),
             ],
         ]);
-    }
-
-    /**
-     * The theme switch, which appears on every page and therefore submits on
-     * its own rather than as part of the settings form.
-     */
-    public function updateTheme(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
-    {
-        $body = $this->body($request);
-        $theme = is_scalar($body['theme'] ?? null) ? (string) $body['theme'] : null;
-
-        $this->preferences->updateTheme($this->user($request)->id, $theme);
-
-        // Back where they were: the switch is in the navigation bar, so
-        // sending them to the settings page from an arbitrary page would be a
-        // navigation they did not ask for.
-        $referer = $request->getHeaderLine('Referer');
-        $target = $referer !== '' ? $this->samePathAsUs($request, $referer) : '/settings';
-
-        return $this->redirectAfterWrite($request, $response, $target);
-    }
-
-    public function updatePreferences(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
-    {
-        $body = $this->body($request);
-        $userId = $this->user($request)->id;
-
-        $this->preferences->update($userId, $body);
-
-        $this->dashboard->update(
-            $userId,
-            is_array($body['card_position'] ?? null) ? $body['card_position'] : [],
-            is_array($body['card_visible'] ?? null) ? $body['card_visible'] : [],
-        );
-
-        $this->flash('success', 'flash.preferences_saved');
-
-        return $this->redirectAfterWrite($request, $response, '/settings');
-    }
-
-    /**
-     * A Referer, reduced to a path on this instance.
-     *
-     * Never used as a redirect target as it arrived: an absolute URL in that
-     * header is attacker-controllable, and handing it to a Location header is
-     * an open redirect. Only the path survives, and only when the host matches.
-     */
-    private function samePathAsUs(ServerRequestInterface $request, string $referer): string
-    {
-        $parts = parse_url($referer);
-        if ($parts === false) {
-            return '/settings';
-        }
-
-        $host = $parts['host'] ?? null;
-        if ($host !== null && $host !== $request->getUri()->getHost()) {
-            return '/settings';
-        }
-
-        $path = $parts['path'] ?? '/';
-
-        return str_starts_with($path, '/') ? $path : '/settings';
     }
 
     public function updateHousehold(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

@@ -142,15 +142,14 @@ final class NavigationService
                 icon: 'settings',
                 matches: ['/settings'],
             ),
-            // The design's Profile row. There is no profile page to send it to
-            // — what it describes is the appearance section of Settings — so it
-            // is a deep link, and it claims no path: the fragment that tells it
-            // apart from Settings never reaches the server, and lighting two
-            // items at once would be worse than lighting the one that is true.
+            // Profile is a page of its own: what one account sets for itself,
+            // as against Settings, where a household or an instance decides
+            // something on everybody's behalf.
             new NavItem(
                 labelKey: 'nav.profile',
-                href: '/settings#appearance',
+                href: '/profile',
                 icon: 'profile',
+                matches: ['/profile'],
             ),
         ];
     }
