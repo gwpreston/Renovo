@@ -1,0 +1,20 @@
+{#
+    The month: the grid and the rail beside it.
+
+    Month navigation swaps this rather than the grid alone, because the rail's
+    insight card describes the month on screen — paging to December and leaving
+    "two trials convert this month" behind from September would be a card that
+    contradicts the grid it sits next to.
+
+    The rail comes after the grid in source order. On a phone the two stack,
+    and a calendar pushed below two cards is not the calendar page; the same
+    order is what a keyboard walks.
+#}
+<div id="calendar-month" class="calendar-layout">
+    {% include 'calendar/_grid.twig' %}
+
+    <aside class="calendar-rail" aria-label="{{ t('calendar.rail') }}">
+        {% include 'calendar/_insight.twig' %}
+        {% include 'calendar/_upcoming.twig' %}
+    </aside>
+</div>

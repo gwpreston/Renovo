@@ -46,7 +46,7 @@ final class CalendarController extends Controller
             $request,
             $response,
             'calendar/index.twig',
-            'calendar/_grid.twig',
+            'calendar/_month.twig',
             [
                 'calendar' => $this->calendar->month(
                     $scope,

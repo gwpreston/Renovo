@@ -555,17 +555,31 @@ return [
 
     // calendar
     'calendar.caption' => 'Renewals and trial conversions in {month}',
+    'calendar.cancel_by' => 'Cancel by {date}',
+    'calendar.deadlines_note' =>
+        'The last day notice can be given to avoid the charge shown. After it, the next charge is due '
+        . 'whether the subscription is cancelled or not.',
+    'calendar.deadlines_this_month' =>
+        '{count, plural, one {# cancellation deadline} other {# cancellation deadlines}} this month',
     'calendar.due_this_month' =>
-        '{count, plural, one {# charge} other {# charges}} this month, totalling',
+        '{count, plural, one {# charge} other {# charges}} due this month',
     'calendar.intro' =>
         'Renewals and the day a free trial starts charging, on the dates they actually fall. '
         . 'Scheduled price changes are applied from their own dates, so an amount here is what will '
         . 'be taken rather than what is charged today.',
+    'calendar.insight' => 'Calendar insight',
     'calendar.just_mine' => 'Just mine',
     'calendar.month_navigation' => 'Month navigation',
     'calendar.next_month' => 'Next month',
+    'calendar.next_up' => 'Next up',
+    'calendar.next_up_note' => 'The next charges due, wherever in the year they fall.',
     'calendar.nothing_due' => 'Nothing due this month.',
+    'calendar.nothing_upcoming' => 'Nothing due in the next twelve months.',
     'calendar.previous_month' => 'Previous month',
+    'calendar.rail' => 'Calendar summary',
+    'calendar.trials_ending' =>
+        '{count, plural, one {# free trial ends} other {# free trials end}} this month',
+    'calendar.trials_starting_note' => 'in new charges once they convert.',
 
     // cancellations
     'cancellations.days_left' => '{days, plural, one {# day left} other {# days left}}',

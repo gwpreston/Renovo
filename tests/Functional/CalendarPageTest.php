@@ -38,6 +38,14 @@ final class CalendarPageTest extends DatabaseTestCase
     /** The month the fixtures live in, so the assertions do not drift. */
     private const MONTH = '2026-09';
 
+    /**
+     * A month inside the horizon with nothing in it. The fixture charges once
+     * and never again, which is what makes such a month reachable at all — a
+     * monthly subscription puts a charge in every month of the horizon, and
+     * paging past the horizon clamps back to one that has one.
+     */
+    private const EMPTY_MONTH = '2026-11';
+
     /** @var App<ContainerInterface> */
     private App $app;
     private ArraySession $session;
@@ -71,15 +79,17 @@ final class CalendarPageTest extends DatabaseTestCase
         $memberships->create($householdId, $userId, Role::OwnerAdmin);
 
         // One charge, on a day chosen so the month has plenty of quiet days
-        // around it — the case the phone layout exists to collapse.
+        // around it — the case the phone layout exists to collapse. It charges
+        // once rather than monthly so that some other month of the horizon is
+        // genuinely empty, which is a case of its own.
         (new SubscriptionRepository($this->db))->create(
             Scope::forMember($userId, true, $householdId, Role::OwnerAdmin, IsolationMode::Shared),
             [
                 'name' => 'A subscription',
                 'price_minor' => 999,
                 'currency' => 'GBP',
-                'subscription_type' => 'recurring',
-                'billing_cycle' => 'monthly',
+                'subscription_type' => 'one_off',
+                'billing_cycle' => null,
                 'next_payment_date' => self::MONTH . '-18',
                 'is_active' => true,
             ],
@@ -133,6 +143,62 @@ final class CalendarPageTest extends DatabaseTestCase
         self::assertDoesNotMatchRegularExpression('/is-empty[^"]*is-quiet/', $html);
     }
 
+    /**
+     * The rail and the grid are one swap.
+     *
+     * Month navigation replaces whatever it targets, so if the insight card
+     * sat outside that target, paging to another month would leave it
+     * describing the month the reader had just left — a card contradicting the
+     * grid beside it, with nothing in the markup to say which was right.
+     */
+    public function testMonthNavigationSwapsTheRailAlongWithTheGrid(): void
+    {
+        $html = $this->calendar();
+
+        self::assertStringContainsString('id="calendar-month"', $html);
+        self::assertStringContainsString('calendar-insight', $html);
+        self::assertStringContainsString('calendar-upcoming', $html);
+
+        preg_match_all('/hx-target="([^"]+)"/', $html, $matches);
+        self::assertNotEmpty($matches[1], 'The month links no longer swap anything.');
+        foreach ($matches[1] as $target) {
+            self::assertSame('#calendar-month', $target);
+        }
+    }
+
+    public function testTheFragmentCarriesTheRailRatherThanTheGridAlone(): void
+    {
+        // The htmx response is what a month link actually receives. A fragment
+        // holding only the grid would swap the rail out of the page entirely.
+        $html = $this->calendar(htmx: true);
+
+        self::assertStringContainsString('id="calendar-month"', $html);
+        self::assertStringContainsString('calendar-insight', $html);
+        self::assertStringContainsString('calendar-upcoming', $html);
+        // A fragment, not the whole page around it.
+        self::assertStringNotContainsString('<body', $html);
+    }
+
+    /**
+     * An empty month has to say so inside the grid card.
+     *
+     * The phone layout hides every quiet day, and in a month with nothing due
+     * every day is quiet — so without this the card is a heading above nothing
+     * at all, and the rail that would have explained it has stacked below the
+     * fold.
+     */
+    public function testAMonthWithNothingDueSaysSoInsideTheGrid(): void
+    {
+        $html = $this->calendar(month: self::EMPTY_MONTH);
+
+        $grid = $this->gridCard($html);
+        self::assertStringContainsString('Nothing due this month', $grid);
+
+        // And the rail's insight card is absent rather than an empty box: the
+        // grid has already said it, better placed.
+        self::assertStringNotContainsString('calendar-insight', $html);
+    }
+
     public function testStylesheetsAndScriptsAreVersioned(): void
     {
         $html = $this->calendar();
@@ -160,15 +226,33 @@ final class CalendarPageTest extends DatabaseTestCase
         return $matches[0];
     }
 
-    private function calendar(): string
+    /**
+     * The grid's own card, so an assertion about it cannot be satisfied by
+     * something the rail happens to say.
+     */
+    private function gridCard(string $html): string
     {
-        $response = $this->app->handle(
-            (new ServerRequestFactory())->createServerRequest(
-                'GET',
-                'http://localhost/calendar?month=' . self::MONTH,
-                ['REMOTE_ADDR' => '127.0.0.1'],
-            ),
+        $start = strpos($html, '<section id="calendar"');
+        self::assertNotFalse($start, 'The grid card is no longer in the page.');
+
+        $end = strpos($html, '<aside', $start);
+
+        return $end === false ? substr($html, $start) : substr($html, $start, $end - $start);
+    }
+
+    private function calendar(bool $htmx = false, ?string $month = null): string
+    {
+        $request = (new ServerRequestFactory())->createServerRequest(
+            'GET',
+            'http://localhost/calendar?month=' . ($month ?? self::MONTH),
+            ['REMOTE_ADDR' => '127.0.0.1'],
         );
+
+        if ($htmx) {
+            $request = $request->withHeader('HX-Request', 'true');
+        }
+
+        $response = $this->app->handle($request);
 
         self::assertSame(200, $response->getStatusCode(), 'The calendar did not render.');
 

@@ -1,6 +1,12 @@
 {#
-    The grid on its own, so month navigation swaps it through htmx without
-    re-rendering the page around it.
+    The grid on its own. `_month.twig` wraps it with the rail and is what
+    month navigation swaps through htmx, so neither is re-rendered without the
+    other and the rail can never describe a month the grid is not showing.
+
+    What the month costs is stated once, in the rail's insight card, rather
+    than here as well. A month with nothing in it still says so here, though:
+    the phone layout hides every quiet day, so an empty month is an empty card,
+    and the rail that would have explained it is below the fold.
 #}
 <section id="calendar" class="card calendar">
     <header class="calendar-header">
@@ -13,7 +19,7 @@
                 <a class="button button-quiet"
                    href="/calendar?month={{ calendar.previous }}{{ query }}"
                    hx-get="/calendar?month={{ calendar.previous }}{{ query }}"
-                   hx-target="#calendar" hx-swap="outerHTML" hx-push-url="true"
+                   hx-target="#calendar-month" hx-swap="outerHTML" hx-push-url="true"
                    rel="prev">{{ t('calendar.previous_month') }}</a>
             {% endif %}
 
@@ -21,7 +27,7 @@
                 <a class="button button-quiet"
                    href="/calendar?month={{ calendar.next }}{{ query }}"
                    hx-get="/calendar?month={{ calendar.next }}{{ query }}"
-                   hx-target="#calendar" hx-swap="outerHTML" hx-push-url="true"
+                   hx-target="#calendar-month" hx-swap="outerHTML" hx-push-url="true"
                    rel="next">{{ t('calendar.next_month') }}</a>
             {% endif %}
         </nav>
@@ -29,13 +35,6 @@
 
     {% if calendar.count == 0 %}
         <p class="muted empty">{{ t('calendar.nothing_due') }}</p>
-    {% else %}
-        <p class="muted">
-            {{ t('calendar.due_this_month', {'count': calendar.count}) }}
-            {% for currency, amount in calendar.totals %}
-                <strong>{{ amount|money(currency) }}</strong>{{ not loop.last ? ' · ' : '' }}
-            {% endfor %}
-        </p>
     {% endif %}
 
     <div class="table-scroll">
