@@ -40,10 +40,9 @@
                 <div>
                     <h3 class="stat-label">{{ t('field.change') }}</h3>
                     <p class="stat-value {{ yoy.change_minor > 0 ? 'is-increase' : 'is-decrease' }}">
-                        {{ yoy.change_minor > 0 ? '+' : '' }}{{ yoy.change_minor|money(yoy.current.currency) }}
+                        {{ yoy.change_minor|money(yoy.current.currency, true) }}
                         {% if yoy.change_percent is not null %}
-                            <span class="stat-unit">({{ yoy.change_percent > 0 ? '+' : '' }}{{
-                                yoy.change_percent }}%)</span>
+                            <span class="stat-unit">({{ yoy.change_percent|percent(true) }})</span>
                         {% endif %}
                     </p>
                 </div>

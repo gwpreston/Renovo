@@ -36,7 +36,7 @@
                 <label for="price">{{ t('field.price') }}</label>
                 <div class="input-group">
                     <input type="text" id="price" name="price" inputmode="decimal"
-                           value="{{ values.price|default('') }}" placeholder="9.99" required>
+                           value="{{ values.price|default('') }}" placeholder="{{ 9.99|decimal(2) }}" required>
                     <select name="currency" aria-label="{{ t('field.currency') }}">
                         {% for code in currencies %}
                             <option value="{{ code }}"
@@ -108,7 +108,7 @@
 
                     <label for="converts_to_price">{{ t('subscriptions_form.converts_to') }}</label>
                     <input type="text" id="converts_to_price" name="converts_to_price" inputmode="decimal"
-                           value="{{ values.converts_to_price|default('') }}" placeholder="9.99">
+                           value="{{ values.converts_to_price|default('') }}" placeholder="{{ 9.99|decimal(2) }}">
                     <p class="hint">{{ t('subscriptions_form.converts_to_price_hint') }}</p>
                     {% if errors.converts_to_price is defined %}
                         <p class="field-error">{{ error_message(errors.converts_to_price) }}</p>
@@ -138,7 +138,7 @@
                 <label for="notice_period_amount">{{ t('subscriptions_form.notice_period') }}</label>
                 <div class="input-group">
                     <input type="number" id="notice_period_amount" name="notice_period_amount" min="0" max="3650"
-                           value="{{ values.notice_period_amount|default('') }}" placeholder="0">
+                           value="{{ values.notice_period_amount|default('') }}" placeholder="{{ 0|decimal }}">
                     <select name="notice_period_unit" aria-label="{{ t('subscriptions_form.notice_period_unit') }}">
                         {% for unit in notice_units %}
                             <option value="{{ unit }}"

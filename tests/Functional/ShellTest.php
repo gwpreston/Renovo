@@ -170,6 +170,43 @@ final class ShellTest extends DatabaseTestCase
     }
 
     /**
+     * One action per screen wears the accent, and never two.
+     *
+     * The filled button is the interface saying "this is the thing to do
+     * here". Two of them on one page says it twice, which is the same as not
+     * saying it: a reader scanning for the action finds a pair and has to read
+     * both to work out which one the screen is about.
+     *
+     * The failure this catches is not a designer writing two on purpose. It is
+     * the arithmetic nobody does — a partial that carries a filled button
+     * appearing on a screen that already had one, or a second section growing
+     * a Save of its own — which is invisible while each template is read on
+     * its own and obvious the moment the page is rendered whole. So it is
+     * counted on the rendered page rather than in the templates.
+     *
+     * `.card-featured` is counted with it for the same reason: it is the other
+     * treatment reserved for one thing per screen.
+     *
+     * @dataProvider pages
+     */
+    public function testAtMostOneActionOnAScreenWearsTheAccent(string $path, string $expectedActive): void
+    {
+        $html = $this->get($path);
+
+        self::assertLessThanOrEqual(
+            1,
+            substr_count($html, 'button-primary'),
+            $path . ' has more than one filled button; only the screen\'s own action takes the accent.',
+        );
+
+        self::assertLessThanOrEqual(
+            1,
+            substr_count($html, 'card-featured'),
+            $path . ' has more than one featured card; the brand wash marks one card per screen.',
+        );
+    }
+
+    /**
      * The heading is the shell's, and there is one of it.
      *
      * Moving the <h1> into the top bar is what lets a page say what it is
@@ -214,17 +251,22 @@ final class ShellTest extends DatabaseTestCase
     }
 
     /**
-     * Quick-add degrades. The top bar's prominent action opens a dialog when
-     * there is script to open it with, and is a link to the real form when
-     * there is not — so the one definition of what a subscription needs is
-     * reached either way.
+     * Quick-add degrades. The top bar's action opens a dialog when there is
+     * script to open it with, and is a link to the real form when there is not
+     * — so the one definition of what a subscription needs is reached either
+     * way.
+     *
+     * It is deliberately not the filled button it used to be: it appears on
+     * every screen, and a filled control on all of them leaves no accent for
+     * the action a particular screen is actually about. See
+     * `testOnlyOneActionOnAScreenWearsTheAccent` below.
      */
     public function testQuickAddIsALinkToTheRealFormBeforeItIsADialog(): void
     {
         $html = $this->get('/');
 
         self::assertMatchesRegularExpression(
-            '~<a class="button button-primary topbar-add" href="/subscriptions/new"\s+data-opens-dialog="quick-add">~',
+            '~<a class="button topbar-add" href="/subscriptions/new"\s+data-opens-dialog="quick-add">~',
             $html,
         );
     }

@@ -3,6 +3,18 @@
 {% block heading %}{{ t('security.title') }}{% endblock %}
 
 {% block content %}
+    {#
+        The screen's one filled action, decided once rather than per section.
+
+        Everything on this page is a control for a factor that is already
+        there — turn it off, rename it, revoke it — except when the account has
+        no second factor at all. In that state there is a single thing worth
+        doing, and it is the only button here that gets the accent; once
+        something is protecting the account, nothing on the page competes for
+        the eye.
+    #}
+    {% set no_second_factor = not totp.enabled and passkeys is empty %}
+
     {% if recovery_codes is not empty %}
         <section class="card callout">
             <h2>{{ t('security.your_recovery_codes') }}</h2>
@@ -37,7 +49,8 @@
 
             <form method="post" action="/settings/security/totp" class="inline">
                 {{ csrf_field() }}
-                <button type="submit" class="button button-primary">{{ t('security.totp_setup_action') }}</button>
+                <button type="submit" class="button{{ no_second_factor ? ' button-primary' : '' }}">{{
+                    t('security.totp_setup_action') }}</button>
             </form>
         {% endif %}
     </section>
@@ -51,48 +64,50 @@
         {% if passkeys is empty %}
             <p class="muted">{{ t('security.none_registered') }}</p>
         {% else %}
-            <table class="table">
-                <thead>
-                <tr>
-                    <th scope="col">{{ t('field.name') }}</th>
-                    <th scope="col">{{ t('field.added') }}</th>
-                    <th scope="col">{{ t('field.last_used') }}</th>
-                    <th scope="col">{{ t('security.transports') }}</th>
-                    <th scope="col"></th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for passkey in passkeys %}
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
                     <tr>
-                        <td>
-                            <form method="post" action="/settings/security/passkeys/{{ passkey.id }}/rename"
-                                  class="inline">
-                                {{ csrf_field() }}
-                                <input type="text" name="name" value="{{ passkey.name }}" maxlength="100"
-                                       aria-label="{{ t('security.passkey_name') }}">
-                                <button type="submit" class="button button-quiet">{{ t('action.rename') }}</button>
-                            </form>
-                        </td>
-                        <td>{{ passkey.createdAt|local_date('d MMM y') }}</td>
-                        <td>{{ passkey.lastUsedAt ? passkey.lastUsedAt|local_date('d MMM y HH:mm') : 'Never' }}</td>
-                        <td class="muted">{{ passkey.transportSummary }}</td>
-                        <td>
-                            <form method="post" action="/settings/security/passkeys/{{ passkey.id }}/delete"
-                                  class="inline">
-                                {{ csrf_field() }}
-                                <button type="submit" class="button button-danger">{{ t('action.revoke') }}</button>
-                            </form>
-                        </td>
+                        <th scope="col">{{ t('field.name') }}</th>
+                        <th scope="col">{{ t('field.added') }}</th>
+                        <th scope="col">{{ t('field.last_used') }}</th>
+                        <th scope="col">{{ t('security.transports') }}</th>
+                        <th scope="col"></th>
                     </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                    {% for passkey in passkeys %}
+                        <tr>
+                            <td>
+                                <form method="post" action="/settings/security/passkeys/{{ passkey.id }}/rename"
+                                      class="inline">
+                                    {{ csrf_field() }}
+                                    <input type="text" name="name" value="{{ passkey.name }}" maxlength="100"
+                                           aria-label="{{ t('security.passkey_name') }}">
+                                    <button type="submit" class="button button-quiet">{{ t('action.rename') }}</button>
+                                </form>
+                            </td>
+                            <td>{{ passkey.createdAt|local_date('d MMM y') }}</td>
+                            <td>{{ passkey.lastUsedAt ? passkey.lastUsedAt|local_date('d MMM y HH:mm') : 'Never' }}</td>
+                            <td class="muted">{{ passkey.transportSummary }}</td>
+                            <td>
+                                <form method="post" action="/settings/security/passkeys/{{ passkey.id }}/delete"
+                                      class="inline">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="button button-danger">{{ t('action.revoke') }}</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         {% endif %}
 
         <div class="stack">
             <label for="passkey-name">{{ t('security.passkey_name_label') }}</label>
             <input type="text" id="passkey-name" maxlength="100" placeholder="{{ t('security.phone_yubikey_laptop') }}">
-            <button type="button" class="button button-primary" id="passkey-register">{{ t('security.add_a_passkey') }}</button>
+            <button type="button" class="button" id="passkey-register">{{ t('security.add_a_passkey') }}</button>
             <p class="field-error" id="passkey-register-error" hidden></p>
         </div>
     </section>
@@ -124,39 +139,41 @@
             {{ t('security.sessions_intro') }}
         </p>
 
-        <table class="table">
-            <thead>
-            <tr>
-                <th scope="col">{{ t('field.device') }}</th>
-                <th scope="col">{{ t('field.address') }}</th>
-                <th scope="col">{{ t('field.started') }}</th>
-                <th scope="col">{{ t('field.last_seen') }}</th>
-                <th scope="col"></th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for item in sessions %}
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
                 <tr>
-                    <td>
-                        {{ item.deviceLabel }}
-                        {% if item.isCurrent %}<span class="badge">{{ t('security.this_device') }}</span>{% endif %}
-                    </td>
-                    <td class="muted">{{ item.ipAddress|default('Unknown') }}</td>
-                    <td>{{ item.createdAt ? item.createdAt|local_date('d MMM y HH:mm') : '—' }}</td>
-                    <td>{{ item.lastActivity|local_date('d MMM y HH:mm') }}</td>
-                    <td>
-                        {% if not item.isCurrent %}
-                            <form method="post" action="/settings/security/sessions/revoke" class="inline">
-                                {{ csrf_field() }}
-                                <input type="hidden" name="handle" value="{{ item.handle }}">
-                                <button type="submit" class="button button-danger">{{ t('action.revoke') }}</button>
-                            </form>
-                        {% endif %}
-                    </td>
+                    <th scope="col">{{ t('field.device') }}</th>
+                    <th scope="col">{{ t('field.address') }}</th>
+                    <th scope="col">{{ t('field.started') }}</th>
+                    <th scope="col">{{ t('field.last_seen') }}</th>
+                    <th scope="col"></th>
                 </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                {% for item in sessions %}
+                    <tr>
+                        <td>
+                            {{ item.deviceLabel }}
+                            {% if item.isCurrent %}<span class="badge">{{ t('security.this_device') }}</span>{% endif %}
+                        </td>
+                        <td class="muted">{{ item.ipAddress|default('Unknown') }}</td>
+                        <td>{{ item.createdAt ? item.createdAt|local_date('d MMM y HH:mm') : '—' }}</td>
+                        <td>{{ item.lastActivity|local_date('d MMM y HH:mm') }}</td>
+                        <td>
+                            {% if not item.isCurrent %}
+                                <form method="post" action="/settings/security/sessions/revoke" class="inline">
+                                    {{ csrf_field() }}
+                                    <input type="hidden" name="handle" value="{{ item.handle }}">
+                                    <button type="submit" class="button button-danger">{{ t('action.revoke') }}</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
         {% if sessions|length > 1 %}
             <form method="post" action="/settings/security/sessions/revoke-others" class="inline">

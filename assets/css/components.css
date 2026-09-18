@@ -246,6 +246,7 @@ main.container {
     height: 100%;
 }
 
+/* Its colour is with the other buttons; this is only its layout. */
 .topbar-add {
     display: inline-flex;
     align-items: center;
@@ -1000,6 +1001,33 @@ legend {
     border-color: transparent;
 }
 
+/*
+ * Quick-add: outlined in the accent, and deliberately not filled with it.
+ *
+ * It is the one control that is on every single screen, which is exactly why
+ * it does not take the fill. "The one primary action per screen" cannot mean
+ * anything if a global shortcut is filled on all of them — the screen's own
+ * action would be arguing with the top bar for the same signal, and a reader
+ * scanning for "the thing to press here" would find two.
+ *
+ * So it keeps the accent in its edge and its ink: still the strongest thing in
+ * the bar, never the strongest thing on the page, and still clearly not the
+ * quiet sign-out beside it. A screen with no action of its own — the
+ * dashboard, the calendar — then has nothing filled at all, which is honest.
+ *
+ * Two class names rather than one, because `.button` is written below this
+ * point in the file and a single-class rule would lose to it on order alone.
+ */
+.button.topbar-add {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.button.topbar-add:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 .button-quiet {
     background: transparent;
 }
@@ -1084,6 +1112,27 @@ legend {
     font-size: 0.75rem;
     background: var(--surface-sunken);
     padding: 0.75rem;
+    border-radius: var(--radius-control);
+}
+
+/*
+ * A command to copy — the `curl` the API page shows, and the calendar feed's
+ * URL.
+ *
+ * `overflow-x` is the whole reason this rule exists. A `<pre>` does not wrap,
+ * and an unstyled one is the same trap a table is: it cannot be laid out
+ * narrower than its longest line, so a 60-character command silently widened
+ * the API tokens page by two hundred pixels on a phone. It scrolls inside its
+ * own box instead. Not wrapped, because a command broken across lines is a
+ * command that will be pasted wrong.
+ */
+.code-block {
+    overflow-x: auto;
+    margin: 0.5rem 0;
+    padding: 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    background: var(--surface-sunken);
     border-radius: var(--radius-control);
 }
 

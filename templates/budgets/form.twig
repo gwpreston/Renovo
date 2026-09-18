@@ -17,7 +17,7 @@
             <label for="amount">{{ t('budgets_form.limit') }}</label>
             <div class="field-row">
                 <input type="text" id="amount" name="amount" inputmode="decimal"
-                       value="{{ values.amount|default('') }}" placeholder="150.00" required>
+                       value="{{ values.amount|default('') }}" placeholder="{{ 150|decimal(2) }}" required>
                 <select name="currency" aria-label="{{ t('field.currency') }}">
                     {% for code in currencies %}
                         <option value="{{ code }}"
@@ -71,8 +71,8 @@
             <label for="warn_threshold_percent">{{ t('budgets_form.warn_at_optional') }}</label>
             <div class="field-row">
                 <input type="number" id="warn_threshold_percent" name="warn_threshold_percent" min="1" max="100"
-                       value="{{ values.warn_threshold_percent|default('') }}" placeholder="90">
-                <span class="field-suffix">%</span>
+                       value="{{ values.warn_threshold_percent|default('') }}" placeholder="{{ 90|decimal }}">
+                <span class="field-suffix">{{ percent_symbol() }}</span>
             </div>
             <p class="hint">{{ t('budgets_form.threshold_hint') }}</p>
             {% if errors.warn_threshold_percent is defined %}
@@ -94,7 +94,7 @@
 
         {% if budget_id and can(scope, 'budget.manage') %}
             <form method="post" action="/budgets/{{ budget_id }}/delete" class="stack"
-                  onsubmit="return confirm('Delete this budget?')">
+                  onsubmit="return confirm('{{ t('confirm.delete_budget')|e('js') }}')">
                 {{ csrf_field() }}
                 <button type="submit" class="button button-danger">{{ t('budgets_form.delete_budget') }}</button>
             </form>

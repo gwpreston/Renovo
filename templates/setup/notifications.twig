@@ -79,7 +79,7 @@
                         {% endif %}
                     {% endfor %}
 
-                    <button type="submit" class="button button-primary">
+                    <button type="submit" class="button">
                         {{ t('notifications.add_channel_of_type', {'type': notifier.label}) }}
                     </button>
                 </form>
@@ -90,7 +90,9 @@
     <form method="post" action="/setup/notifications/finish" class="stack">
         {{ csrf_field() }}
         <button type="submit" class="button button-primary">
-            {{ channels is empty ? 'Skip for now' : 'Finish' }}
+            {{ channels is empty
+                ? t('setup_notifications.skip_for_now')
+                : t('setup_notifications.finish') }}
         </button>
     </form>
 {% endblock %}

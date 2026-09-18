@@ -39,9 +39,14 @@
             subscription's money page, which enforces its own permissions — the
             insight was derived from rows this member can already see, and the
             link is not what makes that true.
+
+            It is also this screen's one filled button, and the only one on it.
+            Everything else here is a figure; this is the single place the
+            screen asks the member to go and do something, which is exactly
+            what the accent is reserved for.
         #}
         <p class="insight-action">
-            <a class="button" href="/subscriptions/{{ lead.subscription.id }}/money">
+            <a class="button button-primary" href="/subscriptions/{{ lead.subscription.id }}/money">
                 {{ t('insight.action') }}
             </a>
         </p>

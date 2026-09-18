@@ -135,7 +135,7 @@
                             {{ slice.is_other ? tail_name : slice.name }}
                         </th>
                         <td class="numeric">{{ slice.display }}</td>
-                        <td class="numeric">{{ slice.percent }}%</td>
+                        <td class="numeric">{{ slice.percent|percent }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -143,7 +143,7 @@
                 <tr>
                     <th scope="row">{{ t('field.total') }}</th>
                     <td class="numeric">{{ donut.total_display }}</td>
-                    <td class="numeric">100%</td>
+                    <td class="numeric">{{ 100|percent }}</td>
                 </tr>
                 </tfoot>
             </table>

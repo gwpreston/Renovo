@@ -28,6 +28,7 @@ use App\Support\AssetVersion;
 use App\Support\BuildManifest;
 use App\Support\DateFormatter;
 use App\Support\MoneyFormatter;
+use App\Support\NumberFormat;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Twig\Extension\AbstractExtension;
@@ -62,6 +63,7 @@ final class AppExtension extends AbstractExtension
         private readonly BuildManifest $build,
         private readonly NavigationService $navigation,
         private readonly DateFormatter $dates,
+        private readonly NumberFormat $numbers,
     ) {
     }
 
@@ -89,6 +91,7 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('alert_type_label', $this->alertTypeLabel(...)),
             new TwigFunction('channel_description', $this->channelDescription(...)),
             new TwigFunction('channel_fields', $this->channelFields(...)),
+            new TwigFunction('percent_symbol', $this->numbers->percentSymbol(...)),
         ];
     }
 
@@ -97,6 +100,8 @@ final class AppExtension extends AbstractExtension
         return [
             new TwigFilter('money', $this->formatMoney(...)),
             new TwigFilter('local_date', $this->formatDate(...)),
+            new TwigFilter('percent', $this->numbers->percent(...)),
+            new TwigFilter('decimal', $this->numbers->decimal(...)),
         ];
     }
 
@@ -131,9 +136,9 @@ final class AppExtension extends AbstractExtension
         return $this->dates->format($date, $pattern);
     }
 
-    public function formatMoney(?int $amountMinor, string $currency): string
+    public function formatMoney(?int $amountMinor, string $currency, bool $signed = false): string
     {
-        return $this->money->formatMinor($amountMinor ?? 0, $currency);
+        return $this->money->formatMinor($amountMinor ?? 0, $currency, $signed);
     }
 
     /**

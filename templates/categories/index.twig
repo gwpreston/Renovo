@@ -11,37 +11,39 @@
             {% if categories is empty %}
                 <p class="muted">{{ t('categories.no_categories_yet') }}</p>
             {% else %}
-                <table class="table">
-                    <tbody>
-                    {% for category in categories %}
-                        <tr>
-                            <td>
-                                {% if can(scope, 'category.manage') %}
-                                    <form method="post" action="/categories/{{ category.id }}" class="inline-form">
-                                        {{ csrf_field() }}
-                                        <input type="text" name="name" value="{{ category.name }}" aria-label="{{ t('categories.category_name') }}">
-                                        <input type="color" name="colour" value="{{ category.colour|default('#888888') }}"
-                                               aria-label="{{ t('categories.category_colour') }}">
-                                        <button type="submit" class="button button-quiet">{{ t('action.save') }}</button>
-                                    </form>
-                                {% else %}
-                                    <span class="swatch" style="background: {{ category.colour|default('#888888') }}"></span>
-                                    {{ category.name }}
-                                {% endif %}
-                            </td>
-                            <td class="actions">
-                                {% if can(scope, 'category.manage') %}
-                                    <form method="post" action="/categories/{{ category.id }}/delete" class="inline"
-                                          onsubmit="return confirm('Delete {{ category.name|e('js') }}?')">
-                                        {{ csrf_field() }}
-                                        <button type="submit" class="button button-danger">{{ t('action.delete') }}</button>
-                                    </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+                <div class="table-scroll">
+                    <table class="table">
+                        <tbody>
+                        {% for category in categories %}
+                            <tr>
+                                <td>
+                                    {% if can(scope, 'category.manage') %}
+                                        <form method="post" action="/categories/{{ category.id }}" class="inline-form">
+                                            {{ csrf_field() }}
+                                            <input type="text" name="name" value="{{ category.name }}" aria-label="{{ t('categories.category_name') }}">
+                                            <input type="color" name="colour" value="{{ category.colour|default('#888888') }}"
+                                                   aria-label="{{ t('categories.category_colour') }}">
+                                            <button type="submit" class="button button-quiet">{{ t('action.save') }}</button>
+                                        </form>
+                                    {% else %}
+                                        <span class="swatch" style="background: {{ category.colour|default('#888888') }}"></span>
+                                        {{ category.name }}
+                                    {% endif %}
+                                </td>
+                                <td class="actions">
+                                    {% if can(scope, 'category.manage') %}
+                                        <form method="post" action="/categories/{{ category.id }}/delete" class="inline"
+                                              onsubmit="return confirm('{{ t('confirm.delete_category', {'name': category.name})|e('js') }}')">
+                                            {{ csrf_field() }}
+                                            <button type="submit" class="button button-danger">{{ t('action.delete') }}</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% endif %}
 
             {% if can(scope, 'category.manage') %}

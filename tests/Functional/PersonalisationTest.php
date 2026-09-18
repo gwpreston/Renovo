@@ -139,6 +139,55 @@ final class PersonalisationTest extends DatabaseTestCase
         );
     }
 
+    /**
+     * Density is a coat of paint, and nothing else.
+     *
+     * Compact and comfortable are the same markup with different padding —
+     * `screens.css` changes a few values under `[data-density='compact']` and
+     * no template renders a different table. That property is easy to lose the
+     * first time somebody "tidies" a compact list by dropping a column from
+     * the markup, and losing it means a reader on a screen reader hears a
+     * different page depending on a setting that is supposed to be visual.
+     *
+     * So the two are compared as text: identical apart from the attribute that
+     * selects them. The comparison covers every screen the setting touches
+     * rather than one, because the failure would arrive on whichever screen was
+     * being tidied.
+     *
+     * @dataProvider densityScreens
+     */
+    public function testDensityChangesTheStylingAndNotTheMarkup(string $path): void
+    {
+        $this->savePreferences(['density' => 'comfortable']);
+        $comfortable = (string) $this->request('GET', $path)->getBody();
+
+        $this->savePreferences(['density' => 'compact']);
+        $compact = (string) $this->request('GET', $path)->getBody();
+
+        self::assertStringContainsString('data-density="comfortable"', $comfortable);
+        self::assertStringContainsString('data-density="compact"', $compact);
+
+        self::assertSame(
+            str_replace('data-density="comfortable"', 'data-density="compact"', $comfortable),
+            $compact,
+            $path . ' renders different markup at the two densities; a screen reader would hear the difference.',
+        );
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function densityScreens(): array
+    {
+        return [
+            'the dashboard' => ['/'],
+            'the list' => ['/subscriptions'],
+            'the calendar' => ['/calendar'],
+            'analytics' => ['/stats'],
+            'budgets' => ['/budgets'],
+        ];
+    }
+
     public function testAnUnrecognisedPreferenceFallsBackInsteadOfBeingStored(): void
     {
         $this->savePreferences(['density' => 'enormous', 'week_start' => '9', 'landing_view' => 'nowhere']);

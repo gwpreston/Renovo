@@ -82,7 +82,6 @@ return [
     'settings.density' => 'List density',
     'settings.landing_view' => 'Open on',
     'settings.landing_view_hint' => 'The page you see when you open Renovo.',
-    'action.save' => 'Save',
 
     'theme.system' => 'Match my system',
     'theme.light' => 'Light',
@@ -587,6 +586,19 @@ return [
     'categories.tags_intro' => 'Tags are created as you type them on a subscription.',
     'categories.title' => 'Categories and tags',
 
+    // confirm — the questions a destructive control asks before it acts. They
+    // are read out by the browser's own dialog, which is why they are short
+    // sentences rather than labels, and they are here rather than written into
+    // an onsubmit attribute so that one check covers every string the
+    // application can show.
+    'confirm.delete_subscription' => 'Delete {name}?',
+    'confirm.delete_category' => 'Delete {name}?',
+    'confirm.delete_budget' => 'Delete this budget?',
+    'confirm.delete_attachment' => 'Delete this file?',
+    'confirm.reset_usage' => 'Reset the usage count to zero?',
+    'confirm.restore_backup' => 'Restore this archive into the current household?',
+    'confirm.revoke_token' => 'Revoke this token? Anything using it stops working straight away.',
+
     // dashboard
     'dashboard.active_subscriptions' => 'Active subscriptions',
     'dashboard.by_category' => 'By category',
@@ -855,6 +867,7 @@ return [
     // shortcuts
     'shortcuts.close' => 'Close a dialog',
     'shortcuts.help' => 'Show this list',
+    'shortcuts.key_escape' => 'Esc',
     'shortcuts.new' => 'Add a subscription',
     'shortcuts.search' => 'Search the list',
     'shortcuts.title' => 'Keyboard shortcuts',
@@ -976,6 +989,7 @@ return [
 
     // setup_notifications
     'setup_notifications.configured' => 'Configured',
+    'setup_notifications.finish' => 'Finish',
     'setup_notifications.intro' =>
         'Step 2 of 2. Renovo will tell you before a subscription renews, before a free trial starts '
         . 'charging, before a cancellation deadline passes, and when a budget is heading over. Add '
@@ -985,6 +999,7 @@ return [
     'setup_notifications.later_note' =>
         'You can add more channels, or change any of this, later under Settings → Notifications. Every '
         . 'member configures their own.',
+    'setup_notifications.skip_for_now' => 'Skip for now',
     'setup_notifications.mail_relay' => 'Mail goes out through {host}, from {from}. Those come from the environment:',
     'setup_notifications.mail_relay_env' =>
         'An instance secret belongs in the environment, not in the database, so they are not set here. '

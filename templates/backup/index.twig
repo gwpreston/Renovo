@@ -36,7 +36,7 @@
         </p>
 
         <form method="post" action="/settings/backup/restore" enctype="multipart/form-data" class="stack"
-              onsubmit="return confirm('Restore this archive into the current household?')">
+              onsubmit="return confirm('{{ t('confirm.restore_backup')|e('js') }}')">
             {{ csrf_field() }}
 
             <label for="restore-archive">{{ t('backup.archive_label', {'version': format_version}) }}</label>

@@ -91,7 +91,7 @@
                                     <form method="post"
                                           action="/settings/api-tokens/{{ token.id }}/revoke"
                                           class="inline"
-                                          onsubmit="return confirm('Revoke this token? Anything using it stops working straight away.')">
+                                          onsubmit="return confirm('{{ t('confirm.revoke_token')|e('js') }}')">
                                         {{ csrf_field() }}
                                         <button type="submit" class="button button-quiet">{{ t('action.revoke') }}</button>
                                     </form>

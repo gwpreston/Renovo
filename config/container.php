@@ -71,6 +71,7 @@ use App\Support\BuildManifest;
 use App\Support\ExternalAssetScanner;
 use App\Support\Clock;
 use App\Support\MoneyFormatter;
+use App\Support\NumberFormat;
 use App\Support\SystemClock;
 use DI\ContainerBuilder;
 use Monolog\Handler\StreamHandler;
@@ -395,6 +396,8 @@ return static function (ContainerBuilder $builder, array $settings): void {
         ),
 
         MoneyFormatter::class => autowire(MoneyFormatter::class),
+
+        NumberFormat::class => autowire(NumberFormat::class),
 
         AssetVersion::class => static fn (ContainerInterface $c): AssetVersion => new AssetVersion(
             $c->get('settings')['paths']['public'],

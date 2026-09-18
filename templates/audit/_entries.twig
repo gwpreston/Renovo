@@ -1,37 +1,39 @@
 {#
     The entries table, rendered on its own for htmx filter and page swaps.
 #}
-<table class="table">
-    <thead>
-    <tr>
-        <th scope="col">{{ t('field.when') }}</th>
-        <th scope="col">{{ t('field.event') }}</th>
-        <th scope="col">{{ t('field.who') }}</th>
-        <th scope="col">{{ t('field.detail') }}</th>
-        <th scope="col">{{ t('field.address') }}</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for entry in entries %}
-        <tr class="{{ entry.action.isFailure ? 'row-warning' : '' }}">
-            <td>{{ entry.occurredAt|local_date('d MMM y HH:mm') }}</td>
-            <td>{{ t(entry.action.labelKey()) }}</td>
-            <td>
-                {{ entry.actorName }}
-                {% if entry.targetLabel and entry.targetUserId != entry.actorUserId %}
-                    <span class="muted">→ {{ entry.targetLabel }}</span>
-                {% endif %}
-            </td>
-            <td class="muted">{{ entry.summary }}</td>
-            <td class="muted">{{ entry.ipAddress|default('—') }}</td>
-        </tr>
-    {% else %}
+<div class="table-scroll">
+    <table class="table">
+        <thead>
         <tr>
-            <td colspan="5" class="muted">{{ t('audit_entries.no_events_recorded') }}</td>
+            <th scope="col">{{ t('field.when') }}</th>
+            <th scope="col">{{ t('field.event') }}</th>
+            <th scope="col">{{ t('field.who') }}</th>
+            <th scope="col">{{ t('field.detail') }}</th>
+            <th scope="col">{{ t('field.address') }}</th>
         </tr>
-    {% endfor %}
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+        {% for entry in entries %}
+            <tr class="{{ entry.action.isFailure ? 'row-warning' : '' }}">
+                <td>{{ entry.occurredAt|local_date('d MMM y HH:mm') }}</td>
+                <td>{{ t(entry.action.labelKey()) }}</td>
+                <td>
+                    {{ entry.actorName }}
+                    {% if entry.targetLabel and entry.targetUserId != entry.actorUserId %}
+                        <span class="muted">→ {{ entry.targetLabel }}</span>
+                    {% endif %}
+                </td>
+                <td class="muted">{{ entry.summary }}</td>
+                <td class="muted">{{ entry.ipAddress|default('—') }}</td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="5" class="muted">{{ t('audit_entries.no_events_recorded') }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
 
 {% if pages > 1 %}
     <nav class="pagination" aria-label="{{ t('subscriptions_list.pagination') }}">
