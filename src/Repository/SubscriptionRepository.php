@@ -169,6 +169,31 @@ final class SubscriptionRepository extends AbstractScopedRepository
         return (int) $this->db->fetchValue($sql, $params);
     }
 
+    /**
+     * The subscriptions that are switched off.
+     *
+     * Hydrated rather than counted in SQL, because the figure the strip wants
+     * beside the count is what these would cost over a year — and a yearly
+     * figure is the billing cycle applied to the price, which `BillingCycle`
+     * knows and the database does not. A `SUM(price_minor)` here would add a
+     * weekly row to a yearly one and call the result a year's spend.
+     *
+     * Scoped like every other read in this class, so ISOLATED mode keeps
+     * another member's paused rows out of the figure exactly as it keeps them
+     * out of the list. A card cannot report a count of things its reader is not
+     * allowed to see.
+     *
+     * @return list<Subscription>
+     */
+    public function findPaused(Scope $scope): array
+    {
+        $criteria = Criteria::new()->equals('is_active', false);
+        $params = [];
+        $sql = $this->selectWithJoins() . $this->scopedWhere($scope, $criteria, $params);
+
+        return $this->hydrateAll($scope, $this->db->fetchAll($sql, $params));
+    }
+
     public function find(Scope $scope, int $id): ?Subscription
     {
         $criteria = Criteria::new()->equals('id', $id);

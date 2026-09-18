@@ -412,6 +412,16 @@ final class SubscriptionService
     }
 
     /**
+     * The switched-off subscriptions, for the strip's paused figure.
+     *
+     * @return list<Subscription>
+     */
+    public function paused(Scope $scope): array
+    {
+        return $this->subscriptions->findPaused($scope);
+    }
+
+    /**
      * @return list<string>
      */
     public function currenciesInUse(Scope $scope): array

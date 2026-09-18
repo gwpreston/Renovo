@@ -6,8 +6,9 @@
     {#
         The screen the design asks for: the figures across the top, the list
         itself, then the two deadline sections and the trials, with the category
-        widget alongside. The list is the list — the same fragment htmx swaps —
-        rather than a second one built for this arrangement.
+        widget and the saved views alongside. The list is the list — the same
+        fragment htmx swaps — rather than a second one built for this
+        arrangement.
     #}
     {% include 'subscriptions/_strip.twig' %}
 
@@ -100,58 +101,15 @@
         </form>
 
         {#
-            Saved views. Ordinary links, not an htmx swap: applying one is a change
-            of view, and the address bar should say so — a saved view that cannot
-            be bookmarked or shared is barely saved at all.
-        #}
-        <section class="card saved-views" aria-labelledby="saved-views-heading">
-            <h2 id="saved-views-heading" class="stat-label">{{ t('saved_views.heading') }}</h2>
-
-            {% if saved_views is empty %}
-                <p class="muted">{{ t('saved_views.empty') }}</p>
-            {% else %}
-                <ul class="saved-view-list">
-                    {% for view in saved_views %}
-                        <li class="chip chip-static">
-                            <a href="{{ view.path }}">{{ view.name }}</a>
-                            <form method="post" action="/saved-views/{{ view.id }}/delete" class="inline">
-                                {{ csrf_field() }}
-                                <button type="submit" class="button-icon"
-                                        aria-label="{{ t('saved_views.forget', {'name': view.name}) }}">×</button>
-                            </form>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-
-            <form method="post" action="/saved-views" class="inline-form">
-                {{ csrf_field() }}
-                {#
-                    What "save this view" would store. The filter form above
-                    swaps only the list, so this field would otherwise still
-                    hold the query the page was *loaded* with — which is how a
-                    view saved after filtering came out empty. `_list.twig`
-                    sends a replacement for it out of band on every filter,
-                    sort and page request; the id is what that replacement
-                    aims at, so the two have to keep matching.
-                #}
-                <input type="hidden" id="saved-view-query" name="query" value="{{ current_query }}">
-                <label for="saved-view-name" class="visually-hidden">{{ t('saved_views.name_label') }}</label>
-                <input type="text" id="saved-view-name" name="name" maxlength="60"
-                       placeholder="{{ t('saved_views.name_placeholder') }}">
-                <button type="submit" class="button">{{ t('saved_views.save_current') }}</button>
-            </form>
-        </section>
-
-        {#
             The list fragment, included from here rather than wrapped from inside
             it: `#subscription-list` has to stay the outermost element of that file,
             because the filter form selects it and swaps it whole.
         #}
         {#
             `oob_query: false` because this page renders the real hidden field
-            above; the fragment's out-of-band copy of it would be a second
-            element with the same id.
+            itself — in the saved-views card, now in the column alongside — and
+            the fragment's out-of-band copy of it would be a second element with
+            the same id.
         #}
         {% include 'subscriptions/_list.twig' with {'oob_query': false} %}
 
@@ -161,6 +119,52 @@
 
         <aside class="subscriptions-side">
             {% include 'subscriptions/_categories.twig' %}
+
+            {#
+                Saved views. Ordinary links, not an htmx swap: applying one is a change
+                of view, and the address bar should say so — a saved view that cannot
+                be bookmarked or shared is barely saved at all.
+            #}
+            <section class="card saved-views" aria-labelledby="saved-views-heading">
+                <h2 id="saved-views-heading" class="stat-label">{{ t('saved_views.heading') }}</h2>
+
+                {% if saved_views is empty %}
+                    <p class="muted">{{ t('saved_views.empty') }}</p>
+                {% else %}
+                    <ul class="saved-view-list">
+                        {% for view in saved_views %}
+                            <li class="chip chip-static">
+                                <a href="{{ view.path }}">{{ view.name }}</a>
+                                <form method="post" action="/saved-views/{{ view.id }}/delete" class="inline">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="button-icon"
+                                            aria-label="{{ t('saved_views.forget', {'name': view.name}) }}">×</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                <form method="post" action="/saved-views" class="inline-form">
+                    {{ csrf_field() }}
+                    {#
+                        What "save this view" would store. The filter form in the
+                        other column swaps only the list, so this field would
+                        otherwise still hold the query the page was *loaded* with
+                        — which is how a view saved after filtering came out
+                        empty. `_list.twig` sends a replacement for it out of band
+                        on every filter, sort and page request; the id is what that
+                        replacement aims at, so the two have to keep matching, and
+                        that is why this card can sit in either column without the
+                        out-of-band swap noticing.
+                    #}
+                    <input type="hidden" id="saved-view-query" name="query" value="{{ current_query }}">
+                    <label for="saved-view-name" class="visually-hidden">{{ t('saved_views.name_label') }}</label>
+                    <input type="text" id="saved-view-name" name="name" maxlength="60"
+                           placeholder="{{ t('saved_views.name_placeholder') }}">
+                    <button type="submit" class="button">{{ t('saved_views.save_current') }}</button>
+                </form>
+            </section>
         </aside>
     </div>
 {% endblock %}

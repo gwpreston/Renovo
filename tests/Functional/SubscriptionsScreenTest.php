@@ -204,6 +204,31 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
             'split_mode' => SplitMode::Equal->value,
             'shares' => [$this->ownerId => 1, $this->editorId => 1],
         ]);
+
+        // Switched off, and owned by two different people. One paused row would
+        // prove the card counts; two owned separately is what lets ISOLATED be
+        // told apart from SHARED.
+        $subscriptions->create($owner, [
+            'name' => 'Paused thing',
+            'price_minor' => 700,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => (new DateTimeImmutable('+18 days'))->format('Y-m-d'),
+            'start_date' => '2025-01-01',
+            'is_active' => false,
+        ], []);
+
+        $subscriptions->create($this->scopeFor($this->editorId), [
+            'name' => 'Editors paused thing',
+            'price_minor' => 300,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => (new DateTimeImmutable('+19 days'))->format('Y-m-d'),
+            'start_date' => '2025-01-01',
+            'is_active' => false,
+        ], []);
     }
 
     public function testTheStripShowsTheFiguresTheStatisticsServiceComputed(): void
@@ -225,6 +250,87 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
 
         $soon = $container->get(SubscriptionService::class)->upcoming($this->scopeFor($this->ownerId), 14);
         self::assertStringContainsString('>' . count($soon) . '<', $strip);
+    }
+
+    public function testTheStripCountsThePausedSubscriptions(): void
+    {
+        $strip = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-strip');
+
+        // Two paused rows exist and the instance is SHARED, so the owner sees
+        // both of them counted.
+        self::assertStringContainsString('Paused / inactive', $strip);
+        self::assertStringContainsString('>2<', $strip);
+    }
+
+    public function testThePausedFigureIsWhatThoseSubscriptionsWouldCostInAYear(): void
+    {
+        $money = $this->container()->get(MoneyFormatter::class);
+        $strip = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-strip');
+
+        // £7.00 and £3.00 a month, so £120.00 a year between them. Asserted as
+        // the figure rather than the arithmetic, because the point of the line
+        // is that it answers "what would resuming these cost".
+        self::assertStringContainsString($money->formatMinor(12000, 'GBP'), $strip);
+    }
+
+    public function testIsolationHidesAnotherMembersPausedSubscriptionFromTheCount(): void
+    {
+        $this->container()->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
+
+        $strip = $this->section($this->body($this->get('/subscriptions', $this->editorId)), 'subscription-strip');
+
+        // The Editor owns one paused subscription and may not see the Owner's.
+        // A card that counted both would be leaking the existence of a row the
+        // list itself refuses to show — which is exactly the failure a count
+        // computed outside the scoping layer would produce.
+        self::assertStringContainsString('>1<', $strip);
+    }
+
+    public function testTheSavedViewQueryFieldSurvivesBesideTheCategoryWidget(): void
+    {
+        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+
+        // The card moved into the column beside the category widget. What must
+        // not have moved with it is the id `_list.twig` aims its out-of-band
+        // replacement at — there is exactly one of these on the page, wherever
+        // the card is drawn, and a second would be an id collision that makes
+        // the swap land on the wrong element.
+        self::assertSame(
+            1,
+            substr_count($body, 'id="saved-view-query"'),
+            'the saved-view query field must appear exactly once',
+        );
+
+        // And it is genuinely below the category widget rather than merely
+        // still on the page: the widget's heading comes first in document
+        // order, which is what "below Category spending" means in the one
+        // column the two share.
+        $widget = strpos($body, 'id="category-spending"');
+        $savedViews = strpos($body, 'id="saved-views-heading"');
+
+        self::assertIsInt($widget, 'the category widget must be on the page');
+        self::assertIsInt($savedViews, 'the saved-views card must be on the page');
+        self::assertGreaterThan(
+            $widget,
+            $savedViews,
+            'saved views must come after the category widget',
+        );
+    }
+
+    public function testFilteringStillReplacesTheSavedViewQueryAfterTheMove(): void
+    {
+        $fragment = $this->body($this->get(
+            '/subscriptions?q=Streaming',
+            $this->ownerId,
+            ['HX-Request' => 'true'],
+        ));
+
+        // The list fragment carries the out-of-band replacement, so a view
+        // saved after filtering stores the filter rather than the query the
+        // page was first loaded with. This is the regression commit 3cad406
+        // fixed, and moving the card across columns is where it would return.
+        self::assertStringContainsString('id="saved-view-query"', $fragment);
+        self::assertStringContainsString('q=Streaming', $fragment);
     }
 
     public function testTheCancelByCardIsOnlyForSubscriptionsWithANoticePeriod(): void

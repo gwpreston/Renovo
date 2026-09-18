@@ -85,7 +85,7 @@ final class SubscriptionScreenService
         $trials = $this->subscriptions->trialsBeforeConversion($scope);
 
         return [
-            'strip' => $this->strip($stats, $soon),
+            'strip' => $this->strip($stats, $soon, $this->subscriptions->paused($scope)),
             'expiring' => $this->expiring($scope, $soon),
             'trials' => $this->trials($scope, $trials),
             // Not `categories`: the page already has a list of them for its
@@ -96,7 +96,7 @@ final class SubscriptionScreenService
     }
 
     /**
-     * The three figures across the top.
+     * The four figures across the top.
      *
      * The yearly one keeps the per-currency rule the rest of the application
      * follows — subtotals, with a combined figure only when every currency in
@@ -105,11 +105,20 @@ final class SubscriptionScreenService
      * common case rather than the only one; a headline that silently dropped a
      * currency would be wrong rather than tidy.
      *
+     * The paused figure is the count, and beside it what those subscriptions
+     * would cost over a year if they were all switched back on — which is the
+     * number that makes the card worth having, since "seven paused" answers
+     * nothing on its own. It is computed here rather than in SQL because a
+     * yearly figure is the billing cycle applied to the price. A lifetime or
+     * one-off purchase has no yearly cost at all and contributes nothing to it,
+     * exactly as it contributes nothing to the active yearly total.
+     *
      * @param array<string, mixed> $stats
      * @param list<Subscription>   $soon
+     * @param list<Subscription>   $paused
      * @return array<string, mixed>
      */
-    private function strip(array $stats, array $soon): array
+    private function strip(array $stats, array $soon, array $paused): array
     {
         /** @var list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring */
         $recurring = $stats['recurring'];
@@ -131,7 +140,49 @@ final class SubscriptionScreenService
                 'days' => self::NEAR_WINDOW_DAYS,
                 'total' => $this->stats->sumByCurrency($soon),
             ],
+            'paused' => [
+                'count' => count($paused),
+                'yearly' => $this->pausedYearly($paused),
+            ],
         ];
+    }
+
+    /**
+     * What the paused subscriptions would cost over a year, per currency.
+     *
+     * Shaped like `renewals.total` rather than like the `yearly` figure, and
+     * rendered the same way: a count as the headline with the money as a muted
+     * line beneath it. Deliberately **not** put through `partials/spend.twig`,
+     * because that macro's job is to produce a single combined headline when
+     * every currency converts — and this figure has not earned a headline. It
+     * is a "what if you turned these back on", not a commitment, so per-currency
+     * subtotals are the honest presentation and a blended total would overstate
+     * what is actually known.
+     *
+     * @param list<Subscription> $paused
+     * @return list<array{currency: string, total_minor: int, count: int}>
+     */
+    private function pausedYearly(array $paused): array
+    {
+        $totals = [];
+        foreach ($paused as $subscription) {
+            // A lifetime or one-off purchase has no yearly cost, and so
+            // contributes nothing here — exactly as it contributes nothing to
+            // the active yearly total beside it.
+            $yearly = $subscription->yearlyMinor();
+            if ($yearly === null) {
+                continue;
+            }
+
+            $currency = $subscription->price->currency;
+            $totals[$currency] ??= ['currency' => $currency, 'total_minor' => 0, 'count' => 0];
+            $totals[$currency]['total_minor'] += $yearly;
+            $totals[$currency]['count']++;
+        }
+
+        ksort($totals);
+
+        return array_values($totals);
     }
 
     /**

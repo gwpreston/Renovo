@@ -1,10 +1,12 @@
 {#
     The stats strip.
 
-    Three figures the application already has, and not one of them computed for
+    Four figures the application already has, and not one of them invented for
     this screen: the active count and the yearly total are the Statistics page's
-    own, and the renewal count is the near window the dashboard and the cancel-by
-    view are built from.
+    own, the renewal count is the near window the dashboard and the cancel-by
+    view are built from, and the paused count is the same list the filter's
+    "include paused" checkbox reveals — read through the scoping layer, so it
+    counts what its reader is allowed to see and nothing more.
 
     The yearly figure keeps the per-currency rule, through the same partial the
     dashboard's tiles use — so it is a single clean number whenever there is an
@@ -22,6 +24,21 @@
     <article class="card stat metric">
         <h2 class="stat-label">{{ t('dashboard.yearly_spend') }}</h2>
         {{ figure.spend(strip.yearly, t('dashboard.per_year_unit')) }}
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('subscriptions.paused_heading') }}</h2>
+        <p class="stat-value">{{ strip.paused.count }}</p>
+        {% if strip.paused.yearly is not empty %}
+            <p class="muted">
+                {% for total in strip.paused.yearly %}
+                    {{ total.total_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
+                {% endfor %}
+                {{ t('subscriptions.paused_if_resumed') }}
+            </p>
+        {% else %}
+            <p class="muted">{{ t('subscriptions.paused_note') }}</p>
+        {% endif %}
     </article>
 
     <article class="card stat metric">
