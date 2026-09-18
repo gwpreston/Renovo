@@ -202,6 +202,50 @@
 {% if can_bulk and subscriptions is not empty %}</form>{% endif %}
 </section>
 
+{#
+    The saved-views form's hidden field, refreshed out of band.
+
+    This fragment is what an htmx filter, sort or page request returns, and it
+    is all that request returns — the saved-views card above the list is not
+    re-rendered. So the field that says "this is the view you are looking at"
+    would keep the value the page was first loaded with, and saving a view
+    after filtering would store an empty query. It did.
+
+    Sending a replacement alongside the list fixes that at the source: the
+    value is still `SubscriptionFilter::toQueryString()`, so what gets saved is
+    what the list itself would have written, rather than something the browser
+    reconstructed from the address bar.
+
+    Out of band and not part of the swap, because the field lives inside a form
+    in the card above and this section is the only thing the list request is
+    allowed to replace. htmx applies out-of-band swaps to the whole response
+    before `hx-select` narrows it to `#subscription-list`, so the sort and
+    pagination links — which do select — carry this too.
+
+    Defaulting to *sending* it is deliberate. Twig here runs with
+    `strict_variables` off, so a caller that forgets to pass this flag gets
+    whatever the default is and no warning either way. Defaulting to false would
+    make that silence reintroduce the stale-field bug — the fragment would
+    render without its replacement and nothing would say so. Defaulting to true
+    makes the same mistake produce a duplicated id on the full page instead,
+    which `PersonalisationTest::savedViewQuery()` asserts against. Both are
+    mistakes; only one of them fails a test.
+
+    So the full page — the one place this is included rather than rendered —
+    turns it off explicitly, and every other render gets it right by doing
+    nothing.
+
+    `??` and not `|default`, which is the trap here: Twig's `default` filter
+    substitutes when the value is *empty*, and `false` is empty — so
+    `oob_query|default(true)` reads a deliberate `false` as "unset" and helpfully
+    turns the field back on. `??` substitutes only for undefined and null, which
+    is the question actually being asked.
+#}
+{% if oob_query ?? true %}
+    <input type="hidden" id="saved-view-query" name="query"
+           value="{{ current_query }}" hx-swap-oob="true">
+{% endif %}
+
 {% macro sort_link(key, label, filter) %}
     {% set direction = (filter.sort == key and filter.direction == 'asc') ? 'desc' : 'asc' %}
     {% set query = filter.toQueryString({'sort': key, 'dir': direction, 'page': null}) %}

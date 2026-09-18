@@ -11,10 +11,36 @@
 
 /* ------------------------------------------------------------------ layout */
 
+/*
+ * The content column and the bar above it share one gutter.
+ *
+ * This used to be capped at 1180px and centred. The top bar is full-bleed, so
+ * on any screen wider than that cap plus the rail the two disagreed about where
+ * the page begins: the bar's contents sat against the window edge while the
+ * content floated in a centred column. Full width is what makes them agree at
+ * every width, and it is what a subscriptions table of nine columns wanted
+ * anyway.
+ *
+ * The horizontal padding is the same 1rem `.topbar` uses. That equality *is*
+ * the alignment — change one and the other has to change with it.
+ *
+ * Pages that are prose or a single form do not stretch with it. They are built
+ * from `.card.narrow`, which carries its own 30rem cap and its own centring, so
+ * signing in and the setup wizard read the same as they did before.
+ *
+ * `max-width: none` is not redundant. Tailwind ships a `.container` utility of
+ * its own — same name, in `@layer utilities` — that caps at 40/48/64/80/96rem
+ * up the breakpoints. This rule is unlayered, so it outranks that one for
+ * everything it declares; what it does not declare, Tailwind still supplies.
+ * Simply dropping the old cap would therefore have left a 96rem one in its
+ * place on a wide screen, and with no `margin: auto` to centre it the content
+ * would have sat against the left with the bar full-bleed above it — the very
+ * misalignment this change is here to remove, only harder to spot because it
+ * takes a 1536px viewport to see it.
+ */
 .container {
     width: 100%;
-    max-width: 1180px;
-    margin: 0 auto;
+    max-width: none;
     padding: 0 1rem;
 }
 

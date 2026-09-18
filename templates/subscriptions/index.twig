@@ -126,7 +126,16 @@
 
             <form method="post" action="/saved-views" class="inline-form">
                 {{ csrf_field() }}
-                <input type="hidden" name="query" value="{{ current_query }}">
+                {#
+                    What "save this view" would store. The filter form above
+                    swaps only the list, so this field would otherwise still
+                    hold the query the page was *loaded* with — which is how a
+                    view saved after filtering came out empty. `_list.twig`
+                    sends a replacement for it out of band on every filter,
+                    sort and page request; the id is what that replacement
+                    aims at, so the two have to keep matching.
+                #}
+                <input type="hidden" id="saved-view-query" name="query" value="{{ current_query }}">
                 <label for="saved-view-name" class="visually-hidden">{{ t('saved_views.name_label') }}</label>
                 <input type="text" id="saved-view-name" name="name" maxlength="60"
                        placeholder="{{ t('saved_views.name_placeholder') }}">
@@ -139,7 +148,12 @@
             it: `#subscription-list` has to stay the outermost element of that file,
             because the filter form selects it and swaps it whole.
         #}
-        {% include 'subscriptions/_list.twig' %}
+        {#
+            `oob_query: false` because this page renders the real hidden field
+            above; the fragment's out-of-band copy of it would be a second
+            element with the same id.
+        #}
+        {% include 'subscriptions/_list.twig' with {'oob_query': false} %}
 
         {% include 'subscriptions/_expiring.twig' %}
         {% include 'subscriptions/_trials.twig' %}

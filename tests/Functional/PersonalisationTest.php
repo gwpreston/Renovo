@@ -106,6 +106,72 @@ final class PersonalisationTest extends DatabaseTestCase
         self::assertStringNotContainsString('Broadband', $filtered);
     }
 
+    /**
+     * A view saved after filtering keeps the filter.
+     *
+     * The failure this exists for: the filter form swaps the list and nothing
+     * else, so the hidden field the saved-views form posts is not re-rendered
+     * when a filter changes. It went on holding the value the page was first
+     * loaded with, and every view saved after filtering stored no filter at
+     * all. It saved, it appeared in the list, and following it did nothing —
+     * which is exactly the "it saves and has no effect" failure this class was
+     * written to catch, and which it missed.
+     *
+     * It missed it because the test above writes the query itself. That proves
+     * the server round trip and steps straight over the hop that was broken:
+     * how the browser obtains the value it posts. So nothing here is
+     * hand-written. The query is read out of the markup the application
+     * actually produced for a filtered list, which is the only version of this
+     * test that can fail when the field goes stale again.
+     */
+    public function testAViewSavedAfterFilteringKeepsTheFilter(): void
+    {
+        // The page as first loaded. Its field carries the sort and nothing to
+        // search for, because nothing has been searched for yet.
+        $page = (string) $this->request('GET', '/subscriptions')->getBody();
+
+        self::assertStringNotContainsString(
+            'q=Streaming',
+            $this->savedViewQuery($page),
+            'Nothing has been filtered yet.',
+        );
+
+        // Filtering is an htmx request, and it returns the list alone. The
+        // field belongs to a card that response does not re-render, so it
+        // arrives beside the list as an out-of-band swap.
+        $fragment = (string) $this->request(
+            'GET',
+            '/subscriptions?q=Streaming&sort=name&dir=asc',
+            [],
+            true,
+        )->getBody();
+
+        self::assertStringContainsString(
+            'hx-swap-oob',
+            $fragment,
+            'The list fragment sends the saved-views field back with it.',
+        );
+
+        $query = $this->savedViewQuery($fragment);
+        self::assertStringContainsString('q=Streaming', $query, 'And it carries the filter that was applied.');
+
+        // What the browser would now post, posted.
+        $this->request('POST', '/saved-views', ['name' => 'Streaming only', 'query' => $query]);
+
+        $list = (string) $this->request('GET', '/subscriptions')->getBody();
+        self::assertStringContainsString('Streaming only', $list);
+
+        // The view points at the filtered list rather than at all of it, and
+        // following it filters — the whole point of having saved it.
+        $path = $this->savedViewPath($list, 'Streaming only');
+        self::assertStringContainsString('q=Streaming', $path, 'The saved view remembers the filter.');
+
+        $filtered = (string) $this->request('GET', $path)->getBody();
+
+        self::assertStringContainsString('Streaming thing', $filtered);
+        self::assertStringNotContainsString('Broadband', $filtered);
+    }
+
     public function testAViewWithNoNameIsRefused(): void
     {
         $this->request('POST', '/saved-views', ['name' => '  ', 'query' => '']);
@@ -317,6 +383,34 @@ final class PersonalisationTest extends DatabaseTestCase
         $this->session->clear();
         $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $this->userId);
         $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $this->householdId);
+    }
+
+    /**
+     * The value of the saved-views form's hidden query field, as rendered.
+     *
+     * Asserts there is exactly one of them, which is the other half of the fix:
+     * the full page renders the real field and the fragment renders its
+     * out-of-band replacement, and a page carrying both would be two elements
+     * sharing an id — the state in which the out-of-band swap stops being able
+     * to say which one it means.
+     */
+    private function savedViewQuery(string $html): string
+    {
+        $count = preg_match_all('/id="saved-view-query"[^>]*value="([^"]*)"/', $html, $matches);
+
+        self::assertSame(1, $count, 'Exactly one saved-view query field is expected.');
+
+        return html_entity_decode($matches[1][0], ENT_QUOTES, 'UTF-8');
+    }
+
+    /** Where a saved view of this name points. */
+    private function savedViewPath(string $html, string $name): string
+    {
+        $pattern = '/<a href="([^"]*)">\s*' . preg_quote($name, '/') . '\s*<\/a>/';
+
+        self::assertSame(1, preg_match($pattern, $html, $matches), 'The saved view should be linked once.');
+
+        return html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
     }
 
     /**
