@@ -27,6 +27,7 @@ import { renderChart } from './charts.js';
 import { drawCategoryDonuts } from './category-donut.js';
 import { hydrateIcons, icon, iconNames } from './icons.js';
 import { drawSpendCharts } from './spend-chart.js';
+import { enhanceTagFields } from './tag-field.js';
 
 /*
  * Assigned, not merged: this is the only thing that writes window.Renovo, and
@@ -62,6 +63,7 @@ function drawCharts(root = document) {
  */
 function hydrate() {
     hydrateIcons(document);
+    enhanceTagFields(document);
     drawCharts();
 }
 
@@ -72,7 +74,12 @@ if (document.readyState === 'loading') {
 }
 
 document.addEventListener('htmx:afterSwap', (event) => {
-    hydrateIcons(event.target instanceof Element ? event.target : document);
+    const root = event.target instanceof Element ? event.target : document;
+
+    hydrateIcons(root);
+    // The quick-add dialog loads the subscription form through htmx, so the
+    // tag field arrives after this module first ran.
+    enhanceTagFields(root);
 });
 
 /*

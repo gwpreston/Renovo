@@ -779,6 +779,72 @@ main.container {
     gap: 0.4rem;
 }
 
+/* ------------------------------------------------------------- tag field */
+
+/*
+ * The searchable tag field (`assets/js/tag-field.js`). Every rule here is
+ * scoped under the wrapper the script builds, so a browser with the script
+ * blocked gets the plain text input with no half-applied styling around it.
+ */
+.tag-field {
+    display: grid;
+    gap: 0.4rem;
+    position: relative;
+}
+
+.tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+}
+
+.tag-chips:empty {
+    display: none;
+}
+
+.tag-suggestions {
+    margin: 0;
+    padding: 0.25rem;
+    list-style: none;
+
+    /*
+     * Over the fields beneath it rather than shoving them down: a list that
+     * reflows the form on every keystroke is hard to aim at.
+     */
+    position: absolute;
+    z-index: 20;
+    top: 100%;
+    left: 0;
+    right: 0;
+
+    background: var(--surface-raised);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-control);
+    box-shadow: var(--shadow);
+    max-height: 14rem;
+    overflow-y: auto;
+}
+
+.tag-suggestion {
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--radius-small);
+    cursor: pointer;
+    font-size: var(--size-body);
+}
+
+/*
+ * The highlighted row. Background *and* weight, because the accent alone is
+ * the thing PHASE.md forbids as a sole signal — in greyscale the shift in
+ * weight is what still says which row Enter would take.
+ */
+.tag-suggestion.is-active,
+.tag-suggestion:hover {
+    background: var(--surface-hover);
+    font-weight: var(--weight-medium);
+}
+
 .tag-list {
     display: flex;
     flex-wrap: wrap;

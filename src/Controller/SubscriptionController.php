@@ -314,6 +314,12 @@ final class SubscriptionController extends Controller
             'cycles' => BillingCycle::cases(),
             'types' => SubscriptionType::cases(),
             'notice_units' => NoticePeriod::units(),
+            // The household's existing tags, so the form can offer them rather
+            // than make the user remember how they spelled one last time. The
+            // field still accepts anything typed into it: `TagRepository::
+            // resolveOrCreate()` matches an existing name or creates a new tag,
+            // so choosing and inventing are the same request.
+            'tags' => $this->tags->all($scope),
         ];
     }
 }

@@ -197,9 +197,33 @@
                 </select>
                 {% if errors.payer_user_id is defined %}<p class="field-error">{{ error_message(errors.payer_user_id) }}</p>{% endif %}
 
+                {#
+                    Tags. A plain comma-separated text field, which is what the
+                    server reads and what a browser with no JavaScript still
+                    posts. `assets/js/tag-field.js` turns it into a searchable
+                    combobox over the household's existing tags, driven by the
+                    list below — choosing one and inventing one are the same
+                    request, because `resolveOrCreate()` does both.
+                #}
                 <label for="tags">{{ t('field.tags') }}</label>
                 <input type="text" id="tags" name="tags" value="{{ values.tags|default('') }}"
-                       placeholder="{{ t('subscriptions_form.streaming_shared') }}">
+                       placeholder="{{ t('subscriptions_form.streaming_shared') }}"
+                       data-tag-options="tag-options"
+                       {#
+                           The chip's remove button is built in JavaScript, so
+                           the tag's name is not known here. The catalogue
+                           still owns the sentence: it is rendered with a
+                           marker in the name's place, and the script puts the
+                           name there. Concatenating "Remove" and a name in the
+                           script instead would be a word order this sentence
+                           does not have in every language.
+                       #}
+                       data-remove-label="{{ t('subscriptions_form.remove_tag', {'name': '%s'}) }}">
+                <datalist id="tag-options">
+                    {% for tag in tags %}
+                        <option value="{{ tag.name }}"></option>
+                    {% endfor %}
+                </datalist>
                 <p class="hint">{{ t('subscriptions_form.tags_hint') }}</p>
 
                 <label for="logo">{{ t('subscriptions_form.logo') }}</label>

@@ -1167,6 +1167,7 @@ return [
         . 'history.',
     'subscriptions_form.started_on' => 'Started on',
     'subscriptions_form.streaming_shared' => 'streaming, shared',
+    'subscriptions_form.remove_tag' => 'Remove {name}',
     'subscriptions_form.tags_hint' => 'Comma separated. New tags are created automatically.',
     'subscriptions_form.trial_end_hint' => 'The last free day — and the day the first charge falls.',
     'subscriptions_form.trial_ends' => 'Trial ends',
