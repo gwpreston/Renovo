@@ -14,7 +14,10 @@ use App\Repository\UserRepository;
 use App\Security\CsrfTokenManager;
 use App\Security\Scope;
 use App\Security\SessionInterface;
+use App\Domain\TokenAbility;
+use App\Service\ApiTokenService;
 use App\Service\InstanceSettingsService;
+use App\Service\ValidationException;
 use App\Tests\Integration\DatabaseTestCase;
 use App\Tests\Support\ArraySession;
 use App\Tests\Support\RecordingMailer;
@@ -144,6 +147,90 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
         self::assertSame(200, $this->request('GET', '/settings/api-tokens')->getStatusCode());
     }
 
+    public function testReissuingATokenKillsTheOldSecretAndIssuesANewOne(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $tokens = $this->tokenService();
+        $user = (new UserRepository($this->db))->findById($this->ownerId);
+        self::assertNotNull($user);
+
+        $original = $tokens->issue($user, $this->householdId, 'Rotating token', TokenAbility::Read);
+        $id = $tokens->listFor($user)[0]->id;
+
+        $reissued = $tokens->reissue($user, $id);
+
+        self::assertNotSame($original, $reissued, 'A reissue must produce a different secret.');
+
+        // The point of the whole feature: the previous credential stops
+        // working. A reissue that left it live would mean every rotation
+        // doubled the number of secrets that can reach the account.
+        self::assertNull($tokens->authenticate($original), 'The old token must stop authenticating.');
+        self::assertNotNull($tokens->authenticate($reissued), 'The new token must authenticate.');
+    }
+
+    public function testAReissuedTokenKeepsItsNameAndAbilities(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $tokens = $this->tokenService();
+        $user = (new UserRepository($this->db))->findById($this->ownerId);
+        self::assertNotNull($user);
+
+        $tokens->issue($user, $this->householdId, 'Rotating token', TokenAbility::Read);
+        $tokens->reissue($user, $tokens->listFor($user)[0]->id);
+
+        // Picked by the property that matters rather than by list order: both
+        // rows were written in the same second, so "the newest" is not
+        // something the ordering can be trusted to answer. Exactly one token
+        // should still be live, and it should be the replacement.
+        $live = array_values(array_filter(
+            $tokens->listFor($user),
+            static fn ($token): bool => !$token->isRevoked(),
+        ));
+
+        self::assertCount(1, $live, 'A rotation leaves exactly one usable token behind.');
+        self::assertSame('Rotating token', $live[0]->name);
+        self::assertSame(TokenAbility::Read, $live[0]->abilities);
+    }
+
+    public function testARevokedTokenCannotBeReissued(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $tokens = $this->tokenService();
+        $user = (new UserRepository($this->db))->findById($this->ownerId);
+        self::assertNotNull($user);
+
+        $tokens->issue($user, $this->householdId, 'Doomed token', TokenAbility::Read);
+        $id = $tokens->listFor($user)[0]->id;
+        $tokens->revoke($user, $id);
+
+        // Reissue carries the old expiry over and issuing refuses a past date,
+        // so a dead token cannot be revived without quietly granting it a
+        // longer life than it had. Refusing is the honest answer.
+        $this->expectException(ValidationException::class);
+        $tokens->reissue($user, $id);
+    }
+
+    public function testOneUserCannotReissueAnothersToken(): void
+    {
+        $tokens = $this->tokenService();
+        $users = new UserRepository($this->db);
+
+        $owner = $users->findById($this->ownerId);
+        $viewer = $users->findById($this->viewerId);
+        self::assertNotNull($owner);
+        self::assertNotNull($viewer);
+
+        $tokens->issue($owner, $this->householdId, 'The owner\'s token', TokenAbility::Read);
+        $ownersTokenId = $tokens->listFor($owner)[0]->id;
+
+        // Scoped by user id in the statement itself, not checked afterwards.
+        $this->expectException(ValidationException::class);
+        $tokens->reissue($viewer, $ownersTokenId);
+    }
+
     public function testIssuingAndRevokingATokenWorksThroughTheForm(): void
     {
         $this->signIn($this->ownerId);
@@ -267,6 +354,14 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
             $response->getStatusCode(),
             sprintf('%s %s must reject a request with no CSRF token.', $method, $path),
         );
+    }
+
+    private function tokenService(): ApiTokenService
+    {
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+
+        return $container->get(ApiTokenService::class);
     }
 
     private function signIn(int $userId): void

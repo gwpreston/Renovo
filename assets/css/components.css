@@ -768,6 +768,17 @@ main.container {
     color: var(--text-muted);
 }
 
+/*
+ * Two actions in one table cell. They wrap rather than force the row wide,
+ * because this table already scrolls on a phone and a cell that refuses to
+ * narrow is what makes it scroll sooner.
+ */
+.token-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
 .tag-list {
     display: flex;
     flex-wrap: wrap;

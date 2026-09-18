@@ -86,7 +86,33 @@
                                     <span class="pill pill-success">{{ t('state.active') }}</span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="token-actions">
+                                {#
+                                    Reissue is offered only on a token that is
+                                    neither revoked nor expired — the same two
+                                    conditions the status column above tests,
+                                    spelled out rather than asked of the entity,
+                                    because Twig's `date()` is not the immutable
+                                    type `isUsable()` takes.
+
+                                    Why those two: a reissue carries the old
+                                    token's expiry over, and issuing refuses a
+                                    date already in the past, so an expired
+                                    token cannot be reissued without quietly
+                                    granting it a longer life than it had.
+                                    `ApiTokenService::reissue()` enforces this
+                                    too — hiding the button is not the check.
+                                #}
+                                {% if not token.isRevoked() and not (token.expiresAt and token.expiresAt < date()) %}
+                                    <form method="post"
+                                          action="/settings/api-tokens/{{ token.id }}/reissue"
+                                          class="inline"
+                                          onsubmit="return confirm('{{ t('confirm.reissue_token')|e('js') }}')">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-quiet">{{ t('action.reissue') }}</button>
+                                    </form>
+                                {% endif %}
+
                                 {% if not token.isRevoked() %}
                                     <form method="post"
                                           action="/settings/api-tokens/{{ token.id }}/revoke"

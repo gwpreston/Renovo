@@ -14,7 +14,7 @@ use App\Support\Clock;
 use DateTimeImmutable;
 
 /**
- * Issuing, presenting and revoking API tokens.
+ * Issuing, presenting, rotating and revoking API tokens.
  *
  * The format is `rnv_<public id>_<secret>`:
  *
@@ -100,6 +100,57 @@ final class ApiTokenService
         ], $householdId);
 
         return sprintf('%s_%s_%s', self::PREFIX, $publicId, $secret);
+    }
+
+    /**
+     * Replace a token with a new one that can do the same things.
+     *
+     * **This is a rotation, not a duplication.** The old secret stops working
+     * the instant the new one is returned. That is the whole point: a reissue
+     * that left the previous credential live would mean every rotation doubled
+     * the number of secrets that can reach the account, and the one thing a
+     * person reissuing a token is usually trying to do is stop trusting the old
+     * one.
+     *
+     * Name, abilities and expiry carry over — a reissue that lost them would be
+     * `issue()` with extra steps. The expiry is the awkward one: `issue()`
+     * refuses a date already in the past, so a token that has expired cannot be
+     * reissued into the same expiry. Rather than silently granting it a longer
+     * life than it had, this refuses, and the caller offers reissue only on a
+     * token that is still usable.
+     *
+     * @return string The full new token. As with `issue()`, this is the only
+     *                time it exists.
+     * @throws ValidationException
+     */
+    public function reissue(User $user, int $tokenId): string
+    {
+        $existing = $this->tokens->findForUser($user->id, $tokenId);
+        if ($existing === null) {
+            throw ValidationException::field('token', 'error.token.not_found');
+        }
+
+        if (!$existing->isUsable($this->clock->now())) {
+            throw ValidationException::field('token', 'error.token.not_reissuable');
+        }
+
+        // Revoked first. If issuing the replacement fails, the worst outcome is
+        // a revoked token and no new one — which is a recoverable inconvenience,
+        // where the other order risks two live secrets and no record of it.
+        $this->tokens->revoke($user->id, $tokenId);
+
+        $this->audit->record(AuditAction::ApiTokenRevoked, $user, [
+            'token_id' => $tokenId,
+            'reason' => 'reissued',
+        ], $existing->householdId);
+
+        return $this->issue(
+            $user,
+            $existing->householdId,
+            $existing->name,
+            $existing->abilities,
+            $existing->expiresAt,
+        );
     }
 
     public function revoke(User $user, int $tokenId): bool

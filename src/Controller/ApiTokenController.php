@@ -79,6 +79,34 @@ final class ApiTokenController extends Controller
         return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
     }
 
+    /**
+     * Rotate a token: the old secret dies, a new one with the same name,
+     * abilities and expiry is shown once.
+     *
+     * The new secret goes into the same one-shot flash a fresh issue uses, so
+     * it is displayed exactly once and a refresh of this page does not bring it
+     * back. Revoke is left alone beside it — reissuing and revoking are
+     * different intentions, and a button that did both would serve neither.
+     */
+    public function reissue(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        try {
+            $token = $this->tokens->reissue($this->user($request), (int) $id);
+        } catch (ValidationException $exception) {
+            $this->flashErrors($exception);
+
+            return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
+        }
+
+        $this->session->set(self::FLASH_NEW_TOKEN, $token);
+        $this->flash('success', 'flash.token_reissued');
+
+        return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
+    }
+
     public function revoke(
         ServerRequestInterface $request,
         ResponseInterface $response,

@@ -358,6 +358,8 @@ return static function (App $app): void {
 
         $group->post('/settings/api-tokens', [ApiTokenController::class, 'create']);
 
+        $group->post('/settings/api-tokens/{id:[0-9]+}/reissue', [ApiTokenController::class, 'reissue']);
+
         $group->post('/settings/api-tokens/{id:[0-9]+}/revoke', [ApiTokenController::class, 'revoke']);
 
         $group->get('/import', [ImportController::class, 'start'])

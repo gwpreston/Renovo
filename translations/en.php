@@ -187,6 +187,10 @@ return [
 
     'error.token.name_required' => 'Give the token a name so you can recognise it later.',
     'error.token.expiry_past' => 'Choose an expiry date in the future.',
+    'error.token.not_found' => 'That token no longer exists.',
+    'error.token.not_reissuable' =>
+        'Only a token that still works can be reissued. This one has been revoked or has expired — '
+        . 'create a new one instead.',
 
     'error.attachment.type' => 'Upload a PDF, PNG, JPEG, WebP or GIF file.',
     'error.attachment.archive_type' => 'The archive contains a file of an unsupported type.',
@@ -309,6 +313,8 @@ return [
         . ' other {# other sessions signed out.}}',
 
     'flash.token_created' => 'Token created. Copy it now — it is not shown again.',
+    'flash.token_reissued' =>
+        'Token reissued. The previous one has stopped working — copy the new one now, it is not shown again.',
     'flash.token_revoked' => 'Token revoked.',
     'flash.token_revoke_failed' => 'That token could not be revoked.',
 
@@ -380,6 +386,7 @@ return [
     'action.previous' => 'Previous',
     'action.remove' => 'Remove',
     'action.rename' => 'Rename',
+    'action.reissue' => 'Reissue',
     'action.revoke' => 'Revoke',
     'action.save' => 'Save',
     'action.send_test' => 'Send test',
@@ -597,6 +604,9 @@ return [
     'confirm.delete_attachment' => 'Delete this file?',
     'confirm.reset_usage' => 'Reset the usage count to zero?',
     'confirm.restore_backup' => 'Restore this archive into the current household?',
+    'confirm.reissue_token' =>
+        'Reissue this token? The current one stops working straight away, and anything using it will need '
+        . 'the new one.',
     'confirm.revoke_token' => 'Revoke this token? Anything using it stops working straight away.',
 
     // dashboard

@@ -99,6 +99,27 @@ final class ApiTokenRepository extends AbstractRepository
     }
 
     /**
+     * One of this user's tokens, by id.
+     *
+     * The user id is part of the statement rather than checked afterwards, for
+     * the same reason it is part of `revoke()`: a finder that returned somebody
+     * else's row and left the caller to notice is a finder that will eventually
+     * be called by something that does not.
+     */
+    public function findForUser(int $userId, int $tokenId): ?ApiToken
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT * FROM ' . $this->quote('api_tokens')
+            . ' WHERE ' . $this->quote('id') . ' = :id'
+            . ' AND ' . $this->quote('user_id') . ' = :user'
+            . ' LIMIT 1',
+            ['id' => $tokenId, 'user' => $userId],
+        );
+
+        return $rows === [] ? null : $this->hydrate($rows[0]);
+    }
+
+    /**
      * Revoke one of this user's tokens.
      *
      * The user id is part of the statement rather than checked beforehand, so
