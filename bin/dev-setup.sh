@@ -78,7 +78,8 @@ Local development for Renovo: start it, or stop it again.
   ./bin/dev-setup.sh --stop --reset      Stop it and delete the data too
 
 Options
-  --with-sample-data   An administrator and seven sample subscriptions.
+  --with-sample-data   An administrator, categories, eleven subscriptions with
+                       two years of history and recorded price changes, and budgets.
   --mysql, --postgres  Which database engine to run. PostgreSQL is the default.
   --reset              Delete the database volume. Prompts unless --yes.
   --stop, --down       Stop the containers instead of starting them.
@@ -539,9 +540,70 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
         fi
         ok "administrator created: $ADMIN_EMAIL"
 
+        # -------------------------------------------------------------
+        # Everything below drives the ordinary web forms, exactly as a person
+        # clicking through them would. Nothing writes to the database directly,
+        # which is what keeps this honest: the sample rows went through the same
+        # validation, the same price-history write and the same scoping as
+        # anybody else's, so the figures the dashboard shows are computed rather
+        # than typed in to look right.
+        # -------------------------------------------------------------
+
+        post_form() {
+            # post_form <path to read the token from> <path to post to> [curl args...]
+            local form_path="$1" action="$2" t
+            shift 2
+            if ! t="$(csrf "$BASE_URL$form_path")"; then
+                warn "could not load $form_path — is the session still valid?"
+                return 1
+            fi
+            curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" \
+                -d "_csrf=$t" "$@" "$BASE_URL$action" || echo 000
+        }
+
+        # Dates, a year either side of today. BSD and GNU date disagree about
+        # relative dates, so both spellings are kept.
+        day_offset() {
+            if date -v +1d >/dev/null 2>&1; then date -v "$1" +%Y-%m-%d; else date -d "$2" +%Y-%m-%d; fi
+        }
+        today_plus()   { day_offset "+$1d"  "+$1 days"; }
+        days_ago()     { day_offset "-$1d"  "-$1 days"; }
+        months_ago()   { day_offset "-$1m"  "-$1 months"; }
+
+        # ----------------------------------------------------- categories
+        CATEGORIES=0
+        add_category() {
+            local status
+            status="$(post_form "/categories" "/categories" -d "name=$1" -d "colour=$2")"
+            [ "$status" = "302" ] && CATEGORIES=$((CATEGORIES + 1))
+        }
+
+        add_category "Streaming"  "#e0516b"
+        add_category "Music"      "#4f7df0"
+        add_category "Software"   "#48a97c"
+        add_category "Utilities"  "#d4a03c"
+        add_category "Health"     "#3fa9c9"
+        ok "$CATEGORIES categories"
+
+        # The ids the server assigned, read back out of the new-subscription
+        # form's own category list rather than guessed at. Sequences do not
+        # restart predictably on a database that has been used before.
+        CATEGORY_HTML="$(curl -s -b "$JAR" -c "$JAR" "$BASE_URL/subscriptions/new" || true)"
+        category_id() {
+            # The template writes an option over two lines, so the newlines go
+            # first and the tags become the line breaks instead.
+            printf '%s' "$CATEGORY_HTML" \
+                | tr '\n' ' ' \
+                | tr '<' '\n' \
+                | sed -n "s|^option value=\"\([0-9]*\)\"[^>]*>$1\$|\1|p" \
+                | head -1
+        }
+
+        # ------------------------------------------------- subscriptions
         CREATED=0
+        LAST_ID=""
         add_subscription() {
-            local t status
+            local t status location
             if ! t="$(csrf "$BASE_URL/subscriptions/new")"; then
                 warn "could not load the new-subscription form — is the session still valid?"
                 return 0
@@ -550,52 +612,143 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
                 -d "_csrf=$t" "$@" "$BASE_URL/subscriptions" || echo 000)"
             if [ "$status" = "302" ]; then
                 CREATED=$((CREATED + 1))
+                # The id of what was just created, for the scheduled price
+                # change below. The highest id in the list is the newest row,
+                # which holds because this script is the only thing writing.
+                # The page size is fixed at 25 and there are fewer rows than
+                # that, so one page is the whole list.
+                LAST_ID="$(curl -s -b "$JAR" -c "$JAR" "$BASE_URL/subscriptions?inactive=1" \
+                    | tr '<' '\n' \
+                    | sed -n 's|^a href="/subscriptions/\([0-9]*\)/edit".*|\1|p' \
+                    | sort -n | tail -1)"
             else
                 warn "a sample subscription was rejected (HTTP $status)"
             fi
         }
 
-        today_plus() {
-            if date -v +1d >/dev/null 2>&1; then date -v "+$1d" +%Y-%m-%d; else date -d "+$1 days" +%Y-%m-%d; fi
+        # A price rise, scheduled.
+        #
+        # Note what this is and is not. `/price-changes` *schedules*: it refuses
+        # a date at or before today, because a change dated in the past is an
+        # edit rather than a schedule. So the historical half of the price
+        # record does not come from here — it comes from the start date, which
+        # is what `recordInitialPrice` dates the opening price from. A
+        # subscription started two years ago therefore has a real price from two
+        # years ago, which is what the twelve-month comparison reconstructs
+        # spend from. This adds the other end: a rise that has not landed yet,
+        # so the scheduled-change path and the price-trend chart have something
+        # true to show.
+        schedule_price_change() {
+            local id="$1" price="$2" currency="$3" effective="$4" status
+            status="$(post_form "/subscriptions/$id/money" "/subscriptions/$id/price-changes" \
+                -d "price=$price" -d "currency=$currency" -d "effective_from=$effective" \
+                -d "note=Announced increase")"
+            [ "$status" = "302" ] || warn "a sample price change was rejected (HTTP $status)"
         }
 
         # A deliberate spread: several currencies, every billing cycle, a
-        # notice period, a paused row, and a lifetime purchase — enough to show
-        # what each part of the dashboard actually does.
+        # notice period, a paused row, a lifetime purchase, a trial — and all
+        # of them started far enough back that the twelve-month comparison has
+        # two years to compare.
         add_subscription -d "name=Netflix"        -d "price=15.99" -d "currency=GBP" \
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
-            -d "next_payment_date=$(today_plus 5)"  -d "notice_period_amount=14" \
-            -d "notice_period_unit=days" -d "tags=streaming, shared" -d "is_active=1"
+            -d "next_payment_date=$(today_plus 5)"  -d "start_date=$(months_ago 26)" \
+            -d "category_id=$(category_id Streaming)" \
+            -d "notice_period_amount=14" -d "notice_period_unit=days" \
+            -d "tags=streaming, shared" -d "is_active=1"
+        [ -n "$LAST_ID" ] && schedule_price_change "$LAST_ID" "17.99" "GBP" "$(today_plus 38)"
 
         add_subscription -d "name=Spotify Family" -d "price=19.99" -d "currency=GBP" \
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
-            -d "next_payment_date=$(today_plus 21)" -d "tags=music, shared" -d "is_active=1"
+            -d "next_payment_date=$(today_plus 21)" -d "start_date=$(months_ago 30)" \
+            -d "category_id=$(category_id Music)" \
+            -d "tags=music, shared" -d "is_active=1"
+        [ -n "$LAST_ID" ] && schedule_price_change "$LAST_ID" "21.99" "GBP" "$(today_plus 52)"
 
         add_subscription -d "name=Gym"            -d "price=12,50" -d "currency=EUR" \
             -d "subscription_type=recurring" -d "billing_cycle=weekly" \
-            -d "next_payment_date=$(today_plus 2)"  -d "tags=health" -d "is_active=1"
+            -d "next_payment_date=$(today_plus 2)"  -d "start_date=$(months_ago 18)" \
+            -d "category_id=$(category_id Health)" \
+            -d "tags=health" -d "is_active=1"
 
         add_subscription -d "name=Domain renewal" -d "price=11.00" -d "currency=USD" \
             -d "subscription_type=recurring" -d "billing_cycle=yearly" \
-            -d "next_payment_date=$(today_plus 120)" -d "notice_period_amount=1" \
-            -d "notice_period_unit=months" -d "tags=infrastructure" -d "is_active=1"
+            -d "next_payment_date=$(today_plus 120)" -d "start_date=$(months_ago 25)" \
+            -d "category_id=$(category_id Utilities)" \
+            -d "notice_period_amount=1" -d "notice_period_unit=months" \
+            -d "tags=infrastructure" -d "is_active=1"
 
         add_subscription -d "name=Contact lenses" -d "price=24.00" -d "currency=GBP" \
             -d "subscription_type=recurring" -d "billing_cycle=custom_days" \
             -d "cycle_days=28" -d "next_payment_date=$(today_plus 9)" \
+            -d "start_date=$(months_ago 20)" -d "category_id=$(category_id Health)" \
             -d "tags=health" -d "is_active=1"
 
+        add_subscription -d "name=Cloud backup"   -d "price=59.00" -d "currency=GBP" \
+            -d "subscription_type=recurring" -d "billing_cycle=yearly" \
+            -d "next_payment_date=$(today_plus 64)" -d "start_date=$(months_ago 27)" \
+            -d "category_id=$(category_id Software)" \
+            -d "tags=work" -d "is_active=1"
+        [ -n "$LAST_ID" ] && schedule_price_change "$LAST_ID" "65.00" "GBP" "$(today_plus 71)"
+
+        add_subscription -d "name=Design suite"   -d "price=21.99" -d "currency=GBP" \
+            -d "subscription_type=recurring" -d "billing_cycle=monthly" \
+            -d "next_payment_date=$(today_plus 25)" -d "start_date=$(months_ago 14)" \
+            -d "category_id=$(category_id Software)" \
+            -d "tags=work" -d "is_active=1"
+
+        # A trial, so the trials card and the conversion countdown have a row.
+        add_subscription -d "name=Recipe box"     -d "price=0.00"  -d "currency=GBP" \
+            -d "subscription_type=recurring" -d "billing_cycle=monthly" \
+            -d "next_payment_date=$(today_plus 9)" -d "start_date=$(days_ago 21)" \
+            -d "category_id=$(category_id Streaming)" \
+            -d "is_trial=1" -d "trial_end_date=$(today_plus 9)" \
+            -d "converts_to_price=14.99" -d "tags=trial" -d "is_active=1"
+
+        # Two paused rows, so the Paused / inactive card is not a zero.
         add_subscription -d "name=Old newspaper"  -d "price=8.00"  -d "currency=GBP" \
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
-            -d "next_payment_date=$(today_plus 30)" -d "is_active=0"
+            -d "next_payment_date=$(today_plus 30)" -d "start_date=$(months_ago 22)" \
+            -d "category_id=$(category_id Streaming)" -d "is_active=0"
+
+        add_subscription -d "name=Language app"   -d "price=9.99"  -d "currency=GBP" \
+            -d "subscription_type=recurring" -d "billing_cycle=monthly" \
+            -d "next_payment_date=$(today_plus 12)" -d "start_date=$(months_ago 16)" \
+            -d "category_id=$(category_id Software)" -d "is_active=0"
 
         add_subscription -d "name=Sublime Text licence" -d "price=99.00" -d "currency=GBP" \
-            -d "subscription_type=lifetime" -d "tags=software" -d "is_active=1"
+            -d "subscription_type=lifetime" -d "start_date=$(months_ago 15)" \
+            -d "category_id=$(category_id Software)" -d "tags=software" -d "is_active=1"
 
-        if [ "$CREATED" -eq 7 ]; then
-            ok "7 sample subscriptions across 3 currencies and every billing cycle"
+        if [ "$CREATED" -eq 11 ]; then
+            ok "11 sample subscriptions across 3 currencies, every billing cycle, two years of history"
         else
-            warn "created $CREATED of 7 sample subscriptions"
+            warn "created $CREATED of 11 sample subscriptions"
+        fi
+
+        # ---------------------------------------------------------- budgets
+        BUDGETS=0
+        add_budget() {
+            local status
+            status="$(post_form "/budgets/new" "/budgets" "$@")"
+            [ "$status" = "302" ] && BUDGETS=$((BUDGETS + 1))
+        }
+
+        # One overall budget and one scoped to a category, which is what makes
+        # the budgets screen show both kinds of progress bar. The overall
+        # figure is deliberately a little under the real monthly total, so the
+        # over-threshold state is visible rather than theoretical.
+        add_budget -d "name=Monthly spending" -d "amount=95.00" -d "currency=GBP" \
+            -d "period=monthly" -d "category_id=" -d "warn_threshold_percent=80" -d "is_active=1"
+
+        add_budget -d "name=Software budget" -d "amount=40.00" -d "currency=GBP" \
+            -d "period=monthly" -d "category_id=$(category_id Software)" \
+            -d "warn_threshold_percent=75" -d "is_active=1"
+
+        if [ "$BUDGETS" -eq 2 ]; then
+            ok "2 budgets, one overall and one by category"
+        else
+            warn "created $BUDGETS of 2 budgets"
         fi
 
         SAMPLE_CREDENTIALS="$ADMIN_EMAIL / $ADMIN_PASSWORD"
