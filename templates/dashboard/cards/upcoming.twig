@@ -13,13 +13,18 @@
 </div>
 
 {% macro upcoming(items, totals) %}
+    {# Imported inside the macro: a Twig macro cannot see its template's
+       top-level imports, only what it imports itself. #}
+    {% import 'partials/logo.twig' as logo %}
     {% if items is empty %}
         <p class="muted">{{ t('dashboard.nothing_due') }}</p>
     {% else %}
         <ul class="renewals">
             {% for item in items %}
                 <li>
-                    <span class="renewal-name">{{ item.name }}</span>
+                    <span class="renewal-name">
+                        {{ logo.mark(item, 20) }}{{ item.name }}
+                    </span>
                     <span class="renewal-date">{{ item.nextPaymentDate|local_date('d MMM') }}</span>
                     <span class="renewal-amount">{{ item.price.amountMinor|money(item.price.currency) }}</span>
                 </li>

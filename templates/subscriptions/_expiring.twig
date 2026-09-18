@@ -56,13 +56,14 @@
     renewal inside the window cannot.
 #}
 {% macro row(row, notice) %}
+    {# Imported inside the macro: a Twig macro cannot see its template's
+       top-level imports, only what it imports itself. #}
+    {% import 'partials/logo.twig' as logo %}
     {% set subscription = row.subscription %}
     <li class="deadline {{ row.is_passed ? 'is-passed' : (row.is_urgent ? 'is-urgent' : '') }}">
         <div class="deadline-main">
             <div class="cell-name">
-                {% if subscription.logoPath %}
-                    <img class="logo" src="/{{ subscription.logoPath }}" alt="" width="24" height="24">
-                {% endif %}
+                {{ logo.mark(subscription) }}
                 <div>
                     <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
                     {% if subscription.isTrial %}

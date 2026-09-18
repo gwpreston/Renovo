@@ -8,6 +8,7 @@
     ordinary one: pausing it pauses the subscription, because they are the same
     row.
 #}
+{% import 'partials/logo.twig' as logo %}
 {% if trials.rows is not empty %}
     <section class="card callout trials" id="free-trials" aria-labelledby="trials-heading">
         <h2 id="trials-heading">{{ t('subscriptions.trials_heading') }}</h2>
@@ -19,9 +20,7 @@
                 <li class="deadline {{ row.is_urgent ? 'is-urgent' : '' }}">
                     <div class="deadline-main">
                         <div class="cell-name">
-                            {% if subscription.logoPath %}
-                                <img class="logo" src="/{{ subscription.logoPath }}" alt="" width="24" height="24">
-                            {% endif %}
+                            {{ logo.mark(subscription) }}
                             <div>
                                 <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
                                 <div class="hint">

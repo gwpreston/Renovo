@@ -11,6 +11,7 @@
 {% endblock %}
 
 {% block content %}
+    {% import 'partials/logo.twig' as logo %}
     <p class="muted note">
         {{ t('forecast.intro') }}
     </p>
@@ -36,6 +37,7 @@
                                 <ul class="plain forecast-events">
                                     {% for event in month.events %}
                                         <li>
+                                            {{ logo.mark(event.subscription, 20) }}
                                             <a href="/subscriptions/{{ event.subscription.id }}/money">{{
                                                 event.subscription.name }}</a>
                                             <span class="muted">{{ event.date|local_date('d MMM') }}</span>

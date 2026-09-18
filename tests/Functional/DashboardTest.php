@@ -273,6 +273,18 @@ final class DashboardTest extends DatabaseTestCase
         self::assertStringContainsString('no exchange rate is available', $body);
     }
 
+    public function testTheUpcomingAndTrialCardsCarryALogoOrTheFallbackMark(): void
+    {
+        $body = $this->body($this->get('/', $this->ownerId));
+
+        // The sprite the fallback points at, and the fallback itself. These
+        // cards had no logo at all before; the assertion that matters is that
+        // a subscription with none still gets a mark rather than a ragged row
+        // where some names are indented and others are not.
+        self::assertStringContainsString('id="renovo-mark"', $body);
+        self::assertStringContainsString('logo-fallback', $body);
+    }
+
     public function testTheStatusBadgesAreComputedFromRealState(): void
     {
         (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [

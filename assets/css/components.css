@@ -718,6 +718,31 @@ main.container {
     flex: 0 0 auto;
 }
 
+/*
+ * The stand-in when a subscription has no logo of its own: the Renovo mark,
+ * `<use>`d from the sprite the shell already emits — see `partials/logo.twig`.
+ *
+ * The mark is 460:427, not square, so it is told to keep its own ratio inside
+ * the square box the macro asks for rather than being stretched to fill it.
+ * `align-self` keeps it on the first line of a name that wraps to two, level
+ * with an uploaded logo beside it in the next row.
+ */
+.logo-fallback {
+    aspect-ratio: 460 / 427;
+    align-self: flex-start;
+}
+
+/*
+ * The compact lists — the dashboard's renewals and the forecast's months — put
+ * the mark inline with the name rather than in a column of its own, so it needs
+ * the gap a flex row would have given it.
+ */
+.renewal-name .logo,
+.forecast-events .logo {
+    vertical-align: -0.2em;
+    margin-right: 0.4rem;
+}
+
 /* ------------------------------------------------------- badges and chips */
 
 .badge {

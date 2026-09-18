@@ -7,6 +7,7 @@
     because the answer to "which view am I looking at" changes with the rows;
     a marker left outside would still be pointing at the previous one.
 #}
+{% import 'partials/logo.twig' as logo %}
 <div id="dashboard-recent">
     {#
         The list's own filter, asked for by name: All includes the paused ones,
@@ -62,10 +63,7 @@
                         <td class="muted reference">#{{ subscription.id }}</td>
                         <th scope="row">
                             <div class="cell-name">
-                                {% if subscription.logoPath %}
-                                    <img class="logo" src="/{{ subscription.logoPath }}" alt=""
-                                         width="24" height="24">
-                                {% endif %}
+                                {{ logo.mark(subscription) }}
                                 <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
                             </div>
                         </th>

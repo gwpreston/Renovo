@@ -1,3 +1,4 @@
+{% import 'partials/logo.twig' as logo %}
 {# Free trials about to start charging — the card worth seeing first. #}
 {% if stats.trials is not empty %}
     <section class="card callout">
@@ -7,6 +8,7 @@
             {% for trial in stats.trials %}
                 <li>
                     <span class="renewal-name">
+                        {{ logo.mark(trial, 20) }}
                         <a href="/subscriptions/{{ trial.id }}/money">{{ trial.name }}</a>
                     </span>
                     <span class="renewal-date">

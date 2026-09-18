@@ -333,6 +333,38 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
         self::assertStringContainsString('q=Streaming', $fragment);
     }
 
+    public function testASubscriptionWithNoLogoFallsBackToTheRenovoMark(): void
+    {
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+
+        // None of the fixtures uploads a logo, so every row is the fallback.
+        self::assertStringContainsString('logo-fallback', $list);
+        self::assertStringContainsString('#renovo-mark', $list);
+    }
+
+    public function testTheFallbackMarkResolvesAgainstASpriteThePageActuallyEmits(): void
+    {
+        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+
+        // A `<use href="#renovo-mark">` with no matching symbol renders nothing
+        // at all, and renders nothing *silently* — no console error, no broken
+        // image. The sprite is emitted by the shell inside `{% if current_user %}`,
+        // so this is the assertion that keeps the fallback from being invisible.
+        self::assertStringContainsString('id="renovo-mark"', $body);
+    }
+
+    public function testAnUploadedLogoIsShownInsteadOfTheFallback(): void
+    {
+        $this->db->execute(
+            'UPDATE subscriptions SET logo_path = :path WHERE id = :id',
+            ['path' => 'assets/logos/streaming.png', 'id' => $this->streamingId],
+        );
+
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+
+        self::assertStringContainsString('src="/assets/logos/streaming.png"', $list);
+    }
+
     public function testTheCancelByCardIsOnlyForSubscriptionsWithANoticePeriod(): void
     {
         $body = $this->body($this->get('/subscriptions', $this->ownerId));

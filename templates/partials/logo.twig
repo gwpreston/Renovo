@@ -1,0 +1,38 @@
+{#
+    A subscription's logo, or the Renovo mark when it has none.
+
+    The same three lines used to be pasted into four templates, and this round
+    added three more places that wanted them. One macro instead, so the
+    fallback, the size and the accessibility treatment are decided once — the
+    failure this replaces is a screen that quietly renders no logo at all
+    because whoever added it copied the `<img>` and not the `{% if %}`.
+
+    **The fallback costs nothing to fetch.** It is a `<use>` of the SVG symbol
+    `partials/brand_sprite.twig` already emits once per signed-in page, so a
+    table of thirty subscriptions with no logos makes no requests and carries no
+    second copy of the path data. It also means the fallback follows the theme:
+    the symbol is filled with the brand gradient by way of the tokens.
+
+    Both forms are decorative and hidden from assistive technology. The
+    subscription's name is always next to the mark and is the thing that
+    identifies it; announcing "Renovo" beside every unbranded row would be
+    noise, and announcing the name twice is worse.
+
+    `subscription`  anything with `logoPath` and `name`
+    `size`          the box to draw it in, in pixels. 24 suits a table row.
+
+    The mark's own aspect ratio is 460:427, so it is drawn into a square box
+    rather than stretched to fill one — the default `preserveAspectRatio`
+    letterboxes it, which is why no width/height juggling is needed here.
+#}
+{% macro mark(subscription, size = 24) %}
+    {%- if subscription.logoPath -%}
+        <img class="logo" src="/{{ subscription.logoPath }}" alt=""
+             width="{{ size }}" height="{{ size }}">
+    {%- else -%}
+        <svg class="logo logo-fallback" width="{{ size }}" height="{{ size }}"
+             viewBox="0 0 460 427" aria-hidden="true" focusable="false">
+            <use href="#renovo-mark"></use>
+        </svg>
+    {%- endif -%}
+{% endmacro %}

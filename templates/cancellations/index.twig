@@ -3,6 +3,7 @@
 {% block heading %}{{ t('nav.cancellations') }}{% endblock %}
 
 {% block content %}
+    {% import 'partials/logo.twig' as logo %}
 
     <p class="muted note">
         {{ t('cancellations.intro') }}
@@ -29,11 +30,16 @@
                     {% for row in deadlines %}
                         <tr class="{{ row.is_passed ? 'is-passed' : (row.is_urgent ? 'is-urgent' : '') }}">
                             <td>
-                                <a href="/subscriptions/{{ row.subscription.id }}/edit">{{
-                                    row.subscription.name }}</a>
-                                {% if row.subscription.categoryName %}
-                                    <div class="hint">{{ row.subscription.categoryName }}</div>
-                                {% endif %}
+                                <div class="cell-name">
+                                    {{ logo.mark(row.subscription) }}
+                                    <div>
+                                        <a href="/subscriptions/{{ row.subscription.id }}/edit">{{
+                                            row.subscription.name }}</a>
+                                        {% if row.subscription.categoryName %}
+                                            <div class="hint">{{ row.subscription.categoryName }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </td>
                             <td>
                                 <strong>{{ row.deadline|local_date('d MMM y') }}</strong>

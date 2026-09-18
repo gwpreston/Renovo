@@ -3,6 +3,7 @@
     requests, and included by the full page for a normal load, so the two can
     never drift apart.
 #}
+{% import 'partials/logo.twig' as logo %}
 {% import _self as list %}
 
 {#
@@ -53,9 +54,7 @@
                         {% endif %}
                         <td>
                             <div class="cell-name">
-                                {% if subscription.logoPath %}
-                                    <img class="logo" src="/{{ subscription.logoPath }}" alt="" width="24" height="24">
-                                {% endif %}
+                                {{ logo.mark(subscription) }}
                                 <div>
                                     <a href="/subscriptions/{{ subscription.id }}/edit">{{ subscription.name }}</a>
                                     {% if not subscription.isActive %}<span class="badge">{{ t('state.paused') }}</span>{% endif %}
