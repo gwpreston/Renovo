@@ -84,6 +84,18 @@ Built in phases:
   feature and moves nothing about permissions, money or scope. See
   [The application shell](#the-application-shell).
 
+- **Phase 10 — the dashboard — complete.** The landing screen as a bento grid:
+  a row of metric cards — monthly and yearly spend as per-currency subtotals,
+  with a combined total alongside only when every currency converts; the count
+  of renewals in the near window; and the active-subscription count with the
+  next charge and its date beneath it — a twelve-month spend chart drawn from
+  the Forecast page's own call, so the two cannot disagree about a month; a
+  budget against its projected spend with the category bars beneath it; and a
+  table of subscriptions whose status badges are computed from real state. The
+  new tiles join the rearranging an account could already do, so a dashboard
+  somebody has arranged keeps its arrangement and finds them appended. It adds
+  no figure the application did not already produce.
+
 - **Phase 11 — my subscriptions — complete.** The subscriptions screen in the
   design's arrangement: a stats strip across the top, the list itself, the two
   deadlines the application distinguishes — a charge inside the near window, and
@@ -93,6 +105,30 @@ Built in phases:
   permissions are unchanged by the restyle; the figures are the ones the
   Statistics page and the cancel-by view already produce. It adds no data and no
   new query path. See [My subscriptions](#my-subscriptions).
+
+- **Phase 12 — analytics and insights — complete.** The Statistics page
+  restyled to the design's layout: a KPI row, the twelve-month spending
+  trajectory, the category breakdown drawn as a donut, the year-over-year
+  comparison, and a notable card ranking the highest and lowest cost — ordered
+  on converted monthly cost, shown in each subscription's own currency, with
+  anything that has no rate left out and counted. The chart payload and the
+  category breakdown moved into services both screens call, so this trajectory
+  and the dashboard's are one payload, and these segments and the
+  subscriptions screen's bars are one breakdown. The donut is drawn only when
+  a single whole exists; where a currency has no rate the screen shows the
+  per-currency figures instead of a centre label standing for a number nobody
+  computed. It introduces no new computation and the route is still `/stats`.
+
+- **Phase 13 — spend insights — complete.** The one phase in the re-skin that
+  adds capability rather than restyling it, built as rules over data the
+  application already holds rather than a model: more than one active
+  subscription in a category, a trial about to convert, a price that has risen,
+  and — only where a usage signal exists — one that is rarely used. Each
+  insight names the subscriptions behind it and states a figure in their own
+  currency that the member can check; nothing is totalled across currencies,
+  urgency rather than size orders the list, and when no rule fires there is no
+  card at all. It sits on the analytics screen; the dashboard tile the brief
+  left optional was kept for later.
 
 That is the v1 feature set, Phase 7 the toolchain under it and Phase 8 the
 design language on top. Deliberately not in it: OIDC/SSO, and bank or
