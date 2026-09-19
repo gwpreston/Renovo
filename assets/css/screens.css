@@ -558,6 +558,84 @@ tr.is-passed > td {
 
 /* --------------------------------------------------------------- calendar */
 
+/*
+ * The screen's shape: the month grid, and the rail beside it on a wide screen
+ * and below it on a narrow one.
+ *
+ * The same breakpoint and the same column widths as `.subscriptions-layout`,
+ * deliberately — two screens that are "a wide thing with a rail" should change
+ * shape at the same width, or the interface appears to reflow at two arbitrary
+ * points instead of one.
+ *
+ * The gap is horizontal only, because the cards space themselves vertically
+ * with their own margin and a row gap on top of that is a double space on
+ * every phone.
+ */
+.calendar-layout {
+    display: grid;
+    gap: 0 1rem;
+    align-items: start;
+}
+
+@media (min-width: 1100px) {
+    .calendar-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
+    }
+}
+
+/*
+ * A seven-column table will happily refuse to be narrower than its content and
+ * push the whole page sideways; `min-width: 0` is what makes it scroll inside
+ * its own wrapper instead.
+ */
+.calendar-layout > .calendar,
+.calendar-rail {
+    min-width: 0;
+}
+
+/*
+ * In a rail this narrow the three-across row the dashboard uses does not fit,
+ * so the name takes the first line and the date and amount share the second.
+ */
+.calendar-rail .renewals li {
+    flex-wrap: wrap;
+}
+
+.calendar-rail .renewal-name {
+    flex: 1 0 100%;
+}
+
+.calendar-rail .renewal-date {
+    flex: 1 1 auto;
+}
+
+/*
+ * The month's figure, stated once and here. Several currencies are several
+ * figures side by side and never a sum: this instance may hold no rate for one
+ * of them, and adding them would invent one.
+ */
+.calendar-insight-total {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    margin: 0;
+}
+
+.calendar-insight-heading {
+    font-size: var(--size-heading);
+    margin: 1rem 0 0.25rem;
+}
+
+/*
+ * A deadline is the one thing in the rail that expires, so it is not left to
+ * the amber badge alone to say so — the row carries a border as well, which
+ * survives greyscale and colour blindness.
+ */
+.calendar-deadline {
+    border-left: 3px solid var(--warning);
+    padding-left: 0.5rem;
+}
+
 .calendar-header {
     display: flex;
     flex-wrap: wrap;

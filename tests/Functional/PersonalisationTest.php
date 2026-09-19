@@ -415,11 +415,34 @@ final class PersonalisationTest extends DatabaseTestCase
     }
 
     /**
+     * The two pages answer different questions, and each holds only its own.
+     *
+     * Settings is what somebody decides on everybody else's behalf — a
+     * household's name, the instance's currency — and every part of it needs a
+     * permission. Profile is what one account sets for itself and needs none.
+     * A preference drifting back onto Settings is the regression this catches.
+     */
+    public function testProfileHoldsYourOwnPreferencesAndSettingsDoesNot(): void
+    {
+        $profile = (string) $this->request('GET', '/profile')->getBody();
+
+        self::assertStringContainsString('action="/profile/preferences"', $profile);
+        self::assertStringContainsString('name="landing_view"', $profile);
+        self::assertStringContainsString('name="card_position[totals]"', $profile, 'The card layout moved too.');
+
+        $settings = (string) $this->request('GET', '/settings')->getBody();
+
+        self::assertStringNotContainsString('name="landing_view"', $settings, 'A preference is still on Settings.');
+        self::assertStringNotContainsString('name="theme"', $settings);
+        self::assertStringContainsString('action="/settings/household"', $settings, 'Settings kept its own.');
+    }
+
+    /**
      * @param array<string, mixed> $values
      */
     private function savePreferences(array $values): void
     {
-        $response = $this->request('POST', '/settings/preferences', $values);
+        $response = $this->request('POST', '/profile/preferences', $values);
 
         self::assertSame(302, $response->getStatusCode(), 'The preferences form must have accepted this.');
     }

@@ -107,6 +107,7 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
     public static function ownerPages(): array
     {
         return [
+            ['/profile'],
             ['/settings'],
             ['/settings/api-tokens'],
             ['/settings/backup'],

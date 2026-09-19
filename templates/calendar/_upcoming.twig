@@ -1,0 +1,41 @@
+{#
+    The next few charges, wherever they fall.
+
+    Deliberately anchored to today rather than to the month on screen. Paging
+    the grid forward asks "what does March look like"; this answers "what is
+    about to leave the account", and the two are different questions — so the
+    heading says "next up" and the dates carry their month, because a reader
+    looking at March must not read this as March's.
+#}
+{% import 'partials/logo.twig' as logo %}
+
+<section class="card calendar-upcoming" aria-labelledby="calendar-upcoming-heading">
+    <h2 id="calendar-upcoming-heading">{{ t('calendar.next_up') }}</h2>
+    <p class="muted note">{{ t('calendar.next_up_note') }}</p>
+
+    {% if calendar.upcoming is empty %}
+        <p class="muted empty">{{ t('calendar.nothing_upcoming') }}</p>
+    {% else %}
+        <ul class="renewals">
+            {% for event in calendar.upcoming %}
+                <li>
+                    <span class="renewal-name">
+                        {{ logo.mark(event.subscription, 20) }}
+                        <a href="/subscriptions/{{ event.subscription.id }}/money">
+                            {{ event.subscription.name }}
+                        </a>
+                    </span>
+                    <span class="renewal-date">
+                        {{ event.date|local_date('d MMM') }}
+                        {%- if event.reason == 'trial_conversion' %}
+                            <span class="badge badge-warning">{{ t('state.trial_converts') }}</span>
+                        {%- endif %}
+                    </span>
+                    <span class="renewal-amount">
+                        {{ event.amount.amountMinor|money(event.amount.currency) }}
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>

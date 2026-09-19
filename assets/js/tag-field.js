@@ -104,6 +104,15 @@ function enhance(input) {
         label.setAttribute('for', box.id);
     }
 
+    // The hint goes across with it. It is copied rather than moved, because
+    // the original input is still the field that posts and a description left
+    // pointing only at the box would be lost if the script ever stopped
+    // running between render and submit.
+    const describedBy = input.getAttribute('aria-describedby');
+    if (describedBy) {
+        box.setAttribute('aria-describedby', describedBy);
+    }
+
     /*
      * A live region for the chips. Adding and removing a tag is a change a
      * sighted user sees immediately and a screen-reader user otherwise would

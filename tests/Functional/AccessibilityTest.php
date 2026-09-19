@@ -108,6 +108,7 @@ final class AccessibilityTest extends DatabaseTestCase
             ['/cancellations'],
             ['/stats'],
             ['/categories'],
+            ['/profile'],
             ['/settings'],
             ['/settings/notifications'],
             ['/settings/security'],

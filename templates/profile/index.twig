@@ -1,0 +1,125 @@
+{% extends 'layout.twig' %}
+
+{% block heading %}{{ t('nav.profile') }}{% endblock %}
+
+{% block content %}
+
+    <section class="card">
+        <h2>{{ t('settings.appearance') }}</h2>
+        <form method="post" action="/profile/preferences" class="stack">
+            {{ csrf_field() }}
+
+            <div class="field">
+                <label for="theme">{{ t('settings.theme') }}</label>
+                <select id="theme" name="theme">
+                    {% for theme in themes %}
+                        <option value="{{ theme.value }}"
+                                {{ current_user.theme == theme.value ? 'selected' : '' }}>
+                            {{ t(theme.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="locale">{{ t('settings.language') }}</label>
+                <select id="locale" name="locale">
+                    {# An empty value is a real choice: follow whatever the instance is set to. #}
+                    <option value="" {{ current_user.locale == '' ? 'selected' : '' }}>
+                        {{ t('settings.language_instance_default') }}
+                    </option>
+                    {% for code, name in locale_choices %}
+                        <option value="{{ code }}" {{ current_user.locale == code ? 'selected' : '' }}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="week_start">{{ t('settings.week_start') }}</label>
+                <select id="week_start" name="week_start">
+                    {% for day in week_starts %}
+                        <option value="{{ day.value }}"
+                                {{ current_user.weekStart == day.value ? 'selected' : '' }}>
+                            {{ t(day.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p class="hint">{{ t('settings.week_start_hint') }}</p>
+            </div>
+
+            <div class="field">
+                <label for="density">{{ t('settings.density') }}</label>
+                <select id="density" name="density">
+                    {% for option in densities %}
+                        <option value="{{ option.value }}"
+                                {{ current_user.density == option.value ? 'selected' : '' }}>
+                            {{ t(option.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="landing_view">{{ t('settings.landing_view') }}</label>
+                <select id="landing_view" name="landing_view">
+                    {% for view in landing_views %}
+                        <option value="{{ view.value }}"
+                                {{ current_user.landingView == view.value ? 'selected' : '' }}>
+                            {{ t(view.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p class="hint">{{ t('settings.landing_view_hint') }}</p>
+            </div>
+
+            <fieldset class="stack">
+                <legend>{{ t('settings.dashboard_cards') }}</legend>
+                <p class="hint">{{ t('settings.dashboard_cards_hint') }}</p>
+
+                <ul class="card-layout">
+                    {% for entry in dashboard_layout %}
+                        <li class="card-layout-row">
+                            <label for="card-position-{{ entry.card.value }}" class="card-layout-name">
+                                {{ t(entry.card.labelKey()) }}
+                            </label>
+                            <input type="number" min="1" max="{{ dashboard_layout|length }}"
+                                   id="card-position-{{ entry.card.value }}"
+                                   name="card_position[{{ entry.card.value }}]"
+                                   value="{{ loop.index }}"
+                                   aria-label="{{ t('settings.card_position', {
+                                       'card': t(entry.card.labelKey()),
+                                   }) }}">
+                            <label class="choice">
+                                <input type="checkbox" name="card_visible[{{ entry.card.value }}]" value="1"
+                                       {{ entry.visible ? 'checked' : '' }}>
+                                <span>{{ t('settings.card_visible') }}</span>
+                            </label>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </fieldset>
+
+            <button type="submit" class="button">{{ t('action.save') }}</button>
+        </form>
+    </section>
+
+    {#
+        Signing in and API tokens live under /settings in the URL, but they are
+        this account's and nobody else's, so this is where they are offered.
+    #}
+    <section class="card">
+        <h2>{{ t('settings.signing_in') }}</h2>
+        <p class="muted">
+            {{ t('settings.security_intro') }}
+        </p>
+        <a class="button" href="/settings/security">{{ t('security.title') }}</a>
+    </section>
+
+    <section class="card">
+        <h2>{{ t('settings.api_and_calendar') }}</h2>
+        <p class="muted">
+            {{ t('settings.api_intro') }}
+        </p>
+        <a class="button" href="/settings/api-tokens">{{ t('tokens.title') }}</a>
+    </section>
+{% endblock %}

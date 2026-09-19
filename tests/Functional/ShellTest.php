@@ -122,6 +122,7 @@ final class ShellTest extends DatabaseTestCase
             'statistics' => ['/stats', '/stats'],
             'categories' => ['/categories', '/categories'],
             'settings' => ['/settings', '/settings'],
+            'your own page' => ['/profile', '/profile'],
             'alerts' => ['/settings/notifications', '/settings/notifications'],
             'security' => ['/settings/security', '/settings'],
             'api tokens' => ['/settings/api-tokens', '/settings'],
