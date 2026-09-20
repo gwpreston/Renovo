@@ -59,6 +59,12 @@ final class Subscription
         public readonly array $tags,
         public readonly DateTimeImmutable $createdAt,
         public readonly DateTimeImmutable $updatedAt,
+        /**
+         * Whether the owner has a picture, so the list can draw a face without
+         * a query per row. Trailing with a default because it is an addition
+         * to an entity that predates it, like the display preferences on User.
+         */
+        public readonly bool $ownerHasAvatar = false,
     ) {
     }
 

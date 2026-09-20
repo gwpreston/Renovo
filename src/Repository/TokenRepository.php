@@ -20,6 +20,30 @@ final class TokenRepository extends AbstractRepository
     public const PURPOSE_VERIFY_EMAIL = 'verify_email';
     public const PURPOSE_RESET_PASSWORD = 'reset_password';
 
+    /**
+     * An invitation from a household Owner.
+     *
+     * A purpose of its own rather than a reused `reset_password`, because the
+     * two links do different things to the account at the other end. A reset
+     * sets a password on an address that has already been proved; an invite
+     * has to prove the address *and* set the first password *and* mark the
+     * membership as taken up. Reusing the reset purpose would either leave
+     * invited members permanently unverified or teach the reset flow to verify
+     * addresses, which is how a password reset quietly becomes a way to
+     * confirm one.
+     */
+    public const PURPOSE_INVITE = 'invite';
+
+    /**
+     * A change of address, confirmed at the address being moved to.
+     *
+     * The token is the only thing that proves the member can read mail at the
+     * new address, which is why the live `email` does not move until one comes
+     * back. A string constant and not a schema change: `auth_tokens.purpose`
+     * has always been free text.
+     */
+    public const PURPOSE_CONFIRM_EMAIL_CHANGE = 'confirm_email_change';
+
     public function __construct(Database $db, private readonly Clock $clock)
     {
         parent::__construct($db);

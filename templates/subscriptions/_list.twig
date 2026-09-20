@@ -4,6 +4,7 @@
     never drift apart.
 #}
 {% import 'partials/logo.twig' as logo %}
+{% import 'partials/avatar.twig' as avatar %}
 {% import _self as list %}
 
 {#
@@ -76,7 +77,22 @@
                             </div>
                         </td>
                         <td>{{ subscription.categoryName ?? '—' }}</td>
-                        <td>{{ subscription.ownerName ?? '—' }}</td>
+                        <td>
+                            {% if subscription.ownerName %}
+                                <span class="member-identity">
+                                    {{ avatar.face(
+                                        subscription.ownerUserId,
+                                        subscription.ownerName,
+                                        subscription.ownerName|initials,
+                                        subscription.ownerHasAvatar,
+                                        24
+                                    ) }}
+                                    <span>{{ subscription.ownerName }}</span>
+                                </span>
+                            {% else %}
+                                {{ t('common.none_symbol') }}
+                            {% endif %}
+                        </td>
                         <td>
                             {{ type_label(subscription.type.value) }}
                             {% if subscription.billingCycle %}

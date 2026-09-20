@@ -45,8 +45,12 @@ final class AuthenticationMiddleware implements MiddlewareInterface
         $userId = $this->session->get(self::SESSION_USER_ID);
         $user = is_int($userId) ? $this->users->findById($userId) : null;
 
-        if ($user === null) {
-            // The session may name a user who has since been deleted.
+        if ($user === null || $user->isDisabled()) {
+            // The session may name a user who has since been deleted, or one
+            // whose login was revoked. Revocation deletes that account's
+            // session rows, so this is usually unreachable — but "usually" is
+            // doing too much work for an authentication check, and the gap it
+            // closes is the request already in flight when the rows went.
             $this->session->remove(self::SESSION_USER_ID);
 
             return $this->redirectToLogin($request);

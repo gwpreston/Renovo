@@ -7,6 +7,7 @@ namespace App\Service;
 use App\I18n\Locales;
 use App\I18n\Translator;
 use App\Domain\AuditAction;
+use App\Domain\Entity\User;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
@@ -84,6 +85,25 @@ final class PasswordResetService
 
         $this->audit->recordAnonymous(AuditAction::PasswordResetRequested, $email, $user);
 
+        $this->sendLinkTo($user);
+    }
+
+    /**
+     * Issue a reset link and mail it, with none of the ceremony above.
+     *
+     * The anonymous form of the request has to be careful: it does not know
+     * whether the address belongs to anybody, so it throttles, counts every
+     * attempt and says the same thing either way. An administrator resetting
+     * one of their own household's members knows perfectly well that the
+     * account exists — they are looking at it — so none of that applies, and
+     * applying it anyway would mean an Owner helping two children in a row got
+     * throttled for their trouble.
+     *
+     * What does not change is who may set the password: this sends a link to
+     * the member and nothing else. The administrator never learns it.
+     */
+    public function sendLinkTo(User $user): void
+    {
         $token = $this->tokens->issue(
             $user->id,
             TokenRepository::PURPOSE_RESET_PASSWORD,

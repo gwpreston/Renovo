@@ -17,6 +17,7 @@
     own filter is the finer instrument, and `/` prefers it — see
     `public/assets/app.js`.
 #}
+{% import 'partials/avatar.twig' as avatar %}
 <div class="topbar-actions">
     {% if can(scope, 'subscription.view') %}
         <form class="topbar-search" method="get" action="/subscriptions" role="search">
@@ -35,7 +36,16 @@
     {% endif %}
 
     <div class="topbar-account">
-        <span class="topbar-name">{{ current_user.displayName }}</span>
+        <a class="topbar-identity" href="/profile/account">
+            {{ avatar.face(
+                current_user.id,
+                current_user.displayName,
+                current_user.initials(),
+                current_user.avatarPath is not null,
+                32
+            ) }}
+            <span class="topbar-name">{{ current_user.displayName }}</span>
+        </a>
         <form method="post" action="/logout" class="inline">
             {{ csrf_field() }}
             <button type="submit" class="button button-quiet">{{ t('nav.sign_out') }}</button>

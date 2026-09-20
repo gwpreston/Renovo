@@ -1,0 +1,200 @@
+{% extends 'layout.twig' %}
+{% import 'partials/avatar.twig' as avatar %}
+
+{% block heading %}{{ t('members.title') }}{% endblock %}
+
+{% block content %}
+    {#
+        The one-time password, shown here and nowhere else.
+
+        It is carried across the redirect in the session and taken straight
+        back out again, so a reload does not show it a second time. Nothing
+        renders it from storage, because nothing stores it — the database has
+        only the hash.
+    #}
+    {% if temporary_password %}
+        <section class="card callout">
+            <h2>{{ t('members.temporary_password_heading') }}</h2>
+            <p>{{ t('members.temporary_password_note', { 'name': temporary_password_for }) }}</p>
+            <ul class="code-list">
+                <li><code>{{ temporary_password }}</code></li>
+            </ul>
+            <p class="muted">{{ t('members.temporary_password_once') }}</p>
+        </section>
+    {% endif %}
+
+    <section class="card">
+        <h2>{{ household ? household.name : t('members.this_household') }}</h2>
+        <p class="muted">{{ t('members.intro') }}</p>
+
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.member') }}</th>
+                    <th scope="col">{{ t('field.role') }}</th>
+                    <th scope="col">{{ t('field.status') }}</th>
+                    <th scope="col">{{ t('members.last_seen') }}</th>
+                    <th scope="col">{{ t('members.actions') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for member in members %}
+                    <tr>
+                        <td>
+                            <span class="member-identity">
+                                {{ avatar.face(
+                                    member.userId,
+                                    member.displayName,
+                                    member.initials(),
+                                    member.hasAvatar,
+                                    32
+                                ) }}
+                                <span class="member-names">
+                                    <strong>{{ member.displayName }}</strong>
+                                    {% if member.canReceiveMail %}
+                                        <span class="hint">{{ member.email }}</span>
+                                    {% else %}
+                                        <span class="hint">{{ t('members.no_mailbox') }}</span>
+                                    {% endif %}
+                                </span>
+                            </span>
+                        </td>
+                        <td>
+                            {% if member.userId == current_user.id %}
+                                {{ role_label(member.role.value) }}
+                                <span class="hint">{{ t('settings.you') }}</span>
+                            {% else %}
+                                <form method="post"
+                                      action="/settings/members/{{ member.userId }}/role"
+                                      class="inline">
+                                    {{ csrf_field() }}
+                                    <select name="role"
+                                            aria-label="{{ t('settings.role_for', {
+                                                'name': member.displayName,
+                                            }) }}">
+                                        {% for role in roles %}
+                                            <option value="{{ role.value }}"
+                                                    {{ member.role == role ? 'selected' : '' }}>
+                                                {{ role_label(role.value) }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="button button-quiet">
+                                        {{ t('members.change_role') }}
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge {{ member.isDisabled ? 'badge-danger' : '' }}">
+                                {{ t(member.statusKey()) }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if member.lastSeenAt %}
+                                {{ member.lastSeenAt|local_date('d MMM y HH:mm') }}
+                            {% else %}
+                                <span class="muted">{{ t('members.never_signed_in') }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if member.userId != current_user.id %}
+                                <div class="row-actions">
+                                    {% if member.status.value == 'pending' and member.canReceiveMail %}
+                                        <form method="post"
+                                              action="/settings/members/{{ member.userId }}/invite"
+                                              class="inline">
+                                            {{ csrf_field() }}
+                                            <button type="submit" class="button button-quiet">
+                                                {{ t('members.resend_invite') }}
+                                            </button>
+                                        </form>
+                                    {% endif %}
+
+                                    {% if member.canReceiveMail %}
+                                        <form method="post"
+                                              action="/settings/members/{{ member.userId }}/reset-password"
+                                              class="inline">
+                                            {{ csrf_field() }}
+                                            <button type="submit" class="button button-quiet">
+                                                {{ t('members.send_reset') }}
+                                            </button>
+                                        </form>
+                                    {% endif %}
+
+                                    {% if member.isDisabled %}
+                                        <form method="post"
+                                              action="/settings/members/{{ member.userId }}/restore"
+                                              class="inline">
+                                            {{ csrf_field() }}
+                                            <button type="submit" class="button button-quiet">
+                                                {{ t('members.restore_login') }}
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post"
+                                              action="/settings/members/{{ member.userId }}/revoke"
+                                              class="inline">
+                                            {{ csrf_field() }}
+                                            <button type="submit" class="button button-quiet button-danger">
+                                                {{ t('members.revoke_login') }}
+                                            </button>
+                                        </form>
+                                    {% endif %}
+
+                                    <a class="button button-quiet button-danger"
+                                       href="/settings/members/{{ member.userId }}/remove">
+                                        {{ t('members.remove') }}
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>{{ t('members.add_heading') }}</h2>
+        <p class="muted">{{ t('members.add_intro') }}</p>
+
+        <form method="post" action="/settings/members" class="stack">
+            {{ csrf_field() }}
+
+            <div class="field">
+                <label for="member_name">{{ t('field.name') }}</label>
+                <input type="text" id="member_name" name="display_name" maxlength="100" required
+                       autocomplete="off">
+            </div>
+
+            <div class="field">
+                <label for="member_email">{{ t('field.email') }}</label>
+                <input type="email" id="member_email" name="email" autocomplete="off"
+                       data-requires-unchecked="member_without_email">
+                <p class="hint">{{ t('members.email_hint') }}</p>
+            </div>
+
+            <div class="field">
+                <label class="choice" for="member_without_email">
+                    <input type="checkbox" id="member_without_email" name="without_email" value="1">
+                    <span>{{ t('members.without_email') }}</span>
+                </label>
+                <p class="hint">{{ t('members.without_email_hint') }}</p>
+            </div>
+
+            <div class="field">
+                <label for="member_role">{{ t('field.role') }}</label>
+                <select id="member_role" name="role">
+                    {% for role in roles %}
+                        <option value="{{ role.value }}">{{ role_label(role.value) }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="button button-primary">{{ t('members.add_button') }}</button>
+        </form>
+    </section>
+{% endblock %}

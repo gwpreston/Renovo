@@ -152,9 +152,10 @@ final class AuditLogViewTest extends DatabaseTestCase
     {
         $this->signIn($this->ownerId, $this->householdId);
 
-        $this->request('POST', '/settings/household', [
-            'name' => 'Test household',
-            'roles' => [(string) $this->editorId => Role::Viewer->value],
+        // The member screen, not the household form: role changes moved there
+        // in Phase 15 so that one guard covers demotion, revocation and removal.
+        $this->request('POST', '/settings/members/' . $this->editorId . '/role', [
+            'role' => Role::Viewer->value,
         ]);
 
         $entry = $this->lastEntryFor(AuditAction::RoleChanged);

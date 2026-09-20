@@ -58,7 +58,10 @@ use App\Service\Notification\NotificationRateLimiter;
 use App\Service\Notification\ReminderRunner;
 use App\Service\TrustedHostService;
 use App\Application\Api\OpenApiDocument;
+use App\Service\AccountService;
 use App\Service\AttachmentStorage;
+use App\Service\AvatarStorage;
+use App\Service\HouseholdMemberService;
 use App\Service\BackupService;
 use App\Service\ImportService;
 use App\Service\LogoStorage;
@@ -376,6 +379,27 @@ return static function (ContainerBuilder $builder, array $settings): void {
                 $uploads['attachment_max_bytes'],
             );
         },
+
+        // ------------------------------------------------------------------
+        // Phase 15: household membership
+        // ------------------------------------------------------------------
+        AvatarStorage::class => static function (ContainerInterface $c): AvatarStorage {
+            $uploads = $c->get('settings')['uploads'];
+
+            return new AvatarStorage($uploads['avatar_directory'], $uploads['avatar_max_bytes']);
+        },
+
+        // Both send mail with a link in it, to somebody who is not looking at
+        // the application when they read it.
+        HouseholdMemberService::class => autowire()->constructorParameter(
+            'appUrl',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
+
+        AccountService::class => autowire()->constructorParameter(
+            'appUrl',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
 
         ImportService::class => autowire(ImportService::class)
             ->constructorParameter(

@@ -190,6 +190,21 @@ final class AuthService
             throw ValidationException::field('email', 'error.auth.credentials');
         }
 
+        if ($user->isDisabled()) {
+            // Told plainly rather than folded into "wrong credentials". The
+            // person has typed the right password into their own account and
+            // an administrator has closed it; leaving them to guess at a
+            // generic failure would have them resetting a password that was
+            // never the problem. It discloses nothing an attacker could not
+            // already learn, because reaching this line at all required the
+            // correct password.
+            $this->rateLimiter->recordFailure(AuthAttemptRepository::KIND_LOGIN, $email, $ipAddress);
+
+            $this->audit->recordAnonymous(AuditAction::LoginFailed, $email, $user, ['reason' => 'disabled']);
+
+            throw ValidationException::field('email', 'error.auth.disabled');
+        }
+
         if (!$user->isVerified()) {
             $this->rateLimiter->recordFailure(AuthAttemptRepository::KIND_LOGIN, $email, $ipAddress);
 

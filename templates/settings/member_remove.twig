@@ -1,0 +1,46 @@
+{% extends 'layout.twig' %}
+
+{% block heading %}{{ t('members.remove_heading', { 'name': member.displayName }) }}{% endblock %}
+
+{% block content %}
+    <section class="card">
+        <p>{{ t('members.remove_intro', { 'name': member.displayName }) }}</p>
+        <p class="muted">{{ t('members.remove_account_kept') }}</p>
+
+        <form method="post" action="/settings/members/{{ member.userId }}/remove" class="stack">
+            {{ csrf_field() }}
+
+            {#
+                The question is only asked in ISOLATED mode, because only there
+                is the answer capable of disclosing something. In SHARED the
+                whole household could already see these rows, so handing them
+                to an Owner changes nothing anybody can see; in ISOLATED they
+                were private, and moving them silently would publish them to
+                the person running the removal.
+            #}
+            {% if is_isolated and owned_rows > 0 %}
+                <fieldset class="stack">
+                    <legend>{{ t('members.remove_data_legend', { 'count': owned_rows }) }}</legend>
+
+                    <label class="choice">
+                        <input type="radio" name="data" value="reassign" checked>
+                        <span>{{ t('members.remove_data_reassign') }}</span>
+                    </label>
+
+                    <label class="choice">
+                        <input type="radio" name="data" value="delete">
+                        <span>{{ t('members.remove_data_delete') }}</span>
+                    </label>
+                </fieldset>
+            {% else %}
+                <input type="hidden" name="data" value="reassign">
+                <p class="muted">{{ t('members.remove_data_shared') }}</p>
+            {% endif %}
+
+            <div class="form-actions">
+                <button type="submit" class="button button-danger">{{ t('members.remove_confirm') }}</button>
+                <a class="button button-quiet" href="/settings/members">{{ t('action.cancel') }}</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

@@ -157,6 +157,15 @@ return [
         // 10 MB: a scanned multi-page invoice, comfortably, and far short of
         // anything that would make a self-hosted instance's disk a concern.
         'attachment_max_bytes' => (int) $env('UPLOAD_MAX_ATTACHMENT_BYTES', '10485760'),
+        // Under var/ for the same reason attachments are, and a stronger one:
+        // on a family instance these are photographs of children. The only way
+        // to read one is the route that checks you share a household with the
+        // person in it.
+        'avatar_directory' => $env('AVATAR_DIRECTORY', dirname(__DIR__) . '/var/avatars'),
+        // 2 MB. The stored file is re-encoded down to a few tens of kilobytes,
+        // so this is a ceiling on what will be decoded, not on what is kept —
+        // generous enough for a photograph straight off a phone.
+        'avatar_max_bytes' => (int) $env('UPLOAD_MAX_AVATAR_BYTES', '2097152'),
     ],
 
     'paths' => [

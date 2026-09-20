@@ -108,6 +108,22 @@ final class SessionRepository extends AbstractRepository
         );
     }
 
+    /**
+     * Every session this account has, including the one making the request.
+     *
+     * The one place that spares nothing, because the account doing the signing
+     * out is not the account being signed out. An administrator revoking a
+     * member's login is not in any of these rows, and a member who keeps one
+     * session after their login is revoked has not had it revoked.
+     */
+    public function deleteAllForUser(int $userId): int
+    {
+        return $this->db->execute(
+            'DELETE FROM ' . $this->quote('sessions') . ' WHERE ' . $this->quote('user_id') . ' = :user',
+            ['user' => $userId],
+        );
+    }
+
     public function countActiveForUser(int $userId, DateTimeImmutable $now): int
     {
         return (int) $this->db->fetchValue(

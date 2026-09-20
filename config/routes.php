@@ -16,6 +16,7 @@ use App\Application\Api\ApiPath;
 use App\Application\Middleware\ApiAuthenticationMiddleware;
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Application\Middleware\FeedAuthenticationMiddleware;
+use App\Application\Middleware\PasswordChangeRequiredMiddleware;
 use App\Application\Middleware\RequirePermissionMiddleware;
 use App\Application\Ops\OpsPath;
 use App\Controller\Api\AttachmentApiController;
@@ -24,12 +25,15 @@ use App\Controller\Api\MeApiController;
 use App\Controller\Api\OpenApiController;
 use App\Controller\Api\SubscriptionApiController;
 use App\Controller\Api\TaxonomyApiController;
+use App\Controller\AccountController;
 use App\Controller\ApiTokenController;
 use App\Controller\AttachmentController;
 use App\Controller\AuditLogController;
 use App\Controller\BackupController;
 use App\Controller\Auth\LoginController;
 use App\Controller\Auth\PasskeyLoginController;
+use App\Controller\Auth\EmailChangeController;
+use App\Controller\Auth\InviteController;
 use App\Controller\Auth\PasswordResetController;
 use App\Controller\Auth\RegisterController;
 use App\Controller\Auth\TwoFactorController;
@@ -41,6 +45,7 @@ use App\Controller\CategoryController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
 use App\Controller\ImportController;
+use App\Controller\MemberController;
 use App\Controller\NotificationController;
 use App\Controller\Ops\HealthController;
 use App\Controller\Ops\MetricsController;
@@ -119,6 +124,16 @@ return static function (App $app): void {
     $app->post('/forgot-password', [PasswordResetController::class, 'submitRequest']);
     $app->get('/reset-password', [PasswordResetController::class, 'showResetForm'])->setName('reset-password');
     $app->post('/reset-password', [PasswordResetController::class, 'submitReset']);
+
+    // Phase 15. Both are followed by somebody who is not signed in — an invited
+    // member who has no password yet, and a member reading a confirmation on
+    // whichever device their mail is on. In each case the token in the link is
+    // the entire credential, which is why it is single-use and short-lived.
+    $app->get('/accept-invite', [InviteController::class, 'showForm'])->setName('accept-invite');
+    $app->post('/accept-invite', [InviteController::class, 'submit']);
+
+    $app->get('/confirm-email-change', [EmailChangeController::class, 'confirm'])
+        ->setName('confirm-email-change');
 
     // ----------------------------------------------------------------------
     // Everything below requires a signed-in user
@@ -264,6 +279,23 @@ return static function (App $app): void {
         $group->post('/profile/theme', [ProfileController::class, 'updateTheme']);
         $group->post('/profile/preferences', [ProfileController::class, 'updatePreferences']);
 
+        // Phase 15: account self-service. No permission on any of them, by the
+        // same rule as the preferences above and the security screen below —
+        // each acts on the id in the session and takes no argument that could
+        // point it at another account.
+        $group->get('/profile/account', [AccountController::class, 'index'])->setName('account');
+        $group->post('/profile/name', [AccountController::class, 'updateName']);
+        $group->post('/profile/email', [AccountController::class, 'requestEmailChange']);
+        $group->post('/profile/email/cancel', [AccountController::class, 'cancelEmailChange']);
+        $group->post('/profile/password', [AccountController::class, 'updatePassword']);
+        $group->post('/profile/avatar', [AccountController::class, 'uploadAvatar']);
+        $group->post('/profile/avatar/delete', [AccountController::class, 'removeAvatar']);
+
+        // Not under /profile: the id is whose face it is, not whose page it is,
+        // and every member of the household fetches every other member's. The
+        // service answers 404 for anybody outside it.
+        $group->get('/avatars/{id:[0-9]+}', [AccountController::class, 'avatar'])->setName('avatar');
+
         $group->get('/settings', [SettingsController::class, 'index'])->setName('settings');
 
         $group->post('/settings/household', [SettingsController::class, 'updateHousehold'])
@@ -271,6 +303,47 @@ return static function (App $app): void {
 
         $group->post('/settings/instance', [SettingsController::class, 'updateInstance'])
             ->add($requires(Permission::ManageInstance));
+
+        // ------------------------------------------------------------------
+        // Phase 15: household members
+        //
+        // Managing other people is household management, so every one of these
+        // names the permission an Owner/Admin has and an Editor or Viewer does
+        // not — including the list, which shows who has been invited, who has
+        // been revoked and when each of them was last here. The service asks
+        // the scope the same question again before it acts.
+        // ------------------------------------------------------------------
+        $group->get('/settings/members', [MemberController::class, 'index'])
+            ->setName('members')
+            ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/members', [MemberController::class, 'add'])
+            ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/members/{id:[0-9]+}/role', [MemberController::class, 'changeRole'])
+            ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/members/{id:[0-9]+}/invite', [MemberController::class, 'resendInvite'])
+            ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/members/{id:[0-9]+}/reset-password', [MemberController::class, 'sendPasswordReset'])
+            ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/members/{id:[0-9]+}/revoke', [MemberController::class, 'revoke'])
+            ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/members/{id:[0-9]+}/restore', [MemberController::class, 'restore'])
+            ->add($requires(Permission::ManageHousehold));
+
+        // A GET that asks the question, and a POST that answers it. Removing a
+        // member in ISOLATED mode disposes of rows nobody else can see, so it
+        // is not something a single click should do.
+        $group->get('/settings/members/{id:[0-9]+}/remove', [MemberController::class, 'confirmRemoval'])
+            ->setName('member-remove')
+            ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/members/{id:[0-9]+}/remove', [MemberController::class, 'remove'])
+            ->add($requires(Permission::ManageHousehold));
 
         // ------------------------------------------------------------------
         // Phase 3: notifications
@@ -420,7 +493,11 @@ return static function (App $app): void {
         $group->post('/setup/notifications/channels', [SetupController::class, 'addNotificationChannel']);
 
         $group->post('/setup/notifications/finish', [SetupController::class, 'finishNotifications']);
-    })->add(AuthenticationMiddleware::class);
+        // Added to the group and therefore runs on every route in it, which is
+        // the point: a member still on the temporary password an administrator
+        // gave them is sent to the account page until they replace it, and a
+        // route added later cannot forget to check.
+    })->add(PasswordChangeRequiredMiddleware::class)->add(AuthenticationMiddleware::class);
 
     // ----------------------------------------------------------------------
     // Phase 5: the versioned API

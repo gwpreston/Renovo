@@ -47,6 +47,26 @@ final class RecordingMailer implements MailerInterface
         return null;
     }
 
+    /**
+     * A token out of one particular message rather than the last.
+     *
+     * A single action can send two mails — a confirmation to a new address and
+     * a warning to the old one — and it is the first that carries the link.
+     */
+    public function lastTokenFromMessage(int $index): ?string
+    {
+        $message = $this->messages[$index] ?? null;
+        if ($message === null) {
+            return null;
+        }
+
+        if (preg_match('/token=([A-Za-z0-9%]+)/', quoted_printable_decode($message->toString()), $m) === 1) {
+            return urldecode($m[1]);
+        }
+
+        return null;
+    }
+
     public function reset(): void
     {
         $this->messages = [];
