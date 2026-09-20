@@ -169,6 +169,27 @@ Built in phases:
   a picture, re-encoded rather than stored as it arrived.
   See [Households and people](#households-and-people).
 
+- **Phase 16 — more ways to be told — complete.** The channels deferred in v1,
+  spending the promise Phase 3 made: a new one costs a class and a line in the
+  container. This cost seven — Discord, Telegram, Pushover, Pushplus,
+  Mattermost, ntfy and Serverchan — and changed neither the dispatcher, the
+  scheduler, the routing rules, the settings form nor the database; the
+  settings page offers them because it already renders whatever the registry
+  holds. Each reads its own service's idea of failure rather than the status
+  code, because several of them answer HTTP 200 with a body saying the message
+  was not sent, and turns it into a sentence naming the thing to fix. What
+  decides each one's transport is whether the service can be self-hosted: a
+  public service forces https and no allowlist entry can downgrade it, while
+  Mattermost and a self-hosted ntfy follow the administrator's trusted-host
+  list exactly as Gotify does — and ntfy, being both, has that rule computed
+  from the URL rather than fixed. Four of these put the credential in the URL
+  itself, so the failure recorded against a channel is scrubbed before it is
+  stored and shown. Browser push is deliberately not in it: its delivery
+  necessarily travels through the browser vendor's push cloud, which is the one
+  thing the offline rule does not permit, so it waits for a phase that can say
+  so plainly rather than arriving with an asterisk. See
+  [Notifications](#notifications).
+
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
@@ -1072,9 +1093,22 @@ four would otherwise quadruple everybody's notifications.
 ### Channels
 
 **Email** (through the instance's SMTP relay), **Gotify**, **Slack** (a channel
-or a direct message, via a bot token) and a **generic webhook** that posts a
-documented JSON payload, optionally signed with HMAC-SHA256 in an
-`X-Renovo-Signature` header.
+or a direct message, via a bot token), **Discord**, **Telegram**, **Pushover**,
+**Pushplus**, **Mattermost**, **ntfy** (on `ntfy.sh` or a server of your own)
+and **Serverchan**, plus a **generic webhook** that posts a documented JSON
+payload, optionally signed with HMAC-SHA256 in an `X-Renovo-Signature` header.
+
+Gotify, Mattermost, a self-hosted ntfy and the generic webhook can all point at
+a LAN or a Tailscale address, and are reachable there — or over plain http —
+only once an administrator adds the host to the trusted-host allowlist. Slack,
+Discord, Telegram, Pushover, Pushplus, Serverchan and ntfy on `ntfy.sh` are
+public services on https, and no allowlist entry can downgrade them: there is
+no legitimate plain-http variant to reach. Email is the exception to all of it,
+since its host comes from the operator's environment rather than from a form.
+
+Browser push is not offered. Delivering one means going through Google's,
+Mozilla's or Apple's push cloud, and this application does not quietly acquire
+a dependency on a third party's server.
 
 Add as many as you like, name them, route each alert type to whichever you
 want, and **send a test message** — a token that looks right and is not is
