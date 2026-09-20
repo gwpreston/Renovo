@@ -10,6 +10,7 @@ use App\Service\ValidationException;
 use JsonException;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 
@@ -54,14 +55,103 @@ abstract class HttpNotifier
             $request = $request->withHeader($name, $value);
         }
 
+        return $this->dispatch($request, $httpsOnly);
+    }
+
+    /**
+     * The same, for the services that want a form body rather than JSON.
+     *
+     * Pushover and Serverchan both document `application/x-www-form-urlencoded`
+     * and nothing else. This exists rather than each of them hand-rolling a
+     * request because the value in `postJson()` is not the encoding — it is the
+     * `catch` below it, which is what turns a dead host into a failure recorded
+     * against one channel instead of an exception escaping into the scheduler.
+     * A notifier that built its own request would quietly lose that.
+     *
+     * @param array<string, string> $fields
+     * @param array<string, string> $headers
+     * @throws NotifierException
+     */
+    protected function postForm(
+        string $url,
+        array $fields,
+        array $headers = [],
+        bool $httpsOnly = false,
+    ): ResponseInterface {
+        $request = $this->requests->createRequest('POST', $url)
+            ->withHeader('Content-Type', 'application/x-www-form-urlencoded')
+            ->withHeader('Accept', 'application/json')
+            // RFC1738, PHP's default: `application/x-www-form-urlencoded`
+            // encodes a space as `+`, not `%20`. RFC3986 would be correct for a
+            // URL and wrong here, and the symptom would be titles arriving with
+            // literal `%20` in them wherever a receiver decodes strictly.
+            ->withBody($this->streams->createStream(http_build_query($fields)));
+
+        foreach ($headers as $name => $value) {
+            $request = $request->withHeader($name, $value);
+        }
+
+        return $this->dispatch($request, $httpsOnly);
+    }
+
+    /**
+     * @throws NotifierException
+     */
+    private function dispatch(RequestInterface $request, bool $httpsOnly): ResponseInterface
+    {
         try {
             return $this->http->send($request, $httpsOnly);
         } catch (ClientExceptionInterface $exception) {
             // Covers both a refused destination and a dead one. The user sees
             // the reason against the channel; neither case is worth taking the
             // rest of the run down for.
-            throw NotifierException::transport($this->label(), $exception->getMessage());
+            throw NotifierException::transport($this->label(), $this->redact($exception->getMessage()));
         }
+    }
+
+    /**
+     * Last chance to take a secret out of an error message before a human sees
+     * it.
+     *
+     * The transport's own exceptions name the URL they failed on — see
+     * `HttpClientException` — and that message is stored in
+     * `notification_channels.last_error` and rendered on the settings page.
+     * For every channel here but one that is harmless, because the secret
+     * travels in a header or a body. Serverchan's sendkey is *in the path*, so
+     * without this hook a single DNS failure would write a live credential into
+     * the database and onto a page the user might screen-share.
+     *
+     * Default: nothing to hide. A channel whose URL carries a secret overrides
+     * it.
+     */
+    protected function redact(string $message): string
+    {
+        return $message;
+    }
+
+    /**
+     * A URL reduced to the part that is safe to show.
+     *
+     * Four of the services here put the credential in the path — Discord's and
+     * Mattermost's webhook URLs, Telegram's `/bot<token>/`, Serverchan's
+     * `<sendkey>.send`. For those, `describe()` cannot do what Gotify's does
+     * and return the URL, because the string it would return next to the
+     * channel name *is* the credential. The host answers the only question
+     * `describe()` is really being asked — where does this one go? — and the
+     * rest is dropped.
+     */
+    protected function summariseUrl(string $url): string
+    {
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (!is_string($scheme) || !is_string($host) || $host === '') {
+            return '';
+        }
+
+        $port = parse_url($url, PHP_URL_PORT);
+
+        return $scheme . '://' . $host . (is_int($port) ? ':' . $port : '');
     }
 
     /**

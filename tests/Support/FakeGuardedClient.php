@@ -6,6 +6,7 @@ namespace App\Tests\Support;
 
 use App\Http\BlockedTargetException;
 use App\Http\GuardedClient;
+use App\Http\HttpClientException;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -32,6 +33,7 @@ final class FakeGuardedClient implements GuardedClient
         private readonly int $status,
         private readonly string $body,
         private readonly ?BlockedTargetException $failure,
+        private readonly bool $failWithUrl = false,
     ) {
     }
 
@@ -53,6 +55,20 @@ final class FakeGuardedClient implements GuardedClient
         return new self(0, '', BlockedTargetException::malformed($reason));
     }
 
+    /**
+     * Fails the way the real client fails: with `HttpClientException`, whose
+     * message quotes the URL that was being fetched.
+     *
+     * That detail is the point. The message ends up in
+     * `notification_channels.last_error` and on the settings page, and four
+     * channels carry their credential in the URL path — so this is what proves
+     * a notifier's `redact()` actually runs.
+     */
+    public static function failingWithUrl(): self
+    {
+        return new self(0, '', null, true);
+    }
+
     public function send(RequestInterface $request, bool $httpsOnly = false): ResponseInterface
     {
         $this->requests[] = $request;
@@ -60,6 +76,10 @@ final class FakeGuardedClient implements GuardedClient
 
         if ($this->failure !== null) {
             throw $this->failure;
+        }
+
+        if ($this->failWithUrl) {
+            throw HttpClientException::transport($request, 'the connection timed out');
         }
 
         return (new ResponseFactory())

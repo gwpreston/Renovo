@@ -45,9 +45,16 @@ use App\Service\ExchangeRate\ExchangeRateHostProvider;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\ExchangeRate\FixerProvider;
 use App\Service\ExchangeRate\FrankfurterProvider;
+use App\Notification\Channel\DiscordNotifier;
 use App\Notification\Channel\EmailNotifier;
 use App\Notification\Channel\GotifyNotifier;
+use App\Notification\Channel\MattermostNotifier;
+use App\Notification\Channel\NtfyNotifier;
+use App\Notification\Channel\PushoverNotifier;
+use App\Notification\Channel\PushplusNotifier;
+use App\Notification\Channel\ServerchanNotifier;
 use App\Notification\Channel\SlackNotifier;
+use App\Notification\Channel\TelegramNotifier;
 use App\Notification\Channel\WebhookNotifier;
 use App\Notification\NotifierRegistry;
 use App\Service\ExchangeRateService;
@@ -202,8 +209,15 @@ return static function (ContainerBuilder $builder, array $settings): void {
         // codebase names a channel.
         NotifierRegistry::class => static fn (ContainerInterface $c): NotifierRegistry => new NotifierRegistry([
             $c->get(EmailNotifier::class),
+            $c->get(DiscordNotifier::class),
             $c->get(GotifyNotifier::class),
+            $c->get(MattermostNotifier::class),
+            $c->get(NtfyNotifier::class),
+            $c->get(PushoverNotifier::class),
+            $c->get(PushplusNotifier::class),
+            $c->get(ServerchanNotifier::class),
             $c->get(SlackNotifier::class),
+            $c->get(TelegramNotifier::class),
             $c->get(WebhookNotifier::class),
         ]),
 

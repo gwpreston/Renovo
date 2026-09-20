@@ -11,6 +11,7 @@ use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
 use App\Domain\AlertType;
 use App\Repository\NotificationChannelRepository;
+use App\Notification\NotifierRegistry;
 use App\Repository\NotificationLogRepository;
 use App\Repository\TrustedHostRepository;
 use App\Repository\UserRepository;
@@ -119,6 +120,51 @@ final class NotificationRoutesTest extends DatabaseTestCase
         self::assertStringContainsString('Upcoming renewal', $body);
         // The stored token is never rendered back into the page.
         self::assertStringNotContainsString('AsecretToken1', $body);
+    }
+
+    /**
+     * Every registered channel type is offered on the page.
+     *
+     * The controller hands the template `NotifierRegistry::all()` and the
+     * template loops it, so this should follow automatically — which is exactly
+     * why it is worth asserting. The promise the registry makes is that adding
+     * a channel to the container is the whole job; a filter, a hardcoded list
+     * or a template that stopped looping would break that silently, and the
+     * only symptom would be a channel nobody can select.
+     */
+    public function testTheAddAChannelSectionOffersEveryRegisteredType(): void
+    {
+        $this->signIn($this->viewerId);
+
+        $body = (string) $this->request('GET', '/settings/notifications')->getBody();
+
+        $registry = $this->app->getContainer()?->get(NotifierRegistry::class);
+        self::assertInstanceOf(NotifierRegistry::class, $registry);
+
+        foreach ($registry->all() as $notifier) {
+            // The hidden input is what actually submits the type, so it is a
+            // better witness than the label a theme might restyle away.
+            self::assertStringContainsString(
+                'name="channel_type" value="' . $notifier->key() . '"',
+                $body,
+                $notifier->label() . ' is registered but not offered on the page.',
+            );
+
+            foreach ($notifier->fields() as $field) {
+                self::assertStringContainsString(
+                    'id="' . $notifier->key() . '_' . $field->name . '"',
+                    $body,
+                    $notifier->label() . ' is offered without its ' . $field->name . ' field.',
+                );
+            }
+        }
+
+        // The seven this phase added, named explicitly: a regression that
+        // dropped them would otherwise pass an assertion that iterates a
+        // registry which had also lost them.
+        foreach (['discord', 'telegram', 'pushover', 'pushplus', 'mattermost', 'ntfy', 'serverchan'] as $key) {
+            self::assertStringContainsString('name="channel_type" value="' . $key . '"', $body);
+        }
     }
 
     public function testAViewerMayAddAChannelOfTheirOwn(): void

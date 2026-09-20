@@ -345,6 +345,32 @@ return [
     'error.slack.token_required' => 'Enter the Slack bot token.',
     'error.slack.channel_required' => 'Enter the channel or user to message.',
     'error.slack.channel_invalid' => 'That does not look like a channel or user id.',
+    'error.discord.https_required' => 'A Discord webhook URL must start with https://.',
+    'error.discord.url_invalid' =>
+        'That is not a Discord webhook URL. Copy it from Server Settings → Integrations → Webhooks.',
+    'error.mattermost.url_invalid' =>
+        'That is not a Mattermost webhook URL — it should contain /hooks/.',
+    'error.mattermost.channel_invalid' => 'Use a channel name such as bills, or @username for a direct message.',
+    'error.ntfy.topic_required' => 'Enter the topic to publish to.',
+    'error.ntfy.topic_invalid' => 'A topic may use letters, numbers, dashes and underscores only.',
+    'error.ntfy.priority_range' => 'Enter a priority between 1 and 5.',
+    'error.ntfy.tags_invalid' => 'Enter tags separated by commas, using letters, numbers, dashes and underscores.',
+    'error.pushover.token_required' => 'Enter the Pushover application token.',
+    'error.pushover.token_invalid' => 'A Pushover application token is 30 letters and numbers.',
+    'error.pushover.user_key_required' => 'Enter your Pushover user or group key.',
+    'error.pushover.user_key_invalid' => 'A Pushover user key is 30 letters and numbers.',
+    'error.pushover.priority_range' =>
+        'Enter a priority between -2 and 1. Emergency priority is not supported.',
+    'error.pushplus.token_required' => 'Enter the Pushplus token.',
+    'error.pushplus.token_invalid' => 'A Pushplus token is 32 characters.',
+    'error.pushplus.topic_invalid' => 'That topic code is too long.',
+    'error.serverchan.sendkey_required' => 'Enter your Server酱 SendKey.',
+    'error.serverchan.sendkey_invalid' => 'A Turbo SendKey starts with SCT followed by letters and numbers.',
+    'error.telegram.token_required' => 'Enter the Telegram bot token.',
+    'error.telegram.token_invalid' => 'A bot token looks like 123456789:AA... — copy it from BotFather.',
+    'error.telegram.chat_id_required' => 'Enter the chat to message.',
+    'error.telegram.chat_id_invalid' =>
+        'Use a numeric chat id, or @name for a public channel.',
     'error.channel.type_required' => 'Choose a channel type.',
     'error.channel.missing' => 'That channel no longer exists.',
     'error.channel.type_unavailable' => 'That channel type is no longer available.',
@@ -1517,17 +1543,59 @@ return [
     // channel_field
     'channel_field.email.address' => 'Email address',
     'channel_field.email.address_hint' => 'Leave blank to use your account address.',
+    'channel_field.discord.url' => 'Webhook URL',
+    'channel_field.discord.url_hint' =>
+        'Server Settings → Integrations → Webhooks → Copy Webhook URL. It is the credential, so it is '
+        . 'stored like a password and not shown again.',
     'channel_field.gotify.priority' => 'Priority',
     'channel_field.gotify.priority_hint' => '0–10. Higher priorities ring.',
     'channel_field.gotify.token' => 'Application token',
     'channel_field.gotify.token_hint' => 'Created under Apps in Gotify.',
     'channel_field.gotify.url' => 'Server URL',
     'channel_field.gotify.url_hint' => 'For example https://gotify.example.com',
+    'channel_field.mattermost.channel' => 'Channel',
+    'channel_field.mattermost.channel_hint' =>
+        'Optional. Overrides the webhook’s own channel. Use @username for a direct message.',
+    'channel_field.mattermost.url' => 'Webhook URL',
+    'channel_field.mattermost.url_hint' =>
+        'From Integrations → Incoming Webhooks. A self-hosted server on a private address must be on the '
+        . 'trusted-host list. The URL is the credential, so it is stored like a password and not shown again.',
+    'channel_field.ntfy.priority' => 'Priority',
+    'channel_field.ntfy.priority_hint' => '1–5. 3 is the default; 5 bypasses Do Not Disturb.',
+    'channel_field.ntfy.server' => 'Server URL',
+    'channel_field.ntfy.server_hint' =>
+        'Leave blank for https://ntfy.sh. A self-hosted server on a private address must be on the trusted-host list.',
+    'channel_field.ntfy.tags' => 'Tags',
+    'channel_field.ntfy.tags_hint' => 'Optional, comma-separated. Emoji shortcodes such as warning become icons.',
+    'channel_field.ntfy.token' => 'Access token',
+    'channel_field.ntfy.token_hint' => 'Optional. Only needed for a protected topic.',
+    'channel_field.ntfy.topic' => 'Topic',
+    'channel_field.ntfy.topic_hint' =>
+        'Anyone who knows a topic name on a public server can read it. Choose something hard to guess.',
+    'channel_field.pushover.priority' => 'Priority',
+    'channel_field.pushover.priority_hint' => '-2 silent to 1 high. 0 is the default.',
+    'channel_field.pushover.token' => 'Application token',
+    'channel_field.pushover.token_hint' => 'Created under Your Applications on pushover.net.',
+    'channel_field.pushover.user_key' => 'User or group key',
+    'channel_field.pushover.user_key_hint' => 'Shown on your Pushover dashboard.',
+    'channel_field.pushplus.token' => 'Token',
+    'channel_field.pushplus.token_hint' => 'From the pushplus.plus dashboard.',
+    'channel_field.pushplus.topic' => 'Topic code',
+    'channel_field.pushplus.topic_hint' => 'Optional. Sends to a group instead of your own account.',
+    'channel_field.serverchan.sendkey' => 'SendKey',
+    'channel_field.serverchan.sendkey_hint' =>
+        'From sct.ftqq.com. It travels in the request URL, so it may appear in Server酱’s own logs.',
     'channel_field.slack.channel' => 'Channel or user',
     'channel_field.slack.channel_hint' =>
         'A channel id (C0123…), a channel name (#bills) or a user id (U0123…) for a direct message.',
     'channel_field.slack.token' => 'Bot token',
     'channel_field.slack.token_hint' => 'Starts with xoxb-. Needs the chat:write scope.',
+    'channel_field.telegram.chat_id' => 'Chat id',
+    'channel_field.telegram.chat_id_hint' =>
+        'Message your bot, then open api.telegram.org/bot<token>/getUpdates to find the id. '
+        . 'Negative for a group; @name works for a public channel.',
+    'channel_field.telegram.token' => 'Bot token',
+    'channel_field.telegram.token_hint' => 'Created by BotFather. Looks like 123456789:AA…',
     'channel_field.webhook.secret' => 'Shared secret',
     'channel_field.webhook.secret_hint' =>
         'Optional. Sent as an HMAC-SHA256 signature of the body in X-Renovo-Signature.',
