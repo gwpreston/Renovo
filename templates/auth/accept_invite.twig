@@ -1,0 +1,34 @@
+{% extends 'layout.twig' %}
+
+{% block title %}{{ t('auth_invite.title') }} — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    <section class="card narrow">
+        <h1>{{ t('auth_invite.title') }}</h1>
+        <p class="muted">{{ t('auth_invite.intro') }}</p>
+
+        {#
+            No email field. The person reading this followed a link that was
+            sent to their address, which proves they can read mail there far
+            better than typing it would.
+        #}
+        <form method="post" action="/accept-invite" class="stack">
+            {{ csrf_field() }}
+            <input type="hidden" name="token" value="{{ token }}">
+
+            <label for="password">{{ t('auth_invite.choose_password') }}</label>
+            <input type="password" id="password" name="password" autocomplete="new-password" required autofocus>
+            <p class="hint">{{ t('hint.password_length') }}</p>
+            {% if errors.password is defined %}<p class="field-error">{{ error_message(errors.password) }}</p>{% endif %}
+
+            <label for="password_confirm">{{ t('auth_invite.confirm_password') }}</label>
+            <input type="password" id="password_confirm" name="password_confirm"
+                   autocomplete="new-password" required>
+            {% if errors.password_confirm is defined %}
+                <p class="field-error">{{ error_message(errors.password_confirm) }}</p>
+            {% endif %}
+
+            <button type="submit" class="button button-primary">{{ t('auth_invite.join') }}</button>
+        </form>
+    </section>
+{% endblock %}

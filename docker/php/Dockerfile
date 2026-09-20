@@ -6,21 +6,34 @@
 # Both database drivers are compiled in, because the same image must be able
 # to run against PostgreSQL or MySQL/MariaDB — which engine is in use is a
 # runtime setting, not a build-time one.
+#
+# gd is here for avatars, which are re-encoded on upload rather than stored as
+# they arrived. The runtime libraries stay in the image and only the headers
+# are thrown away with .build-deps, so the extension it produces still has
+# something to link against.
 # ---------------------------------------------------------------------------
 FROM php:8.3-fpm-alpine AS base
 
 RUN apk add --no-cache \
         icu-libs \
+        libjpeg-turbo \
+        libpng \
         libpq \
+        libwebp \
         libzip \
         oniguruma \
     && apk add --no-cache --virtual .build-deps \
         $PHPIZE_DEPS \
         icu-dev \
+        jpeg-dev \
+        libpng-dev \
+        libwebp-dev \
         libzip-dev \
         postgresql-dev \
     && docker-php-ext-configure intl \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install -j"$(nproc)" \
+        gd \
         intl \
         opcache \
         pdo_mysql \
@@ -87,8 +100,8 @@ COPY --from=assets /app/public/build ./public/build
 # that are never web-served — invoices and receipts in the first, in-progress
 # uploads in the second — so they are 0750 rather than the 0755 a cache wants.
 RUN composer dump-autoload --no-dev --optimize --no-interaction \
-    && mkdir -p var/cache var/log var/attachments var/imports public/assets/logos \
-    && chmod 750 var/attachments var/imports \
+    && mkdir -p var/cache var/log var/attachments var/avatars var/imports public/assets/logos \
+    && chmod 750 var/attachments var/avatars var/imports \
     && chown -R www-data:www-data var public/assets/logos
 
 USER www-data

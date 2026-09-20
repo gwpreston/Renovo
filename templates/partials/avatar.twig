@@ -1,0 +1,37 @@
+{#
+    A member's face, or their initials when they have none.
+
+    One macro rather than an `<img>` pasted into the top bar, the member list
+    and the payer field, for the same reason `partials/logo.twig` exists: the
+    fallback is the part that gets forgotten, and a member with no picture
+    should show two letters rather than a broken image.
+
+    The initials form costs no request and follows the theme. It is also the
+    accessible one by default — like the logo mark, both forms are decorative,
+    because the member's name is always rendered beside the avatar and is what
+    identifies them. Announcing "Sam" twice is worse than announcing it once.
+
+    `id`          the member's user id; the picture is fetched from /avatars/{id}
+    `name`        their display name, used only for the initials fallback
+    `initials`    the letters to draw when there is no picture
+    `has_avatar`  whether to try the picture at all
+    `size`        the box to draw it in, in pixels
+
+    The route answers 404 for a member of another household, which is why the
+    caller passes `has_avatar` rather than this asking: a broken image is worse
+    than initials, and the page already knows the answer.
+
+    The size arrives as a custom property rather than a width class, because
+    the two forms have to agree on it — an image sized by attributes and a
+    circle of text sized by a class drift the moment either changes.
+#}
+{% macro face(id, name, initials, has_avatar, size = 32) %}
+    {%- if has_avatar -%}
+        <img class="avatar" src="/avatars/{{ id }}" alt=""
+             width="{{ size }}" height="{{ size }}" loading="lazy"
+             style="--avatar-size: {{ size }}px">
+    {%- else -%}
+        <span class="avatar avatar-initials" aria-hidden="true"
+              style="--avatar-size: {{ size }}px">{{ initials }}</span>
+    {%- endif -%}
+{% endmacro %}

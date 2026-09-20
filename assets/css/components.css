@@ -1471,3 +1471,98 @@ kbd {
     white-space: nowrap;
     border: 0;
 }
+
+/* --------------------------------------------------------------- avatars */
+
+/*
+ * A member's face, from `partials/avatar.twig`.
+ *
+ * The two forms — a photograph and a pair of initials — share one custom
+ * property for their size, because they appear in the same places and any
+ * disagreement between them shows up as a list of circles that do not line up.
+ * The property is set inline by the macro; this is the fallback for anything
+ * that forgets.
+ */
+.avatar {
+    --avatar-size: 2rem;
+
+    inline-size: var(--avatar-size);
+    block-size: var(--avatar-size);
+    border-radius: var(--radius-pill);
+    object-fit: cover;
+    flex: 0 0 auto;
+}
+
+/*
+ * The fallback. A tinted disc with one or two letters, sized from the same
+ * property so it matches the photograph it stands in for. The font size is a
+ * fraction of the box rather than a fixed value, so the 96-pixel avatar on the
+ * account page and the 24-pixel one in a table row are the same design.
+ */
+.avatar-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: calc(var(--avatar-size) * 0.4);
+    font-weight: var(--weight-medium);
+    line-height: 1;
+    letter-spacing: 0.02em;
+    user-select: none;
+}
+
+/* A face and a name, wherever the two appear together. */
+.member-identity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.member-names {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+/*
+ * The top bar's own name, now a link to the account page. It keeps the muted
+ * treatment it had as plain text — it is an identity, not a call to action —
+ * and gains the underline only on hover.
+ */
+.topbar-identity {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: inherit;
+    text-decoration: none;
+}
+
+.topbar-identity:hover .topbar-name,
+.topbar-identity:focus-visible .topbar-name {
+    color: var(--text);
+    text-decoration: underline;
+}
+
+/*
+ * The member list's per-row controls. They wrap rather than widening the
+ * table, because there are up to four of them and a phone has room for two.
+ */
+.row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+/*
+ * The account page's picture section: the avatar beside the controls that
+ * change it, stacking on a narrow screen like every other two-column block.
+ */
+.avatar-editor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1rem;
+}

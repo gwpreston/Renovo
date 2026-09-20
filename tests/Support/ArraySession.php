@@ -73,6 +73,18 @@ final class ArraySession implements SessionInterface
         return $this->id;
     }
 
+    /**
+     * Pin the id, for a test about which session survives something.
+     *
+     * The real session's id is decided by PHP; here it has to be decided by
+     * the test, because "everything but this browser" is only a meaningful
+     * assertion if the test knows which browser this one is.
+     */
+    public function setId(string $id): void
+    {
+        $this->id = $id;
+    }
+
     public function flash(string $type, string $key, array $parameters = []): void
     {
         $this->data['_flashes'][] = ['type' => $type, 'message' => $key, 'parameters' => $parameters];

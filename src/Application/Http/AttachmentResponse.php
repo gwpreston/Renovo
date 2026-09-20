@@ -27,6 +27,36 @@ use Psr\Http\Message\StreamFactoryInterface;
  */
 final class AttachmentResponse
 {
+    /**
+     * Stream an image meant to be *rendered*, not downloaded.
+     *
+     * The one deliberate difference from `stream()` is the disposition: an
+     * avatar is the target of an `<img src>`, so `attachment` would make every
+     * face on the page a download prompt. Everything that made that safe stays
+     * — `nosniff`, and a type this application chose rather than one a client
+     * claimed — and here the type is not merely detected but guaranteed:
+     * `AvatarStorage` re-encodes every upload to PNG, so the bytes on disk were
+     * written by GD and by nothing else.
+     *
+     * `no-cache` rather than a max-age, because the URL is the member's id and
+     * does not change when their picture does. A cached avatar would outlive
+     * the one it replaced, and on the remove path would outlive it entirely.
+     */
+    public static function streamImage(
+        ResponseInterface $response,
+        StreamFactoryInterface $streams,
+        string $absolutePath,
+        string $mimeType,
+    ): ResponseInterface {
+        return $response
+            ->withBody($streams->createStreamFromFile($absolutePath, 'rb'))
+            ->withHeader('Content-Type', $mimeType)
+            ->withHeader('Content-Length', (string) (filesize($absolutePath) ?: 0))
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Cache-Control', 'private, no-cache')
+            ->withHeader('Content-Disposition', 'inline');
+    }
+
     public static function stream(
         ResponseInterface $response,
         StreamFactoryInterface $streams,

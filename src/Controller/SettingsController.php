@@ -7,7 +7,6 @@ namespace App\Controller;
 use App\I18n\Translator;
 use App\Domain\Currency;
 use App\Domain\IsolationMode;
-use App\Domain\Role;
 use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
@@ -33,6 +32,11 @@ use Slim\Views\Twig;
  * The two tiers here are separate routes with separate permissions: renaming a
  * household needs Owner/Admin, and the isolation mode needs instance
  * administration.
+ *
+ * Who is *in* the household is not here either, since Phase 15. It outgrew a
+ * fieldset the moment it had to show a status and offer six actions per
+ * person, so it is a screen of its own — `MemberController` — and this page
+ * links to it.
  */
 final class SettingsController extends Controller
 {
@@ -66,7 +70,6 @@ final class SettingsController extends Controller
             'members' => $scope->hasHousehold()
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],
-            'roles' => Role::assignable(),
             'currencies' => Currency::common(),
             'isolation_modes' => IsolationMode::cases(),
             'rate_providers' => $this->rateProviders->all(),
@@ -93,17 +96,11 @@ final class SettingsController extends Controller
         $body = $this->body($request);
 
         if ($scope->hasHousehold()) {
-            $user = $this->user($request);
-            $householdId = (int) $scope->householdId;
-            $roles = $body['roles'] ?? null;
-
             $this->householdSettings->rename(
-                $user,
-                $householdId,
+                $this->user($request),
+                (int) $scope->householdId,
                 is_scalar($body['name'] ?? null) ? (string) $body['name'] : '',
             );
-
-            $this->householdSettings->changeRoles($user, $householdId, is_array($roles) ? $roles : []);
         }
 
         $this->flash('success', 'flash.household_saved');

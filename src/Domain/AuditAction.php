@@ -11,12 +11,13 @@ namespace App\Domain;
  * them, and so that adding an event is a deliberate act with a name, not a
  * typo waiting to split one event into two.
  *
- * What is absent is as deliberate as what is present: there is no
- * `user.disabled` case, because nothing in the application can disable an
- * account — the users table has no such column and there is no
- * user-administration UI. Adding the case now would give the admin view a
- * filter that can never match anything and imply an audit guarantee nothing is
- * enforcing. It arrives with the feature it describes.
+ * Cases arrive with the feature they describe, which is why the member
+ * administration block below did not exist until Phase 15 built the screen it
+ * records. Until then there was no `member.login_revoked`, because nothing
+ * could revoke a login: the users table had no column for it and no UI reached
+ * it, and a filter in the admin view that can never match anything implies an
+ * audit guarantee nothing is enforcing. The rule still holds for whatever is
+ * absent now.
  */
 enum AuditAction: string
 {
@@ -62,6 +63,27 @@ enum AuditAction: string
 
     case AttachmentUploaded = 'attachment.uploaded';
     case AttachmentDeleted = 'attachment.deleted';
+
+    // Phase 15. Household member administration: everything an Owner/Admin can
+    // do to somebody else's account. Each of these carries a target as well as
+    // an actor, which is the whole reason they are separate cases from the
+    // self-service ones below — "who revoked whose login" is unanswerable if
+    // the event only records that a login was revoked.
+    case MemberAdded = 'member.added';
+    case MemberInviteResent = 'member.invite_resent';
+    case MemberTemporaryPasswordIssued = 'member.temporary_password_issued';
+    case MemberPasswordResetSent = 'member.password_reset_sent';
+    case MemberLoginRevoked = 'member.login_revoked';
+    case MemberLoginRestored = 'member.login_restored';
+    case MemberRemoved = 'member.removed';
+
+    // Phase 15. Account self-service: the acting user is also the target, so
+    // these say nothing about who else was involved because nobody was.
+    case NameChanged = 'account.name_changed';
+    case EmailChangeRequested = 'account.email_change_requested';
+    case EmailChanged = 'account.email_changed';
+    case AvatarChanged = 'account.avatar_changed';
+    case AvatarRemoved = 'account.avatar_removed';
 
     /**
      * The key for a short description of the event, for the log view.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Entity;
 
+use App\Domain\MembershipStatus;
 use App\Domain\Role;
 
 final class Membership
@@ -14,6 +15,7 @@ final class Membership
         public readonly int $userId,
         public readonly Role $role,
         public readonly ?string $householdName = null,
+        public readonly MembershipStatus $status = MembershipStatus::Active,
     ) {
     }
 }

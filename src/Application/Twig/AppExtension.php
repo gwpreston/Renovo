@@ -32,6 +32,7 @@ use App\Support\NumberFormat;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Twig\Extension\AbstractExtension;
+use App\Support\Initials;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
 
@@ -102,6 +103,9 @@ final class AppExtension extends AbstractExtension
             new TwigFilter('local_date', $this->formatDate(...)),
             new TwigFilter('percent', $this->numbers->percent(...)),
             new TwigFilter('decimal', $this->numbers->decimal(...)),
+            // For the places that have a name and no entity to ask — the owner
+            // of a subscription is a display name on the row, not a User.
+            new TwigFilter('initials', Initials::of(...)),
         ];
     }
 

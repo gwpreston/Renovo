@@ -662,6 +662,9 @@ final class SubscriptionRepository extends AbstractScopedRepository
         return 'SELECT ' . $subscriptions . '.*,'
             . ' c.' . $this->quote('name') . ' AS category_name,'
             . ' owner_user.' . $this->quote('display_name') . ' AS owner_name,'
+            // Whether, not where: the path is never rendered, because an
+            // avatar is fetched through the scoped route by the owner's id.
+            . ' owner_user.' . $this->quote('avatar_path') . ' AS owner_avatar_path,'
             . ' payer_user.' . $this->quote('display_name') . ' AS payer_name'
             . ' FROM ' . $subscriptions
             . ' LEFT JOIN ' . $this->quote('categories') . ' c'
@@ -814,6 +817,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
             categoryId: $this->nullableInt($row['category_id'] ?? null),
             categoryName: $this->nullableString($row['category_name'] ?? null),
             ownerName: $this->nullableString($row['owner_name'] ?? null),
+            ownerHasAvatar: $this->nullableString($row['owner_avatar_path'] ?? null) !== null,
             payerName: $this->nullableString($row['payer_name'] ?? null),
             tags: $tags,
             createdAt: new DateTimeImmutable((string) $row['created_at']),

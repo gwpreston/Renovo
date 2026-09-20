@@ -22,6 +22,69 @@ return [
     // -----------------------------------------------------------------------
     // Shared vocabulary
     // -----------------------------------------------------------------------
+    'account.choose_picture' => 'Choose a picture',
+    'account.confirm_password' => 'Confirm new password',
+    'account.current_password' => 'Current password',
+    'account.email_cancel' => 'Cancel that change',
+    'account.email_current' => 'You sign in as {email}.',
+    'account.email_hint' =>
+        'We will send a link to the new address. Nothing changes until you follow it, so a typo '
+        . 'cannot lock you out.',
+    'account.email_new' => 'New email address',
+    'account.email_none' =>
+        'This account has no mailbox of its own. An Owner of your household can give it an address.',
+    'account.email_pending' => 'Waiting for {email} to be confirmed.',
+    'account.email_request' => 'Send confirmation link',
+    'account.must_change_heading' => 'Choose a password of your own',
+    'account.must_change_note' =>
+        'You are signed in with a password somebody else chose for you. Set one of your own below '
+        . 'and the rest of Renovo opens up.',
+    'account.new_password' => 'New password',
+    'account.picture_hint' =>
+        'PNG, JPEG, WebP or GIF, up to {kilobytes} KB. It is cropped square and resized, and the '
+        . 'original is not kept.',
+    'account.remove_picture' => 'Remove picture',
+    'account.save_name' => 'Save name',
+    'account.save_password' => 'Change password',
+    'account.save_picture' => 'Save picture',
+    'account.sign_out_others' => 'Sign out my other devices',
+    'account.sign_out_others_hint' =>
+        'Leave this on unless you meant somebody else to stay signed in. This device stays signed '
+        . 'in either way.',
+    'account.title' => 'Your account',
+    'account.who_you_are' => 'Who you are',
+    'account.your_email' => 'Your email address',
+    'account.your_password' => 'Your password',
+    'account.your_picture' => 'Your picture',
+    'audit_action.account.avatar_changed' => 'Picture changed',
+    'audit_action.account.avatar_removed' => 'Picture removed',
+    'audit_action.account.email_change_requested' => 'Email change requested',
+    'audit_action.account.email_changed' => 'Email address changed',
+    'audit_action.account.name_changed' => 'Name changed',
+    'audit_action.member.added' => 'Member added',
+    'audit_action.member.invite_resent' => 'Invitation resent',
+    'audit_action.member.login_restored' => 'Login restored',
+    'audit_action.member.login_revoked' => 'Login revoked',
+    'audit_action.member.password_reset_sent' => 'Password reset sent',
+    'audit_action.member.removed' => 'Member removed from household',
+    'audit_action.member.temporary_password_issued' => 'Temporary password issued',
+    'auth.back_to_sign_in' => 'Back to sign in',
+    'auth_email_change_failed.back' => 'Back to your account',
+    'auth_email_change_failed.intro' =>
+        'Confirmation links are valid for one hour and can be used once. Your address has not been '
+        . 'changed.',
+    'auth_email_change_failed.title' => 'That link did not work',
+    'auth_invite.choose_password' => 'Choose a password',
+    'auth_invite.confirm_password' => 'Confirm password',
+    'auth_invite.intro' =>
+        'Your account is nearly ready. Choose a password and it is yours — nobody else, including '
+        . 'whoever invited you, ever sees it.',
+    'auth_invite.join' => 'Set password and join',
+    'auth_invite.title' => 'Join the household',
+    'auth_invite_expired.intro' =>
+        'Invitations are valid for seven days, and each one can be used once. Ask whoever invited '
+        . 'you to send another.',
+    'auth_invite_expired.title' => 'This invitation has expired',
     'common.none_symbol' => '—',
 
     // -----------------------------------------------------------------------
@@ -35,6 +98,114 @@ return [
     'cycle.custom' => 'Custom',
     'cycle.custom_days' => 'Every {days, plural, one {# day} other {# days}}',
 
+    'error.auth.disabled' =>
+        'This account has been closed by an administrator of your household. Ask them to restore it.',
+    'error.avatar.dimensions' => 'That image is too large to work with. Try a smaller one.',
+    'error.avatar.too_large' => 'A picture must be {kilobytes} KB or smaller.',
+    'error.avatar.type' => 'That file is not a PNG, JPEG, WebP or GIF image.',
+    'error.email.no_mailbox' =>
+        'This account has no mailbox of its own, so it cannot confirm a new address. An Owner of your '
+        . 'household can change it for you.',
+    'error.email.unchanged' => 'That is already your email address.',
+    'error.email_change.invalid_token' =>
+        'That confirmation link has expired or has already been used.',
+    'error.invite.invalid_token' => 'That invitation has expired or has already been used.',
+    'error.member.last_owner' =>
+        'This is the household\'s last Owner. Make somebody else an Owner first — a household with '
+        . 'nobody able to administer it cannot be put right from inside.',
+    'error.member.no_mailbox' => 'That member has no email address, so nothing can be sent to them.',
+    'error.member.not_found' => 'That person is not a member of this household.',
+    'error.member.not_your_own_role' =>
+        'You cannot change your own role. Ask another Owner to change it for you.',
+    'error.member.not_yourself' => 'You cannot do that to your own account.',
+    'error.member.role_invalid' => 'Choose a role from the list.',
+    'flash.avatar_missing' => 'There was no picture to remove.',
+    'flash.avatar_removed' => 'Your picture has been removed.',
+    'flash.avatar_saved' => 'Your picture has been saved.',
+    'flash.email_change_cancelled' => 'The pending email change has been cancelled.',
+    'flash.email_change_confirmed' =>
+        'Your email address has been changed. Use the new one to sign in from now on.',
+    'flash.email_change_requested' =>
+        'Check the new address for a confirmation link. Until you follow it, your current address '
+        . 'stays your sign-in.',
+    'flash.invite_accepted' => 'Your account is ready. Sign in with the password you just chose.',
+    'flash.member_added_temporary' => 'The account has been created. Give them the password below.',
+    'flash.member_invite_resent' => 'The invitation has been sent again.',
+    'flash.member_invited' => 'An invitation is on its way.',
+    'flash.member_removed' => 'They are no longer a member of this household.',
+    'flash.member_reset_sent' => 'A password reset link has been sent to them.',
+    'flash.member_restored' => 'They can sign in again.',
+    'flash.member_revoked' =>
+        'Their login has been revoked and they have been signed out everywhere.',
+    'flash.member_role_changed' => 'Their role has been changed.',
+    'flash.name_saved' => 'Your name has been saved.',
+    'flash.password_changed_sessions' =>
+        'Your password has been changed, and {count, plural, one {# other session was} other {# other sessions were}} signed out.',
+    'mail.email_change.body' =>
+        'Hello {name},\n\nConfirm that you can read mail at this address, and it becomes the one '
+        . 'you sign in with:\n\n{link}\n\nThe link is valid for one hour. Until you follow it, '
+        . 'nothing changes. If you did not ask for this, you can ignore this message.',
+    'mail.email_change.subject' => 'Confirm your new {instance} address',
+    'mail.email_change_notice.body' =>
+        'Hello {name},\n\nSomebody asked to move your {instance} account to {new_email}. Nothing '
+        . 'has changed yet: this address is still your sign-in until the new one is '
+        . 'confirmed.\n\nIf that was not you, sign in and change your password now.',
+    'mail.email_change_notice.subject' => 'A change of address was requested on {instance}',
+    'mail.invite.body' =>
+        'Hello {name},\n\n{inviter} has added you to their household on {instance}, a shared '
+        . 'subscription tracker.\n\nChoose a password and you are in:\n\n{link}\n\nThe link is '
+        . 'valid for seven days. If you were not expecting this, you can ignore this message.',
+    'mail.invite.subject' => '{inviter} has invited you to {instance}',
+    'members.actions' => 'Actions',
+    'members.add_button' => 'Add member',
+    'members.add_heading' => 'Add someone',
+    'members.add_intro' =>
+        'They get an invitation and choose their own password — you never see it. A member with no '
+        . 'mailbox of their own is the one exception; tick the box below for that.',
+    'members.change_role' => 'Change',
+    'members.email_hint' => 'Where their invitation goes. Leave it empty if they have no address.',
+    'members.intro' =>
+        'Everybody who shares this household, what they may do in it, and whether they have arrived '
+        . 'yet.',
+    'members.last_seen' => 'Last seen',
+    'members.never_signed_in' => 'Never',
+    'members.no_mailbox' => 'No email address',
+    'members.remove' => 'Remove',
+    'members.remove_account_kept' =>
+        'Their account itself is not deleted — this removes their membership of this household.',
+    'members.remove_confirm' => 'Remove from household',
+    'members.remove_data_delete' =>
+        'Delete them, along with their price history, attachments and budgets. This cannot be undone.',
+    'members.remove_data_legend' =>
+        'What should happen to the {count, plural, one {# subscription} other {# subscriptions}} they '
+        . 'own?',
+    'members.remove_data_reassign' => 'Give them to me. Nothing is lost, and I become their owner.',
+    'members.remove_data_shared' =>
+        'Anything they own stays with the household and becomes yours. Their share of any split cost '
+        . 'is removed.',
+    'members.remove_heading' => 'Remove {name}?',
+    'members.remove_intro' =>
+        '{name} will lose access to this household immediately, and will be signed out everywhere.',
+    'members.resend_invite' => 'Resend invitation',
+    'members.restore_login' => 'Restore login',
+    'members.revoke_login' => 'Revoke login',
+    'members.send_reset' => 'Send password reset',
+    'members.temporary_password_heading' => 'Their temporary password',
+    'members.temporary_password_note' =>
+        'Give this to {name}. They will be asked to replace it as soon as they sign in.',
+    'members.temporary_password_once' =>
+        'This is the only time it is shown. Renovo keeps only a hash of it, so it cannot be looked '
+        . 'up again — if it is lost, add nothing and simply issue a new one.',
+    'members.this_household' => 'This household',
+    'members.title' => 'Household members',
+    'members.without_email' => 'This member has no email address',
+    'members.without_email_hint' =>
+        'For a child with no mailbox. Renovo creates the account with a one-time password shown to '
+        . 'you once, which they must replace the first time they sign in.',
+    'membership_status.active' => 'Active',
+    'membership_status.pending' => 'Invited',
+    'membership_status.revoked' => 'Revoked',
+    'settings.manage_members' => 'Manage members',
     'type.recurring' => 'Recurring',
     'type.one_off' => 'One-off',
     'type.lifetime' => 'Lifetime',

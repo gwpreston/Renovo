@@ -35,6 +35,11 @@ use App\Service\AuditLogService;
  *  4. Record it, with the method used, because "signed in with a passkey" and
  *     "signed in with a password and a code" are different facts to anyone
  *     reading the log afterwards.
+ *
+ * Being the one place also makes it the one place a revoked login can be
+ * stopped for good. Checking `disabled_at` in the password path alone would
+ * leave the passkey and second-factor routes open, so the check is here as
+ * well — see `establish()`.
  */
 final class SignInService
 {
@@ -54,8 +59,19 @@ final class SignInService
     ) {
     }
 
+    /**
+     * @throws AccountDisabledException when the account's login is revoked.
+     */
     public function establish(User $user, string $method): void
     {
+        // Before anything else, and before any of the four steps below. Each
+        // route has already refused a revoked account with a message of its
+        // own; this is the check a fifth route cannot omit, because it is not
+        // in the route.
+        if ($user->isDisabled()) {
+            throw AccountDisabledException::forUser($user->id);
+        }
+
         $this->session->regenerate();
         $this->csrf->rotate();
 

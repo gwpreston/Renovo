@@ -94,6 +94,18 @@ final class PasskeyLoginController extends Controller
 
         $user = $result['user'];
 
+        if ($user->isDisabled()) {
+            // A passkey is a credential the account still holds, and it still
+            // verifies — which is exactly why this check has to be here and not
+            // only on the password path. Nothing about the credential is wrong;
+            // the account is closed.
+            $this->audit->recordAnonymous(AuditAction::LoginFailed, $user->email, $user, ['reason' => 'disabled']);
+
+            return $this->json($response->withStatus(403), [
+                'error' => $this->translator->trans('error.auth.disabled'),
+            ]);
+        }
+
         if (!$user->isVerified()) {
             return $this->json($response->withStatus(403), [
                 'error' => $this->translator->trans('error.auth.unverified_short'),

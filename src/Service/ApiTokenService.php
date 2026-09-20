@@ -191,7 +191,11 @@ final class ApiTokenService
         }
 
         $user = $this->users->findById($token->userId);
-        if ($user === null) {
+        if ($user === null || $user->isDisabled()) {
+            // A revoked login is revoked everywhere. The token itself is still
+            // valid and starts working again if the account is restored, which
+            // is the right behaviour for a temporary suspension — but while the
+            // account is disabled it answers exactly as an unknown token does.
             return null;
         }
 

@@ -32,45 +32,24 @@
                     <label for="household_name">{{ t('field.name') }}</label>
                     <input type="text" id="household_name" name="name" value="{{ household.name }}">
 
-                    <h3>{{ t('settings.members') }}</h3>
-                    <div class="table-scroll">
-                        <table class="table">
-                            <thead>
-                            <tr>
-                                <th scope="col">{{ t('field.member') }}</th>
-                                <th scope="col">{{ t('field.role') }}</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {% for member in members %}
-                                <tr>
-                                    <td>{{ member.display_name }}</td>
-                                    <td>
-                                        {% if member.id == current_user.id %}
-                                            {{ role_label(member.role) }}
-                                            <span class="hint">{{ t('settings.you') }}</span>
-                                        {% else %}
-                                            <select name="roles[{{ member.id }}]"
-                                                    aria-label="{{ t('settings.role_for', {
-                                                        'name': member.display_name,
-                                                    }) }}">
-                                                {% for role in roles %}
-                                                    <option value="{{ role.value }}"
-                                                            {{ member.role == role.value ? 'selected' : '' }}>
-                                                        {{ role_label(role.value) }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
                     <button type="submit" class="button">{{ t('settings.save_household') }}</button>
                 </form>
+
+                {#
+                    Who is in the household is a screen of its own. It outgrew a
+                    fieldset the moment each person needed a status and six
+                    actions, and it is where the last-Owner guard and the audit
+                    entries live.
+                #}
+                <h3>{{ t('settings.members') }}</h3>
+                <ul class="plain">
+                    {% for member in members %}
+                        <li>{{ member.display_name }} — {{ role_label(member.role) }}</li>
+                    {% endfor %}
+                </ul>
+                <p class="form-actions">
+                    <a class="button" href="/settings/members">{{ t('settings.manage_members') }}</a>
+                </p>
             {% else %}
                 <p><strong>{{ household.name }}</strong></p>
                 <ul class="plain">

@@ -158,6 +158,13 @@ final class TwoFactorService
     /**
      * The user the pending challenge belongs to, or null when there is none,
      * it has expired, or it names an account that no longer exists.
+     *
+     * An account whose login has been revoked since the password step counts
+     * as no challenge at all. Every one of the four routes into the second
+     * factor reads the pending account through here, so refusing it once
+     * refuses it everywhere: the browser is sent back to the login form, where
+     * the password path explains what has happened. The alternative — a check
+     * in each route — is four checks and a fifth route that forgets.
      */
     public function pendingUser(): ?User
     {
@@ -166,7 +173,14 @@ final class TwoFactorService
             return null;
         }
 
-        return $this->users->findById($pending['user_id']);
+        $user = $this->users->findById($pending['user_id']);
+        if ($user !== null && $user->isDisabled()) {
+            $this->clear();
+
+            return null;
+        }
+
+        return $user;
     }
 
     public function pendingTarget(): string

@@ -22,6 +22,18 @@ abstract class DatabaseTestCase extends TestCase
 {
     protected Database $db;
 
+    /**
+     * Whether `truncateAll()` is allowed to run at all.
+     *
+     * Set only once `assertSafeToDestroy()` has passed, and checked by every
+     * caller rather than by `setUp()` alone. `markTestSkipped()` throws, but
+     * PHPUnit still runs `tearDown()` afterwards — so a guard that lived only
+     * in `setUp()` refused to empty a development database on the way in and
+     * then emptied it on the way out, which is worse than having no guard,
+     * because the message says it was refused.
+     */
+    private bool $mayTruncate = false;
+
     protected function setUp(): void
     {
         $config = [
@@ -49,7 +61,12 @@ abstract class DatabaseTestCase extends TestCase
             );
         }
 
+        // Before anything is written, and before `$this->db` can be used to
+        // empty anything: this throws past the two lines below.
         $this->assertSafeToDestroy($config['name']);
+
+        $this->mayTruncate = true;
+
         $this->assertSchemaPresent();
         $this->truncateAll();
     }
@@ -86,11 +103,30 @@ abstract class DatabaseTestCase extends TestCase
     }
 
     /**
+     * Whether this test may destroy what it is pointed at.
+     *
+     * Exposed so a subclass that reaches for the database in its own
+     * `tearDown()` can ask the same question rather than assuming the answer.
+     */
+    protected function mayTruncate(): bool
+    {
+        return $this->mayTruncate;
+    }
+
+    /**
      * Remove every row, in dependency order, so each test starts from a known
      * state without dropping and re-creating the schema each time.
      */
     protected function truncateAll(): void
     {
+        if (!$this->mayTruncate) {
+            // A skipped test still gets a tearDown, and `$this->db` is already
+            // connected by then. Without this line, refusing to run against a
+            // development database in `setUp()` does not stop `tearDown()`
+            // deleting every row in it.
+            return;
+        }
+
         foreach (
             [
             'audit_log',

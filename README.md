@@ -130,9 +130,49 @@ Built in phases:
   card at all. It sits on the analytics screen; the dashboard tile the brief
   left optional was kept for later.
 
-That is the v1 feature set, Phase 7 the toolchain under it and Phase 8 the
-design language on top. Deliberately not in it: OIDC/SSO, and bank or
-transaction sync — see the end of `PHASE.md` for what was deferred and why.
+- **Phase 14 — polish, responsiveness, accessibility and sign-off —
+  complete.** The screens seen whole rather than one at a time, and the rules
+  that came out of it written down as tests rather than as intentions. The
+  accent now means one thing: a screen carries at most one filled button, which
+  is why the top bar's quick-add is outlined — a control on every screen cannot
+  hold the accent for the one thing a particular screen is about. Every screen
+  was walked at 1440, 390 and 320 pixels in both themes, which is how a `curl`
+  example turned out to be making the API tokens page wider than the phone
+  showing it; every table and every `<pre>` now scrolls inside its own card,
+  and below 720px the calendar stops being a seven-column grid and becomes a
+  list in which each day names its own weekday. Contrast is checked as a matrix
+  rather than against one surface — quiet text on the page, in a hovered row
+  and in a row tinted for urgency, in both themes — and the light theme is
+  proved by that matrix rather than by being looked at. Every figure on every
+  screen goes through ICU, so not one number, currency sign or percent is
+  written in a template. See [One filled button per
+  screen](#one-filled-button-per-screen), [Contrast is tested, not
+  eyeballed](#contrast-is-tested-not-eyeballed) and [On a narrow
+  screen](#on-a-narrow-screen).
+
+- **Phase 15 — household membership — complete.** The part of Phase 6 that was
+  deferred: a household has always been a real scoping entity, but two of its
+  edges were never wired to a screen. An Owner/Admin can now put somebody into
+  their household, and every member can manage their own account. Adding a
+  member creates a membership in **this** household and never a second one —
+  the single thing separating provisioning from open sign-up — and sends a
+  link the new member sets their own password with; an administrator never
+  sets one and never sees one. The exception is a member with no mailbox of
+  their own, who gets a placeholder address that can never receive mail and a
+  one-time password shown once, stored only as a hash and enforced until it is
+  replaced. Revoking a login closes every door rather than the obvious one —
+  password, passkey, second factor and API token — and ends every session at
+  once. Two things are refused however they are attempted: acting on the
+  household's last Owner, and leaving a row that belongs to nobody.
+  Self-service covers the name, the address — which does not become the login
+  until it has been proved — the password, which asks for the current one, and
+  a picture, re-encoded rather than stored as it arrived.
+  See [Households and people](#households-and-people).
+
+That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
+language on top and Phase 14 the pass that made it one interface rather than
+seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
+see the end of `PHASE.md` for what was deferred and why.
 
 See `PHASE.md` for what was in scope for the last phase and `SPEC.md` for the
 conventions every phase followed.
@@ -142,9 +182,10 @@ conventions every phase followed.
 ## Requirements
 
 - **Docker** and the Compose plugin (the supported way to run it), or
-- **PHP 8.2+** with `pdo_pgsql` or `pdo_mysql`, `intl`, `curl`, `zip`, `openssl`
-  and `sodium` (the last two are bundled with most builds; they encrypt stored
-  two-factor secrets and verify passkeys), plus Composer and a
+- **PHP 8.2+** with `pdo_pgsql` or `pdo_mysql`, `intl`, `curl`, `zip`, `gd`,
+  `openssl` and `sodium` (the last two are bundled with most builds; they
+  encrypt stored two-factor secrets and verify passkeys, and `gd` re-encodes
+  uploaded avatars), plus Composer and a
   **PostgreSQL 14+** or **MySQL 8 / MariaDB 10.6+** server — and **Node 20+**
   to compile the front-end assets, which the published image and the Compose
   stack do for you.
@@ -338,6 +379,8 @@ list. `.env` is never committed. The ones that matter most:
 | `APP_LOCALE`                | The language and formatting an account gets before choosing its own. Any ICU locale with a catalogue in `translations/`. |
 | `METRICS_TOKEN`             | Unset means `/metrics` does not exist. Set it to expose Prometheus metrics to a scrape job carrying the same bearer token. |
 | `LOGO_CACHE_DIRECTORY`      | Where fetched site icons are cached, one file per domain. Under `var/` by default. |
+| `AVATAR_DIRECTORY`          | Where members' pictures are stored. Outside the web root, under `var/` by default — back it up with the attachments. |
+| `UPLOAD_MAX_AVATAR_BYTES`   | Ceiling on an avatar upload before it is re-encoded. 2 MB by default. |
 
 ---
 
@@ -1336,6 +1379,59 @@ filename, and files are served with the detected type, `nosniff` and
 
 Set the ceiling with `UPLOAD_MAX_ATTACHMENT_BYTES` (10 MB by default) and the
 location with `ATTACHMENT_DIRECTORY`.
+
+---
+
+## Households and people
+
+A household is what Renovo scopes everything to, and an **Owner/Admin** is the
+person who decides who is in it. **Settings → Members** lists everybody, with
+their role, whether they have taken up their invitation, and when they were last
+here; the controls beside each row are drawn only for an Owner, and an Editor or
+Viewer reaching one of those routes directly gets a 403 rather than a hidden
+button.
+
+Adding somebody creates an account and a membership **of this household** —
+never a second household, which is the one thing that separates this from open
+sign-up. They are sent a link, and they choose their own password: an
+administrator never sets one and never sees one.
+
+The exception is a member with no mailbox of their own — a child, in practice.
+Tick **this member has no email address** and Renovo creates the account with a
+placeholder address that can never receive mail and a one-time password shown to
+you once. Only a hash of it is stored, it is written to the audit log, and every
+page that member asks for is the account page until they have replaced it.
+
+An Owner can also send a member a password-reset link, change their role,
+**revoke their login** — which disables the account and ends every session it
+has, everywhere, at once — and remove them from the household. Two things are
+refused however they are attempted: acting on the household's **last Owner**, so
+it cannot lock itself out, and leaving a row behind that belongs to nobody. On
+removal, what the departing member owned is handed to the Owner doing the
+removing; on an ISOLATED instance, where those rows were private, you are asked
+first whether to reassign or delete them.
+
+Everything an Owner does to somebody else's account is written to the audit log
+with both the actor and the target.
+
+### Your own account
+
+**Profile → Your account** is where a member changes their own name, address,
+password and picture, whatever their role. Nothing there needs a permission,
+because nothing there can be pointed at anybody else.
+
+Changing an address does not change the login until the new address has been
+proved: the new value waits, a link goes to it, and the old address — still the
+one you sign in with — is told that a change was requested. Changing a password
+asks for the current one, and offers to sign out your other devices.
+
+A picture is re-encoded on upload rather than stored as it arrived, which is
+what removes the EXIF (including where a photograph was taken) and defeats a
+file that is both a valid image and something else. It is kept outside the web
+root and served by a route that answers only to somebody who shares a household
+with you; a member with no picture shows their initials. Set the ceiling with
+`UPLOAD_MAX_AVATAR_BYTES` (2 MB by default) and the location with
+`AVATAR_DIRECTORY`.
 
 ---
 
