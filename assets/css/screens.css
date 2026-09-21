@@ -290,54 +290,6 @@
     color: var(--warning);
 }
 
-/* The chips that choose which rows the table shows. */
-.chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin-bottom: 0.75rem;
-}
-
-.chip-action {
-    text-decoration: none;
-    color: var(--text-muted);
-    cursor: pointer;
-}
-
-.chip-action:hover {
-    background: var(--surface-hover);
-    color: var(--text);
-}
-
-.chip-action.is-active {
-    background: var(--accent);
-    color: var(--accent-text);
-    border-color: transparent;
-}
-
-/*
- * A row's state, as a badge. Renewing soon takes the warm hue reserved for
- * "money is about to move"; a trial takes the same, because it is the same
- * fact seen earlier. Active and paused are quiet on purpose — a badge on every
- * row in the strongest colour available says nothing.
- */
-.badge-status {
-    margin-left: 0;
-}
-
-.badge-renewing,
-.badge-trial {
-    background: var(--warning-bg);
-    color: var(--warning);
-    border-color: transparent;
-}
-
-.badge-active {
-    background: var(--success-bg);
-    color: var(--success-text);
-    border-color: transparent;
-}
-
 /* Where the money goes, as a share of the combined monthly total. */
 .distribution {
     display: flex;

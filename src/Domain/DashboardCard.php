@@ -14,9 +14,9 @@ namespace App\Domain;
  * The order of the cases is the default layout, and it is an argued one: what
  * is about to start costing money comes before what already does, and the
  * three tiles Phase 10 added sit where the design puts them — the metric row,
- * then the chart beside the usage widget, then the table — rather than at the
- * end. That ordering is what a *new* account gets. An account that has already
- * arranged its dashboard keeps its arrangement and finds the new tiles
+ * then the chart beside the usage widget, then the two lists — rather than at
+ * the end. That ordering is what a *new* account gets. An account that has
+ * already arranged its dashboard keeps its arrangement and finds the new tiles
  * appended, which is DashboardLayoutService's business and deliberately not
  * changed here: moving somebody's saved layout around to match a redesign
  * would be a worse surprise than three new tiles at the bottom.
@@ -29,7 +29,10 @@ namespace App\Domain;
  * case answers to is simply passed over. That is how the per-period tile left
  * — the same four figures are the Analytics page's own subject, so the
  * dashboard was saying them twice — without a migration to chase the rows that
- * still name it.
+ * still name it. The subscriptions table left the same way and for the same
+ * reason: the list, its filters and its status badges are the Subscriptions
+ * page's own subject, and eight rows of it on the landing screen were a second,
+ * shorter answer to a question already answered in full elsewhere.
  */
 enum DashboardCard: string
 {
@@ -37,7 +40,6 @@ enum DashboardCard: string
     case Totals = 'totals';
     case SpendChart = 'spend_chart';
     case BudgetUsage = 'budget_usage';
-    case Recent = 'recent';
     case Upcoming = 'upcoming';
     case ByCategory = 'by_category';
 

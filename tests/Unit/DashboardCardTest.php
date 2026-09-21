@@ -92,14 +92,16 @@ final class DashboardCardTest extends TestCase
      * row in `dashboard_cards` that holds it, and the account that arranged it
      * silently loses the card.
      *
-     * `per_period` is deliberately absent: the tile was removed because the
-     * Analytics page says the same four figures, and rows still naming it are
-     * passed over rather than migrated away.
+     * `per_period` and `recent` are deliberately absent: both tiles were
+     * removed because another screen is the same subject's home — the
+     * Analytics page for the four per-period figures, the Subscriptions page
+     * for the list — and rows still naming them are passed over rather than
+     * migrated away.
      */
     public function testTheStoredKeysAreUnchanged(): void
     {
         self::assertSame(
-            ['trials', 'totals', 'spend_chart', 'budget_usage', 'recent', 'upcoming', 'by_category'],
+            ['trials', 'totals', 'spend_chart', 'budget_usage', 'upcoming', 'by_category'],
             array_map(static fn (DashboardCard $card): string => $card->value, DashboardCard::cases()),
         );
     }

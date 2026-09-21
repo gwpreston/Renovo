@@ -37,34 +37,11 @@ final class DashboardController extends Controller
         // permanent redirect, and since the navigation's Dashboard item points
         // at `/`, it made the dashboard unreachable for anyone whose preference
         // was some other screen.
-        $view = $this->requestedView($request);
-
-        // A chip on the table asks for the table, and nothing else. Rendering
-        // the fragment on its own is not an optimisation here — recomputing
-        // the overview would re-run the catch-up and walk the forecast to
-        // answer a question about eight rows, and swapping the whole card
-        // would take the chart's canvas with it.
-        if ($this->isHtmx($request)) {
-            return $this->render($request, $response, 'dashboard/_recent_table.twig', [
-                'recent' => $this->dashboard->recent($scope, $view),
-            ]);
-        }
-
         $overview = $this->dashboard->overview($scope);
 
         return $this->render($request, $response, 'dashboard/index.twig', $overview + [
-            // The near-window renewals the tiles were counted from, so the
-            // badges below them are the same list rather than a second one.
-            'recent' => $this->dashboard->recent($scope, $view, $overview['renewing_soon']),
             'base_currency' => $this->settings->baseCurrency(),
             'dashboard_cards' => $this->layout->visibleFor($user->id),
         ]);
-    }
-
-    private function requestedView(ServerRequestInterface $request): string
-    {
-        $view = $request->getQueryParams()['show'] ?? '';
-
-        return is_string($view) ? $view : '';
     }
 }

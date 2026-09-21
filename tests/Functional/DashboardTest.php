@@ -556,45 +556,6 @@ final class DashboardTest extends DatabaseTestCase
         return $matches[1];
     }
 
-    public function testTheStatusBadgesAreComputedFromRealState(): void
-    {
-        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
-            'name' => 'Paused thing',
-            'price_minor' => 100,
-            'currency' => 'GBP',
-            'subscription_type' => 'recurring',
-            'billing_cycle' => 'monthly',
-            'next_payment_date' => (new DateTimeImmutable('+2 days'))->format('Y-m-d'),
-            'is_active' => false,
-        ], []);
-
-        $rows = $this->body($this->get('/?show=all', $this->ownerId));
-
-        self::assertStringContainsString('badge-renewing', $rows);
-        self::assertStringContainsString('badge-trial', $rows);
-        self::assertStringContainsString('badge-paused', $rows);
-
-        // The paused row is only in the All view; Active does not claim to
-        // show it and then show it.
-        self::assertStringNotContainsString('Paused thing', $this->body($this->get('/', $this->ownerId)));
-    }
-
-    public function testAChipSwapsTheRowsAndNotTheChart(): void
-    {
-        $response = $this->get('/?show=expiring', $this->ownerId, ['HX-Request' => 'true']);
-        $fragment = $this->body($response);
-
-        self::assertSame(200, $response->getStatusCode());
-        self::assertStringContainsString('id="dashboard-recent"', $fragment);
-        self::assertStringNotContainsString('<html', $fragment);
-        self::assertStringNotContainsString('data-chart="spend"', $fragment);
-
-        // Expiring is the near window, so the two rows renewing inside it are
-        // there and the one two hundred days out is not.
-        self::assertStringContainsString('Streaming', $fragment);
-        self::assertStringNotContainsString('Hosting', $fragment);
-    }
-
     public function testTheUsageWidgetShowsThisMembersOwnBudget(): void
     {
         $body = $this->body($this->get('/', $this->ownerId));
@@ -613,21 +574,34 @@ final class DashboardTest extends DatabaseTestCase
         self::assertStringNotContainsString('/budgets/new', $body);
     }
 
+    /**
+     * Asserted on the topbar's add button rather than on anything in a card:
+     * with the subscriptions table gone the dashboard's cards offer a Viewer
+     * nothing to be refused, and a test whose subject has left the page passes
+     * for the wrong reason.
+     */
     public function testAViewerIsOfferedNoMutatingControl(): void
     {
         $body = $this->body($this->get('/', $this->viewerId));
 
-        self::assertStringNotContainsString('/settings/backup/export', $body);
         self::assertStringNotContainsString('/subscriptions/new', $body);
+        // The same page, for somebody who may add one, really does offer it —
+        // so the assertion above is about the role and not about the markup.
+        self::assertStringContainsString('/subscriptions/new', $this->body($this->get('/', $this->ownerId)));
     }
 
-    public function testIsolatedModeKeepsAnotherMembersRowsOutOfTheTable(): void
+    /**
+     * Read through the Coming soon card since the subscriptions table left:
+     * both fixtures renew inside its window, so an Editor on an ISOLATED
+     * instance sees their own charge there and not the Owner's.
+     */
+    public function testIsolatedModeKeepsAnotherMembersRowsOffTheDashboard(): void
     {
         $container = $this->app->getContainer();
         self::assertNotNull($container);
         $container->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
 
-        $body = $this->body($this->get('/?show=all', $this->editorId));
+        $body = $this->body($this->get('/', $this->editorId));
 
         self::assertStringContainsString('Editors own thing', $body);
         self::assertStringNotContainsString('Streaming', $body);
@@ -638,22 +612,23 @@ final class DashboardTest extends DatabaseTestCase
         // The layout as it was saved before this phase existed: five cards,
         // none of which are the three it adds.
         //
-        // `per_period` stays in this fixture on purpose even though no enum
-        // case answers to it any more. It is what a real saved layout from
-        // before the tile was removed still holds, so this is also the test
-        // that a key the enum has forgotten is passed over rather than fatal.
+        // `per_period` and `recent` stay in this fixture on purpose even
+        // though no enum case answers to either any more. They are what a real
+        // saved layout from before those tiles were removed still holds, so
+        // this is also the test that a key the enum has forgotten is passed
+        // over rather than fatal.
         (new DashboardCardRepository($this->db))->replaceFor($this->ownerId, [
             ['card_key' => 'trials', 'position' => 0, 'visible' => true],
             ['card_key' => 'totals', 'position' => 1, 'visible' => true],
             ['card_key' => 'upcoming', 'position' => 2, 'visible' => true],
             ['card_key' => 'per_period', 'position' => 3, 'visible' => true],
-            ['card_key' => 'by_category', 'position' => 4, 'visible' => true],
+            ['card_key' => 'recent', 'position' => 4, 'visible' => true],
+            ['card_key' => 'by_category', 'position' => 5, 'visible' => true],
         ]);
 
         $body = $this->body($this->get('/', $this->ownerId));
 
         self::assertStringContainsString('data-chart="spend"', $body, 'the chart went missing');
-        self::assertStringContainsString('id="dashboard-recent"', $body, 'the table went missing');
         self::assertStringContainsString('Where it goes', $body, 'the usage widget went missing');
     }
 
@@ -790,19 +765,13 @@ final class DashboardTest extends DatabaseTestCase
         return (string) $response->getBody();
     }
 
-    /**
-     * @param array<string, string> $headers
-     */
-    private function get(string $path, int $userId, array $headers = []): ResponseInterface
+    private function get(string $path, int $userId): ResponseInterface
     {
         $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $userId);
         $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $this->householdId);
 
-        $request = (new ServerRequestFactory())->createServerRequest('GET', $path);
-        foreach ($headers as $name => $value) {
-            $request = $request->withHeader($name, $value);
-        }
-
-        return $this->app->handle($request);
+        return $this->app->handle(
+            (new ServerRequestFactory())->createServerRequest('GET', $path),
+        );
     }
 }

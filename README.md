@@ -90,11 +90,13 @@ Built in phases:
   of renewals in the near window; and the active-subscription count with the
   next charge and its date beneath it — a twelve-month spend chart drawn from
   the Forecast page's own call, so the two cannot disagree about a month; a
-  budget against its projected spend with the category bars beneath it; and a
-  table of subscriptions whose status badges are computed from real state. The
-  new tiles join the rearranging an account could already do, so a dashboard
-  somebody has arranged keeps its arrangement and finds them appended. It adds
-  no figure the application did not already produce.
+  budget against its projected spend with the category bars beneath it; and the
+  charges coming in the next six weeks beside where the money goes by category.
+  The new tiles join the rearranging an account could already do, so a
+  dashboard somebody has arranged keeps its arrangement and finds them
+  appended. It adds no figure the application did not already produce — and it
+  no longer repeats the subscriptions list, which is the Subscriptions page's
+  own subject.
 
 - **Phase 11 — my subscriptions — complete.** The subscriptions screen in the
   design's arrangement: a stats strip across the top, the list itself, the two
