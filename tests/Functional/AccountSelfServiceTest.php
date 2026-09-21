@@ -107,6 +107,56 @@ final class AccountSelfServiceTest extends DatabaseTestCase
         parent::tearDown();
     }
 
+    // -------------------------------------------------------------- the page
+
+    /**
+     * One page, not two.
+     *
+     * The account cards and the preferences used to be separate screens under
+     * the same URL prefix, reached from two corners of the same shell. This is
+     * the assertion that they arrive together — by the forms they carry rather
+     * than by their headings, because a form's action is the part a reader
+     * actually needs to be on the page they were sent to.
+     */
+    public function testEverythingAboutThisAccountIsOnOnePage(): void
+    {
+        $this->signIn($this->memberId);
+
+        $body = (string) $this->request('GET', '/profile')->getBody();
+
+        foreach ([
+            '/profile/name',
+            '/profile/email',
+            '/profile/password',
+            '/profile/avatar',
+            '/profile/preferences',
+        ] as $action) {
+            self::assertStringContainsString(
+                'action="' . $action . '"',
+                $body,
+                $action . ' is not offered on the profile page',
+            );
+        }
+    }
+
+    /**
+     * The old address keeps working.
+     *
+     * A confirmation email for a change of address links to `/profile/account`
+     * and is sent before anybody rearranges a screen, so the path redirects
+     * rather than 404s. Asserted because "we will keep the old URL alive" is
+     * exactly the kind of promise that is quietly dropped in a later tidy-up.
+     */
+    public function testTheOldAccountUrlStillLeadsToThePage(): void
+    {
+        $this->signIn($this->memberId);
+
+        $response = $this->request('GET', '/profile/account');
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/profile', $response->getHeaderLine('Location'));
+    }
+
     // -------------------------------------------------------------- the name
 
     public function testTheNameChangesAndIsRecorded(): void

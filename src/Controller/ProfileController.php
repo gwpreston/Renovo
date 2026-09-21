@@ -11,6 +11,7 @@ use App\Domain\WeekStart;
 use App\I18n\Locales;
 use App\I18n\Translator;
 use App\Security\SessionInterface;
+use App\Service\AvatarStorage;
 use App\Service\DashboardLayoutService;
 use App\Service\UserPreferencesService;
 use Psr\Http\Message\ResponseInterface;
@@ -18,12 +19,21 @@ use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
 
 /**
- * The account's own page: how Renovo looks and behaves for one person.
+ * The account's own page: who one person is, how they get in, and how Renovo
+ * looks and behaves for them.
  *
  * Separate from Settings because the two answer different questions. Nothing
  * here needs a permission — every value changes what one account sees and
  * nothing that anybody else does — whereas most of Settings is a household or
  * an instance deciding something on everybody's behalf.
+ *
+ * `/profile` and `/profile/account` used to be two screens, reached from two
+ * corners of the same shell, and the line between them was not one a reader
+ * had to draw: both acted on the id in the session and neither needed a
+ * permission. They are one page now. This controller renders it and
+ * `AccountController` still answers the name, address, password and picture
+ * forms on it — one page, two controllers, because "how this looks" and "who
+ * is looking" remain different subjects however they are laid out.
  */
 final class ProfileController extends Controller
 {
@@ -34,6 +44,10 @@ final class ProfileController extends Controller
         private readonly UserPreferencesService $preferences,
         private readonly DashboardLayoutService $dashboard,
         private readonly Locales $locales,
+        // For the picture card's size hint. The uploads themselves are
+        // AccountController's, and so is every other write this page's forms
+        // make; what this controller owns is the page they are drawn on.
+        private readonly AvatarStorage $avatarStorage,
     ) {
         parent::__construct($view, $session, $translator);
     }
@@ -47,6 +61,7 @@ final class ProfileController extends Controller
             'landing_views' => LandingView::cases(),
             'locale_choices' => $this->locales->choices(),
             'dashboard_layout' => $this->dashboard->forUser($this->user($request)->id),
+            'avatar_max_kilobytes' => max(1, intdiv($this->avatarStorage->maxBytes(), 1024)),
         ]);
     }
 

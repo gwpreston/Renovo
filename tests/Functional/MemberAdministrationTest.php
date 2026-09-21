@@ -318,7 +318,14 @@ final class MemberAdministrationTest extends DatabaseTestCase
         self::assertTrue($this->hasAudit(AuditAction::MemberTemporaryPasswordIssued, $member->id));
     }
 
-    public function testAMemberOnATemporaryPasswordIsHeldOnTheAccountPage(): void
+    /**
+     * The account page and the preferences page were merged, so the screen a
+     * member on a temporary password is held on is `/profile`. That path is
+     * allowed *exactly* and not as a prefix, which is the assertion below
+     * about `/profile/preferences`: were it a prefix, being locked out would
+     * quietly grant every route under it.
+     */
+    public function testAMemberOnATemporaryPasswordIsHeldOnTheProfilePage(): void
     {
         $this->signIn($this->ownerId);
         $this->request('POST', '/settings/members', [
@@ -335,10 +342,23 @@ final class MemberAdministrationTest extends DatabaseTestCase
 
         $diverted = $this->request('GET', '/subscriptions');
         self::assertSame(302, $diverted->getStatusCode());
-        self::assertSame('/profile/account', $diverted->getHeaderLine('Location'));
+        self::assertSame('/profile', $diverted->getHeaderLine('Location'));
 
-        $page = $this->request('GET', '/profile/account');
+        $page = $this->request('GET', '/profile');
         self::assertSame(200, $page->getStatusCode(), substr((string) $page->getBody(), 0, 2000));
+
+        // The page is the callout and the password form, and nothing else:
+        // every other card on it posts to a route this member cannot reach,
+        // and a form that throws them back here is worse than one that waits.
+        $body = (string) $page->getBody();
+        self::assertStringContainsString('/profile/password', $body);
+        self::assertStringNotContainsString('/profile/preferences', $body);
+        self::assertStringNotContainsString('/profile/email', $body);
+
+        // The routes under the page stay shut while the flag is set.
+        $preferences = $this->request('POST', '/profile/preferences', ['theme' => 'dark']);
+        self::assertSame(302, $preferences->getStatusCode());
+        self::assertSame('/profile', $preferences->getHeaderLine('Location'));
 
         $this->request('POST', '/profile/password', [
             'current_password' => $temporary,

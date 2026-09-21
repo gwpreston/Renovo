@@ -283,7 +283,15 @@ return static function (App $app): void {
         // same rule as the preferences above and the security screen below —
         // each acts on the id in the session and takes no argument that could
         // point it at another account.
-        $group->get('/profile/account', [AccountController::class, 'index'])->setName('account');
+        //
+        // `/profile/account` was the page these forms lived on; they are on
+        // `/profile` now. The path stays as a redirect rather than becoming a
+        // 404, because an email-change confirmation that has already been sent
+        // points a reader here and those links outlive a rearrangement of the
+        // screens. 302 rather than 301: a permanent redirect is cached by the
+        // browser for as long as it likes, which is a long time to commit to
+        // for a layout decision.
+        $group->get('/profile/account', [AccountController::class, 'moved'])->setName('account');
         $group->post('/profile/name', [AccountController::class, 'updateName']);
         $group->post('/profile/email', [AccountController::class, 'requestEmailChange']);
         $group->post('/profile/email/cancel', [AccountController::class, 'cancelEmailChange']);

@@ -51,7 +51,6 @@ return [
     'account.sign_out_others_hint' =>
         'Leave this on unless you meant somebody else to stay signed in. This device stays signed '
         . 'in either way.',
-    'account.title' => 'Your account',
     'account.who_you_are' => 'Who you are',
     'account.your_email' => 'Your email address',
     'account.your_password' => 'Your password',

@@ -49,6 +49,6 @@ final class EmailChangeController extends Controller
 
         $this->flash('success', 'flash.email_change_confirmed');
 
-        return $this->redirect($response, '/profile/account');
+        return $this->redirect($response, '/profile');
     }
 }

@@ -551,6 +551,40 @@ tr.is-passed > td {
     text-decoration: none;
 }
 
+/* ---------------------------------------------------------------- profile */
+
+/*
+ * A row of the profile page: two cards side by side on a wide screen, stacked
+ * on a narrow one.
+ *
+ * Its own rule rather than `.columns`, which gaps both axes. A card already
+ * carries its own bottom margin, so a row gap on top of that is a double space
+ * every time the row becomes a stack — the same reason the analytics layout
+ * spaces horizontally and leaves the vertical rhythm to the cards. The pairs
+ * here are cards of similar weight, so they stretch to a common height and the
+ * row reads as one thing; the dashboard's grid starts its cards instead,
+ * because there the heights are nothing like each other.
+ *
+ * Stretching is left to `align-items` and not helped along with a height on
+ * the card. `height: 100%` looks like the same instruction and is not: it
+ * measures the card against the track and then adds the margin below it, so
+ * every card overhangs its own row by exactly the gap that was supposed to
+ * separate it from the next one, and the page arrives as one unbroken block
+ * of cards. Stretch already fills the track minus the margins, which is the
+ * height actually wanted.
+ */
+.profile-row {
+    display: grid;
+    gap: 0 1rem;
+    align-items: stretch;
+}
+
+@media (min-width: 860px) {
+    .profile-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+
 /* --------------------------------------------------- dashboard card layout */
 
 .card-layout {

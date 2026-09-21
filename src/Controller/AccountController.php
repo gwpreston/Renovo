@@ -9,7 +9,6 @@ use App\I18n\Translator;
 use App\Security\SessionInterface;
 use App\Service\AccountService;
 use App\Service\AvatarService;
-use App\Service\AvatarStorage;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -20,12 +19,16 @@ use Slim\Views\Twig;
 /**
  * The signed-in member's own account: their name, address, password and face.
  *
- * Alongside `ProfileController` rather than inside it, and both under
- * `/profile`, because the two answer different questions about the same page.
- * Preferences decide how Renovo looks to one person; these decide who that
- * person is and how they get in. Neither needs a permission, for the same
- * reason: every route here acts on `$this->user($request)` and there is no
- * parameter that could make it act on anybody else.
+ * Writes only. The page these forms sit on is `/profile`, rendered by
+ * `ProfileController`, and each of them posts back to it — so this class has
+ * no `index()` and the template it used to render is gone.
+ *
+ * Alongside `ProfileController` rather than inside it, because the two answer
+ * different questions about the same page. Preferences decide how Renovo looks
+ * to one person; these decide who that person is and how they get in. Neither
+ * needs a permission, for the same reason: every route here acts on
+ * `$this->user($request)` and there is no parameter that could make it act on
+ * anybody else.
  */
 final class AccountController extends Controller
 {
@@ -35,17 +38,27 @@ final class AccountController extends Controller
         Translator $translator,
         private readonly AccountService $account,
         private readonly AvatarService $avatars,
-        private readonly AvatarStorage $avatarStorage,
+        // No AvatarStorage here any more: the only thing it answered was the
+        // size hint on the picture card, and the card is rendered by
+        // ProfileController now. The uploads themselves go through
+        // AvatarService, which does its own limit checking.
         private readonly StreamFactoryInterface $streams,
     ) {
         parent::__construct($view, $session, $translator);
     }
 
-    public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    /**
+     * Where the account page used to be.
+     *
+     * Kept as a redirect rather than removed: the confirmation email for an
+     * address change links here, and those are sent before anybody rearranges
+     * a screen. Nothing else should point at it — every link in the
+     * application now names `/profile` — so this exists for the mail already
+     * in somebody's inbox and for a bookmark.
+     */
+    public function moved(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->render($request, $response, 'profile/account.twig', [
-            'avatar_max_kilobytes' => max(1, intdiv($this->avatarStorage->maxBytes(), 1024)),
-        ]);
+        return $this->redirect($response, '/profile');
     }
 
     public function updateName(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -171,6 +184,6 @@ final class AccountController extends Controller
 
     private function done(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->redirectAfterWrite($request, $response, '/profile/account');
+        return $this->redirectAfterWrite($request, $response, '/profile');
     }
 }
