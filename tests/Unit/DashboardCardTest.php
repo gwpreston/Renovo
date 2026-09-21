@@ -69,6 +69,42 @@ final class DashboardCardTest extends TestCase
     }
 
     /**
+     * And the same arrangement for the year behind: a two-thirds chart with
+     * the trials callout beside it.
+     *
+     * Asserted as a sum rather than as two numbers because that is the claim —
+     * either card could be widened as long as the other gave the width back,
+     * and a row that adds up to seven silently becomes two rows.
+     */
+    public function testTheHistoryChartAndTheTrialsCalloutShareARow(): void
+    {
+        self::assertSame(
+            6,
+            DashboardCard::SpendHistory->columnSpan() + DashboardCard::Trials->columnSpan(),
+        );
+    }
+
+    /**
+     * A row is only a row where the two cards are next to each other, so the
+     * default order has to put them there. This is the assertion that fails if
+     * a card is ever inserted between a chart and the narrow card it shares
+     * its width with.
+     */
+    public function testTheDefaultOrderPutsEachChartBesideItsOwnNarrowCard(): void
+    {
+        $order = DashboardCard::defaultOrder();
+
+        foreach ([[DashboardCard::SpendChart, DashboardCard::BudgetUsage],
+            [DashboardCard::SpendHistory, DashboardCard::Trials]] as [$chart, $beside]) {
+            self::assertSame(
+                array_search($chart, $order, true) + 1,
+                array_search($beside, $order, true),
+                $beside->value . ' does not directly follow ' . $chart->value,
+            );
+        }
+    }
+
+    /**
      * The second split row: the renewals list and the category table are half
      * the grid each. This is the assertion that would fail if the grid went
      * back to three columns, where there is no half to give them.
@@ -92,12 +128,12 @@ final class DashboardCardTest extends TestCase
      * row in `dashboard_cards` that holds it, and the account that arranged it
      * silently loses the card.
      *
-     * `spend_history` joined the list rather than replacing anything: the year
-     * behind is a second chart beside the year ahead, and it is full width
-     * because halving the pair would break the row the forecast shares with
-     * the usage widget. An account that had already arranged its dashboard
-     * finds it appended, which is `DashboardLayoutService`'s rule for any card
-     * added since a layout was saved.
+     * `spend_history` joined the list rather than replacing anything, and
+     * `trials` moved from the head of it to sit beside the new chart. The
+     * order is a default, so an account that has already arranged its
+     * dashboard keeps its own — `DashboardLayoutService`'s rule, and the
+     * reason moving a case here is a change of first impression rather than a
+     * change to anybody's saved screen.
      *
      * `per_period` and `recent` are deliberately absent: both tiles were
      * removed because another screen is the same subject's home — the
@@ -108,7 +144,7 @@ final class DashboardCardTest extends TestCase
     public function testTheStoredKeysAreUnchanged(): void
     {
         self::assertSame(
-            ['trials', 'totals', 'spend_chart', 'budget_usage', 'spend_history', 'upcoming', 'by_category'],
+            ['totals', 'spend_chart', 'budget_usage', 'spend_history', 'trials', 'upcoming', 'by_category'],
             array_map(static fn (DashboardCard $card): string => $card->value, DashboardCard::cases()),
         );
     }

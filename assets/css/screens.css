@@ -63,14 +63,16 @@
  * The bento grid.
  *
  * Six columns, and each card says how many of them it wants — which is what
- * puts the chart beside the usage widget, and Coming soon beside By category,
- * without any of them being fixed in place. A card the account has moved keeps
- * whatever span it declares, so the layout survives being rearranged.
+ * puts each chart beside the narrow card whose subject it shares, and Coming
+ * soon beside By category, without any of them being fixed in place. A card
+ * the account has moved keeps whatever span it declares, so the layout
+ * survives being rearranged.
  *
- * Six because the two split rows divide differently: two thirds and a third
- * for the chart and the usage widget, halves for the two lists. Three columns
- * can do the first and has no half for the second, and twelve would buy
- * nothing either of them asks for.
+ * Six because the split rows divide differently: two thirds and a third for a
+ * chart and the card beside it — the forecast with the budget it is measured
+ * against, the year behind with the trials about to join it — and halves for
+ * the two lists. Three columns can do the first and has no half for the
+ * second, and twelve would buy nothing either of them asks for.
  *
  * Auto-placement is deliberately not dense: a dense grid reflows tiles past one
  * another to fill a hole, and an order somebody chose is not something to
