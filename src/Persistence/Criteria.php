@@ -25,7 +25,7 @@ final class Criteria
     /** @var list<array{columns: list<string>, term: string}> */
     private array $searches = [];
 
-    /** @var list<array{column: string, direction: string}> */
+    /** @var list<array{column: string, direction: string, nullsLast: bool}> */
     private array $ordering = [];
 
     private ?int $limit = null;
@@ -88,12 +88,18 @@ final class Criteria
         return $clone;
     }
 
-    public function orderBy(string $column, string $direction = 'ASC'): self
+    /**
+     * `$nullsLast` asks for NULLs at the bottom whichever direction is sorted.
+     * The engines disagree about where NULL belongs, so a nullable sort column
+     * has to say what it wants rather than inherit a default that differs
+     * between PostgreSQL and MySQL.
+     */
+    public function orderBy(string $column, string $direction = 'ASC', bool $nullsLast = false): self
     {
         $direction = strtoupper(trim($direction)) === 'DESC' ? 'DESC' : 'ASC';
 
         $clone = clone $this;
-        $clone->ordering[] = ['column' => $column, 'direction' => $direction];
+        $clone->ordering[] = ['column' => $column, 'direction' => $direction, 'nullsLast' => $nullsLast];
 
         return $clone;
     }
@@ -135,7 +141,7 @@ final class Criteria
     }
 
     /**
-     * @return list<array{column: string, direction: string}>
+     * @return list<array{column: string, direction: string, nullsLast: bool}>
      */
     public function ordering(): array
     {

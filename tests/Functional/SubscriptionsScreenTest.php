@@ -569,6 +569,107 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
         }
     }
 
+    public function testPausedSubscriptionsAreListedWithoutBeingAskedFor(): void
+    {
+        // No query string at all: the checkbox that used to be needed for this
+        // is gone, so the plain page has to show them.
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+
+        self::assertStringContainsString('Paused thing', $list);
+        self::assertStringContainsString('Editors paused thing', $list);
+    }
+
+    public function testEveryPausedRowSitsBelowEveryActiveOne(): void
+    {
+        // The paused fixtures renew in 18 and 19 days, so by the default sort
+        // — next charge, ascending — they would fall in the middle of the
+        // table. Hosting is 200 days out and is the last active row.
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+
+        foreach (['Paused thing', 'Editors paused thing'] as $paused) {
+            foreach (['Streaming', 'Family plan', 'Gym membership', 'Hosting'] as $active) {
+                self::assertLessThan(
+                    (int) strpos($list, $paused),
+                    (int) strpos($list, $active),
+                    sprintf('"%s" is listed above the active "%s"', $paused, $active),
+                );
+            }
+        }
+    }
+
+    public function testPausedRowsStaySunkUnderAHeaderSort(): void
+    {
+        // Sorting by name would otherwise put "Editors paused thing" second.
+        $list = $this->section(
+            $this->body($this->get('/subscriptions?sort=name&dir=asc', $this->ownerId)),
+            'subscription-list',
+        );
+
+        self::assertGreaterThan((int) strpos($list, 'Streaming'), (int) strpos($list, 'Editors paused thing'));
+        self::assertGreaterThan((int) strpos($list, 'Streaming'), (int) strpos($list, 'Paused thing'));
+    }
+
+    public function testASubscriptionWithNoNextChargeSitsBelowTheOnesThatHaveOne(): void
+    {
+        // A lifetime licence has no next payment date. Which end of the list
+        // that puts it at is a thing the two engines disagree about by
+        // default — PostgreSQL sorts NULLs last ascending, MySQL sorts them
+        // first — so the ordering asks for NULLS LAST explicitly and this is
+        // what says so.
+        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
+            'name' => 'Lifetime licence',
+            'price_minor' => 4900,
+            'currency' => 'GBP',
+            'subscription_type' => 'lifetime',
+            'start_date' => '2025-01-01',
+            'is_active' => true,
+        ], []);
+
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+
+        // Below everything still being charged for, and above the paused rows:
+        // switched off is further down than merely finished paying.
+        self::assertGreaterThan((int) strpos($list, 'Hosting'), (int) strpos($list, 'Lifetime licence'));
+        self::assertLessThan((int) strpos($list, 'Paused thing'), (int) strpos($list, 'Lifetime licence'));
+    }
+
+    public function testThePausedRowsAreCountedByTheListTheyAppearIn(): void
+    {
+        // Nine subscriptions exist in this household, two of them paused. The
+        // table is what the pager and the total are computed from, so a row
+        // shown but not counted would page wrongly.
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+
+        // Body rows only: every one of them carries a class, the header row
+        // does not.
+        self::assertSame(9, substr_count($list, '<tr class='));
+    }
+
+    public function testTheSearchFormOffersNeitherCurrencyTypeNorPaused(): void
+    {
+        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+
+        self::assertStringNotContainsString('name="currency"', $body);
+        self::assertStringNotContainsString('name="type"', $body);
+        self::assertStringNotContainsString('name="inactive"', $body);
+
+        // What is left of the form still works.
+        self::assertStringContainsString('name="q"', $body);
+        self::assertStringContainsString('name="category"', $body);
+        self::assertStringContainsString('name="owner"', $body);
+    }
+
+    public function testTheListHasNoBulkControlsLeftBehind(): void
+    {
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+
+        // The bar went, and so did the checkboxes it collected — a checkbox
+        // posting nowhere would be worse than either.
+        self::assertStringNotContainsString('/subscriptions/bulk', $list);
+        self::assertStringNotContainsString('name="ids[]"', $list);
+        self::assertStringNotContainsString('bulk-bar', $list);
+    }
+
     /**
      * One section of the page, by id, so an assertion about the trials card
      * cannot be satisfied by the list underneath it.

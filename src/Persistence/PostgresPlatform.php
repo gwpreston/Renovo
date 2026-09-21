@@ -60,6 +60,11 @@ final class PostgresPlatform implements Platform
         return sprintf('LOWER(%s) LIKE %s', $quotedColumn, $placeholder);
     }
 
+    public function orderByNullsLast(string $quotedColumn, string $direction): string
+    {
+        return sprintf('%s %s NULLS LAST', $quotedColumn, $direction);
+    }
+
     public function reportsMatchedRowsOnUpdate(): bool
     {
         // PostgreSQL counts every row the WHERE clause matched, whether or not

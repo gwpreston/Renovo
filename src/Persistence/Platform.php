@@ -69,6 +69,19 @@ interface Platform
     public function caseInsensitiveLike(string $quotedColumn, string $placeholder): string;
 
     /**
+     * An ORDER BY term that sorts NULLs last, whichever direction is asked
+     * for.
+     *
+     * The engines disagree by default and in opposite directions: PostgreSQL
+     * treats NULL as the largest value (last on ASC, first on DESC), MySQL as
+     * the smallest (first on ASC, last on DESC). A list that puts "no next
+     * charge" at the bottom therefore cannot rely on either default. The term
+     * returned may contain more than one comma-separated expression, so it is
+     * spliced into the ORDER BY as written.
+     */
+    public function orderByNullsLast(string $quotedColumn, string $direction): string;
+
+    /**
      * Driver-specific connection options merged over the shared defaults.
      *
      * @return array<int, mixed>

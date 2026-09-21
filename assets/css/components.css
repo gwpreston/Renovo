@@ -1181,16 +1181,6 @@ legend {
     grid-column: span 2;
 }
 
-/*
- * A filter that is a checkbox is both a `.filter-field` and a `.choice`, and
- * the column direction the first one wants would stack the box above its own
- * label. The control belongs beside the words it labels.
- */
-.filter-field.choice {
-    flex-direction: row;
-    align-items: center;
-}
-
 .filter-tags {
     display: flex;
     flex-wrap: wrap;

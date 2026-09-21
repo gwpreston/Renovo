@@ -513,43 +513,6 @@ tr.is-passed > td {
     color: var(--decrease);
 }
 
-/* ----------------------------------------------------------- bulk actions */
-
-.bulk-bar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-    margin-top: 0.75rem;
-}
-
-/*
- * The base form styles stretch every control to the width of its container,
- * which is right in a stacked form and wrong in a toolbar. Overriding the
- * width is what lets these sit on one line.
- */
-.bulk-bar select,
-.bulk-bar input {
-    flex: 0 1 auto;
-    width: auto;
-    min-width: 8rem;
-}
-
-.select-column {
-    width: 2.5rem;
-}
-
-@media (max-width: 40rem) {
-    .bulk-bar select,
-    .bulk-bar input,
-    .bulk-bar button {
-        flex: 1 1 100%;
-        width: 100%;
-    }
-}
-
 /* ------------------------------------------------- security and the audit log */
 
 /*

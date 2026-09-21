@@ -73,6 +73,45 @@ final class SubscriptionFilter
         );
     }
 
+    /**
+     * The same filter with paused subscriptions included.
+     *
+     * The web list has no "include paused" control any more: it always shows
+     * them, sunk to the bottom by the repository's ordering. The API keeps the
+     * `inactive` parameter and its default, which is why this is a wither the
+     * web controller applies rather than a new default on the constructor.
+     */
+    public function withIncludeInactive(): self
+    {
+        if ($this->includeInactive) {
+            return $this;
+        }
+
+        return new self(
+            search: $this->search,
+            categoryId: $this->categoryId,
+            tagIds: $this->tagIds,
+            ownerUserId: $this->ownerUserId,
+            currency: $this->currency,
+            type: $this->type,
+            includeInactive: true,
+            sort: $this->sort,
+            direction: $this->direction,
+            page: $this->page,
+            perPage: $this->perPage,
+        );
+    }
+
+    /**
+     * Whether the user has narrowed the list, which is what decides between
+     * "nothing matches" and "there is nothing here yet".
+     *
+     * `includeInactive` is deliberately not one of them. It widens the list
+     * rather than narrowing it, so it can never be the reason a search came
+     * back empty — and since the web list now sets it unconditionally,
+     * counting it here would tell a household with no subscriptions at all
+     * that its filters matched nothing.
+     */
     public function hasActiveFilters(): bool
     {
         return $this->search !== ''
@@ -80,8 +119,7 @@ final class SubscriptionFilter
             || $this->tagIds !== []
             || $this->ownerUserId !== null
             || $this->currency !== null
-            || $this->type !== null
-            || $this->includeInactive;
+            || $this->type !== null;
     }
 
     /**

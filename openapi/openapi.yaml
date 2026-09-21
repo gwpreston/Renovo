@@ -124,6 +124,10 @@ paths:
         - name: sort
           in: query
           schema: { type: string, enum: [name, next_payment, price, created] }
+          description: >
+            Whatever is chosen, inactive subscriptions are ordered after active
+            ones, and rows with no value in the sort column (a lifetime licence
+            has no next payment date) after those that have one.
         - { name: dir, in: query, schema: { type: string, enum: [asc, desc] } }
         - { name: page, in: query, schema: { type: integer, minimum: 1 } }
         - name: per_page

@@ -336,6 +336,11 @@ interface.
 | `page` | integer | Minimum 1. |
 | `per_page` | integer | 1–100, default 25. |
 
+Two things hold whatever `sort` and `dir` say, so that a page of results means
+the same on either supported database engine: inactive subscriptions come after
+active ones, and a row whose sort column is empty — a lifetime licence has no
+next payment date — comes after the rows that have a value there.
+
 ```bash
 curl -H "Authorization: Bearer rnv_..." \
      "https://your-instance.example/api/v1/subscriptions?sort=next_payment&per_page=50"

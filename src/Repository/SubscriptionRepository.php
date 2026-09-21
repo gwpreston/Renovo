@@ -106,8 +106,22 @@ final class SubscriptionRepository extends AbstractScopedRepository
      */
     public function findForList(Scope $scope, SubscriptionFilter $filter): array
     {
+        // Paused subscriptions sink to the bottom of the whole list, under
+        // every sort the headers offer — they are the household's history
+        // rather than its bill, and a paused row interleaved with live ones
+        // reads as something still being paid for. This has to be the first
+        // ORDER BY term and not a rearrangement in the template: the list is
+        // paginated, and a template can only reorder the rows of the page it
+        // was handed.
+        //
+        // NULLS LAST on the sort column puts "nothing due" — a lifetime
+        // licence, a one-off — beneath the things that do have a next charge,
+        // and puts it there on both engines. The default would not: PostgreSQL
+        // sorts NULLs last ascending, MySQL sorts them first, so the bottom of
+        // this list depended on which database the instance happened to run.
         $criteria = $this->criteriaFor($filter)
-            ->orderBy(self::SORT_COLUMNS[$filter->sort], $filter->direction)
+            ->orderBy('is_active', 'desc')
+            ->orderBy(self::SORT_COLUMNS[$filter->sort], $filter->direction, nullsLast: true)
             ->paginate($filter->page, $filter->perPage);
 
         // A stable secondary sort keeps pagination deterministic when the
@@ -530,24 +544,6 @@ final class SubscriptionRepository extends AbstractScopedRepository
             'currency' => $price->currency,
             'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
-    }
-
-    /**
-     * Distinct currencies in scope, for the filter pick-list.
-     *
-     * @return list<string>
-     */
-    public function distinctCurrencies(Scope $scope): array
-    {
-        $params = [];
-        $sql = 'SELECT DISTINCT ' . $this->qualify('currency') . ' AS currency FROM ' . $this->quote('subscriptions')
-            . $this->scopedWhere($scope, Criteria::new(), $params)
-            . ' ORDER BY ' . $this->quote('currency') . ' ASC';
-
-        return array_values(array_map(
-            static fn (array $row): string => (string) $row['currency'],
-            $this->db->fetchAll($sql, $params),
-        ));
     }
 
     /**

@@ -18,6 +18,13 @@
             The filter form drives the list through htmx: it replaces only the
             table, and pushes the query string so the view is bookmarkable and the
             back button works.
+
+            Search, category and member, and the tag chips. Currency and type
+            are still understood as query parameters — the API takes them, and
+            a saved view may carry them — but they are not offered here: a
+            household types a name far more often than it narrows by currency.
+            Paused subscriptions are always listed, at the bottom, so there is
+            nothing to tick either.
         #}
         <form class="card filters"
               hx-get="/subscriptions"
@@ -56,33 +63,6 @@
                     </select>
                 </div>
 
-                <div class="filter-field">
-                    <label for="currency">{{ t('field.currency') }}</label>
-                    <select id="currency" name="currency">
-                        <option value="">{{ t('state.all') }}</option>
-                        {% for code in currencies %}
-                            <option value="{{ code }}" {{ filter.currency == code ? 'selected' : '' }}>{{ code }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="filter-field">
-                    <label for="type">{{ t('field.type') }}</label>
-                    <select id="type" name="type">
-                        <option value="">{{ t('state.all') }}</option>
-                        {% for type in types %}
-                            <option value="{{ type.value }}"
-                                    {{ filter.type and filter.type.value == type.value ? 'selected' : '' }}>
-                                {{ type_label(type.value) }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <label class="filter-field choice">
-                    <input type="checkbox" name="inactive" value="1" {{ filter.includeInactive ? 'checked' : '' }}>
-                    <span>{{ t('subscriptions.include_paused') }}</span>
-                </label>
             </div>
 
             {% if tags %}

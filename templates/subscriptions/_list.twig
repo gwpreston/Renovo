@@ -8,13 +8,13 @@
 {% import _self as list %}
 
 {#
-    The bulk form wraps the table so a checkbox in any row posts with it. It is
-    a plain form rather than an htmx swap: a bulk edit changes rows that may
-    drop out of the current filter, so a full reload is the honest response.
+    There is no bulk bar on this screen and so no form around the table: the
+    row checkboxes went with the "with selected" controls, because a checkbox
+    that posts nowhere is worse than no checkbox. The endpoint, the service
+    behind it and its permission are untouched; what went is the screen that
+    drove them.
 #}
 <section id="subscription-list" class="card">
-{% set can_bulk = can(scope, 'subscription.bulk_edit') %}
-{% if can_bulk and subscriptions is not empty %}<form method="post" action="/subscriptions/bulk">{{ csrf_field() }}{% endif %}
     {% if subscriptions is empty %}
         <p class="muted empty">
             {% if filter.hasActiveFilters %}
@@ -31,9 +31,6 @@
             <table class="table">
                 <thead>
                 <tr>
-                    {% if can_bulk %}
-                        <th scope="col" class="select-column"><span class="visually-hidden">{{ t('subscriptions_list.select') }}</span></th>
-                    {% endif %}
                     <th scope="col">{{ list.sort_link('name', t('field.name'), filter) }}</th>
                     <th scope="col">{{ t('field.category') }}</th>
                     <th scope="col">{{ t('field.member') }}</th>
@@ -47,12 +44,6 @@
                 <tbody>
                 {% for subscription in subscriptions %}
                     <tr class="{{ subscription.isActive ? '' : 'is-paused' }}">
-                        {% if can_bulk %}
-                            <td class="select-column">
-                                <input type="checkbox" name="ids[]" value="{{ subscription.id }}"
-                                       aria-label="Select {{ subscription.name }}">
-                            </td>
-                        {% endif %}
                         <td>
                             <div class="cell-name">
                                 {{ logo.mark(subscription) }}
@@ -149,47 +140,6 @@
             </table>
         </div>
 
-        {% if can_bulk %}
-            <div class="bulk-bar">
-                <label for="bulk-action">{{ t('subscriptions_list.with_selected') }}</label>
-                <select id="bulk-action" name="action">
-                    <option value="category">{{ t('subscriptions_list.set_category') }}</option>
-                    <option value="add_tag">{{ t('subscriptions_list.add_tag') }}</option>
-                    <option value="remove_tag">{{ t('subscriptions_list.remove_tag') }}</option>
-                    <option value="owner">{{ t('subscriptions_list.set_member') }}</option>
-                    <option value="payer">{{ t('subscriptions_list.set_payer') }}</option>
-                    <option value="currency">{{ t('subscriptions_list.convert_currency') }}</option>
-                    <option value="activate">{{ t('subscriptions_list.resume') }}</option>
-                    <option value="deactivate">{{ t('subscriptions_list.pause') }}</option>
-                </select>
-
-                <select name="category_id" aria-label="{{ t('field.category') }}">
-                    <option value="">{{ t('subscriptions_list.no_category') }}</option>
-                    {% for category in categories %}
-                        <option value="{{ category.id }}">{{ category.name }}</option>
-                    {% endfor %}
-                </select>
-
-                <input type="text" name="tag" placeholder="{{ t('field.tag') }}" aria-label="{{ t('field.tag') }}">
-
-                <select name="user_id" aria-label="{{ t('field.member') }}">
-                    <option value="">{{ t('subscriptions_list.nobody') }}</option>
-                    {% for member in members %}
-                        <option value="{{ member.id }}">{{ member.display_name }}</option>
-                    {% endfor %}
-                </select>
-
-                <select name="currency" aria-label="{{ t('field.currency') }}">
-                    {% for code in all_currencies %}
-                        <option value="{{ code }}">{{ code }}</option>
-                    {% endfor %}
-                </select>
-
-                <button type="submit" class="button">{{ t('action.apply') }}</button>
-            </div>
-            <p class="hint">{{ t('subscriptions_list.convert_note') }}</p>
-        {% endif %}
-
         {% if page_count > 1 %}
             <nav class="pager" aria-label="{{ t('subscriptions_list.pagination') }}">
                 {% if filter.page > 1 %}
@@ -214,7 +164,6 @@
             </nav>
         {% endif %}
     {% endif %}
-{% if can_bulk and subscriptions is not empty %}</form>{% endif %}
 </section>
 
 {#

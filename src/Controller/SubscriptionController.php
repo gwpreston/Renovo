@@ -53,7 +53,11 @@ final class SubscriptionController extends Controller
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $scope = $this->scope($request);
-        $filter = SubscriptionFilter::fromQueryParams($request->getQueryParams());
+        // The list always shows paused subscriptions; the repository sinks them
+        // to the bottom. There is no control for it any more, so the flag is
+        // set here rather than read from the query string — the API keeps both
+        // the parameter and its default.
+        $filter = SubscriptionFilter::fromQueryParams($request->getQueryParams())->withIncludeInactive();
         $fragment = $this->isHtmx($request);
 
         // The sections around the list are computed for a whole page and not
@@ -84,16 +88,10 @@ final class SubscriptionController extends Controller
             'members' => $scope->hasHousehold()
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],
-            'currencies' => $this->subscriptions->currenciesInUse($scope),
-            // The filter offers only currencies actually in use; converting to
-            // one needs the full pick-list.
-            'all_currencies' => Currency::common(),
-            'types' => SubscriptionType::cases(),
             'saved_views' => $this->savedViews->forScope($scope),
             // What "save this view" would store: the filter as the list itself
             // would write it, rather than whatever is in the address bar.
             'current_query' => $filter->toQueryString(['page' => null]),
-            'bulk_actions' => BulkActionService::actions(),
         ] + $overview;
 
         // htmx asks for just the table when filtering, sorting or paging.

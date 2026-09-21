@@ -62,6 +62,14 @@ final class MySqlPlatform implements Platform
         return sprintf('LOWER(%s) LIKE %s', $quotedColumn, $placeholder);
     }
 
+    public function orderByNullsLast(string $quotedColumn, string $direction): string
+    {
+        // MySQL has no NULLS LAST, so the sort is done in two terms: a boolean
+        // that is 1 for the NULLs and sorts them to the back, then the column
+        // itself.
+        return sprintf('%s IS NULL, %s %s', $quotedColumn, $quotedColumn, $direction);
+    }
+
     public function connectionOptions(): array
     {
         // Deliberately empty, and two constants are deliberately *not* here.

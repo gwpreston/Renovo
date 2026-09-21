@@ -422,14 +422,6 @@ final class SubscriptionService
     }
 
     /**
-     * @return list<string>
-     */
-    public function currenciesInUse(Scope $scope): array
-    {
-        return $this->subscriptions->distinctCurrencies($scope);
-    }
-
-    /**
      * Turn submitted form data into validated column values.
      *
      * `$commits` is false on a dry run — the importer's preview calls this on

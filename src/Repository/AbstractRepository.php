@@ -111,7 +111,10 @@ abstract class AbstractRepository
     {
         $parts = [];
         foreach ($criteria->ordering() as $order) {
-            $parts[] = $this->qualify($this->assertColumn($order['column'])) . ' ' . $order['direction'];
+            $column = $this->qualify($this->assertColumn($order['column']));
+            $parts[] = $order['nullsLast']
+                ? $this->db->platform()->orderByNullsLast($column, $order['direction'])
+                : $column . ' ' . $order['direction'];
         }
 
         if ($parts === []) {
