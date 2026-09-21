@@ -37,14 +37,22 @@ final class DashboardCardTest extends TestCase
     }
 
     /**
-     * The grid is three columns. A card asking for four would silently become
-     * one row of its own with a hole beside it.
+     * The grid is six columns, and the stylesheet has a class for each span
+     * the design actually uses. A span inside the grid but without a class —
+     * five, say — would not fail on width; it would silently fall through to
+     * the full-width default, which is why this asserts the set rather than a
+     * range.
      */
-    public function testEverySpanFitsTheGrid(): void
+    public function testEverySpanHasAClassInTheStylesheet(): void
     {
+        $css = (string) file_get_contents(dirname(__DIR__, 2) . '/assets/css/screens.css');
+
         foreach (DashboardCard::cases() as $card) {
-            self::assertGreaterThanOrEqual(1, $card->columnSpan(), $card->value);
-            self::assertLessThanOrEqual(3, $card->columnSpan(), $card->value);
+            self::assertStringContainsString(
+                '.bento-span-' . $card->columnSpan() . ' {',
+                $css,
+                $card->value . ' asks for a span the stylesheet does not define',
+            );
         }
     }
 
@@ -55,8 +63,27 @@ final class DashboardCardTest extends TestCase
     public function testTheChartAndTheUsageWidgetShareARow(): void
     {
         self::assertSame(
-            3,
+            6,
             DashboardCard::SpendChart->columnSpan() + DashboardCard::BudgetUsage->columnSpan(),
+        );
+    }
+
+    /**
+     * The second split row: the renewals list and the category table are half
+     * the grid each. This is the assertion that would fail if the grid went
+     * back to three columns, where there is no half to give them.
+     */
+    public function testComingSoonAndByCategoryShareARow(): void
+    {
+        self::assertSame(
+            3,
+            DashboardCard::Upcoming->columnSpan(),
+            'Coming soon should be half the grid',
+        );
+        self::assertSame(
+            3,
+            DashboardCard::ByCategory->columnSpan(),
+            'By category should be half the grid',
         );
     }
 
@@ -64,11 +91,15 @@ final class DashboardCardTest extends TestCase
      * The stored layout is keyed by these strings. Renaming one orphans every
      * row in `dashboard_cards` that holds it, and the account that arranged it
      * silently loses the card.
+     *
+     * `per_period` is deliberately absent: the tile was removed because the
+     * Analytics page says the same four figures, and rows still naming it are
+     * passed over rather than migrated away.
      */
     public function testTheStoredKeysAreUnchanged(): void
     {
         self::assertSame(
-            ['trials', 'totals', 'spend_chart', 'budget_usage', 'recent', 'upcoming', 'per_period', 'by_category'],
+            ['trials', 'totals', 'spend_chart', 'budget_usage', 'recent', 'upcoming', 'by_category'],
             array_map(static fn (DashboardCard $card): string => $card->value, DashboardCard::cases()),
         );
     }

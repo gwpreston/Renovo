@@ -23,6 +23,13 @@ namespace App\Domain;
  *
  * The case *values* are stored in `dashboard_cards.card_key`, so they are a
  * data format. Renaming one would orphan every row that holds it.
+ *
+ * Removing one is survivable where renaming is not, because the layout is read
+ * back as raw strings and merged against these cases: a row holding a key no
+ * case answers to is simply passed over. That is how the per-period tile left
+ * — the same four figures are the Analytics page's own subject, so the
+ * dashboard was saying them twice — without a migration to chase the rows that
+ * still name it.
  */
 enum DashboardCard: string
 {
@@ -32,7 +39,6 @@ enum DashboardCard: string
     case BudgetUsage = 'budget_usage';
     case Recent = 'recent';
     case Upcoming = 'upcoming';
-    case PerPeriod = 'per_period';
     case ByCategory = 'by_category';
 
     public function labelKey(): string
@@ -41,13 +47,25 @@ enum DashboardCard: string
     }
 
     /**
-     * How many of the grid's three columns this card asks for.
+     * How many of the grid's six columns this card asks for.
      *
-     * The dashboard is a three-column grid that collapses to one on a narrow
-     * screen, and this is what makes the design's split middle section — a
-     * wide chart beside a narrow usage widget — a property of the cards rather
-     * than of a fixed layout. Every other card takes the full width, so a
-     * rearranged dashboard stays a legible stack.
+     * The dashboard is a six-column grid that collapses to one on a narrow
+     * screen, and this is what makes the design's split rows — a wide chart
+     * beside a narrow usage widget, then the renewals list beside the category
+     * table — a property of the cards rather than of a fixed layout. Every
+     * other card takes the full width, so a rearranged dashboard stays a
+     * legible stack.
+     *
+     * Six rather than three because two of these rows divide differently: the
+     * chart takes two thirds and the usage widget one, while Coming soon and
+     * By category take half each. Three columns can express the first split
+     * and has no half to give the second.
+     *
+     * A span is the card's own property, not the row's, so two halves make a
+     * row only where they land next to each other. An account that has
+     * rearranged its dashboard and put something between them gets two
+     * half-width cards on separate rows, which is the honest rendering of the
+     * order it chose.
      *
      * Auto-placement is left alone rather than made dense: a dense grid would
      * reflow tiles past one another to fill holes, and a card order the user
@@ -56,9 +74,10 @@ enum DashboardCard: string
     public function columnSpan(): int
     {
         return match ($this) {
-            self::SpendChart => 2,
-            self::BudgetUsage => 1,
-            default => 3,
+            self::SpendChart => 4,
+            self::BudgetUsage => 2,
+            self::Upcoming, self::ByCategory => 3,
+            default => 6,
         };
     }
 

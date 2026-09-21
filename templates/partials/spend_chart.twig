@@ -8,12 +8,19 @@
 
     `id` is what ties the canvas to its payload: two charts on one page need two
     of them, and the canvas names the script element it reads.
+
+    The legend is rendered here rather than by the chart library. Every other
+    string on this page is formatted server-side by ICU, and a legend drawn by
+    the library would be the one label that was not — it would also have to be
+    reachable from the browser catalogue, and it would vanish for a reader who
+    only ever sees the table. Marked `aria-hidden` because the table below names
+    both series in its own column headings.
 #}
 {% macro spend_chart(chart, id, alt) %}
     {% if not chart.is_drawable %}
         {#
-            A missing month total would be drawn as a short bar, which reads as
-            a cheap month rather than an unknown one. So there is no chart —
+            A missing month total would be drawn as a dip, which reads as a
+            cheap month rather than an unknown one. So there is no chart —
             the Forecast page shows those months per currency instead.
         #}
         <p class="muted empty">
@@ -23,6 +30,14 @@
             }) }}
         </p>
     {% else %}
+        {% if chart.has_trials %}
+            <ul class="chart-legend" aria-hidden="true">
+                <li><span class="chart-key chart-key-total"></span>{{ t('dashboard.series_with_trials') }}</li>
+                <li><span class="chart-key chart-key-committed"></span>{{ t('dashboard.series_committed') }}</li>
+                <li><span class="chart-key chart-key-gap"></span>{{ t('dashboard.series_trial_gap') }}</li>
+            </ul>
+        {% endif %}
+
         <div class="chart-frame">
             <canvas class="chart-canvas"
                     data-chart="spend"
@@ -47,23 +62,45 @@
                 <thead>
                 <tr>
                     <th scope="col">{{ t('field.month') }}</th>
-                    <th scope="col" class="numeric">{{ t('field.total') }}</th>
+                    <th scope="col" class="numeric">
+                        {{ chart.has_trials ? t('dashboard.series_with_trials') : t('field.total') }}
+                    </th>
+                    {% if chart.has_trials %}
+                        <th scope="col" class="numeric">{{ t('dashboard.series_committed') }}</th>
+                    {% endif %}
                 </tr>
                 </thead>
                 <tbody>
                 {% for month in chart.months %}
                     <tr{{ loop.index0 == chart.peak_index ? ' class="is-peak"' : '' }}>
-                        <th scope="row">{{ month.label }}</th>
+                        <th scope="row">
+                            {{ month.label }}
+                            {% if month.is_partial %}
+                                <span class="badge">{{ t('dashboard.part_month') }}</span>
+                            {% endif %}
+                        </th>
                         <td class="numeric">
                             {{ month.display }}
                             {% if loop.index0 == chart.peak_index %}
                                 <span class="badge badge-warning">{{ t('dashboard.peak_month') }}</span>
                             {% endif %}
                         </td>
+                        {% if chart.has_trials %}
+                            <td class="numeric">{{ month.committed_display }}</td>
+                        {% endif %}
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        {#
+            Said once, under the figures, rather than repeated on every row: the
+            opening month counts only the charges still ahead of today, so it is
+            short by however much of the month has already been paid.
+        #}
+        {% if chart.months|first.is_partial %}
+            <p class="muted chart-note">{{ t('dashboard.part_month_note') }}</p>
+        {% endif %}
     {% endif %}
 {% endmacro %}

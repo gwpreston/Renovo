@@ -342,7 +342,7 @@ final class PersonalisationTest extends DatabaseTestCase
             'card_position' => ['by_category' => '5', 'totals' => '1'],
             // by_category is absent from card_visible, which is how an
             // unticked checkbox arrives.
-            'card_visible' => ['totals' => '1', 'trials' => '1', 'upcoming' => '1', 'per_period' => '1'],
+            'card_visible' => ['totals' => '1', 'trials' => '1', 'upcoming' => '1'],
         ]);
 
         self::assertStringNotContainsString('By category', (string) $this->request('GET', '/')->getBody());
@@ -356,14 +356,12 @@ final class PersonalisationTest extends DatabaseTestCase
                 'totals' => '2',
                 'trials' => '3',
                 'upcoming' => '4',
-                'per_period' => '5',
             ],
             'card_visible' => [
                 'by_category' => '1',
                 'totals' => '1',
                 'trials' => '1',
                 'upcoming' => '1',
-                'per_period' => '1',
             ],
         ]);
 

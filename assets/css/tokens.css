@@ -139,6 +139,17 @@
     --warning: #a83f0e;
     --warning-bg: #fff1e8;
 
+    /*
+     * The wash the spend chart fills between its two lines with — what
+     * converting trials will add to a month. `--warning` at low opacity, but
+     * written out per theme rather than mixed at use: a canvas fill reads
+     * this through `getComputedStyle`, which hands back a custom property
+     * unresolved, so anything with a `var()` or a `color-mix()` inside it
+     * would reach the canvas as a string it cannot parse. It also wants more
+     * weight on a dark surface than on a light one to read as the same wash.
+     */
+    --chart-band: rgba(168, 63, 14, 0.16);
+
     /* a genuine problem, distinct from the heads-up above */
     --danger: #b3261e;
     --error-bg: #fdecea;
@@ -211,6 +222,9 @@
         --warning: #ff784e;
         --warning-bg: #3a1f10;
 
+        /* Heavier than the light theme's: the same wash on a darker surface. */
+        --chart-band: rgba(255, 120, 78, 0.26);
+
         --danger: #ff6b63;
         --error-bg: #3a1614;
         --error-text: #ff8a82;
@@ -261,6 +275,9 @@
 
     --warning: #ff784e;
     --warning-bg: #3a1f10;
+
+    /* Heavier than the light theme's: the same wash on a darker surface. */
+    --chart-band: rgba(255, 120, 78, 0.26);
 
     --danger: #ff6b63;
     --error-bg: #3a1614;

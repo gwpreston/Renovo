@@ -7,6 +7,12 @@
     from their own dates. It is the same call the Forecast page makes, so the
     two screens cannot disagree about a month.
 
+    Two lines, where there used to be bars: the upper one is that figure, the
+    lower one is the same months with the trials taken out, and the band
+    between them is what converting trials will add. A trial is the only future
+    cost still worth a decision, and one line either hid it or overstated what
+    is being paid today.
+
     The chart itself is `partials/spend_chart.twig`, which the analytics
     screen's spending trajectory also renders — one payload, one picture, drawn
     in two places.
@@ -22,6 +28,8 @@
     {{ trend.spend_chart(
         chart,
         'dashboard-spend-data',
-        t('dashboard.spend_chart_alt', {'currency': chart.currency})
+        chart.has_trials
+            ? t('dashboard.spend_chart_alt', {'currency': chart.currency})
+            : t('dashboard.spend_chart_alt_single', {'currency': chart.currency})
     ) }}
 </section>

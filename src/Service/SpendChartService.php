@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\Entity\Subscription;
+use App\Domain\Money;
+use App\Support\Clock;
 use App\Support\DateFormatter;
 use App\Support\MoneyFormatter;
 use DateTimeImmutable;
@@ -30,14 +33,36 @@ use DateTimeImmutable;
  * does not arise. The axis is pinned to ticks named here for the same reason:
  * an axis label is a money value, and money values are formatted in one place.
  *
- * **When a month cannot be combined, there is no chart.** A bar chart draws a
- * missing total as a short bar, which reads as a cheap month rather than an
- * unknown one — the one failure mode worth refusing outright. The caller says
+ * **When a month cannot be combined, there is no chart.** A line drawn through
+ * a missing total would slope towards it as though the month were cheap rather
+ * than unknown — the one failure mode worth refusing outright. The caller says
  * which currencies have no rate and points at the Forecast page, which shows
  * those months per currency.
  *
+ * **Two lines, and the gap between them is the point.** `minor` is every charge
+ * the horizon holds. `committed_minor` is the same walk with the trials taken
+ * out, so the distance between the two is what converting trials will add to a
+ * month that is not paying for them yet. A trial is the one future cost a user
+ * can still avoid, and a single line either hides it or overstates today.
+ *
+ * The split is made on `isTrial`, not on a charge's `reason`. A trial that
+ * converts inside the horizon goes on renewing afterwards, and those later
+ * charges are reasoned `renewal` like any other — filtering on the reason would
+ * count the conversion as trial-driven and then quietly count the renewals it
+ * caused as committed. Every charge a trial produces belongs to the trial.
+ *
  * @phpstan-import-type MonthTotals from ForecastService
- * @phpstan-type ChartMonth array{key: string, label: string, minor: int, display: string}
+ * @phpstan-type ChartMonth array{
+ *     key: string,
+ *     label: string,
+ *     minor: int,
+ *     display: string,
+ *     committed_minor: int,
+ *     committed_display: string,
+ *     trial_minor: int,
+ *     trial_display: string,
+ *     is_partial: bool
+ * }
  * @phpstan-type ChartTick array{value: int, label: string}
  */
 final class SpendChartService
@@ -47,6 +72,7 @@ final class SpendChartService
         private readonly InstanceSettingsService $settings,
         private readonly MoneyFormatter $money,
         private readonly DateFormatter $dates,
+        private readonly Clock $clock,
     ) {
     }
 
@@ -73,12 +99,26 @@ final class SpendChartService
         $combined = $this->stats->combine($union);
         $drawable = $combined['unconvertible'] === [];
 
+        // The horizon starts today, not on the first of the month, so unless
+        // today *is* the first the opening bucket holds only the part of the
+        // month still ahead. As bars that read as a cheap month; as a line it
+        // reads as a fall, which is worse — so the month says it is partial
+        // and the chart draws that segment differently.
+        $partialIndex = $this->clock->today()->format('j') === '1' ? null : 0;
+
         $points = [];
         $max = 0;
         $peak = null;
+        $hasTrials = false;
 
         foreach ($months as $index => $month) {
             $minor = $drawable ? (int) ($month['combined_minor'] ?? 0) : 0;
+            $committed = $drawable ? $this->committedTotal($month['events']) : 0;
+            $trial = $minor - $committed;
+
+            if ($trial !== 0) {
+                $hasTrials = true;
+            }
 
             $points[] = [
                 'key' => $month['month'],
@@ -88,10 +128,17 @@ final class SpendChartService
                 ),
                 'minor' => $minor,
                 'display' => $this->money->formatMinor($minor, $currency),
+                'committed_minor' => $committed,
+                'committed_display' => $this->money->formatMinor($committed, $currency),
+                'trial_minor' => $trial,
+                'trial_display' => $this->money->formatMinor($trial, $currency),
+                'is_partial' => $index === $partialIndex,
             ];
 
             // Ties go to the earlier month: the first time spending reaches its
-            // high point is the month worth looking at.
+            // high point is the month worth looking at. Measured on the total
+            // rather than the committed line, because the peak of the chart is
+            // the peak of its upper edge.
             if ($minor > $max) {
                 $max = $minor;
                 $peak = $index;
@@ -108,6 +155,11 @@ final class SpendChartService
             'currency' => $currency,
             'unconvertible' => $combined['unconvertible'],
             'is_drawable' => $drawable,
+            // False when no trial converts inside the horizon, which is the
+            // common case. The second line would then sit exactly on the first,
+            // and two lines saying one thing is noise — so the chart, the
+            // legend and the table all drop to one series on this flag.
+            'has_trials' => $hasTrials,
         ];
 
         // Encoded here rather than in the template, for the reason the
@@ -120,6 +172,37 @@ final class SpendChartService
         );
 
         return $chart;
+    }
+
+    /**
+     * One month's spend with the trials taken out, in the base currency.
+     *
+     * Summed from the charges the forecast already walked rather than by
+     * walking it a second time: `monthly()` hands every event over, so the
+     * committed line is a second reading of one forecast, not a second
+     * forecast. Two walks would agree on the day this was written.
+     *
+     * Combined through `StatsService` for the same reason the total is —
+     * one definition of what converting a currency means. The caller has
+     * already established that every currency in the horizon has a rate, and
+     * these charges are a subset of those, so the combination cannot fail
+     * here if it succeeded there.
+     *
+     * @param list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}> $events
+     */
+    private function committedTotal(array $events): int
+    {
+        $byCurrency = [];
+        foreach ($events as $event) {
+            if ($event['subscription']->isTrial) {
+                continue;
+            }
+
+            $amount = $event['amount'];
+            $byCurrency[$amount->currency] = ($byCurrency[$amount->currency] ?? 0) + $amount->amountMinor;
+        }
+
+        return $this->stats->combine($byCurrency)['amount_minor'] ?? 0;
     }
 
     /**

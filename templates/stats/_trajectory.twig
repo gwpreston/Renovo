@@ -8,8 +8,10 @@
     this reuses the Phase 10 chart instead of adding a second one.
 
     Each renewal falls in the month it actually falls; a scheduled price change
-    or a trial conversion applies from its own date, so a bar does not move when
-    the change eventually lands.
+    or a trial conversion applies from its own date, so a point does not move
+    when the change eventually lands. The second line is those months without
+    the trials, so the gap between the two is the spend that is coming but is
+    not committed yet.
 #}
 {% import 'partials/spend_chart.twig' as trend %}
 
@@ -24,6 +26,8 @@
     {{ trend.spend_chart(
         trajectory,
         'analytics-trajectory-data',
-        t('dashboard.spend_chart_alt', {'currency': trajectory.currency})
+        trajectory.has_trials
+            ? t('dashboard.spend_chart_alt', {'currency': trajectory.currency})
+            : t('dashboard.spend_chart_alt_single', {'currency': trajectory.currency})
     ) }}
 </section>

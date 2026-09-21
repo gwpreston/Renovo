@@ -828,6 +828,10 @@ return [
         . 'a month missing one of its currencies would be drawn as a cheap month rather than an unknown '
         . 'one. The forecast shows those months per currency.',
     'dashboard.combined_in' => 'Combined · {currency}',
+    'dashboard.coming_soon' => 'Coming soon',
+    'dashboard.coming_soon_note' => 'Next payments in the following {days} days',
+    'dashboard.days_away' =>
+        '{days, plural, one {# day} other {# days}}',
     'dashboard.combined_note' =>
         '{amount} per year, converted at the latest cached rates. The per-currency figures above are the '
         . 'amounts actually charged.',
@@ -836,8 +840,6 @@ return [
     'dashboard.filter_rows' => 'Which subscriptions to list',
     'dashboard.metrics' => 'Spending at a glance',
     'dashboard.monthly_spend' => 'Monthly spend',
-    'dashboard.next_30_days' => 'Next 30 days',
-    'dashboard.next_7_days' => 'Next 7 days',
     'dashboard.next_charge' => 'Next: {name}, {date} · {amount}',
     'dashboard.no_budget' => 'No budget set for you yet, so there is nothing to measure this against.',
     'dashboard.no_household' => 'No household',
@@ -862,9 +864,22 @@ return [
     'dashboard.renewing_soon_note' => 'in the next {days} days',
     'dashboard.see_all' => 'All subscriptions',
     'dashboard.share_of_spend' => '{name}: {percent}% of monthly spend',
+    'dashboard.part_month' => 'Part month',
+    'dashboard.part_month_note' =>
+        'The first month counts only the charges still ahead of today, so it is short by whatever has '
+        . 'already been paid this month.',
+    'dashboard.series_committed' => 'Excluding trial conversions',
+    'dashboard.series_trial_gap' => 'What trials will add',
+    'dashboard.series_with_trials' => 'Including trial conversions',
     'dashboard.spend_chart' => 'The next twelve months',
     'dashboard.spend_chart_alt' =>
-        'Bar chart of spend per month for the next twelve months, in {currency}. The same figures are in '
+        'Line chart of spend per month for the next twelve months, in {currency}: one line including trial '
+        . 'conversions and one excluding them. The same figures are in the table that follows.',
+    // The same chart with no trial converting inside the horizon, where the
+    // second line would sit exactly on the first and is not drawn. The
+    // description has to match the picture, and the table under it.
+    'dashboard.spend_chart_alt_single' =>
+        'Line chart of spend per month for the next twelve months, in {currency}. The same figures are in '
         . 'the table that follows.',
     'dashboard.trials_ending_soon' => 'Trials ending soon',
     'dashboard.trials_note' => 'Free today. About to stop being.',
@@ -1011,7 +1026,11 @@ return [
     'insight.trial_converting.headline' => 'A free trial is about to convert',
 
     // js
+    'js.dashboard.part_month' => 'part month',
     'js.dashboard.spend' => 'Spend',
+    'js.dashboard.spend_committed' => 'Excluding trial conversions',
+    'js.dashboard.spend_with_trials' => 'Including trial conversions',
+    'js.dashboard.trial_gap' => 'Trials add {amount}',
     'js.quick_add_failed' => 'That form could not be loaded. Open the full page instead.',
     'js.passkey_generic_error' => 'That did not work. Try again.',
     'js.passkey_not_used' => 'No passkey was used.',
@@ -1604,12 +1623,11 @@ return [
     // dashboard_card
     'dashboard_card.budget_usage' => 'Budget and where it goes',
     'dashboard_card.by_category' => 'By category',
-    'dashboard_card.per_period' => 'Per day, week, month and year',
     'dashboard_card.recent' => 'Subscriptions table',
     'dashboard_card.spend_chart' => 'The next twelve months',
     'dashboard_card.totals' => 'Spending at a glance',
     'dashboard_card.trials' => 'Trials ending soon',
-    'dashboard_card.upcoming' => 'Upcoming charges',
+    'dashboard_card.upcoming' => 'Coming soon',
 
     // digest_mode
     'digest_mode.immediate' => 'As they happen',

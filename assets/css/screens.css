@@ -26,23 +26,51 @@
     border-bottom: 0;
 }
 
+/*
+ * `min-width: 0` and a wrap that will break a word: a flex item refuses to
+ * shrink below its longest word by default, and at half the grid's width this
+ * row is narrow enough for one subscription named without spaces to push the
+ * amount off the end of the card.
+ */
 .renewal-name {
     flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .renewal-date,
+.renewal-days,
 .renewal-amount {
     color: var(--text-muted);
     white-space: nowrap;
 }
 
 /*
+ * A countdown close enough to act on.
+ *
+ * `--danger` rather than the `.is-urgent` state the cancel-by rows use: that
+ * one is `--warning`, an orange that says "coming up", and this says "this
+ * week". Colour is not the only carrier — the number itself is the message, and
+ * it changes whether or not the hue lands — so the weight goes up with it for
+ * anyone who cannot tell the two apart.
+ */
+.renewal-days.is-due-soon {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+/*
  * The bento grid.
  *
- * Three columns, and each card says how many of them it wants — which is what
- * puts the chart beside the usage widget without either of them being fixed in
- * place. A card the account has moved keeps whatever span it declares, so the
- * layout survives being rearranged.
+ * Six columns, and each card says how many of them it wants — which is what
+ * puts the chart beside the usage widget, and Coming soon beside By category,
+ * without any of them being fixed in place. A card the account has moved keeps
+ * whatever span it declares, so the layout survives being rearranged.
+ *
+ * Six because the two split rows divide differently: two thirds and a third
+ * for the chart and the usage widget, halves for the two lists. Three columns
+ * can do the first and has no half for the second, and twelve would buy
+ * nothing either of them asks for.
  *
  * Auto-placement is deliberately not dense: a dense grid reflows tiles past one
  * another to fill a hole, and an order somebody chose is not something to
@@ -50,13 +78,13 @@
  */
 .bento {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 1rem;
     align-items: start;
 }
 
 .bento-item {
-    grid-column: span 3;
+    grid-column: span 6;
     min-width: 0;
 }
 
@@ -70,12 +98,21 @@
     display: none;
 }
 
-.bento-span-1 {
-    grid-column: span 1;
-}
-
 .bento-span-2 {
     grid-column: span 2;
+}
+
+/* Half the grid: the two lists that share a row. */
+.bento-span-3 {
+    grid-column: span 3;
+}
+
+.bento-span-4 {
+    grid-column: span 4;
+}
+
+.bento-span-6 {
+    grid-column: span 6;
 }
 
 /*
@@ -84,9 +121,11 @@
  */
 @media (max-width: 767px) {
     .bento-item,
-    .bento-span-1,
-    .bento-span-2 {
-        grid-column: span 3;
+    .bento-span-2,
+    .bento-span-3,
+    .bento-span-4,
+    .bento-span-6 {
+        grid-column: span 6;
     }
 }
 
@@ -180,6 +219,70 @@
 .chart-canvas {
     width: 100%;
     height: 100%;
+}
+
+/*
+ * The chart's legend, rendered in the template so both series are named in the
+ * same ICU as everything else on the page — and hidden with the frame it
+ * belongs to, because a legend for a chart that was never drawn is a key to
+ * nothing. The reader left with the table gets the series as its column
+ * headings instead.
+ */
+.chart-legend {
+    display: none;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin: 0 0 0.5rem;
+    padding: 0;
+    list-style: none;
+    font-size: var(--size-label);
+    color: var(--text-muted);
+}
+
+.chart-card.is-drawn .chart-legend {
+    display: flex;
+}
+
+.chart-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/*
+ * Each key is the mark it stands for, not a square of colour: a solid rule, a
+ * dashed rule, a wash. Told apart by shape as well as by hue, so the legend
+ * still works for a reader who cannot rely on the second.
+ */
+.chart-key {
+    display: inline-block;
+    width: 1.25rem;
+    height: 0;
+    border-top-width: 2px;
+    border-top-style: solid;
+}
+
+.chart-key-total {
+    border-top-color: var(--warning);
+}
+
+.chart-key-committed {
+    border-top-style: dashed;
+    border-top-color: var(--accent);
+}
+
+.chart-key-gap {
+    height: 0.6rem;
+    border-top: 0;
+    border-radius: 2px;
+    /* The same token the chart fills the band with. */
+    background: var(--chart-band);
+}
+
+/* Said under the figures, so it reads with the chart and with the table. */
+.chart-note {
+    margin-top: 0.5rem;
+    font-size: var(--size-label);
 }
 
 .chart-figures .is-peak th,

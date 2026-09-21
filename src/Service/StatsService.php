@@ -32,10 +32,37 @@ use DateTimeImmutable;
  * @phpstan-type OneOffTotals array{currency: string, total_minor: int, count: int}
  * @phpstan-type CategoryTotals array{name: string, currency: string, monthly_minor: int, count: int}
  * @phpstan-type Combined array{currency: string, amount_minor: int|null, unconvertible: list<string>}
+ * @phpstan-type UpcomingRow array{
+ *     subscription: Subscription,
+ *     date: DateTimeImmutable,
+ *     days: int,
+ *     is_urgent: bool
+ * }
  */
 final class StatsService
 {
     private const MAX_HISTORIC_CHARGES = 500;
+
+    /**
+     * How far ahead the Coming soon card looks.
+     *
+     * Deliberately not `DashboardService::NEAR_WINDOW_DAYS`: that window is
+     * fourteen days and answers "what is about to renew", which the metric
+     * tile, the table's badges and the Expiring chip are all counted from. This
+     * one answers a different question — "what is coming" — and a card that
+     * shows a month and a half is a plan rather than a warning. Two questions,
+     * two windows, neither pretending to be the other.
+     */
+    public const UPCOMING_WINDOW_DAYS = 45;
+
+    /**
+     * Inside this many days a row in that card stops being a plan.
+     *
+     * A month and a half of charges is a list to read; a charge this week is
+     * one to act on, so the row says so in its own right rather than relying on
+     * the reader to do the subtraction.
+     */
+    public const UPCOMING_URGENT_DAYS = 7;
 
     public function __construct(
         private readonly SubscriptionService $subscriptions,
@@ -53,10 +80,9 @@ final class StatsService
      *     one_off: list<OneOffTotals>,
      *     by_category: list<CategoryTotals>,
      *     active_count: int,
-     *     upcoming_7: list<Subscription>,
-     *     upcoming_30: list<Subscription>,
-     *     upcoming_7_totals: list<OneOffTotals>,
-     *     upcoming_30_totals: list<OneOffTotals>,
+     *     upcoming: list<UpcomingRow>,
+     *     upcoming_totals: list<OneOffTotals>,
+     *     upcoming_days: int,
      *     combined_monthly: Combined,
      *     combined_yearly: Combined,
      *     per_period: array<string, int|null>,
@@ -125,8 +151,7 @@ final class StatsService
         ksort($oneOff);
         uasort($byCategory, static fn (array $a, array $b): int => $b['monthly_minor'] <=> $a['monthly_minor']);
 
-        $upcoming7 = $this->subscriptions->upcoming($scope, 7);
-        $upcoming30 = $this->subscriptions->upcoming($scope, 30);
+        $upcoming = $this->upcomingRows($this->subscriptions->upcoming($scope, self::UPCOMING_WINDOW_DAYS));
         $trials = $this->subscriptions->trialsEndingSoon($scope, 30);
 
         $monthlyByCurrency = [];
@@ -143,16 +168,58 @@ final class StatsService
             'one_off' => array_values($oneOff),
             'by_category' => array_values($byCategory),
             'active_count' => $activeCount,
-            'upcoming_7' => $upcoming7,
-            'upcoming_30' => $upcoming30,
-            'upcoming_7_totals' => $this->sumByCurrency($upcoming7),
-            'upcoming_30_totals' => $this->sumByCurrency($upcoming30),
+            'upcoming' => $upcoming,
+            // Summed from the rows the card actually draws, not from the query
+            // behind them: a subscription dropped for want of a date would
+            // otherwise be missing from the list and present in its total.
+            'upcoming_totals' => $this->sumByCurrency(array_column($upcoming, 'subscription')),
+            'upcoming_days' => self::UPCOMING_WINDOW_DAYS,
             'combined_monthly' => $this->combine($monthlyByCurrency),
             'combined_yearly' => $combinedYearly,
             'per_period' => $this->perPeriod($combinedYearly['amount_minor']),
             'trials' => $trials,
             'trial_totals' => $this->sumConvertedPrices($trials),
         ];
+    }
+
+    /**
+     * The Coming soon rows: each charge with how far away it is.
+     *
+     * The countdown is computed here rather than in the template because it is
+     * a judgement, not a formatting choice — how many days away a charge is,
+     * and whether that is close enough to stop being a plan. A template that
+     * worked it out would be the second place the threshold lived.
+     *
+     * Counted to `nextPaymentDate` because that is the column the query filters
+     * and orders by. Counting to `nextChargeDate()` instead would number a
+     * trial by its conversion date while the list around it was sorted by its
+     * payment date, and the card would be ordered by one date and labelled with
+     * another.
+     *
+     * @param list<Subscription> $upcoming
+     * @return list<UpcomingRow>
+     */
+    private function upcomingRows(array $upcoming): array
+    {
+        $today = $this->clock->today();
+
+        $rows = [];
+        foreach ($upcoming as $subscription) {
+            $date = $subscription->nextPaymentDate;
+            $days = $subscription->daysUntilNextPayment($today);
+            if ($date === null || $days === null) {
+                continue;
+            }
+
+            $rows[] = [
+                'subscription' => $subscription,
+                'date' => $date,
+                'days' => $days,
+                'is_urgent' => $days <= self::UPCOMING_URGENT_DAYS,
+            ];
+        }
+
+        return $rows;
     }
 
     /**

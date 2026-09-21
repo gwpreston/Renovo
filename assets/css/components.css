@@ -608,10 +608,6 @@ main.container {
     letter-spacing: 0;
 }
 
-.stat-small .stat-value {
-    font-size: 1.375rem;
-}
-
 .note {
     font-size: var(--size-label);
 }

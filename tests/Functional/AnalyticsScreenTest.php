@@ -208,6 +208,15 @@ final class AnalyticsScreenTest extends DatabaseTestCase
         self::assertSame($dashboard['months'], $analytics['months']);
         self::assertSame($dashboard['peak_index'], $analytics['peak_index']);
         self::assertSame($dashboard['ticks'], $analytics['ticks']);
+
+        // Both lines, not just the upper one. The committed figures are the
+        // half a second payload builder would have been most likely to get
+        // differently, so they are the half worth naming here.
+        self::assertSame($dashboard['has_trials'], $analytics['has_trials']);
+        self::assertSame(
+            array_column($dashboard['months'], 'committed_minor'),
+            array_column($analytics['months'], 'committed_minor'),
+        );
     }
 
     public function testTheDonutsCentreIsTheTotalItsSegmentsAreSharesOf(): void
