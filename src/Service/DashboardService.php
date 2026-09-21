@@ -57,12 +57,13 @@ final class DashboardService
     }
 
     /**
-     * The whole screen: the metric row, the chart and the usage widget.
+     * The whole screen: the metric row, the two charts and the usage widget.
      *
      * @return array{
      *     stats: array<string, mixed>,
      *     metrics: array<string, mixed>,
      *     chart: array<string, mixed>,
+     *     history: array<string, mixed>,
      *     usage: array<string, mixed>
      * }
      */
@@ -80,6 +81,12 @@ final class DashboardService
             'stats' => $stats,
             'metrics' => $this->metrics($stats, $soon, $months),
             'chart' => $this->chart($months),
+            // The year behind, drawn by the same builder as the year ahead and
+            // reconstructed by `StatsService` from the same walk the Analytics
+            // page's year-over-year card reads — so the two price a given past
+            // charge identically, even though their windows differ (twelve
+            // calendar months here, a rolling year there).
+            'history' => $this->spendChart->fromHistory($this->stats->monthlyHistory($scope)),
             'usage' => $this->usage($scope, $stats),
         ];
     }

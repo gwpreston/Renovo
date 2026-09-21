@@ -25,11 +25,28 @@
         <a class="button button-quiet" href="/forecast">{{ t('nav.forecast') }}</a>
     </header>
 
+    {#
+        Said under the heading rather than in it: "Forecast, next 12 months"
+        names the window, and what it leaves out is that these are projected
+        figures and which currency they are stated in. Only when there is a
+        picture to describe — an unconvertible chart says why it is not drawn
+        instead, and a currency line above that message would be claiming a
+        total the card has just refused to state.
+    #}
+    {% if chart.is_drawable %}
+        <p class="muted">{{ t('dashboard.spend_chart_note', {'currency': chart.currency}) }}</p>
+    {% endif %}
+
     {{ trend.spend_chart(
         chart,
         'dashboard-spend-data',
         chart.has_trials
             ? t('dashboard.spend_chart_alt', {'currency': chart.currency})
-            : t('dashboard.spend_chart_alt_single', {'currency': chart.currency})
+            : t('dashboard.spend_chart_alt_single', {'currency': chart.currency}),
+        t('dashboard.part_month_note'),
+        t('dashboard.chart_unconvertible', {
+            'currencies': chart.unconvertible|join(', '),
+            'currency': chart.currency,
+        })
     ) }}
 </section>

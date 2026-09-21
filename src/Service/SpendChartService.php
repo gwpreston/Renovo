@@ -21,6 +21,14 @@ use DateTimeImmutable;
  * piece of code that decides it. A second copy would agree on the day it was
  * written and drift afterwards.
  *
+ * **Two windows, one builder.** `fromMonths()` draws the twelve months ahead
+ * and `fromHistory()` the twelve behind, and they differ in exactly two ways —
+ * which end of the row is a part month, and whether trials are worth a second
+ * line — both of which are arguments to the one private builder. The axis, the
+ * ticks, the peak and every formatted string are therefore decided in one
+ * place, so the past and the future are drawn to the same rules and a reader
+ * comparing them is comparing like with like.
+ *
  * The design's chart was income against expenses. There is no income in a
  * subscription tracker, so this is spend over time: each renewal in the month
  * it actually falls, trials priced from their conversion date and scheduled
@@ -77,12 +85,65 @@ final class SpendChartService
     }
 
     /**
-     * The payload for one spend chart, JSON included.
+     * The payload for the forecast chart: the twelve months ahead.
      *
      * @param list<MonthTotals> $months
      * @return array<string, mixed>
      */
     public function fromMonths(array $months): array
+    {
+        // The horizon starts today, so unless today *is* the first of the
+        // month the opening bucket holds only the part of the month still
+        // ahead.
+        $partial = $this->clock->today()->format('j') === '1' ? null : 0;
+
+        return $this->build($months, $months === [] ? null : $partial, true);
+    }
+
+    /**
+     * The payload for the history chart: the twelve months behind.
+     *
+     * The same picture drawn from the other direction, and deliberately the
+     * same builder — a second one would agree about the axis on the day it was
+     * written and drift afterwards. Two things differ, and both are arguments
+     * rather than settings:
+     *
+     * **The partial month is the last, not the first.** The window ends today,
+     * so the closing bucket holds only the part of this month that has already
+     * happened. Reusing the forecast's rule would dash the segment leaving the
+     * *oldest* month and call a month that completed a year ago incomplete.
+     *
+     * **There is no trial line.** "What converting trials will add" is a claim
+     * about the future; a trial that ran last spring either converted, in which
+     * case the charges it produced are in these months as themselves, or it did
+     * not, in which case it cost nothing. So the committed line sits exactly on
+     * the total, `has_trials` stays false, and the second series, the legend
+     * and the third column of the table all drop out on their own.
+     *
+     * @param list<MonthTotals> $months
+     * @return array<string, mixed>
+     */
+    public function fromHistory(array $months): array
+    {
+        $today = $this->clock->today();
+
+        // The mirror of the forecast's rule: complete only when today is the
+        // last day of its month, because then there is no rest of the month
+        // left to come.
+        $partial = $today->format('j') === $today->format('t') ? null : count($months) - 1;
+
+        return $this->build($months, $months === [] ? null : $partial, false);
+    }
+
+    /**
+     * One chart's payload, JSON included.
+     *
+     * @param list<MonthTotals> $months
+     * @param int|null          $partialIndex Which bucket covers part of a month, if any.
+     * @param bool              $splitTrials  Whether to draw the committed line under the total.
+     * @return array<string, mixed>
+     */
+    private function build(array $months, ?int $partialIndex, bool $splitTrials): array
     {
         $currency = $this->settings->baseCurrency();
 
@@ -99,13 +160,12 @@ final class SpendChartService
         $combined = $this->stats->combine($union);
         $drawable = $combined['unconvertible'] === [];
 
-        // The horizon starts today, not on the first of the month, so unless
-        // today *is* the first the opening bucket holds only the part of the
-        // month still ahead. As bars that read as a cheap month; as a line it
-        // reads as a fall, which is worse — so the month says it is partial
-        // and the chart draws that segment differently.
-        $partialIndex = $this->clock->today()->format('j') === '1' ? null : 0;
-
+        // A bucket that covers part of a month reads as a cheap month, which
+        // is worse as a line than as a bar: it reads as a fall. So the month
+        // says it is partial, the chart draws the segment beside it dashed and
+        // the figures carry a note. Which end it falls at is the caller's to
+        // say — it is the opening month of a forecast and the closing month of
+        // a history.
         $points = [];
         $max = 0;
         $peak = null;
@@ -113,7 +173,7 @@ final class SpendChartService
 
         foreach ($months as $index => $month) {
             $minor = $drawable ? (int) ($month['combined_minor'] ?? 0) : 0;
-            $committed = $drawable ? $this->committedTotal($month['events']) : 0;
+            $committed = $drawable && $splitTrials ? $this->committedTotal($month['events']) : $minor;
             $trial = $minor - $committed;
 
             if ($trial !== 0) {
@@ -150,6 +210,11 @@ final class SpendChartService
         $chart = [
             'months' => $points,
             'peak_index' => $max > 0 ? $peak : null,
+            // Named rather than left to be found: the template's footnote and
+            // the browser's dashed segment both need to know which bucket it
+            // is, and looking for the first month flagged partial only
+            // happens to be right for a chart whose partial month is first.
+            'partial_index' => $partialIndex,
             'axis_max' => $axisMax,
             'ticks' => $this->ticks($axisMax, $currency),
             'currency' => $currency,

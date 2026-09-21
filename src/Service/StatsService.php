@@ -32,6 +32,7 @@ use DateTimeImmutable;
  * @phpstan-type OneOffTotals array{currency: string, total_minor: int, count: int}
  * @phpstan-type CategoryTotals array{name: string, currency: string, monthly_minor: int, count: int}
  * @phpstan-type Combined array{currency: string, amount_minor: int|null, unconvertible: list<string>}
+ * @phpstan-import-type MonthTotals from ForecastService
  * @phpstan-type UpcomingRow array{
  *     subscription: Subscription,
  *     date: DateTimeImmutable,
@@ -42,6 +43,15 @@ use DateTimeImmutable;
 final class StatsService
 {
     private const MAX_HISTORIC_CHARGES = 500;
+
+    /**
+     * How many months of reconstructed spend the history chart shows.
+     *
+     * Twelve, to match the forecast's horizon: the two charts either side of a
+     * dashboard are a year behind and a year ahead, and a reader comparing them
+     * is comparing windows of the same length.
+     */
+    public const HISTORY_MONTHS = 12;
 
     /**
      * How far ahead the Coming soon card looks.
@@ -244,6 +254,100 @@ final class StatsService
             'monthly' => Rounding::divide($yearlyMinor, 12),
             'yearly' => $yearlyMinor,
         ];
+    }
+
+    /**
+     * Month-by-month spend over the window that has just been lived through.
+     *
+     * The mirror of `ForecastService::monthly()`, and shaped exactly like it so
+     * that the same chart payload builder draws both: twelve buckets, the
+     * oldest beginning on the first of the month eleven back, the newest
+     * ending today.
+     *
+     * **This is reconstructed, not recorded**, in the same sense and by the
+     * same code as `yearOverYear()` — the application tracks what is due, not a
+     * ledger of what was paid, so the past is rebuilt from start dates, billing
+     * cycles and recorded price history. Sharing `historicCharges()` with the
+     * comparison card is the point: a chart and a total describing the same
+     * twelve months are read off one reconstruction, so they cannot disagree
+     * about last March. A subscription with no start date contributes nothing,
+     * for the reason given there.
+     *
+     * Two properties of the window are worth stating because the chart depends
+     * on them. The lower bound is the day before the oldest bucket opens, and
+     * is exclusive, so a charge on the first of that month lands inside it
+     * rather than being dropped. The upper bound is today, not the end of this
+     * month, which is what makes the closing bucket a part month — the chart
+     * draws it as one rather than as a collapse in spending.
+     *
+     * Every month is converted at today's rates, as the comparison card
+     * already does. There is no history of rates to price a charge at the rate
+     * that stood on its day, and inventing one would be a worse answer than a
+     * consistent one.
+     *
+     * @return list<MonthTotals>
+     */
+    public function monthlyHistory(Scope $scope, int $months = self::HISTORY_MONTHS): array
+    {
+        $today = $this->clock->today();
+        $baseCurrency = $this->settings->baseCurrency();
+
+        $buckets = [];
+        $cursor = $today->modify('first day of this month')->modify(sprintf('-%d months', $months - 1));
+        $windowStart = $cursor;
+
+        for ($i = 0; $i < $months; $i++) {
+            $key = $cursor->format('Y-m');
+            $buckets[$key] = [
+                'month' => $key,
+                'label' => $cursor->format('M Y'),
+                'by_currency' => [],
+                'combined_minor' => 0,
+                'events' => [],
+            ];
+            $cursor = $cursor->modify('+1 month');
+        }
+
+        $from = $windowStart->modify('-1 day');
+
+        foreach ($this->subscriptions->allForStats($scope, false) as $subscription) {
+            foreach ($this->historicCharges($scope, $subscription, $from, $today) as $charge) {
+                $key = $charge['date']->format('Y-m');
+                if (!isset($buckets[$key])) {
+                    continue;
+                }
+
+                $currency = $charge['amount']->currency;
+                $buckets[$key]['by_currency'][$currency] =
+                    ($buckets[$key]['by_currency'][$currency] ?? 0) + $charge['amount']->amountMinor;
+
+                // Shaped like a forecast charge because the payload builder
+                // takes forecast charges. `reason` is `historic` rather than
+                // `renewal`: this is a charge the reconstruction believes took
+                // place, not one the forecast is predicting, and labelling it
+                // as the latter would make the two indistinguishable to
+                // anything that ever reads the field.
+                $buckets[$key]['events'][] = [
+                    'subscription' => $subscription,
+                    'date' => $charge['date'],
+                    'amount' => $charge['amount'],
+                    'reason' => 'historic',
+                ];
+            }
+        }
+
+        foreach ($buckets as $key => $bucket) {
+            ksort($bucket['by_currency']);
+            // Null when a currency in the month has no rate, exactly as the
+            // forecast does it — which is what makes the chart refuse to draw
+            // rather than slope towards a month it cannot total.
+            $bucket['combined_minor'] = $bucket['by_currency'] === []
+                ? 0
+                : $this->rates->combine($bucket['by_currency'], $baseCurrency);
+            $buckets[$key] = $bucket;
+        }
+
+        return array_values($buckets);
     }
 
     /**

@@ -9,8 +9,8 @@ use App\Security\Scope;
 use App\Support\MoneyFormatter;
 
 /**
- * The analytics screen: the KPI row, the spending trajectory, the category
- * donut, year over year and the notable subscriptions.
+ * The analytics screen: the KPI row, the twelve months behind and the twelve
+ * ahead, the category donut, year over year and the notable subscriptions.
  *
  * The third of these assemblers, after DashboardService and
  * SubscriptionScreenService, and held to the same rule: **not one figure here
@@ -58,18 +58,20 @@ final class AnalyticsScreenService
      * second time for them would be two answers to one question waiting to
      * differ — the arrangement the dashboard uses for its near-window query.
      *
-     * **Known cost: three walks of the household for one page.** The statistics
+     * **Known cost: four walks of the household for one page.** The statistics
      * read every subscription, this reads them again because `notable` and the
-     * usage ranking both want the rows, and `yearOverYear` reads them a third
-     * time with its own argument. Sharing one read would mean changing what
-     * `StatsService` hands back rather than what it computes, which is a change
-     * to a service three screens depend on and not a restyle's to make. Worth
-     * fixing when something else touches it; stated here so it is a known cost
-     * rather than a surprise.
+     * usage ranking both want the rows, and `yearOverYear` and the history
+     * chart each read them again with their own argument and their own window.
+     * Sharing one read would mean changing what `StatsService` hands back
+     * rather than what it computes, which is a change to a service three
+     * screens depend on and not a restyle's to make. Worth fixing when
+     * something else touches it; stated here so it is a known cost rather than
+     * a surprise.
      *
      * @return array{
      *     kpis: array<string, mixed>,
      *     trajectory: array<string, mixed>,
+     *     history: array<string, mixed>,
      *     categories: array<string, mixed>,
      *     year_over_year: array<string, mixed>,
      *     notable: array{highest: NotableRow|null, lowest: NotableRow|null, excluded_count: int},
@@ -103,6 +105,13 @@ final class AnalyticsScreenService
         return [
             'kpis' => $this->kpis($stats),
             'trajectory' => $this->spendChart->fromMonths($months),
+            // What the trajectory is a continuation of. The same payload
+            // builder as the trajectory and the same reconstruction the
+            // year-over-year card is totalled from, so one walk of the
+            // household answers both — over twelve calendar months here and a
+            // rolling year there, which is why the totals are close rather
+            // than equal.
+            'history' => $this->spendChart->fromHistory($this->stats->monthlyHistory($scope)),
             'categories' => $breakdown + ['donut' => $this->donut($breakdown)],
             'year_over_year' => $this->stats->yearOverYear($scope),
             'notable' => $this->notable($all),

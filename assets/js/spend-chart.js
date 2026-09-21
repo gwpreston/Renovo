@@ -1,9 +1,15 @@
 /**
  * The twelve-month spend chart.
  *
- * Drawn on the dashboard and, as the analytics screen's spending trajectory,
- * on `/stats`. One payload builder on the server and one drawing routine here,
- * so the two pictures cannot disagree about a month.
+ * Drawn four times across two screens: the twelve months ahead and the twelve
+ * behind, on the dashboard and again on `/stats`. One payload builder on the
+ * server and one drawing routine here, so no two of them can disagree about a
+ * month, and a reader comparing the year behind with the year ahead is
+ * comparing pictures drawn to the same rules.
+ *
+ * Which way a chart looks is not something this file decides or needs to ask:
+ * the payload says which bucket is a part month and whether there is a trial
+ * line to draw, and everything below follows from those two.
  *
  * The server has already done everything that involves money: the twelve
  * months arrive as integer minor units for the lines to be drawn from, and
@@ -137,12 +143,17 @@ function configFor(data) {
        decision for the palette to make. */
     const band = token('--chart-band', 'rgba(168, 63, 14, 0.16)');
 
-    const partialIndex = data.months.findIndex((month) => month.is_partial);
-    /* The opening month counts only the charges still ahead of today, so the
-       segment leading out of it is drawn dashed: it starts from a figure that
-       is short by however much of the month has already been paid. */
+    const partialIndex = data.partial_index ?? -1;
+    /* The segment touching the part month is drawn dashed, whichever side of it
+       that is: a forecast's part month is its first and only has a segment
+       leading out of it, a history's is its last and only has one leading in.
+       Testing both ends is what makes one rule serve both charts — matching on
+       the start of a segment alone would leave the history's final leg solid,
+       which is the leg drawn from the figure that is short. */
     const dashPartial = (ctx) =>
-        (partialIndex !== -1 && ctx.p0DataIndex === partialIndex ? [4, 4] : undefined);
+        (partialIndex !== -1 && (ctx.p0DataIndex === partialIndex || ctx.p1DataIndex === partialIndex)
+            ? [4, 4]
+            : undefined);
 
     const line = {
         borderWidth: 2,

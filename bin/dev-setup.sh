@@ -583,6 +583,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
         add_category "Software"   "#48a97c"
         add_category "Utilities"  "#d4a03c"
         add_category "Health"     "#3fa9c9"
+        add_category "Home"       "#8b6bd9"
         ok "$CATEGORIES categories"
 
         # The ids the server assigned, read back out of the new-subscription
@@ -720,10 +721,63 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=lifetime" -d "start_date=$(months_ago 15)" \
             -d "category_id=$(category_id Software)" -d "tags=software" -d "is_active=1"
 
-        if [ "$CREATED" -eq 11 ]; then
-            ok "11 sample subscriptions across 3 currencies, every billing cycle, two years of history"
+        # ------------------------------------------------ shape, not volume
+        #
+        # The four below are here for the two twelve-month charts — the year
+        # behind on the dashboard and the analytics screen, and the year ahead
+        # beside it. Both are drawn from individual charges landing in the
+        # month they actually land, so a household of monthly subscriptions
+        # that all began around the same time draws two nearly flat lines and
+        # demonstrates nothing about either.
+        #
+        # What gives a line a shape is bills that are not monthly and
+        # subscriptions that have not always been there: a yearly bill is a
+        # spike in one month and nothing in the other eleven, a quarterly one
+        # is four bumps, and something that started four months ago is a step
+        # part-way along the year behind.
+        #
+        # Each yearly start date is a whole number of years before its own next
+        # payment, so the charge falls in the same month in every year it has
+        # run — the property the reconstruction of the past depends on, and the
+        # one an arbitrary start date quietly breaks.
+
+        # A yearly bill five months out, so its last one was seven months ago:
+        # one tall spike in the year behind and another in the year ahead.
+        add_subscription -d "name=Home insurance" -d "price=214.00" -d "currency=GBP" \
+            -d "subscription_type=recurring" -d "billing_cycle=yearly" \
+            -d "next_payment_date=$(today_plus 150)" -d "start_date=$(months_ago 19)" \
+            -d "category_id=$(category_id Home)" \
+            -d "notice_period_amount=1" -d "notice_period_unit=months" \
+            -d "tags=household" -d "is_active=1"
+
+        # Quarterly: four modest bumps a year rather than one spike or a flat
+        # line, in months nothing else lands in.
+        add_subscription -d "name=Boiler cover" -d "price=45.00" -d "currency=GBP" \
+            -d "subscription_type=recurring" -d "billing_cycle=quarterly" \
+            -d "next_payment_date=$(today_plus 20)" -d "start_date=$(months_ago 23)" \
+            -d "category_id=$(category_id Home)" \
+            -d "tags=household" -d "is_active=1"
+
+        # A second yearly, in a different month again, so the year behind has
+        # more than one peak to compare.
+        add_subscription -d "name=Photo storage" -d "price=89.00" -d "currency=GBP" \
+            -d "subscription_type=recurring" -d "billing_cycle=yearly" \
+            -d "next_payment_date=$(today_plus 290)" -d "start_date=$(months_ago 14)" \
+            -d "category_id=$(category_id Software)" \
+            -d "tags=photos" -d "is_active=1"
+
+        # Recent enough to be a step rather than a level: the months before it
+        # joined are genuinely cheaper than the months after.
+        add_subscription -d "name=Meal kit" -d "price=34.00" -d "currency=GBP" \
+            -d "subscription_type=recurring" -d "billing_cycle=monthly" \
+            -d "next_payment_date=$(today_plus 16)" -d "start_date=$(months_ago 4)" \
+            -d "category_id=$(category_id Home)" \
+            -d "tags=food" -d "is_active=1"
+
+        if [ "$CREATED" -eq 15 ]; then
+            ok "15 sample subscriptions across 3 currencies, every billing cycle, two years of history"
         else
-            warn "created $CREATED of 11 sample subscriptions"
+            warn "created $CREATED of 15 sample subscriptions"
         fi
 
         # ---------------------------------------------------------- budgets

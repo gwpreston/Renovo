@@ -632,15 +632,27 @@ final class DashboardTest extends DatabaseTestCase
         self::assertStringContainsString('Where it goes', $body, 'the usage widget went missing');
     }
 
+    /**
+     * Asserted on the forecast card's own payload id rather than on
+     * `data-chart="spend"`: the dashboard draws two of these charts now, the
+     * year behind and the year ahead, and the attribute they share cannot tell
+     * them apart. Each names its own payload, so the id is what identifies a
+     * card — and hiding one while the other stays is the stronger claim
+     * anyway.
+     */
     public function testAHiddenCardStaysHidden(): void
     {
         (new DashboardCardRepository($this->db))->replaceFor($this->ownerId, [
             ['card_key' => DashboardCard::SpendChart->value, 'position' => 0, 'visible' => false],
         ]);
 
-        self::assertStringNotContainsString(
-            'data-chart="spend"',
-            $this->body($this->get('/', $this->ownerId)),
+        $body = $this->body($this->get('/', $this->ownerId));
+
+        self::assertStringNotContainsString('dashboard-spend-data', $body);
+        self::assertStringContainsString(
+            'dashboard-history-data',
+            $body,
+            'hiding one card should not take the other chart with it',
         );
     }
 
@@ -658,6 +670,67 @@ final class DashboardTest extends DatabaseTestCase
 
         self::assertStringNotContainsString('Per day', $body);
         self::assertStringNotContainsString('Per week', $body);
+    }
+
+    /**
+     * The dashboard shows the year behind as well as the year ahead, and they
+     * are two charts rather than one drawn twice: each names its own payload,
+     * and the payloads cover different months.
+     */
+    public function testTheDashboardDrawsTheYearBehindBesideTheYearAhead(): void
+    {
+        $body = $this->body($this->get('/', $this->ownerId));
+
+        $history = $this->chartPayload($body, 'dashboard-history-data');
+        $forecast = $this->chartPayload($body, 'dashboard-spend-data');
+
+        self::assertNotNull($history, 'the history payload was not rendered');
+        self::assertNotNull($forecast, 'the forecast payload was not rendered');
+
+        self::assertCount(12, $history['months']);
+        self::assertNotSame($forecast['months'], $history['months']);
+
+        // The history ends where the forecast begins: the current month is the
+        // last bucket of one and the first of the other, which is what makes
+        // the two charts one continuous window rather than two overlapping
+        // ones.
+        self::assertSame(
+            $forecast['months'][0]['key'],
+            $history['months'][11]['key'],
+            'the two windows do not meet at this month',
+        );
+    }
+
+    /**
+     * The history's figures agree with the reconstruction the Analytics page's
+     * year-over-year card is totalled from, because they are that
+     * reconstruction — read through the service rather than recomputed here.
+     */
+    public function testTheHistoryIsTheReconstructionAndNotASecondOpinion(): void
+    {
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+
+        $months = $container->get(StatsService::class)->monthlyHistory(
+            $this->scopeFor($this->ownerId),
+        );
+
+        $payload = $this->chartPayload(
+            $this->body($this->get('/', $this->ownerId)),
+            'dashboard-history-data',
+        );
+
+        self::assertNotNull($payload, 'the history payload was not rendered');
+        self::assertCount(count($months), $payload['months']);
+
+        foreach ($months as $index => $month) {
+            self::assertSame(
+                $month['combined_minor'],
+                $payload['months'][$index]['minor'],
+                'month ' . $month['month'] . ' disagrees with the reconstruction',
+            );
+            self::assertIsInt($payload['months'][$index]['minor']);
+        }
     }
 
     /**
@@ -686,14 +759,21 @@ final class DashboardTest extends DatabaseTestCase
     }
 
     /**
-     * The chart's payload, as the browser would read it, or null when the card
+     * A chart's payload, as the browser would read it, or null when the card
      * decided there was nothing honest to draw.
+     *
+     * Named by id because the dashboard draws two of these: the forecast's
+     * `dashboard-spend-data` and the history's `dashboard-history-data`. The
+     * canvas finds its own the same way.
      *
      * @return array<string, mixed>|null
      */
-    private function chartPayload(string $html): ?array
+    private function chartPayload(string $html, string $id = 'dashboard-spend-data'): ?array
     {
-        $pattern = '/<script id="dashboard-spend-data" type="application\/json">(.*?)<\/script>/s';
+        $pattern = sprintf(
+            '/<script id="%s" type="application\/json">(.*?)<\/script>/s',
+            preg_quote($id, '/'),
+        );
         if (preg_match($pattern, $html, $matches) !== 1) {
             return null;
         }

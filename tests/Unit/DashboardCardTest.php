@@ -92,6 +92,13 @@ final class DashboardCardTest extends TestCase
      * row in `dashboard_cards` that holds it, and the account that arranged it
      * silently loses the card.
      *
+     * `spend_history` joined the list rather than replacing anything: the year
+     * behind is a second chart beside the year ahead, and it is full width
+     * because halving the pair would break the row the forecast shares with
+     * the usage widget. An account that had already arranged its dashboard
+     * finds it appended, which is `DashboardLayoutService`'s rule for any card
+     * added since a layout was saved.
+     *
      * `per_period` and `recent` are deliberately absent: both tiles were
      * removed because another screen is the same subject's home — the
      * Analytics page for the four per-period figures, the Subscriptions page
@@ -101,7 +108,7 @@ final class DashboardCardTest extends TestCase
     public function testTheStoredKeysAreUnchanged(): void
     {
         self::assertSame(
-            ['trials', 'totals', 'spend_chart', 'budget_usage', 'upcoming', 'by_category'],
+            ['trials', 'totals', 'spend_chart', 'budget_usage', 'spend_history', 'upcoming', 'by_category'],
             array_map(static fn (DashboardCard $card): string => $card->value, DashboardCard::cases()),
         );
     }

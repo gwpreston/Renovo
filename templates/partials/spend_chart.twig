@@ -7,7 +7,16 @@
     once here for the same reason the payload is built once there.
 
     `id` is what ties the canvas to its payload: two charts on one page need two
-    of them, and the canvas names the script element it reads.
+    of them, and the canvas names the script element it reads. Both screens now
+    carry two — the year behind and the year ahead — so an id reused rather than
+    chosen is a chart drawn twice from one payload.
+
+    `part_note` is the sentence under the figures explaining the month the
+    window only partly covers, and `blocked_note` the one shown in place of a
+    chart that cannot be drawn. Both are the caller's because both differ by
+    direction: a forecast's part month is its first and a history's is its
+    last, and the page that shows the unconvertible months is not the same page
+    either.
 
     The legend is rendered here rather than by the chart library. Every other
     string on this page is formatted server-side by ICU, and a legend drawn by
@@ -16,18 +25,20 @@
     only ever sees the table. Marked `aria-hidden` because the table below names
     both series in its own column headings.
 #}
-{% macro spend_chart(chart, id, alt) %}
+{% macro spend_chart(chart, id, alt, part_note, blocked_note) %}
     {% if not chart.is_drawable %}
         {#
             A missing month total would be drawn as a dip, which reads as a
-            cheap month rather than an unknown one. So there is no chart —
-            the Forecast page shows those months per currency instead.
+            cheap month rather than an unknown one. So there is no chart, and
+            the message says where those months can be read per currency —
+            which is a different page for a forecast than for a history, so it
+            is the caller's sentence for the same reason the part-month note is.
         #}
         <p class="muted empty">
-            {{ t('dashboard.chart_unconvertible', {
+            {{ blocked_note|default(t('dashboard.chart_unconvertible', {
                 'currencies': chart.unconvertible|join(', '),
                 'currency': chart.currency,
-            }) }}
+            })) }}
         </p>
     {% else %}
         {% if chart.has_trials %}
@@ -95,12 +106,18 @@
         </div>
 
         {#
-            Said once, under the figures, rather than repeated on every row: the
-            opening month counts only the charges still ahead of today, so it is
-            short by however much of the month has already been paid.
+            Said once, under the figures, rather than repeated on every row: one
+            of these months is only partly covered by the window, so its figure
+            is short by the rest of it.
+
+            Which month, and therefore what is missing from it, depends on which
+            way the chart looks — the opening month of a forecast holds only the
+            charges still ahead, the closing month of a history only those
+            already taken — so the caller hands in the sentence rather than this
+            picking one and being wrong on the other screen.
         #}
-        {% if chart.months|first.is_partial %}
-            <p class="muted chart-note">{{ t('dashboard.part_month_note') }}</p>
+        {% if chart.partial_index is not null %}
+            <p class="muted chart-note">{{ part_note|default(t('dashboard.part_month_note')) }}</p>
         {% endif %}
     {% endif %}
 {% endmacro %}

@@ -1,0 +1,53 @@
+{#
+    Twelve months of spend that have already happened.
+
+    The forecast card's mirror image, and deliberately the same picture drawn
+    by the same code: `SpendChartService::fromHistory()` builds the payload,
+    `partials/spend_chart.twig` draws it, and the axis, the peak marker and
+    every formatted figure follow the same rules as the year ahead. Two charts
+    a reader is meant to compare have to be comparable.
+
+    **These months are reconstructed, not recorded.** The application tracks
+    what is due, not a ledger of payments taken, so the past is rebuilt from
+    each subscription's start date, its billing cycle and its recorded price
+    history — the same walk the Analytics page's year-over-year card is totalled
+    from, so the two price a past charge identically, over windows that differ
+    at the edges (twelve calendar months here, a rolling year there). A
+    subscription with no start date contributes nothing rather than an invented
+    amount: under-reporting the past is the right direction to be wrong in.
+
+    One line, not two. The forecast draws a second line for what converting
+    trials will add, because that is the one future cost still worth a decision.
+    A trial in the past either converted — in which case the charges are here as
+    themselves — or cost nothing, so there is nothing to shade.
+#}
+{% import 'partials/spend_chart.twig' as trend %}
+
+<section class="card chart-card">
+    <header class="card-header">
+        <h2>{{ t('dashboard.spend_history') }}</h2>
+        <a class="button button-quiet" href="/stats">{{ t('nav.analytics') }}</a>
+    </header>
+
+    {#
+        What the heading leaves out: that these figures were rebuilt rather than
+        recorded, and which currency they are stated in. Only when there is a
+        picture to describe — the message that replaces an undrawable chart is
+        already an explanation, and a currency line above it would be claiming a
+        total the card has just refused to state.
+    #}
+    {% if history.is_drawable %}
+        <p class="muted">{{ t('dashboard.spend_history_note', {'currency': history.currency}) }}</p>
+    {% endif %}
+
+    {{ trend.spend_chart(
+        history,
+        'dashboard-history-data',
+        t('dashboard.spend_history_alt', {'currency': history.currency}),
+        t('dashboard.history_part_month_note'),
+        t('dashboard.history_unconvertible', {
+            'currencies': history.unconvertible|join(', '),
+            'currency': history.currency,
+        })
+    ) }}
+</section>

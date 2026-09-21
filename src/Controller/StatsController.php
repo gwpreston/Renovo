@@ -15,10 +15,10 @@ use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
 
 /**
- * The analytics screen: the spend-insight card, the KPI row, the spending
- * trajectory, the category donut, year over year and the notable subscriptions
- * — and, below them, the cost-per-period figures and the "worth it?" ranking
- * this page has always carried.
+ * The analytics screen: the spend-insight card, the KPI row, the twelve months
+ * behind, the spending trajectory, the category donut, year over year and the
+ * notable subscriptions — and, below them, the cost-per-period figures and the
+ * "worth it?" ranking this page has always carried.
  *
  * Thin, like every controller here. `AnalyticsScreenService` assembles the
  * screen, insights and usage ranking included, so this hands it a scope and
@@ -56,6 +56,10 @@ final class StatsController extends Controller
             'insights' => $overview['insights'],
             'kpis' => $kpis,
             'trajectory' => $overview['trajectory'],
+            // The same chart drawn over the window that has already happened.
+            // Reconstructed rather than recorded, which the card says on its
+            // own behalf rather than leaving the reader to assume a ledger.
+            'history' => $overview['history'],
             'categories' => $overview['categories'],
             'year_over_year' => $overview['year_over_year'],
             'notable' => $overview['notable'],

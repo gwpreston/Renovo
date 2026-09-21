@@ -14,8 +14,8 @@ namespace App\Domain;
  * The order of the cases is the default layout, and it is an argued one: what
  * is about to start costing money comes before what already does, and the
  * three tiles Phase 10 added sit where the design puts them — the metric row,
- * then the chart beside the usage widget, then the two lists — rather than at
- * the end. That ordering is what a *new* account gets. An account that has
+ * then the chart beside the usage widget, the year behind under the year
+ * ahead, then the two lists — rather than at the end. That ordering is what a *new* account gets. An account that has
  * already arranged its dashboard keeps its arrangement and finds the new tiles
  * appended, which is DashboardLayoutService's business and deliberately not
  * changed here: moving somebody's saved layout around to match a redesign
@@ -40,6 +40,7 @@ enum DashboardCard: string
     case Totals = 'totals';
     case SpendChart = 'spend_chart';
     case BudgetUsage = 'budget_usage';
+    case SpendHistory = 'spend_history';
     case Upcoming = 'upcoming';
     case ByCategory = 'by_category';
 
@@ -68,6 +69,14 @@ enum DashboardCard: string
      * rearranged its dashboard and put something between them gets two
      * half-width cards on separate rows, which is the honest rendering of the
      * order it chose.
+     *
+     * Spend history takes the full-width default, and that is an argument
+     * rather than an omission. Halving it against the forecast would read as
+     * the neater arrangement — a year behind beside a year ahead — but it would
+     * cost the forecast the two thirds it shares with the usage widget and
+     * leave that widget alone on a row. Twelve points drawn in a third of the
+     * grid is also a chart whose shape cannot be read, which is the only thing
+     * either of these cards is for.
      *
      * Auto-placement is left alone rather than made dense: a dense grid would
      * reflow tiles past one another to fill holes, and a card order the user

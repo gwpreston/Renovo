@@ -1,0 +1,387 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Integration;
+
+use App\Domain\IsolationMode;
+use App\Domain\Money;
+use App\Domain\PriceChangeSource;
+use App\Domain\Role;
+use App\I18n\LocaleContext;
+use App\Repository\CategoryRepository;
+use App\Repository\ExchangeRateRepository;
+use App\Repository\HouseholdRepository;
+use App\Repository\InstanceSettingsRepository;
+use App\Repository\MembershipRepository;
+use App\Repository\PriceHistoryRepository;
+use App\Repository\SubscriptionRepository;
+use App\Repository\TagRepository;
+use App\Repository\UserRepository;
+use App\Security\Scope;
+use App\Service\CatchUpService;
+use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
+use App\Service\ExchangeRate\FrankfurterProvider;
+use App\Service\ExchangeRateService;
+use App\Service\InstanceSettingsService;
+use App\Service\PriceHistoryService;
+use App\Service\SpendChartService;
+use App\Service\StatsService;
+use App\Service\SubscriptionService;
+use App\Service\TrialService;
+use App\Support\DateFormatter;
+use App\Support\FrozenClock;
+use App\Support\MoneyFormatter;
+use App\Tests\Support\FakeHttpClient;
+use App\Tests\Support\TestLogoFetcher;
+use DateTimeImmutable;
+use Psr\Log\NullLogger;
+use Slim\Psr7\Factory\RequestFactory;
+
+/**
+ * The twelve months behind, month by month.
+ *
+ * The history chart's figures are *reconstructed* — this application records
+ * what is due, not a ledger of what was paid — so these tests pin the same two
+ * things the year-over-year comparison's do: what the reconstruction can work
+ * out from start dates, cycles and price history, and what it honestly cannot.
+ * The difference is that a total can hide an off-by-one in its window and a
+ * chart cannot: a charge in the wrong bucket is a visible bump in the wrong
+ * month.
+ *
+ * The clock is frozen mid-month on purpose. The window ends today rather than
+ * at the end of the month, which is what makes the closing bucket a part month
+ * — the one property of this chart that differs from the forecast's and the one
+ * most likely to be quietly lost.
+ */
+final class SpendHistoryTest extends DatabaseTestCase
+{
+    private SubscriptionRepository $subscriptions;
+    private PriceHistoryService $priceHistory;
+    private StatsService $stats;
+    private SpendChartService $chart;
+
+    private int $alice;
+    private int $household;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $users = new UserRepository($this->db);
+        $households = new HouseholdRepository($this->db);
+        $memberships = new MembershipRepository($this->db);
+
+        $this->alice = $users->create('alice@example.test', 'Alice', 'hash');
+        $this->household = $households->create('Shared house', $this->alice);
+        $memberships->create($this->household, $this->alice, Role::OwnerAdmin);
+
+        $this->subscriptions = new SubscriptionRepository($this->db);
+        // The 15th: eleven whole months behind it and this one half-done.
+        $clock = FrozenClock::at('2026-06-15 09:00:00');
+
+        $settings = new InstanceSettingsService(new InstanceSettingsRepository($this->db));
+        $settings->setBaseCurrency('GBP');
+
+        $historyRepository = new PriceHistoryRepository($this->db);
+        $this->priceHistory = new PriceHistoryService(
+            $historyRepository,
+            $this->subscriptions,
+            $this->db,
+            $clock,
+        );
+
+        $subscriptionService = new SubscriptionService(
+            $this->subscriptions,
+            new CategoryRepository($this->db),
+            new TagRepository($this->db),
+            TestLogoFetcher::silent($this->db, $clock),
+            $memberships,
+            $this->priceHistory,
+            $this->db,
+            $clock,
+        );
+
+        $rates = new ExchangeRateService(
+            new ExchangeRateRepository($this->db),
+            new ExchangeRateProviderRegistry([
+                new FrankfurterProvider(
+                    FakeHttpClient::returningJson([
+                        'base' => 'GBP',
+                        'date' => '2026-06-14',
+                        'rates' => ['EUR' => 1.2],
+                    ]),
+                    new RequestFactory(),
+                ),
+            ]),
+            $settings,
+            $clock,
+            new NullLogger(),
+            43200,
+            3600,
+            '',
+        );
+        $rates->refresh();
+
+        $catchUp = new CatchUpService(
+            $this->priceHistory,
+            new TrialService($this->subscriptions, $this->priceHistory, $this->db, $clock),
+            $subscriptionService,
+        );
+
+        $this->stats = new StatsService(
+            $subscriptionService,
+            $catchUp,
+            $rates,
+            $settings,
+            $historyRepository,
+            $clock,
+        );
+
+        $this->chart = new SpendChartService(
+            $this->stats,
+            $settings,
+            new MoneyFormatter(new LocaleContext('en_GB')),
+            new DateFormatter(new LocaleContext('en_GB')),
+            $clock,
+        );
+    }
+
+    public function testTheWindowIsTwelveCalendarMonthsEndingWithThisOne(): void
+    {
+        $months = $this->stats->monthlyHistory($this->scope());
+
+        self::assertCount(12, $months);
+        self::assertSame('2025-07', $months[0]['month']);
+        self::assertSame('2026-06', $months[11]['month']);
+    }
+
+    public function testASteadyMonthlySubscriptionIsTheSameFigureEveryMonth(): void
+    {
+        // Charged on the 15th, and the window ends on the 15th, so this month's
+        // charge has already been taken: twelve of them, one per bucket.
+        $this->createMonthly('Streaming', 1000, '2023-06-15');
+
+        $months = $this->stats->monthlyHistory($this->scope());
+
+        self::assertSame(
+            array_fill(0, 12, 1000),
+            array_map(static fn (array $month): ?int => $month['combined_minor'], $months),
+        );
+    }
+
+    public function testAYearlySubscriptionIsABillInItsOwnMonthAndNowhereElse(): void
+    {
+        // The claim the whole chart exists to make: a yearly bill is a spike in
+        // March, not a twelfth of itself every month.
+        $this->subscriptions->create($this->scope(), [
+            'name' => 'Domain',
+            'price_minor' => 12000,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'yearly',
+            'next_payment_date' => '2027-03-10',
+            'start_date' => '2022-03-10',
+            'anchor_day' => 10,
+            'is_active' => true,
+        ], []);
+
+        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+
+        self::assertSame(12000, $byMonth['2026-03']);
+        self::assertSame(0, $byMonth['2026-02']);
+        self::assertSame(0, $byMonth['2026-04']);
+    }
+
+    public function testAPriceRiseStepsTheLineOnTheMonthItTookEffect(): void
+    {
+        // Priced from the history, not from the current price extended
+        // backwards — otherwise every past month would quietly be restated at
+        // today's price and the chart would show a rise that never happened.
+        $id = $this->createMonthly('Streaming', 2000, '2023-06-15');
+
+        $this->priceHistory->recordInitialPrice(
+            $this->scope(),
+            $id,
+            Money::of(1000, 'GBP'),
+            new DateTimeImmutable('2023-06-15'),
+            $this->alice,
+        );
+        $this->priceHistory->recordCurrentPrice(
+            $this->scope(),
+            $id,
+            Money::of(2000, 'GBP'),
+            PriceChangeSource::Manual,
+            $this->alice,
+            null,
+            new DateTimeImmutable('2026-01-01'),
+        );
+
+        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+
+        self::assertSame(1000, $byMonth['2025-12']);
+        self::assertSame(2000, $byMonth['2026-01']);
+    }
+
+    public function testACancelledSubscriptionStillCountsForTheMonthsItRan(): void
+    {
+        // The money was spent. Dropping it would make the months before a
+        // cancellation look cheaper in hindsight than they were.
+        $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false);
+
+        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+
+        self::assertSame(1000, $byMonth['2025-09']);
+    }
+
+    public function testASubscriptionWithNoStartDateContributesNothing(): void
+    {
+        // The documented limitation, and the same answer year over year gives:
+        // there is no evidence of when it began, and under-reporting the past
+        // beats inventing spending that may never have happened.
+        $this->subscriptions->create($this->scope(), [
+            'name' => 'Unknown start',
+            'price_minor' => 5000,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-07-01',
+            'start_date' => null,
+            'is_active' => true,
+        ], []);
+
+        self::assertSame(
+            array_fill(0, 12, 0),
+            array_map(
+                static fn (array $month): ?int => $month['combined_minor'],
+                $this->stats->monthlyHistory($this->scope()),
+            ),
+        );
+    }
+
+    public function testACurrencyWithNoRateWithholdsTheChartRatherThanDrawingAGap(): void
+    {
+        $this->createMonthly('Sterling', 1000, '2023-06-15');
+        $this->createMonthly('Exotic', 5000, '2023-06-15', currency: 'XOF');
+
+        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
+
+        self::assertFalse($chart['is_drawable']);
+        self::assertSame(['XOF'], $chart['unconvertible']);
+    }
+
+    /**
+     * The property that separates this chart from the forecast, and the reason
+     * the payload names the bucket rather than leaving it to be found: the part
+     * month is the *last* one, because the window ends today rather than at the
+     * end of the month.
+     */
+    public function testThePartMonthIsTheLastOneNotTheFirst(): void
+    {
+        $this->createMonthly('Streaming', 1000, '2023-06-15');
+
+        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
+
+        self::assertSame(11, $chart['partial_index']);
+        self::assertFalse($chart['months'][0]['is_partial']);
+        self::assertTrue($chart['months'][11]['is_partial']);
+    }
+
+    /**
+     * A trial in the past either converted — in which case its charges are in
+     * these months as themselves — or cost nothing. Either way there is no
+     * second line to draw, and the legend and the table's third column go with
+     * it.
+     */
+    public function testThereIsNoTrialLineOnAChartOfThePast(): void
+    {
+        $this->createMonthly('Streaming', 1000, '2023-06-15');
+        $this->subscriptions->create($this->scope(), [
+            'name' => 'Trial',
+            'price_minor' => 0,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-07-01',
+            'start_date' => '2026-06-01',
+            'anchor_day' => 1,
+            'is_active' => true,
+            'is_trial' => true,
+            'trial_end_date' => '2026-06-30',
+            'converts_to_price_minor' => 1500,
+        ], []);
+
+        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
+
+        self::assertFalse($chart['has_trials']);
+        foreach ($chart['months'] as $month) {
+            self::assertSame($month['minor'], $month['committed_minor']);
+            self::assertSame(0, $month['trial_minor']);
+        }
+    }
+
+    /**
+     * The forecast is untouched by any of this. Its part month is still its
+     * first, which is the assertion that would fail if the shared builder were
+     * ever given the history's rule by default.
+     */
+    public function testTheForecastStillTreatsItsOpeningMonthAsThePartOne(): void
+    {
+        $chart = $this->chart->fromMonths($this->stats->monthlyHistory($this->scope()));
+
+        self::assertSame(0, $chart['partial_index']);
+    }
+
+    public function testSpendInAnotherCurrencyIsConvertedIntoTheBaseOne(): void
+    {
+        $this->createMonthly('Euro', 1200, '2023-06-15', currency: 'EUR');
+
+        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+
+        // €12.00 at 1.20 is £10.00.
+        self::assertSame(1000, $byMonth['2026-02']);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $months
+     * @return array<string, int|null>
+     */
+    private function byMonth(array $months): array
+    {
+        $totals = [];
+        foreach ($months as $month) {
+            /** @var string $key */
+            $key = $month['month'];
+            /** @var int|null $total */
+            $total = $month['combined_minor'];
+            $totals[$key] = $total;
+        }
+
+        return $totals;
+    }
+
+    private function createMonthly(
+        string $name,
+        int $priceMinor,
+        string $startDate,
+        string $currency = 'GBP',
+        bool $isActive = true,
+    ): int {
+        return $this->subscriptions->create($this->scope(), [
+            'name' => $name,
+            'price_minor' => $priceMinor,
+            'currency' => $currency,
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-07-15',
+            'start_date' => $startDate,
+            'anchor_day' => (int) (new DateTimeImmutable($startDate))->format('j'),
+            'is_active' => $isActive,
+        ], []);
+    }
+
+    private function scope(): Scope
+    {
+        return Scope::forMember($this->alice, false, $this->household, Role::OwnerAdmin, IsolationMode::Shared);
+    }
+}

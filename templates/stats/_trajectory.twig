@@ -28,6 +28,11 @@
         'analytics-trajectory-data',
         trajectory.has_trials
             ? t('dashboard.spend_chart_alt', {'currency': trajectory.currency})
-            : t('dashboard.spend_chart_alt_single', {'currency': trajectory.currency})
+            : t('dashboard.spend_chart_alt_single', {'currency': trajectory.currency}),
+        t('dashboard.part_month_note'),
+        t('dashboard.chart_unconvertible', {
+            'currencies': trajectory.unconvertible|join(', '),
+            'currency': trajectory.currency,
+        })
     ) }}
 </section>

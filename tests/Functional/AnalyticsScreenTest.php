@@ -185,6 +185,57 @@ final class AnalyticsScreenTest extends DatabaseTestCase
     }
 
     /**
+     * The year behind is the dashboard's history card, not a second answer to
+     * the same question — the same assertion the trajectory gets, for the same
+     * reason. Both screens build it from one reconstruction, so a payload that
+     * differed would mean two walks of the household had been allowed to
+     * disagree about a month that has already happened.
+     */
+    public function testTheHistoryIsTheSameChartTheDashboardDraws(): void
+    {
+        $analytics = $this->payload(
+            $this->body($this->get('/stats', $this->ownerId)),
+            'analytics-history-data',
+        );
+        $dashboard = $this->payload(
+            $this->body($this->get('/', $this->ownerId)),
+            'dashboard-history-data',
+        );
+
+        self::assertCount(12, $analytics['months'] ?? []);
+        self::assertSame($dashboard['months'], $analytics['months']);
+        self::assertSame($dashboard['partial_index'], $analytics['partial_index']);
+        self::assertSame($dashboard['ticks'], $analytics['ticks']);
+    }
+
+    /**
+     * The two charts on this screen are the two halves of one window, and the
+     * page has to be able to tell them apart: each canvas reaches its payload
+     * by id, so two charts sharing one would draw the same picture twice.
+     *
+     * The part month is the assertion that says which is which. A forecast's
+     * is its opening bucket and a history's its closing one, so this fails if
+     * either chart is ever handed the other's rule.
+     */
+    public function testTheTwoChartsAreTwoChartsAndLookOppositeWays(): void
+    {
+        $body = $this->body($this->get('/stats', $this->ownerId));
+
+        $history = $this->payload($body, 'analytics-history-data');
+        $trajectory = $this->payload($body, 'analytics-trajectory-data');
+
+        self::assertNotSame($history['months'], $trajectory['months']);
+
+        // Null on the first of the month, when neither end is partial —
+        // asserted as "not the same end" rather than as two fixed indices so
+        // the test does not depend on the day it runs.
+        if ($history['partial_index'] !== null || $trajectory['partial_index'] !== null) {
+            self::assertSame(11, $history['partial_index']);
+            self::assertSame(0, $trajectory['partial_index']);
+        }
+    }
+
+    /**
      * The claim Phase 12 makes about the trajectory, asserted directly.
      *
      * Not "both pages have a chart" but "both pages have *this* chart": the
@@ -384,7 +435,7 @@ final class AnalyticsScreenTest extends DatabaseTestCase
     {
         $body = $this->body($this->get('/stats', $this->ownerId));
 
-        foreach (['analytics-trajectory', 'analytics-categories'] as $id) {
+        foreach (['analytics-history', 'analytics-trajectory', 'analytics-categories'] as $id) {
             $section = $this->section($body, $id);
 
             self::assertStringContainsString('chart-figures', $section, $id . ' draws without its figures');

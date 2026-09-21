@@ -15,12 +15,14 @@
 
 {% block content %}
     {#
-        The design's arrangement: the KPI row, the spending trajectory, the
-        category donut, and the comparative pair. Not one figure on any of them
-        is computed for this screen — the KPIs are the statistics this page
-        already reported, the trajectory is the dashboard's own chart payload,
-        the donut is the breakdown the my-subscriptions widget draws as bars,
-        and year over year is the reconstruction it has always performed.
+        The design's arrangement: the KPI row, the twelve months behind and the
+        spending trajectory ahead, the category donut, and the comparative
+        pair. Not one figure on any of them is computed for this screen — the
+        KPIs are the statistics this page already reported, the trajectory is
+        the dashboard's own chart payload, the months behind it are the
+        reconstruction year over year is totalled from, the donut is the
+        breakdown the my-subscriptions widget draws as bars, and year over year
+        is that same reconstruction stated as a pair of totals.
 
         Below them, what this page has always carried and the design has no
         place for: the same cost expressed over each period people think in, and
@@ -36,8 +38,17 @@
 
     {% include 'stats/_kpis.twig' %}
 
+    {#
+        The two twelve-month charts are stacked in the main column, the year
+        behind above the year ahead, so they are read in the order they
+        happened and share an x-axis width the eye can carry a figure across.
+        The donut keeps the side column beside both of them; the layout's gap
+        is horizontal only, so cards space themselves vertically with their own
+        margin and the stack needs nothing new from the stylesheet.
+    #}
     <div class="analytics-layout">
         <div class="analytics-main">
+            {% include 'stats/_history.twig' %}
             {% include 'stats/_trajectory.twig' %}
         </div>
         <aside class="analytics-side">

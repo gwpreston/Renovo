@@ -865,10 +865,17 @@ return [
     'dashboard.part_month_note' =>
         'The first month counts only the charges still ahead of today, so it is short by whatever has '
         . 'already been paid this month.',
+    'dashboard.history_part_month_note' =>
+        'This month counts only the charges taken so far, so it is short by whatever is still to come '
+        . 'before the month is out.',
+    'dashboard.history_unconvertible' =>
+        'The chart of the last twelve months is not drawn, because no exchange rate is available for '
+        . '{currencies} and a month missing one of its currencies would be drawn as a cheap month rather '
+        . 'than an unknown one. Analytics shows the per-currency figures instead.',
     'dashboard.series_committed' => 'Excluding trial conversions',
     'dashboard.series_trial_gap' => 'What trials will add',
     'dashboard.series_with_trials' => 'Including trial conversions',
-    'dashboard.spend_chart' => 'The next twelve months',
+    'dashboard.spend_chart' => 'Forecast, next 12 months',
     'dashboard.spend_chart_alt' =>
         'Line chart of spend per month for the next twelve months, in {currency}: one line including trial '
         . 'conversions and one excluding them. The same figures are in the table that follows.',
@@ -878,6 +885,17 @@ return [
     'dashboard.spend_chart_alt_single' =>
         'Line chart of spend per month for the next twelve months, in {currency}. The same figures are in '
         . 'the table that follows.',
+    'dashboard.spend_chart_note' => 'Projected monthly spend in {currency}',
+    'dashboard.spend_history' => 'Spend, last 12 months',
+    'dashboard.spend_history_alt' =>
+        'Line chart of spend per month over the last twelve months, in {currency}. The same figures are '
+        . 'in the table that follows.',
+    // Said rather than implied: the application records what is due, not a
+    // ledger of payments taken, so these months were rebuilt from start dates,
+    // billing cycles and price history. A reader comparing them with a bank
+    // statement should know that before they do it.
+    'dashboard.spend_history_note' =>
+        'Reconstructed monthly spend in {currency}, from start dates and recorded price history',
     'dashboard.trials_ending_soon' => 'Trials ending soon',
     'dashboard.trials_note' => 'Free today. About to stop being.',
     'dashboard.trials_total_note' => 'about to start being charged',
@@ -1294,6 +1312,19 @@ return [
         'All four are derived from the yearly figure, so they always multiply up to one another. Days '
         . 'and weeks use the mean Gregorian year of 365.25 days. One-off and lifetime entries are '
         . 'excluded.',
+    'stats.history' => 'The last 12 months',
+    // The dashboard's version of this sentence sends the reader to Analytics.
+    // This *is* Analytics, so it names the figures further down this page —
+    // the per-currency yearly totals the cost-by-period card falls back to
+    // when the same conversion fails there.
+    'stats.history_unconvertible' =>
+        'The chart of the last twelve months is not drawn, because no exchange rate is available for '
+        . '{currencies} and a month missing one of its currencies would be drawn as a cheap month rather '
+        . 'than an unknown one. The per-currency figures further down this page are the complete picture.',
+    'stats.history_note' =>
+        'What has already been spent, month by calendar month. Reconstructed from start dates, billing '
+        . 'cycles and recorded price history — this tracks what is due rather than a ledger of payments '
+        . 'taken, so a subscription with no start date is left out rather than guessed at.',
     'stats.rarely_used' => 'Rarely used',
     'stats.rating_label' => '{rating} out of {max}',
     'stats.the_12_before_that' => 'The 12 before that',
@@ -1615,7 +1646,8 @@ return [
     // dashboard_card
     'dashboard_card.budget_usage' => 'Budget and where it goes',
     'dashboard_card.by_category' => 'By category',
-    'dashboard_card.spend_chart' => 'The next twelve months',
+    'dashboard_card.spend_chart' => 'Forecast, next 12 months',
+    'dashboard_card.spend_history' => 'Spend, last 12 months',
     'dashboard_card.totals' => 'Spending at a glance',
     'dashboard_card.trials' => 'Trials ending soon',
     'dashboard_card.upcoming' => 'Coming soon',
