@@ -247,7 +247,7 @@ one command either way:
 ./bin/dev-setup.sh                     # no sample data; you run the wizard
 ./bin/dev-setup.sh --mysql             # MySQL/MariaDB instead of PostgreSQL
 ./bin/dev-setup.sh --reset             # start again from an empty database
-APP_PORT=9090 ./bin/dev-setup.sh       # if 8080 is taken
+APP_PORT=8080 ./bin/dev-setup.sh       # if 9090 is taken
 ./bin/dev-setup.sh --help              # all of the above
 ```
 
@@ -261,7 +261,7 @@ printf 'SESSION_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
 docker compose up
 ```
 
-Then open **http://localhost:8080** and complete the first-run wizard. The
+Then open **http://localhost:9090** and complete the first-run wizard. The
 account you create there is the instance administrator.
 
 The `migrate` container applies the schema and then exits — seeing it as
@@ -271,7 +271,7 @@ The `migrate` container applies the schema and then exits — seeing it as
 
 | Container   | What it does                                                       |
 |-------------|--------------------------------------------------------------------|
-| `web`       | nginx, serving the web root on `${APP_PORT:-8080}`                 |
+| `web`       | nginx, serving the web root on `${APP_PORT:-9090}`                 |
 | `app`       | php-fpm running the application                                    |
 | `database`  | PostgreSQL 16, also published on `127.0.0.1:5432` for host tooling |
 | `migrate`   | Applies migrations once, then exits                                |
@@ -335,7 +335,7 @@ npm install && npm run build  # compile the front-end assets into public/build
 cp .env.example .env          # then edit DB_* and set SESSION_KEY
 
 vendor/bin/phinx migrate      # create the schema
-php -S localhost:8080 -t public
+php -S localhost:9090 -t public
 ```
 
 The asset build is not optional: every page resolves its stylesheet through the
@@ -1258,7 +1258,7 @@ write — it fails the same permission check the browser would. A read-only toke
 is refused any unsafe method outright, before a route runs.
 
 ```bash
-curl -H "Authorization: Bearer rnv_..." http://localhost:8080/api/v1/subscriptions
+curl -H "Authorization: Bearer rnv_..." http://localhost:9090/api/v1/subscriptions
 ```
 
 Session cookies are **not** accepted. That is deliberate rather than an

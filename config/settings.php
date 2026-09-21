@@ -39,7 +39,7 @@ return [
         'env' => $appEnv,
         'debug' => $bool($env('APP_DEBUG', $appEnv === 'production' ? 'false' : 'true')),
         'name' => $env('APP_NAME', 'Renovo'),
-        'url' => rtrim($env('APP_URL', 'http://localhost:8080'), '/'),
+        'url' => rtrim($env('APP_URL', 'http://localhost:9090'), '/'),
         'locale' => $env('APP_LOCALE', 'en_GB'),
     ],
 

@@ -109,7 +109,7 @@ jobs:
     env:
       APP_ENV: test
       APP_DEBUG: 'true'
-      APP_URL: http://localhost:8080
+      APP_URL: http://localhost:9090
       DB_DRIVER: ${{ matrix.driver }}
       DB_HOST: 127.0.0.1
       DB_PORT: ${{ matrix.port }}

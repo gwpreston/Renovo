@@ -35,7 +35,7 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       APP_DEBUG: ${APP_DEBUG:-true}
-      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_URL: ${APP_URL:-http://localhost:9090}
       DB_DRIVER: ${DB_DRIVER:-pgsql}
       DB_HOST: database
       DB_PORT: ${DB_PORT:-5432}
@@ -74,7 +74,7 @@ services:
     depends_on:
       - app
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-9090}:80"
     volumes:
       - logos:/var/www/html/public/assets/logos:ro
     # Readiness, not liveness: this container is only useful once the thing
@@ -152,7 +152,7 @@ services:
       DB_USER: ${DB_USER:-renovo}
       DB_PASSWORD: ${DB_PASSWORD:-renovo}
       SESSION_KEY: ${SESSION_KEY:-unused-by-scheduler}
-      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_URL: ${APP_URL:-http://localhost:9090}
       # The scheduler is what actually sends the reminders, so it needs the
       # whole relay configuration rather than the subset the app needs for
       # verification and reset mail.

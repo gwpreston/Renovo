@@ -87,7 +87,7 @@ Options
   -h, --help           This message.
 
 Ports may be overridden for a single run without editing .env:
-  APP_PORT=9090 DB_PORT_PUBLISHED=55432 ./bin/dev-setup.sh
+  APP_PORT=8080 DB_PORT_PUBLISHED=55432 ./bin/dev-setup.sh
 USAGE
 }
 
@@ -259,8 +259,8 @@ set_env DB_HOST 127.0.0.1
 ok "development defaults applied (APP_ENV=development, DB_DRIVER=$DB_DRIVER)"
 
 # Ports may be overridden for a single run without editing .env:
-#   APP_PORT=9090 DB_PORT_PUBLISHED=55432 ./bin/dev-setup.sh
-APP_PORT="${APP_PORT:-$(get_env APP_PORT 8080)}"
+#   APP_PORT=8080 DB_PORT_PUBLISHED=55432 ./bin/dev-setup.sh
+APP_PORT="${APP_PORT:-$(get_env APP_PORT 9090)}"
 DB_NAME="$(get_env DB_NAME renovo)"
 DB_USER="$(get_env DB_USER renovo)"
 DB_PASSWORD="$(get_env DB_PASSWORD renovo)"
