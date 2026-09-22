@@ -545,6 +545,131 @@ main.container {
     flex-wrap: wrap;
 }
 
+/* ------------------------------------------------- the pages with no shell */
+
+/*
+ * Signing in, registering, resetting a password, the first-run wizard: every
+ * page rendered before there is an account to draw a rail for.
+ *
+ * They used to be a card sitting under an empty top bar, which left the form
+ * pinned to the top of an otherwise blank page with nothing above it saying
+ * whose instance it was. The frame here is three rows — the mark and the
+ * instance's name, the card, the theme switch — and it is hung on `no-shell`
+ * rather than on the sign-in template, because "Forgotten your password?" is
+ * a link to another page built exactly the same way and it should not look
+ * like a different application.
+ */
+body.no-shell {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+.auth-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 2.5rem 1rem 0;
+    text-align: center;
+}
+
+.auth-mark {
+    height: 3rem;
+}
+
+.auth-instance {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+}
+
+body.no-shell main.container {
+    flex: 1 1 auto;
+}
+
+/*
+ * Optically centred, but only where centring cannot cost anything.
+ *
+ * The mark and the card are centred *together*, by giving the free space to
+ * the margins above the header and above the footer rather than to the space
+ * between them: centring the card alone inside a stretched <main> pushes it
+ * away from the mark and the pair stops reading as one thing.
+ *
+ * Two auto margins rather than `justify-content: center`, which on content
+ * taller than the window overflows at both ends and puts the top of the form
+ * somewhere no scrollbar can reach. Below this height nothing is centred at
+ * all: the card sits under the header and the page scrolls as it always did.
+ */
+@media (min-height: 44rem) {
+    .auth-header {
+        margin-top: auto;
+        padding-top: 0;
+    }
+
+    body.no-shell main.container {
+        flex: 0 0 auto;
+    }
+
+    body.no-shell .footer {
+        margin-top: auto;
+    }
+}
+
+/* The footer carries one thing here, so it is centred rather than spread. */
+body.no-shell .footer {
+    justify-content: center;
+}
+
+/*
+ * The theme switch: light, dark, and the machine's own preference.
+ *
+ * Three states rather than two, because "follow the system" is the default
+ * and a two-state toggle cannot express it — a reader who has never touched
+ * this should be able to get back to it. A segmented control rather than a
+ * `<select>` because all three fit, and the one in use should be visible
+ * without opening anything.
+ *
+ * The selected option is marked by `aria-pressed`, so what the eye reads from
+ * the fill is the same thing a screen reader is told, with no second source
+ * of truth to fall out of step.
+ */
+.theme-switch {
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.1875rem;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+}
+
+.theme-switch-option {
+    padding: 0.3rem 0.75rem;
+    font: inherit;
+    font-size: var(--size-label);
+    font-weight: var(--weight-medium);
+    color: var(--text-muted);
+    background: transparent;
+    /* Transparent rather than absent: the selected option takes a visible one
+       and the row must not shift by a pixel when the selection moves. */
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+}
+
+.theme-switch-option:hover {
+    color: var(--text);
+}
+
+.theme-switch-option[aria-pressed='true'] {
+    color: var(--text);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow);
+}
+
 /*
  * Off-screen until focused, which is the only time it is of use to anybody: a
  * keyboard user should not have to tab through the whole navigation bar on

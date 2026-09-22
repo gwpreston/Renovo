@@ -254,6 +254,9 @@ return [
     'settings.landing_view_hint' => 'The page you see when you open Renovo.',
 
     'theme.system' => 'Match my system',
+    // The same choice on the sign-in screen's switch, where the three options
+    // sit side by side and a sentence would not fit beside two single words.
+    'theme.system_short' => 'Auto',
     'theme.light' => 'Light',
     'theme.dark' => 'Dark',
 

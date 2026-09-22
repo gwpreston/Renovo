@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Application\Middleware\AuthenticationMiddleware;
+use App\Application\Middleware\InstanceContextMiddleware;
 use App\Domain\IsolationMode;
 use App\Domain\Role;
 use App\Repository\HouseholdRepository;
@@ -436,6 +437,60 @@ final class PersonalisationTest extends DatabaseTestCase
     }
 
     /**
+     * The theme a visitor with no account picks, and where it is kept.
+     *
+     * A cookie rather than local storage because the palette is decided in the
+     * opening `<html>` tag: the point of this test is that the *server*
+     * rendered `data-theme`, so the sign-in page arrives in the chosen palette
+     * rather than being repainted after the parser has run.
+     */
+    public function testASignedOutVisitorsThemeCookieDecidesThePalette(): void
+    {
+        $this->session->clear();
+
+        $html = (string) $this->signedOut('/login', 'dark')->getBody();
+
+        self::assertStringContainsString('data-theme="dark"', $html);
+        self::assertMatchesRegularExpression(
+            '~data-theme-choice="dark"\s+aria-pressed="true"~',
+            $html,
+            'The switch should show the choice the page was rendered with.',
+        );
+    }
+
+    /**
+     * A cookie is whatever the machine sends, and it lands in an HTML
+     * attribute. Anything that is not one of the three themes resolves to the
+     * default rather than being written out — see `Theme::fromString()`.
+     */
+    public function testAnUnrecognisedThemeCookieFallsBackToTheSystemPalette(): void
+    {
+        $this->session->clear();
+
+        $html = (string) $this->signedOut('/login', 'neon"><script>')->getBody();
+
+        self::assertStringContainsString('data-theme="system"', $html);
+        self::assertStringNotContainsString('neon', $html);
+    }
+
+    /**
+     * An account's own setting beats a cookie left behind on the machine.
+     *
+     * The two writers exist for different readers — the cookie for somebody
+     * with no account, the setting for somebody with one — and a signed-in
+     * page must never consult the cookie, or a shared machine would hand one
+     * person's choice to the next person who signs in on it.
+     */
+    public function testAnAccountsThemeWinsOverACookieOnTheMachine(): void
+    {
+        $this->savePreferences(['theme' => 'light']);
+
+        $html = (string) $this->signedOut('/', 'dark', signOut: false)->getBody();
+
+        self::assertStringContainsString('data-theme="light"', $html);
+    }
+
+    /**
      * @param array<string, mixed> $values
      */
     private function savePreferences(array $values): void
@@ -483,6 +538,23 @@ final class PersonalisationTest extends DatabaseTestCase
         self::assertSame(1, preg_match($pattern, $html, $matches), 'The saved view should be linked once.');
 
         return html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * A page fetched with a theme cookie on the request, and — unless the test
+     * is about a signed-in reader — with nobody signed in.
+     */
+    private function signedOut(string $path, string $theme, bool $signOut = true): ResponseInterface
+    {
+        if ($signOut) {
+            $this->session->clear();
+        }
+
+        $request = (new ServerRequestFactory())
+            ->createServerRequest('GET', 'http://localhost' . $path, ['REMOTE_ADDR' => '127.0.0.1'])
+            ->withCookieParams([InstanceContextMiddleware::THEME_COOKIE => $theme]);
+
+        return $this->app->handle($request);
     }
 
     /**

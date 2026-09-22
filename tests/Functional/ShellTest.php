@@ -307,6 +307,80 @@ final class ShellTest extends DatabaseTestCase
     }
 
     /**
+     * What a page with no shell gets instead of one.
+     *
+     * The frame is hung on the layout's signed-out branch rather than on the
+     * sign-in template, so every page reached from it — the password reset
+     * behind "Forgotten your password?", the invitation a new member follows —
+     * is the same application rather than a bare card. That is what the second
+     * path in the loop is checking; the mark is the specific regression, since
+     * the sprite defining `#renovo-mark` used to be included only for
+     * signed-in pages and a `<use>` of a symbol that is not there draws
+     * nothing at all.
+     *
+     * @dataProvider signedOutPages
+     */
+    public function testASignedOutPageCarriesTheMarkAndTheThemeSwitch(string $path): void
+    {
+        $this->session->clear();
+
+        $html = $this->get($path);
+
+        self::assertStringContainsString('id="renovo-mark"', $html, $path . ' has no brand mark to draw.');
+        self::assertStringContainsString('class="auth-header"', $html, $path . ' has no branded header.');
+        self::assertStringContainsString('data-theme-switch', $html, $path . ' offers no theme switch.');
+
+        // All three states, and exactly one of them marked as current.
+        foreach (['system', 'light', 'dark'] as $choice) {
+            self::assertStringContainsString('data-theme-choice="' . $choice . '"', $html);
+        }
+
+        self::assertSame(1, preg_match_all('~aria-pressed="true"~', $html), $path);
+    }
+
+    /**
+     * An error page is not a pre-account page, whatever it looks like.
+     *
+     * `HttpErrorHandler` renders with no user because it cannot know whether
+     * there was one — the failure may have come before the account was
+     * loaded. The layout would otherwise read that as "before there is an
+     * account" and offer a signed-in reader hitting a 404 the sign-in
+     * screen's theme switch, which writes a cookie that none of their own
+     * pages read: a control that visibly does nothing.
+     */
+    public function testAnErrorPageIsNotDressedAsASignInScreen(): void
+    {
+        $response = $this->app->handle(
+            (new ServerRequestFactory())->createServerRequest(
+                'GET',
+                'http://localhost/no-such-page',
+                ['REMOTE_ADDR' => '127.0.0.1'],
+            ),
+        );
+
+        self::assertSame(404, $response->getStatusCode());
+
+        $html = (string) $response->getBody();
+
+        self::assertStringNotContainsString('data-theme-switch', $html, 'The error page offers a theme switch.');
+        self::assertStringNotContainsString('class="auth-header"', $html);
+        self::assertSame(1, preg_match_all('/<h1\b/', $html), 'An error page still has exactly one heading.');
+    }
+
+    /**
+     * The pages rendered before there is an account.
+     *
+     * @return array<string, array{0: string}>
+     */
+    public static function signedOutPages(): array
+    {
+        return [
+            'signing in' => ['/login'],
+            'asking for a reset' => ['/forgot-password'],
+        ];
+    }
+
+    /**
      * Distinct destinations marked as current in the rendered page.
      *
      * The rail and the narrow layout both draw the active item, so the same

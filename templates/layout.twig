@@ -1,7 +1,27 @@
 <!DOCTYPE html>
+{#
+    Whether this page is dressed as a pre-account screen — see the branch
+    further down. Resolved once, here, and deliberately not with the `default`
+    filter, which replaces anything *falsy*: run through it, the `false` the
+    one page that opts out passes in comes back as `true`, and the page opts
+    silently back in.
+#}
+{% set auth_chrome = auth_chrome is not defined or auth_chrome %}
+{#
+    Two writers for one attribute, and only one of them per request.
+
+    A signed-in page uses the account's own setting, which follows the reader
+    from machine to machine. A signed-out one uses `guest_theme`, which
+    InstanceContextMiddleware resolves from the cookie the sign-in screen's
+    switch writes — the account wins wherever there is an account, and the
+    palette is decided before the page paints either way.
+
+    Density has only the one writer, and says so in the same shape rather than
+    leaning on a null reader resolving to the same default by accident.
+#}
 <html lang="{{ locale_tag() }}"
-      data-theme="{{ current_user.theme|default('system') }}"
-      data-density="{{ current_user.density|default('comfortable') }}">
+      data-theme="{{ current_user ? current_user.theme|default('system') : guest_theme|default('system') }}"
+      data-density="{{ current_user ? current_user.density|default('comfortable') : 'comfortable' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -40,6 +60,15 @@
     <script src="{{ asset('/assets/app.js') }}" defer></script>
     {# A module, so it is deferred already; `defer` on one is ignored. #}
     <script src="{{ bundle('app.js') }}" type="module"></script>
+    {#
+        The theme switch, on the only pages that carry one. A signed-in reader
+        changes their theme under Profile → Appearance, where it is saved to
+        the account, so shipping this to every page would be shipping a
+        handler for a control that is never there.
+    #}
+    {% if not current_user and auth_chrome %}
+        <script src="{{ asset('/assets/theme.js') }}" defer></script>
+    {% endif %}
 </head>
 {#
     The CSRF token rides on every htmx request via hx-headers, so a fragment
@@ -89,19 +118,33 @@
 <a class="skip-link" href="#main">{{ t('nav.skip_to_content') }}</a>
 
 {#
+    The mark, once per document, for whichever of the two headers below draws
+    it. It used to sit inside the signed-in branch, which left `#renovo-mark`
+    undefined on exactly the screens — signing in, resetting a password, the
+    first-run wizard — that now want to show it.
+#}
+{% include 'partials/brand_sprite.twig' %}
+
+{#
     The shell, for a signed-in page: the rail, the top bar over the content and
     the bottom bar a narrow screen gets instead of the rail. Which item each of
     them marks as current is decided here, once, from the request path — so the
     highlight is right in the HTML that arrives rather than being corrected by
     script after the page has painted.
 
-    Sign-in, registration and the setup wizard render without any of it. There
-    is nowhere to navigate to before there is an account.
+    Sign-in, registration and the setup wizard get none of it. There is nowhere
+    to navigate to before there is an account — so what they get instead is the
+    branded header below, which names the instance and nothing else.
+
+    `auth_chrome` is how the third case opts out. An error page is rendered
+    with no user whoever is reading it — HttpErrorHandler cannot know, since
+    the failure may have happened before the account was loaded — so without
+    the flag a signed-in reader's 404 would offer them the sign-in screen's
+    theme switch, a control writing a cookie that none of their pages read.
 #}
 {% if current_user %}
     {% set nav = navigation(scope, current_path) %}
 
-    {% include 'partials/brand_sprite.twig' %}
     {% include 'partials/sidebar.twig' %}
 
     <header class="topbar">
@@ -126,6 +169,23 @@
 
         {% include 'partials/topbar_actions.twig' %}
     </header>
+{% elseif auth_chrome %}
+    {#
+        What a page rendered before there is an account gets instead of the
+        shell: the mark and the instance's own name above the card.
+
+        The name is text rather than the logo's wordmark for the reason
+        `partials/brand_sprite.twig` gives — the wordmark is navy, and this
+        page is as likely to be near-black as white — and because the operator
+        may have named the instance something other than Renovo, in which case
+        their name is the one that belongs over their sign-in form.
+    #}
+    <header class="auth-header">
+        <svg class="brand-mark auth-mark" viewBox="0 0 460 427" aria-hidden="true" focusable="false">
+            <use href="#renovo-mark"></use>
+        </svg>
+        <p class="auth-instance">{{ instance_name }}</p>
+    </header>
 {% endif %}
 
 <main class="container" id="main" tabindex="-1">
@@ -134,11 +194,43 @@
 </main>
 
 <footer class="container footer">
-    <span>{{ instance_name }}</span>
+    {#
+        The instance's name, except on the pages whose header has just said
+        it — twice on one short page is once too many. An error page has no
+        such header, so it keeps the name it always carried.
+    #}
+    {% if current_user or not auth_chrome %}
+        <span>{{ instance_name }}</span>
+    {% endif %}
+
     {% if current_user %}
         <button type="button" class="button-link" data-opens-dialog="shortcut-help">
             {{ t('shortcuts.title') }}
         </button>
+    {% elseif auth_chrome %}
+        {#
+            The theme switch: three states, one of which is "whatever this
+            machine asks for", so it is a group of three buttons rather than a
+            two-state toggle that cannot express the default.
+
+            `aria-pressed` is rendered by the server from the same value the
+            `<html>` attribute carries, so the control states the truth before
+            any script runs. Without a script it does nothing and the page is
+            still themed — this changes how the page looks, not what it can do.
+        #}
+        <div class="theme-switch" role="group" aria-label="{{ t('settings.theme') }}"
+             data-theme-switch>
+            {% for choice, label in {
+                'system': 'theme.system_short',
+                'light': 'theme.light',
+                'dark': 'theme.dark'
+            } %}
+                <button type="button" class="theme-switch-option" data-theme-choice="{{ choice }}"
+                        aria-pressed="{{ (guest_theme|default('system')) == choice ? 'true' : 'false' }}">
+                    {{ t(label) }}
+                </button>
+            {% endfor %}
+        </div>
     {% endif %}
 </footer>
 

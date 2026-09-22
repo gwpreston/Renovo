@@ -124,6 +124,19 @@ final class HttpErrorHandler extends ErrorHandler
             'flashes' => [],
             'current_user' => null,
             'scope' => null,
+            /*
+             * No mark, no instance name, no theme switch above the message.
+             *
+             * An error page is rendered with no user whoever is reading it:
+             * the failure may have happened before the account was loaded, so
+             * this handler cannot tell a signed-in reader's 404 from a
+             * stranger's. The layout treats "no user" as "before there is an
+             * account" and dresses the page accordingly, which for a signed-in
+             * reader would mean offering them a theme switch that writes a
+             * cookie none of their own pages read. This is the one page that
+             * says no.
+             */
+            'auth_chrome' => false,
             'current_path' => $this->request->getUri()->getPath(),
         ]);
     }
