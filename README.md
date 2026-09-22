@@ -231,9 +231,19 @@ uses it, and a deployment from the published image never installs it. See
 That is the whole thing. It checks your prerequisites, writes `.env` with a
 real session key, starts the stack, migrates both the development and test
 databases, confirms the app actually serves a page, and — with that flag —
-creates an administrator and a spread of sample subscriptions so there is
-something on the dashboard to look at. It prints the sign-in details at the
-end. Re-running it is safe; nothing already set up is overwritten.
+creates a **household with two people in it** so there is something on the
+dashboard to look at: an administrator with a spread of sample subscriptions
+and two budgets, and a **Contributor** with five of their own and two more, one
+of them over its limit. It prints both sets of sign-in details at the end.
+
+The second account is what makes the per-member figures, the Household screen
+and the roles worth looking at, and it is created the long way round — invited
+through the members form, its invitation read out of Mailpit, its password set
+and its subscriptions entered in its own session — so everything it owns was
+written by somebody with a Contributor's permissions rather than handed to it
+by the administrator.
+
+Re-running it is safe; nothing already set up is overwritten.
 
 The same script stops it again, so starting and stopping local development is
 one command either way:
@@ -435,7 +445,7 @@ php bin/console maintenance:prune   # expired sessions, tokens, throttle, notifi
                                     # records, plus abandoned import uploads
 php bin/console i18n:check          # every locale against the base catalogue; non-zero on drift
 php bin/console assets:offline-check # non-zero if anything the browser loads names a third-party host
-php bin/console demo:seed           # the demonstration household, for read-only demo mode
+php bin/console demo:seed           # the demonstration household and its two accounts
 ```
 
 The `scheduler` container runs `reminders:run` and `maintenance:prune` once a
@@ -1653,20 +1663,39 @@ Seed something worth showing first:
 php bin/console demo:seed
 ```
 
-That creates a `demo@renovo.local` account in its own household with six
-invented subscriptions, one of them a trial about to convert, and prints a
-random password once. The subscriptions are written through the ordinary
-services, so the dashboard's figures are computed exactly as they would be for
-a real household.
+That creates a household with **two accounts in it** and prints a random
+password for each, once:
+
+| Account | Role | What it has |
+| --- | --- | --- |
+| `demo@renovo.local` | Owner/Admin | Fourteen invented subscriptions — monthly, quarterly and yearly bills, two trials about to convert, a rise that has already happened, one announced for later, and a cancelled subscription — plus two budgets. |
+| `rowan@renovo.local` | Contributor | Five of their own, and two budgets, one of them over its limit. |
+
+The second account is what makes the demonstration a household rather than a
+list. A **Contributor** reads everything and changes only their own part of it,
+so signing in as Rowan is the only way to see that role; the per-member
+breakdown on the dashboard and the Household screen need somebody to compare
+against before they draw anything at all; and the four budgets between them
+land comfortable, near their limit and over it, which is every state the budget
+card has.
+
+Everything is written through the ordinary services — and Rowan's rows through
+*Rowan's own* scope, not handed over by the owner — so the dashboard's figures
+are computed exactly as they would be for a real household, and the price rise
+on Rowan's music subscription says Rowan made it.
+
+The seed does nothing at all if `demo@renovo.local` already exists, so it is
+safe to run twice. That also means an instance seeded before the second account
+existed will not gain one: remove the demo account and seed again.
 
 Two things are still allowed while demo mode is on: signing in and out, and an
 instance administrator saving the instance settings form — otherwise the switch
 could not be turned off again without database access.
 
-Nothing special happens to reads. The demo account is an ordinary member of its
-own household, so the scoping layer shows it the seeded data and nothing else,
-exactly as it would for anybody. An instance that also hosts real accounts
-keeps them private, and there is a test that says so.
+Nothing special happens to reads. Both demo accounts are ordinary members of
+their own household, so the scoping layer shows them the seeded data and
+nothing else, exactly as it would for anybody. An instance that also hosts real
+accounts keeps them private, and there is a test that says so.
 
 ## Security
 

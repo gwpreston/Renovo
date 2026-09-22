@@ -152,13 +152,28 @@ switch ($command) {
         $result = $container->get(DemoSeedService::class)->seed();
 
         if (!$result['created']) {
-            $out(sprintf('The demo account (%s) already exists. Nothing was changed.', $result['email']));
+            $out(sprintf('The demo account (%s) already exists. Nothing was changed.', DemoSeedService::EMAIL));
             exit(0);
         }
 
-        $out(sprintf('Created %s with %d subscriptions.', $result['email'], $result['subscriptions']));
-        $out('Password: ' . (string) $result['password']);
+        $out(sprintf(
+            'Created the demo household: %d subscriptions and %d budgets across %d accounts.',
+            $result['subscriptions'],
+            $result['budgets'],
+            count($result['accounts']),
+        ));
         $out('');
+
+        // Both passwords, because the second account is the point of there
+        // being two: signing in as the Contributor is the only way to see what
+        // a role that reads the whole household and writes only its own part
+        // of it actually looks like.
+        foreach ($result['accounts'] as $account) {
+            $out(sprintf('  %s (%s)', $account['email'], $account['role']));
+            $out('  Password: ' . $account['password']);
+            $out('');
+        }
+
         $out('This is shown once. Turn on "Read-only demonstration" under Settings → Instance');
         $out('to close the instance to writes.');
         exit(0);

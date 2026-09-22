@@ -505,7 +505,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
         warn "skipped — the instance already has accounts, and this would need to sign in as one"
     else
         JAR="$(mktemp -t renovo-setup)"
-        trap 'rm -f "$JAR"' EXIT
+        trap 'rm -f "$JAR" "${MEMBER_JAR:-}"' EXIT
 
         # Pulled out with parameter expansion rather than a pipeline: a
         # `grep | head` here exits early, and pipefail would report the whole
@@ -805,6 +805,165 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             warn "created $BUDGETS of 2 budgets"
         fi
 
+        # ------------------------------------------------- a second member
+        #
+        # A household with one person in it demonstrates about half of what
+        # this application does. Roles, the per-member breakdown on the
+        # dashboard, the Household screen and the rule that a budget measures
+        # *one member's* share all need somebody to compare against, and with a
+        # single member most of them draw nothing at all rather than drawing
+        # something uninteresting.
+        #
+        # Rowan is a **Contributor**: reads the whole household, changes only
+        # what is theirs. Everything of Rowan's below is created in Rowan's own
+        # session — invitation accepted, password set, signed in — rather than
+        # by the administrator ticking somebody else's name in the "belongs to"
+        # box. An Owner may do that, so doing it here would have been shorter
+        # and would have proved nothing about the fence this role exists for.
+        MEMBER_EMAIL="rowan@example.test"
+        MEMBER_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-20)"
+        MAILPIT_URL="http://localhost:$(get_env MAILPIT_PORT 8025)"
+
+        # The invitation link, read out of the email the app has just sent.
+        # An administrator never sets a member's password and never sees one,
+        # so the token is the single thing in this script that cannot come from
+        # a form — and it does not come from the database either: in
+        # development every email the app sends lands in Mailpit.
+        invite_token() {
+            local id body rest
+            id="$(curl -s "$MAILPIT_URL/api/v1/messages?limit=10" \
+                | tr ',' '\n' \
+                | sed -n 's/.*"ID":"\([^"]*\)".*/\1/p' \
+                | head -1)"
+            [ -n "$id" ] || return 1
+
+            body="$(curl -s "$MAILPIT_URL/api/v1/message/$id" || true)"
+            case "$body" in
+                *"accept-invite?token="*) ;;
+                *) return 1 ;;
+            esac
+
+            rest="${body#*accept-invite?token=}"
+            printf '%s' "$rest" | sed -n 's|^\([A-Za-z0-9._~-]*\).*|\1|p' | head -1
+        }
+
+        MEMBER_READY=0
+        member_status="$(post_form "/settings/members" "/settings/members" \
+            -d "display_name=Rowan" -d "email=$MEMBER_EMAIL" -d "role=contributor")"
+
+        if [ "$member_status" != "302" ]; then
+            warn "the second member was rejected (HTTP $member_status)"
+        else
+            ok "Rowan invited as a Contributor"
+
+            MEMBER_TOKEN="$(invite_token || true)"
+            if [ -z "$MEMBER_TOKEN" ]; then
+                warn "no invitation email in Mailpit — Rowan stays invited, with nothing of their own yet"
+            else
+                # From here to the end of this block, $JAR is Rowan's session:
+                # every helper above reads it when it is called, so pointing it
+                # somewhere else is the whole of "sign in as somebody else".
+                DEV_JAR="$JAR"
+                MEMBER_JAR="$(mktemp -t renovo-setup-member)"
+                JAR="$MEMBER_JAR"
+
+                accept_status=000
+                if accept_token="$(csrf "$BASE_URL/accept-invite?token=$MEMBER_TOKEN")"; then
+                    accept_status="$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" \
+                        -d "_csrf=$accept_token" -d "token=$MEMBER_TOKEN" \
+                        -d "password=$MEMBER_PASSWORD" -d "password_confirm=$MEMBER_PASSWORD" \
+                        "$BASE_URL/accept-invite" || echo 000)"
+                fi
+
+                if [ "$accept_status" != "302" ]; then
+                    warn "the invitation could not be accepted (HTTP $accept_status)"
+                elif login_token="$(csrf "$BASE_URL/login")"; then
+                    # Accepting sets the password; it deliberately does not sign
+                    # anybody in, so this is the ordinary sign-in form.
+                    login_status="$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" \
+                        -d "_csrf=$login_token" -d "email=$MEMBER_EMAIL" \
+                        -d "password=$MEMBER_PASSWORD" "$BASE_URL/login" || echo 000)"
+
+                    if [ "$login_status" = "302" ]; then
+                        MEMBER_READY=1
+                    else
+                        warn "Rowan could not sign in (HTTP $login_status)"
+                    fi
+                fi
+            fi
+        fi
+
+        if [ "$MEMBER_READY" -eq 1 ]; then
+            MEMBER_SUBSCRIPTIONS_BEFORE="$CREATED"
+            MEMBER_BUDGETS_BEFORE="$BUDGETS"
+
+            # Renewing in months the administrator's bills do not, for the same
+            # reason the four above exist: the twelve-month charts are drawn
+            # from the household, so a second member whose yearly bills land on
+            # top of the first member's makes their spikes taller rather than
+            # giving the household a second shape.
+            add_subscription -d "name=Phone contract" -d "price=14.00" -d "currency=GBP" \
+                -d "subscription_type=recurring" -d "billing_cycle=monthly" \
+                -d "next_payment_date=$(today_plus 8)" -d "start_date=$(months_ago 18)" \
+                -d "category_id=$(category_id Utilities)" \
+                -d "tags=household" -d "is_active=1"
+
+            add_subscription -d "name=Music streaming" -d "price=10.99" -d "currency=GBP" \
+                -d "subscription_type=recurring" -d "billing_cycle=monthly" \
+                -d "next_payment_date=$(today_plus 2)" -d "start_date=$(months_ago 20)" \
+                -d "category_id=$(category_id Music)" \
+                -d "tags=music" -d "is_active=1"
+            # A Contributor may schedule a rise on their own subscription, and
+            # not on anybody else's. This one is theirs.
+            [ -n "$LAST_ID" ] && schedule_price_change "$LAST_ID" "11.99" "GBP" "$(today_plus 47)"
+
+            add_subscription -d "name=Climbing membership" -d "price=26.00" -d "currency=GBP" \
+                -d "subscription_type=recurring" -d "billing_cycle=monthly" \
+                -d "next_payment_date=$(today_plus 16)" -d "start_date=$(months_ago 10)" \
+                -d "category_id=$(category_id Health)" \
+                -d "tags=health" -d "is_active=1"
+
+            add_subscription -d "name=Travel insurance" -d "price=64.00" -d "currency=GBP" \
+                -d "subscription_type=recurring" -d "billing_cycle=yearly" \
+                -d "next_payment_date=$(today_plus 92)" -d "start_date=$(months_ago 21)" \
+                -d "category_id=$(category_id Home)" \
+                -d "tags=household" -d "is_active=1"
+
+            add_subscription -d "name=Notes app" -d "price=29.00" -d "currency=GBP" \
+                -d "subscription_type=recurring" -d "billing_cycle=yearly" \
+                -d "next_payment_date=$(today_plus 275)" -d "start_date=$(months_ago 15)" \
+                -d "category_id=$(category_id Software)" \
+                -d "tags=work" -d "is_active=1"
+
+            # Rowan's budgets are Rowan's: the form does not offer a
+            # Contributor anybody else's name, and the service would not take
+            # it if the form did. The category one is over its limit on a
+            # single subscription, which is the state the budget card exists to
+            # draw and the one the administrator's two do not both reach.
+            add_budget -d "name=Monthly spending" -d "amount=60.00" -d "currency=GBP" \
+                -d "period=monthly" -d "category_id=" -d "warn_threshold_percent=80" -d "is_active=1"
+
+            add_budget -d "name=Health budget" -d "amount=20.00" -d "currency=GBP" \
+                -d "period=monthly" -d "category_id=$(category_id Health)" \
+                -d "warn_threshold_percent=75" -d "is_active=1"
+
+            MEMBER_SUBSCRIPTIONS=$((CREATED - MEMBER_SUBSCRIPTIONS_BEFORE))
+            MEMBER_BUDGETS=$((BUDGETS - MEMBER_BUDGETS_BEFORE))
+
+            if [ "$MEMBER_SUBSCRIPTIONS" -eq 5 ] && [ "$MEMBER_BUDGETS" -eq 2 ]; then
+                ok "5 subscriptions and 2 budgets of Rowan's, created as Rowan"
+            else
+                warn "created $MEMBER_SUBSCRIPTIONS of 5 subscriptions and $MEMBER_BUDGETS of 2 budgets for Rowan"
+            fi
+
+            MEMBER_CREDENTIALS="$MEMBER_EMAIL / $MEMBER_PASSWORD"
+        fi
+
+        # Back to the administrator's session unconditionally — including on
+        # the paths where Rowan's never opened — so that anything appended
+        # after this block runs as whoever the step above it expected.
+        JAR="${DEV_JAR:-$JAR}"
+
         SAMPLE_CREDENTIALS="$ADMIN_EMAIL / $ADMIN_PASSWORD"
     fi
 fi
@@ -820,8 +979,13 @@ printf '  %sDatabase%s     %s on 127.0.0.1:%s  %s(%s, tests use %s)%s\n' \
     "$BOLD" "$RESET" "$ENGINE" "$PUBLISHED_DB_PORT" "$DIM" "$DB_NAME" "$TEST_DB_NAME" "$RESET"
 
 if [ -n "${SAMPLE_CREDENTIALS:-}" ]; then
-    printf '\n  %sSign in with%s  %s\n' "$BOLD" "$RESET" "$SAMPLE_CREDENTIALS"
-    printf '  %sThat password is random and shown only here. Note it now.%s\n' "$DIM" "$RESET"
+    printf '\n  %sSign in with%s  %s  %s(Owner/Admin)%s\n' \
+        "$BOLD" "$RESET" "$SAMPLE_CREDENTIALS" "$DIM" "$RESET"
+    if [ -n "${MEMBER_CREDENTIALS:-}" ]; then
+        printf '  %sor as%s         %s  %s(Contributor: reads everything, changes only their own)%s\n' \
+            "$BOLD" "$RESET" "$MEMBER_CREDENTIALS" "$DIM" "$RESET"
+    fi
+    printf '  %sThose passwords are random and shown only here. Note them now.%s\n' "$DIM" "$RESET"
 elif [ "$SETUP_NEEDED" -eq 1 ]; then
     printf '\n  %sOpen the app to create your administrator account.%s\n' "$BOLD" "$RESET"
 fi

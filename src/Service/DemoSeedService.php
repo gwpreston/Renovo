@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Domain\BillingCycle;
+use App\Domain\BudgetPeriod;
 use App\Domain\Money;
 use App\Domain\PriceChangeSource;
 use App\Domain\Role;
@@ -13,6 +14,7 @@ use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\UserRepository;
 use App\Security\PasswordHasher;
+use App\Security\Scope;
 use App\Security\ScopeFactory;
 use App\Support\Clock;
 
@@ -25,15 +27,25 @@ use App\Support\Clock;
  * anybody else's, so the figures on the dashboard are computed the way they
  * would be for a real household rather than typed in to look right.
  *
- * The account it creates is an ordinary member of its own household, and that
- * is the whole of the isolation story. It is not an instance administrator, it
- * belongs to no other household, and the scoping layer answers "what may this
- * account see" for it exactly as for anybody — so a demo instance that also
- * hosts real accounts shows the demo visitor the demo data and nothing else.
+ * The accounts it creates are ordinary members of their own household, and
+ * that is the whole of the isolation story. Neither is an instance
+ * administrator, neither belongs to another household, and the scoping layer
+ * answers "what may this account see" for them exactly as for anybody — so a
+ * demo instance that also hosts real accounts shows the demo visitor the demo
+ * data and nothing else.
+ *
+ * **There are two of them because a household of one demonstrates half the
+ * application.** Roles, the per-member breakdown and the rule that a budget
+ * measures one member's share all need somebody to compare against, and the
+ * second account is a **Contributor** — the role whose whole definition is
+ * that it reads the household and writes only its own part of it. Its rows are
+ * written through *its own* scope rather than handed to it by the owner, so
+ * what the demo shows is a household a Contributor really could have built.
  */
 final class DemoSeedService
 {
     public const EMAIL = 'demo@renovo.local';
+    public const CONTRIBUTOR_EMAIL = 'rowan@renovo.local';
 
     public function __construct(
         private readonly UserRepository $users,
@@ -42,6 +54,7 @@ final class DemoSeedService
         private readonly CategoryService $categories,
         private readonly SubscriptionService $subscriptions,
         private readonly PriceHistoryService $priceHistory,
+        private readonly BudgetService $budgets,
         private readonly ScopeFactory $scopes,
         private readonly PasswordHasher $hasher,
         private readonly Clock $clock,
@@ -49,17 +62,27 @@ final class DemoSeedService
     }
 
     /**
-     * Create the demo account and its data, or do nothing if it already
-     * exists. Returns the password when an account was created, so that
-     * whoever ran the command can sign in as it once.
+     * Create the demo household and its data, or do nothing if it already
+     * exists. Returns each account's password when they were created, so that
+     * whoever ran the command can sign in as either of them once.
      *
-     * @return array{created: bool, email: string, password: string|null, subscriptions: int}
+     * The guard is the owner's address alone. An instance seeded before the
+     * second member existed therefore stays as it was rather than gaining one
+     * on a re-run: this builds a household, it does not migrate one, and
+     * re-seeding means removing the demo account first.
+     *
+     * @return array{
+     *     created: bool,
+     *     accounts: list<array{email: string, password: string, role: string}>,
+     *     subscriptions: int,
+     *     budgets: int
+     * }
      */
     public function seed(): array
     {
         $existing = $this->users->findByEmail(self::EMAIL);
         if ($existing !== null) {
-            return ['created' => false, 'email' => self::EMAIL, 'password' => null, 'subscriptions' => 0];
+            return ['created' => false, 'accounts' => [], 'subscriptions' => 0, 'budgets' => 0];
         }
 
         // Random, and printed once. A demo account with a published password
@@ -77,12 +100,7 @@ final class DemoSeedService
         $householdId = $this->households->create('Demo household', $userId);
         $this->memberships->create($householdId, $userId, Role::OwnerAdmin);
 
-        $user = $this->users->findById($userId);
-        if ($user === null) {
-            throw new \RuntimeException('The demo account could not be read back after creation.');
-        }
-
-        $scope = $this->scopes->forUser($user, $householdId);
+        $scope = $this->scopeFor($userId, $householdId);
 
         $categories = [];
         $palette = [
@@ -97,10 +115,99 @@ final class DemoSeedService
             $categories[$name] = $this->categories->create($scope, $name, $colour);
         }
 
+        $count = $this->seedSubscriptions($scope, $userId, $categories, $this->fixtures());
+
+        // The second member, and everything of theirs written as they would
+        // have written it. A Contributor's scope confines its own writes, so
+        // passing the fixtures through it is not merely tidier than setting
+        // `owner_user_id` from the owner's scope — it is the only version of
+        // this the role itself would have allowed.
+        $contributorPassword = bin2hex(random_bytes(9));
+
+        $contributorId = $this->users->create(
+            self::CONTRIBUTOR_EMAIL,
+            'Rowan',
+            $this->hasher->hash($contributorPassword),
+            false,
+            $this->clock->now(),
+        );
+
+        $this->memberships->create($householdId, $contributorId, Role::Contributor);
+
+        $contributorScope = $this->scopeFor($contributorId, $householdId);
+
+        $count += $this->seedSubscriptions(
+            $contributorScope,
+            $contributorId,
+            $categories,
+            $this->contributorFixtures(),
+        );
+
+        // Budgets last, because what they measure has to exist first. Each
+        // member's are created through their own scope, which is what settles
+        // whose they are: `BudgetService` gives a confined writer their own id
+        // and never asks.
+        $budgets = $this->seedBudgets($scope, $categories, $this->ownerBudgets())
+            + $this->seedBudgets($contributorScope, $categories, $this->contributorBudgets());
+
+        return [
+            'created' => true,
+            'accounts' => [
+                ['email' => self::EMAIL, 'password' => $password, 'role' => Role::OwnerAdmin->value],
+                [
+                    'email' => self::CONTRIBUTOR_EMAIL,
+                    'password' => $contributorPassword,
+                    'role' => Role::Contributor->value,
+                ],
+            ],
+            'subscriptions' => $count,
+            'budgets' => $budgets,
+        ];
+    }
+
+    /**
+     * A scope for a member of the demo household, read back the way the
+     * application reads anybody back.
+     */
+    private function scopeFor(int $userId, int $householdId): Scope
+    {
+        $user = $this->users->findById($userId);
+        if ($user === null) {
+            throw new \RuntimeException('A demo account could not be read back after creation.');
+        }
+
+        return $this->scopes->forUser($user, $householdId);
+    }
+
+    /**
+     * One member's subscriptions, with their price history.
+     *
+     * Takes the owner's id beside the scope rather than reaching into it,
+     * because a price-history row records *who* made the change and getting
+     * that from the wrong member would attribute one person's rise to another.
+     *
+     * @param array<string, int> $categories
+     * @param list<array{
+     *     name: string,
+     *     price: string,
+     *     cycle: string,
+     *     due: string,
+     *     start: string,
+     *     category: string,
+     *     active: bool,
+     *     trial: array{ends: string, price: string}|null,
+     *     rises: list<array{price: string, from: string}>,
+     *     scheduled: array{price: string, from: string}|null,
+     *     tags: string
+     * }> $fixtures
+     * @return int How many were created.
+     */
+    private function seedSubscriptions(Scope $scope, int $userId, array $categories, array $fixtures): int
+    {
         $today = $this->clock->today();
         $count = 0;
 
-        foreach ($this->fixtures() as $fixture) {
+        foreach ($fixtures as $fixture) {
             // Each subscription's dates hang off its own next payment rather
             // than off today, which is what keeps a yearly bill landing in the
             // same month in every year it has run: a start date three years
@@ -167,7 +274,7 @@ final class DemoSeedService
             $count++;
         }
 
-        return ['created' => true, 'email' => self::EMAIL, 'password' => $password, 'subscriptions' => $count];
+        return $count;
     }
 
     /**
@@ -200,6 +307,11 @@ final class DemoSeedService
      * realistic and would also mean that an instance with no exchange rate
      * cached yet draws no charts at all — the demo would then be demonstrating
      * the refusal rather than the feature.
+     *
+     * This is the owner's table. The second member's is `contributorFixtures()`
+     * below, and the two are read together: the charts are drawn from the
+     * household, so what the second table has to avoid is renewing in the
+     * months this one already peaks in.
      *
      * `due` is relative to today; `start`, `rises` and `scheduled` are relative
      * to `due`, which is what keeps a yearly bill in the same month in every
@@ -286,6 +398,131 @@ final class DemoSeedService
                 'trial' => ['ends' => '+19 days', 'price' => '9.99'],
                 'tags' => 'trial',
             ]),
+        ];
+    }
+
+    /**
+     * The second member's subscriptions.
+     *
+     * Fewer than the owner's, on purpose: a household where everybody carries
+     * the same amount makes the per-member comparison a straight line and says
+     * nothing. Five rows against fourteen is a household with a main bill payer
+     * and somebody who keeps their own handful, which is the ordinary shape.
+     *
+     * The same chart rules as the owner's table apply, and one more on top:
+     * these renew in months the owner's yearly bills do not, so they are their
+     * own shapes in the twelve-month charts rather than a taller version of
+     * somebody else's spike. The rise six months back is here rather than in
+     * the owner's table for a reason a reader can check — a price-history row
+     * records who made the change, and this one has to say Rowan.
+     *
+     * @return list<array{
+     *     name: string,
+     *     price: string,
+     *     cycle: string,
+     *     due: string,
+     *     start: string,
+     *     category: string,
+     *     active: bool,
+     *     trial: array{ends: string, price: string}|null,
+     *     rises: list<array{price: string, from: string}>,
+     *     scheduled: array{price: string, from: string}|null,
+     *     tags: string
+     * }>
+     */
+    private function contributorFixtures(): array
+    {
+        return [
+            $this->fixture('Mobile plan', '14.00', BillingCycle::Monthly, '+8 days', '-2 years', 'Utilities'),
+            // Rowan's own price rise, recorded against Rowan.
+            $this->fixture('Soundstream', '9.99', BillingCycle::Monthly, '+2 days', '-20 months', 'Entertainment', [
+                'rises' => [['price' => '10.99', 'from' => '-6 months']],
+            ]),
+            $this->fixture('Studio membership', '26.00', BillingCycle::Monthly, '+16 days', '-10 months', 'Health'),
+            // Two yearly bills in months nothing of the owner's renews in.
+            $this->fixture('Travel insurance', '64.00', BillingCycle::Yearly, '+3 months', '-3 years', 'Home'),
+            $this->fixture('Notebook app', '29.00', BillingCycle::Yearly, '+9 months', '-2 years', 'Software', [
+                'tags' => 'work',
+            ]),
+        ];
+    }
+
+    /**
+     * The owner's budgets: one comfortable, one close to its limit.
+     *
+     * A budget is projected spend against a limit, so what a demonstration
+     * needs is limits that land the household in more than one state — a bar
+     * that is nowhere near its end proves as little as a household of
+     * identical subscriptions. Between these and Rowan's below, the budget card
+     * shows all three: comfortable, warning, and over.
+     *
+     * @return list<array{name: string, amount: string, period: BudgetPeriod, category: string|null, warn: int}>
+     */
+    private function ownerBudgets(): array
+    {
+        return [
+            $this->budget('Everything, each month', '320.00', BudgetPeriod::Monthly, null, 80),
+            $this->budget('Software, each month', '130.00', BudgetPeriod::Monthly, 'Software', 80),
+        ];
+    }
+
+    /**
+     * Rowan's budgets, and the one that is blown.
+     *
+     * The second of these is over its limit on a single subscription, which is
+     * the state the card exists for. It is also the clearest thing a two-member
+     * demo can show about budgets at all: this is Rowan's overspend and it is
+     * on Rowan's dashboard, because a budget measures one member's share and
+     * not the household's.
+     *
+     * @return list<array{name: string, amount: string, period: BudgetPeriod, category: string|null, warn: int}>
+     */
+    private function contributorBudgets(): array
+    {
+        return [
+            $this->budget('Everything, each month', '60.00', BudgetPeriod::Monthly, null, 80),
+            $this->budget('Health, each month', '20.00', BudgetPeriod::Monthly, 'Health', 80),
+        ];
+    }
+
+    /**
+     * @param array<string, int> $categories
+     * @param list<array{name: string, amount: string, period: BudgetPeriod, category: string|null, warn: int}> $rows
+     * @return int How many were created.
+     */
+    private function seedBudgets(Scope $scope, array $categories, array $rows): int
+    {
+        foreach ($rows as $row) {
+            $this->budgets->create($scope, [
+                'name' => $row['name'],
+                'amount' => $row['amount'],
+                'currency' => 'GBP',
+                'period' => $row['period']->value,
+                'category_id' => $row['category'] === null ? '' : (string) $categories[$row['category']],
+                'warn_threshold_percent' => (string) $row['warn'],
+                'is_active' => '1',
+            ]);
+        }
+
+        return count($rows);
+    }
+
+    /**
+     * @return array{name: string, amount: string, period: BudgetPeriod, category: string|null, warn: int}
+     */
+    private function budget(
+        string $name,
+        string $amount,
+        BudgetPeriod $period,
+        ?string $category,
+        int $warn,
+    ): array {
+        return [
+            'name' => $name,
+            'amount' => $amount,
+            'period' => $period,
+            'category' => $category,
+            'warn' => $warn,
         ];
     }
 
