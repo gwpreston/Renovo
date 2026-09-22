@@ -335,9 +335,9 @@
             <div class="field-grid">
                 <div class="field">
                     <label for="owner_user_id">{{ t('subscriptions_form.belongs_to') }}</label>
-                    <select id="owner_user_id" name="owner_user_id" {{ scope.isOwnerRestricted ? 'disabled' : '' }}
-                            {% if scope.isOwnerRestricted or errors.owner_user_id is defined %}
-                                aria-describedby="{% if scope.isOwnerRestricted %}owner_user_id-hint{% endif %}{% if errors.owner_user_id is defined %} owner_user_id-error{% endif %}"
+                    <select id="owner_user_id" name="owner_user_id" {{ scope.restrictsWritesToOwner ? 'disabled' : '' }}
+                            {% if scope.restrictsWritesToOwner or errors.owner_user_id is defined %}
+                                aria-describedby="{% if scope.restrictsWritesToOwner %}owner_user_id-hint{% endif %}{% if errors.owner_user_id is defined %} owner_user_id-error{% endif %}"
                             {% endif %}>
                         {% for member in members %}
                             <option value="{{ member.id }}"
@@ -346,8 +346,21 @@
                             </option>
                         {% endfor %}
                     </select>
-                    {% if scope.isOwnerRestricted %}
-                        <p class="hint" id="owner_user_id-hint">{{ t('subscriptions_form.isolated_owner_note') }}</p>
+                    {#
+                        The hint is drawn on exactly the condition that disables
+                        the control, because the select names it in
+                        `aria-describedby` — a note gated on anything narrower
+                        would leave a description pointing at an id that is not
+                        on the page, which a reader hears as nothing at all.
+                        Which of the two it says depends on where the
+                        restriction came from: the instance, or the role.
+                    #}
+                    {% if scope.restrictsWritesToOwner %}
+                        <p class="hint" id="owner_user_id-hint">
+                            {{ scope.restrictsReadsToOwner
+                                ? t('subscriptions_form.isolated_owner_note')
+                                : t('subscriptions_form.own_rows_owner_note') }}
+                        </p>
                     {% endif %}
                     {% if errors.owner_user_id is defined %}
                         <p class="field-error" id="owner_user_id-error">{{ error_message(errors.owner_user_id) }}</p>

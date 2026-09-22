@@ -211,6 +211,7 @@ return [
 
     'role.owner_admin' => 'Owner / Admin',
     'role.editor' => 'Editor',
+    'role.contributor' => 'Contributor',
     'role.viewer' => 'Viewer',
 
     'isolation.shared' => 'Shared — everyone in a household sees its subscriptions',
@@ -840,6 +841,10 @@ return [
     'dashboard.converts_on' => 'converts {date}',
     'dashboard.due_in_total' => 'due in total',
     'dashboard.metrics' => 'Spending at a glance',
+    'dashboard.member_shares' => 'Who pays for what',
+    'dashboard.member_shares_note' =>
+        'Each member\'s share of the household\'s recurring bill. Split subscriptions count '
+        . 'towards each of their participants at their own portion.',
     'dashboard.monthly_spend' => 'Monthly spend',
     'dashboard.next_charge' => 'Next: {name}, {date} · {amount}',
     'dashboard.no_budget' => 'No budget set for you yet, so there is nothing to measure this against.',
@@ -877,7 +882,11 @@ return [
     'dashboard.series_committed' => 'Excluding trial conversions',
     'dashboard.series_trial_gap' => 'What trials will add',
     'dashboard.series_with_trials' => 'Including trial conversions',
-    'dashboard.spend_chart' => 'Forecast, next 12 months',
+    // The year ahead is no longer a dashboard card, but these three keep their
+    // `dashboard.` prefix: they describe the picture `partials/spend_chart.twig`
+    // draws, which the Analytics trajectory renders and which asks for them by
+    // name. Renaming them would be renaming the partial's vocabulary to record
+    // where it was first used.
     'dashboard.spend_chart_alt' =>
         'Line chart of spend per month for the next twelve months, in {currency}: one line including trial '
         . 'conversions and one excluding them. The same figures are in the table that follows.',
@@ -887,7 +896,6 @@ return [
     'dashboard.spend_chart_alt_single' =>
         'Line chart of spend per month for the next twelve months, in {currency}. The same figures are in '
         . 'the table that follows.',
-    'dashboard.spend_chart_note' => 'Projected monthly spend in {currency}',
     'dashboard.spend_history' => 'Spend, last 12 months',
     'dashboard.spend_history_alt' =>
         'Line chart of spend per month over the last twelve months, in {currency}. The same figures are '
@@ -941,6 +949,7 @@ return [
     'field.notes' => 'Notes',
     'field.password' => 'Password',
     'field.per_month' => 'Per month',
+    'field.per_year' => 'Per year',
     'field.period' => 'Period',
     'field.price' => 'Price',
     'field.rating' => 'Rating',
@@ -978,6 +987,24 @@ return [
 
     // hint
     'hint.password_length' => 'At least 10 characters.',
+
+    // household
+    'household.capability_held' => 'Yes',
+    'household.capability_not_held' => 'No',
+    'household.figures_withheld' => 'Not shown',
+    'household.figures_withheld_note' =>
+        'This instance keeps each member\'s subscriptions private, so only your own figures can be '
+        . 'added up here.',
+    'household.intro' =>
+        'Everyone in this household, and the share of the bill each of them carries. A subscription '
+        . 'that is split counts towards each member at their own portion of it.',
+    'household.manage_members' => 'Manage members',
+    'household.one_off_count' =>
+        '{count, plural, one {# of these is one-off} other {# of these are one-off}}',
+    'household.role_grants' => 'What they can do',
+    'household.subscriptions_count' =>
+        '{count, plural, =0 {No subscriptions} one {# subscription} other {# subscriptions}}',
+    'household.title' => 'Household',
 
     // import_map
     'import_map.column_in_your_file' => 'Column in your file',
@@ -1062,7 +1089,7 @@ return [
     'nav.categories' => 'Categories',
     'nav.dashboard' => 'Dashboard',
     'nav.forecast' => 'Forecast',
-    'nav.import' => 'Import',
+    'nav.household' => 'Household',
     'nav.more' => 'More',
     'nav.notifications' => 'Notifications',
     'nav.primary' => 'Primary',
@@ -1403,6 +1430,8 @@ return [
     'subscriptions_form.is_trial' => 'This is a free trial',
     'subscriptions_form.isolated_owner_note' =>
         'This instance keeps members\' subscriptions separate, so new entries belong to you.',
+    'subscriptions_form.own_rows_owner_note' =>
+        'Your role covers the entries you own, so new ones belong to you.',
     'subscriptions_form.logo' => 'Logo',
     'subscriptions_form.logo_hint' => 'Uploading a new file replaces it.',
     'subscriptions_form.next_payment_date' => 'Next payment date',
@@ -1584,6 +1613,16 @@ return [
     'calendar.trial_description' => 'The free trial of {name} ends and it converts to {amount}.',
     'calendar.trial_summary' => '{name} trial ends ({amount})',
 
+    // capability — the household screen's plain-language ladder. Every card
+    // lists all five; the ones a member has not got are greyed rather than
+    // dropped, so the wording has to read the same either way. Third person,
+    // because a card is about somebody else as often as it is about you.
+    'capability.edit_anything' => 'Add and edit anything',
+    'capability.edit_own' => 'Add and edit their own',
+    'capability.manage_members' => 'Invite and remove members',
+    'capability.see_everything' => 'See every line',
+    'capability.set_budgets' => 'Set budgets',
+
     // channel_field
     'channel_field.email.address' => 'Email address',
     'channel_field.email.address_hint' => 'Leave blank to use your account address.',
@@ -1648,7 +1687,7 @@ return [
     // dashboard_card
     'dashboard_card.budget_usage' => 'Budget and where it goes',
     'dashboard_card.by_category' => 'By category',
-    'dashboard_card.spend_chart' => 'Forecast, next 12 months',
+    'dashboard_card.member_shares' => 'Who pays for what',
     'dashboard_card.spend_history' => 'Spend, last 12 months',
     'dashboard_card.totals' => 'Spending at a glance',
     'dashboard_card.trials' => 'Trials ending soon',

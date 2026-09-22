@@ -100,6 +100,17 @@ final class NavigationService
                 matches: ['/categories'],
                 permission: Permission::ViewSubscriptions,
             ),
+            // The people, rather than the subscriptions. It asks for a
+            // permission of its own because it is the one screen that shows
+            // what somebody *else* spends, and that is not part of being
+            // allowed to read the household's list.
+            new NavItem(
+                labelKey: 'nav.household',
+                href: '/household',
+                icon: 'household',
+                matches: ['/household'],
+                permission: Permission::ViewHousehold,
+            ),
         ];
     }
 
@@ -110,6 +121,9 @@ final class NavigationService
      * design gives it a row of its own and because it is the one a person
      * visits repeatedly. Its path is longer than Settings', which is what makes
      * it win the active item — see `NavItem::claim()`.
+     *
+     * Import has no row. It is reached from Settings, which is where its
+     * button lives, and Settings is what the rail marks while you are on it.
      *
      * @return list<NavItem>
      */
@@ -123,24 +137,23 @@ final class NavigationService
                 matches: ['/settings/notifications'],
             ),
             new NavItem(
-                labelKey: 'nav.import',
-                href: '/import',
-                icon: 'import',
-                matches: ['/import'],
-                permission: Permission::ImportData,
-            ),
-            new NavItem(
                 labelKey: 'nav.audit',
                 href: '/audit',
                 icon: 'audit',
                 matches: ['/audit'],
                 permission: Permission::ViewAuditLog,
             ),
+            // Settings claims the import screens as well as its own. Importing
+            // is something you do once and from where you were sent — the
+            // Settings page carries the button — so a rail row of its own was
+            // a permanent fixture for an occasional errand. It still has to be
+            // claimed by *something*, or the import page is the one screen in
+            // the application whose rail marks nothing as where you are.
             new NavItem(
                 labelKey: 'nav.settings',
                 href: '/settings',
                 icon: 'settings',
-                matches: ['/settings'],
+                matches: ['/settings', '/import'],
             ),
             // Profile is a page of its own: what one account sets for itself,
             // as against Settings, where a household or an instance decides

@@ -170,6 +170,55 @@ final class MemberAdministrationTest extends DatabaseTestCase
         self::assertStringContainsString('type="radio"', (string) $isolated->getBody());
     }
 
+    /**
+     * Every assignable role reaches the two pick-lists on the members screen.
+     *
+     * Read off the enum rather than written out, so a role added to
+     * `Role::assignable()` and forgotten in a template fails here. The failure
+     * it exists for is the quiet one: a new role that works everywhere except
+     * the only form that can hand it to anybody.
+     */
+    public function testEveryAssignableRoleIsOfferedOnTheMembersScreen(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $html = (string) $this->request('GET', '/settings/members')->getBody();
+
+        foreach (Role::assignable() as $role) {
+            self::assertStringContainsString(
+                sprintf('value="%s"', $role->value),
+                $html,
+                sprintf('The members screen offers no way to pick %s.', $role->value),
+            );
+        }
+
+        self::assertStringContainsString('Contributor', $html, 'The role has no label on the screen.');
+    }
+
+    /**
+     * And a role picked in that form is the role the member ends up with.
+     */
+    public function testSomebodyCanBeAddedAsAContributor(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $this->request('POST', '/settings/members', [
+            'display_name' => 'Bram',
+            'email' => 'bram@example.test',
+            'role' => Role::Contributor->value,
+        ]);
+
+        $added = null;
+        foreach ((new MembershipRepository($this->db))->listMembers($this->householdId) as $member) {
+            if ($member->email === 'bram@example.test') {
+                $added = $member;
+            }
+        }
+
+        self::assertNotNull($added, 'The member was not added.');
+        self::assertSame(Role::Contributor, $added->role);
+    }
+
     public function testTheInviteFormRenders(): void
     {
         $this->signIn($this->ownerId);

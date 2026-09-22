@@ -27,6 +27,11 @@ enum Permission: string
     case RecordUsage = 'usage.record';
     case BulkEdit = 'subscription.bulk_edit';
 
+    // Reading the household: who is in it, what each member carries and what
+    // their role lets them do. A read, but not one a Viewer gets — what it
+    // discloses is every other member's spending, which is a household's
+    // business rather than an onlooker's.
+    case ViewHousehold = 'household.view';
     case ManageHousehold = 'household.manage';
 
     // Phase 5. Attaching an invoice and importing a file are both ordinary
@@ -46,6 +51,6 @@ enum Permission: string
 
     public function isMutating(): bool
     {
-        return !in_array($this, [self::ViewSubscriptions, self::ViewAuditLog], true);
+        return !in_array($this, [self::ViewSubscriptions, self::ViewHousehold, self::ViewAuditLog], true);
     }
 }

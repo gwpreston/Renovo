@@ -12,16 +12,21 @@ namespace App\Domain;
  * list it is handed and knows nothing about what is in them.
  *
  * The order of the cases is the default layout, and it is an argued one: the
- * metric row, then each chart with the narrow card whose subject it shares —
- * the year ahead beside the budget it is measured against, the year behind
- * beside the trials about to add to it — and then the two lists.
+ * metric row, then the year behind beside the budget it is measured against,
+ * then the trials about to add to it, then the two lists.
  *
- * Trials used to lead the screen, on the argument that what is about to start
- * costing money comes before what already does. It is still the most urgent
- * card here and it is still a callout, but a full-width band for what is
- * usually a single row was paying for that urgency in space rather than in
- * emphasis. Beside the year behind it is read at the same moment as the
- * spending it is about to join, in a row that exists either way.
+ * The year *ahead* used to lead that arrangement, and the dashboard drew both
+ * charts. It draws one now. The forecast is the Analytics page's own subject —
+ * its trajectory is the same payload from the same builder — and a landing
+ * screen carrying two twelve-month charts was asking a reader to tell them
+ * apart before either had said anything. What already happened is the one a
+ * dashboard is for; what is projected is a page you go to.
+ *
+ * Trials is a full-width callout again with the chart it was paired with gone.
+ * It led the screen once, on the argument that what is about to start costing
+ * money comes before what already does, and was narrowed to sit beside the
+ * year behind. There is no second chart to sit beside now, and a 2-of-6 tile
+ * alone on a row is a hole rather than an arrangement.
  *
  * That ordering is what a *new* account gets. An account that has
  * already arranged its dashboard keeps its arrangement and finds the new tiles
@@ -45,12 +50,12 @@ namespace App\Domain;
 enum DashboardCard: string
 {
     case Totals = 'totals';
-    case SpendChart = 'spend_chart';
-    case BudgetUsage = 'budget_usage';
     case SpendHistory = 'spend_history';
+    case BudgetUsage = 'budget_usage';
     case Trials = 'trials';
     case Upcoming = 'upcoming';
     case ByCategory = 'by_category';
+    case MemberShares = 'member_shares';
 
     public function labelKey(): string
     {
@@ -78,19 +83,23 @@ enum DashboardCard: string
      * half-width cards on separate rows, which is the honest rendering of the
      * order it chose.
      *
-     * The two charts take two thirds each and are deliberately not put side
-     * by side. That would read as the neater arrangement and is not: twelve
-     * points drawn in a third of the grid is a chart whose shape cannot be
-     * read, which is the only thing either card is for, and it would leave
-     * both the budget widget and the trials callout alone on rows of their
-     * own. Each chart takes the narrow card whose subject it shares instead.
+     * The chart takes two thirds rather than the whole width: twelve points
+     * drawn across six columns is a picture with nothing beside it, and the
+     * budget it is measured against is the natural thing to read next to the
+     * spending it measures.
      *
      * A card that renders nothing leaves the rest of its row empty rather than
      * closing it up, because auto-placement is not dense. Trials is the card
-     * most often absent — most households have no trial running — so the year
-     * behind is usually two thirds of a chart with a third of white space
-     * beside it. That is this arrangement's quiet cost, and a smaller one than
-     * a chart nobody can read the shape of.
+     * most often absent — most households have no trial running — which is the
+     * other half of why it is full width: an absent card of its own width
+     * leaves an empty row of no height, where an absent narrow one leaves a
+     * visible hole beside whatever it was paired with.
+     *
+     * Member shares is full width for the reason Trials is. The two halves
+     * above it already pair with each other, so a third half-width card would
+     * sit beside a hole — and it is the card most often absent, because a
+     * household of one and an ISOLATED instance both give it nothing to
+     * compare.
      *
      * Auto-placement is left alone rather than made dense: a dense grid would
      * reflow tiles past one another to fill holes, and a card order the user
@@ -99,8 +108,8 @@ enum DashboardCard: string
     public function columnSpan(): int
     {
         return match ($this) {
-            self::SpendChart, self::SpendHistory => 4,
-            self::BudgetUsage, self::Trials => 2,
+            self::SpendHistory => 4,
+            self::BudgetUsage => 2,
             self::Upcoming, self::ByCategory => 3,
             default => 6,
         };

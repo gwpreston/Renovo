@@ -24,9 +24,12 @@
         breakdown the my-subscriptions widget draws as bars, and year over year
         is that same reconstruction stated as a pair of totals.
 
-        Below them, what this page has always carried and the design has no
-        place for: the same cost expressed over each period people think in, and
-        the cost-per-use ranking.
+        Below them, the review: the comparative cards and the same cost
+        expressed over each period people think in, gathered into one column,
+        with the cost-per-use ranking standing beside them in a column of its
+        own. Those three are figures to read; "Worth it?" is the table to act
+        on, and it is a row per subscription, so it earns both the wider share
+        and its own full height rather than a place at the end of a queue.
     #}
     {#
         The insight card leads, when there is one. It is the only thing on this
@@ -56,115 +59,125 @@
         </aside>
     </div>
 
-    {% include 'stats/_comparison.twig' %}
+    <div class="analytics-review">
+        <div class="analytics-review-figures">
+            {% include 'stats/_comparison.twig' %}
 
-    <section class="card">
-        <h2>{{ t('stats.per_period') }}</h2>
+            <section class="card">
+                <h2>{{ t('stats.per_period') }}</h2>
 
-        <div class="stat-grid stat-grid-inline">
-            {% for label, amount in per_period %}
-                <div class="stat">
-                    <h3 class="stat-label">{{ t('period.per_' ~ label) }}</h3>
-                    <p class="stat-value">
-                        {{ amount is not null ? amount|money(combined_yearly.currency) : '—' }}
-                    </p>
+                <div class="stat-grid stat-grid-inline">
+                    {% for label, amount in per_period %}
+                        <div class="stat">
+                            <h3 class="stat-label">{{ t('period.per_' ~ label) }}</h3>
+                            <p class="stat-value">
+                                {{ amount is not null ? amount|money(combined_yearly.currency) : '—' }}
+                            </p>
+                        </div>
+                    {% endfor %}
                 </div>
-            {% endfor %}
+
+                {% if combined_yearly.amount_minor is null %}
+                    <p class="muted note">
+                        {{ t('stats.unconvertible', {
+                            'currency': base_currency,
+                            'currencies': combined_yearly.unconvertible|join(', '),
+                        }) }}
+                    </p>
+                    <h3 class="stat-label">{{ t('stats.per_year_heading') }}</h3>
+                    <ul class="plain">
+                        {% for total in yearly_by_currency %}
+                            <li>{{ total.amount_minor|money(total.currency) }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="hint">{{ t('stats.per_year_note') }}</p>
+                {% endif %}
+            </section>
         </div>
 
-        {% if combined_yearly.amount_minor is null %}
-            <p class="muted note">
-                {{ t('stats.unconvertible', {
-                    'currency': base_currency,
-                    'currencies': combined_yearly.unconvertible|join(', '),
-                }) }}
-            </p>
-            <h3 class="stat-label">{{ t('stats.per_year_heading') }}</h3>
-            <ul class="plain">
-                {% for total in yearly_by_currency %}
-                    <li>{{ total.amount_minor|money(total.currency) }}</li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p class="hint">{{ t('stats.per_year_note') }}</p>
-        {% endif %}
-    </section>
+        {#
+            "Worth it?" is a column of its own, not a card at the foot of the
+            page: it is a row per subscription and the only thing here with an
+            action attached, so it keeps the wider share and reads at full
+            height beside the figures rather than after them.
+        #}
+        <section class="card">
+            <h2>{{ t('stats.worth_it') }}</h2>
+            <p class="muted">{{ t('stats.value_note') }}</p>
 
-    <section class="card">
-        <h2>{{ t('stats.worth_it') }}</h2>
-        <p class="muted">{{ t('stats.value_note') }}</p>
-
-        {% if value_signals is empty %}
-            <p class="muted empty">{{ t('stats.value_empty') }}</p>
-        {% else %}
-            <div class="table-scroll">
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th scope="col">{{ t('field.subscription') }}</th>
-                        <th scope="col" class="numeric">{{ t('field.per_month') }}</th>
-                        <th scope="col" class="numeric">{{ t('field.uses') }}</th>
-                        <th scope="col" class="numeric">{{ t('stats.cost_per_use') }}</th>
-                        <th scope="col">{{ t('field.rating') }}</th>
-                        <th scope="col"><span class="visually-hidden">{{ t('field.actions') }}</span></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for signal in value_signals %}
-                        {% set subscription = signal.subscription %}
-                        <tr class="{{ signal.is_low_use ? 'is-urgent' : '' }}">
-                            <td>
-                                <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
-                                {% if signal.is_low_use %}
-                                    <span class="badge badge-warning">{{ t('stats.rarely_used') }}</span>
-                                {% endif %}
-                            </td>
-                            <td class="numeric">{{
-                                subscription.monthlyMinor|money(subscription.price.currency) }}</td>
-                            <td class="numeric">
-                                {{ subscription.usageCount }}
-                                {% if signal.uses_per_month is not null %}
-                                    <div class="hint">{{ t('stats.uses_per_month', {
-                                        'count': signal.uses_per_month|number_format(1),
-                                    }) }}</div>
-                                {% endif %}
-                            </td>
-                            <td class="numeric">
-                                {% if signal.cost_per_use_minor is not null %}
-                                    {{ signal.cost_per_use_minor|money(subscription.price.currency) }}
-                                {% else %}
-                                    <span class="muted" title="{{ t('stats.no_uses_recorded') }}">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if subscription.usageRating %}
-                                    <span aria-label="{{ t('stats.rating_label', {
-                                        'rating': subscription.usageRating,
-                                        'max': max_rating,
-                                    }) }}">
-                                        {%- for star in 1..max_rating -%}
-                                            {{ star <= subscription.usageRating ? '★' : '☆' }}
-                                        {%- endfor -%}
-                                    </span>
-                                {% else %}
-                                    <span class="muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td class="actions">
-                                {% if can(scope, 'usage.record') %}
-                                    <form method="post" action="/subscriptions/{{ subscription.id }}/usage"
-                                          class="inline">
-                                        {{ csrf_field() }}
-                                        <input type="hidden" name="return_to" value="/stats">
-                                        <button type="submit" class="button button-quiet">{{ t('stats.used_it') }}</button>
-                                    </form>
-                                {% endif %}
-                            </td>
+            {% if value_signals is empty %}
+                <p class="muted empty">{{ t('stats.value_empty') }}</p>
+            {% else %}
+                <div class="table-scroll">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th scope="col">{{ t('field.subscription') }}</th>
+                            <th scope="col" class="numeric">{{ t('field.per_month') }}</th>
+                            <th scope="col" class="numeric">{{ t('field.uses') }}</th>
+                            <th scope="col" class="numeric">{{ t('stats.cost_per_use') }}</th>
+                            <th scope="col">{{ t('field.rating') }}</th>
+                            <th scope="col"><span class="visually-hidden">{{ t('field.actions') }}</span></th>
                         </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endif %}
-    </section>
+                        </thead>
+                        <tbody>
+                        {% for signal in value_signals %}
+                            {% set subscription = signal.subscription %}
+                            <tr class="{{ signal.is_low_use ? 'is-urgent' : '' }}">
+                                <td>
+                                    <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
+                                    {% if signal.is_low_use %}
+                                        <span class="badge badge-warning">{{ t('stats.rarely_used') }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="numeric">{{
+                                    subscription.monthlyMinor|money(subscription.price.currency) }}</td>
+                                <td class="numeric">
+                                    {{ subscription.usageCount }}
+                                    {% if signal.uses_per_month is not null %}
+                                        <div class="hint">{{ t('stats.uses_per_month', {
+                                            'count': signal.uses_per_month|number_format(1),
+                                        }) }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="numeric">
+                                    {% if signal.cost_per_use_minor is not null %}
+                                        {{ signal.cost_per_use_minor|money(subscription.price.currency) }}
+                                    {% else %}
+                                        <span class="muted" title="{{ t('stats.no_uses_recorded') }}">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if subscription.usageRating %}
+                                        <span aria-label="{{ t('stats.rating_label', {
+                                            'rating': subscription.usageRating,
+                                            'max': max_rating,
+                                        }) }}">
+                                            {%- for star in 1..max_rating -%}
+                                                {{ star <= subscription.usageRating ? '★' : '☆' }}
+                                            {%- endfor -%}
+                                        </span>
+                                    {% else %}
+                                        <span class="muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="actions">
+                                    {% if can(scope, 'usage.record') and can_edit_row(scope, subscription) %}
+                                        <form method="post" action="/subscriptions/{{ subscription.id }}/usage"
+                                              class="inline">
+                                            {{ csrf_field() }}
+                                            <input type="hidden" name="return_to" value="/stats">
+                                            <button type="submit" class="button button-quiet">{{ t('stats.used_it') }}</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </section>
+    </div>
 {% endblock %}

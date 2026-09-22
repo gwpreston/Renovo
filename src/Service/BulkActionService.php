@@ -187,11 +187,14 @@ final class BulkActionService
                 throw new ValidationException(['user_id' => 'error.member.required']);
             }
 
-            // Reassigning ownership in ISOLATED mode would hand somebody a row
-            // they can no longer see, or take one away from themselves without
-            // meaning to. The single-subscription form refuses it for the same
-            // reason.
-            if ($scope->isOwnerRestricted()) {
+            // Handing a row to somebody else is a write outside your own rows,
+            // so anybody fenced to them is refused: in ISOLATED it would give
+            // away a row they can no longer see, or take one from themselves
+            // without meaning to. The single-subscription form refuses it for
+            // the same reason. (A Contributor never arrives here — bulk editing
+            // is not theirs to do — but the question asked is still "may this
+            // person write outside their own rows", so it is asked that way.)
+            if ($scope->restrictsWritesToOwner()) {
                 throw new ValidationException([
                     'user_id' => 'error.bulk.isolated_reassign',
                 ]);

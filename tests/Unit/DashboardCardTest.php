@@ -59,49 +59,58 @@ final class DashboardCardTest extends TestCase
     /**
      * The design's split middle section: the chart and the usage widget are a
      * row between them, which is the whole reason a card declares a span.
-     */
-    public function testTheChartAndTheUsageWidgetShareARow(): void
-    {
-        self::assertSame(
-            6,
-            DashboardCard::SpendChart->columnSpan() + DashboardCard::BudgetUsage->columnSpan(),
-        );
-    }
-
-    /**
-     * And the same arrangement for the year behind: a two-thirds chart with
-     * the trials callout beside it.
      *
      * Asserted as a sum rather than as two numbers because that is the claim —
      * either card could be widened as long as the other gave the width back,
      * and a row that adds up to seven silently becomes two rows.
      */
-    public function testTheHistoryChartAndTheTrialsCalloutShareARow(): void
+    public function testTheChartAndTheUsageWidgetShareARow(): void
     {
         self::assertSame(
             6,
-            DashboardCard::SpendHistory->columnSpan() + DashboardCard::Trials->columnSpan(),
+            DashboardCard::SpendHistory->columnSpan() + DashboardCard::BudgetUsage->columnSpan(),
         );
     }
 
     /**
      * A row is only a row where the two cards are next to each other, so the
      * default order has to put them there. This is the assertion that fails if
-     * a card is ever inserted between a chart and the narrow card it shares
-     * its width with.
+     * a card is ever inserted between the chart and the widget it shares its
+     * width with.
      */
-    public function testTheDefaultOrderPutsEachChartBesideItsOwnNarrowCard(): void
+    public function testTheDefaultOrderPutsTheUsageWidgetBesideTheChart(): void
     {
         $order = DashboardCard::defaultOrder();
 
-        foreach ([[DashboardCard::SpendChart, DashboardCard::BudgetUsage],
-            [DashboardCard::SpendHistory, DashboardCard::Trials]] as [$chart, $beside]) {
-            self::assertSame(
-                array_search($chart, $order, true) + 1,
-                array_search($beside, $order, true),
-                $beside->value . ' does not directly follow ' . $chart->value,
-            );
+        self::assertSame(
+            array_search(DashboardCard::SpendHistory, $order, true) + 1,
+            array_search(DashboardCard::BudgetUsage, $order, true),
+            'budget_usage does not directly follow spend_history',
+        );
+    }
+
+    /**
+     * Every row of the default arrangement adds up to the full six.
+     *
+     * The spans are what make the rows, and with one chart rather than two
+     * they only tile if Trials is full width — 6, then 4 + 2, then 6, then
+     * 3 + 3. Narrow it again without giving it a partner and the grid gains a
+     * hole that nothing in the CSS or the enum would complain about, which is
+     * exactly the kind of wrong that ships.
+     */
+    public function testTheDefaultOrderTilesIntoWholeRows(): void
+    {
+        $row = 0;
+
+        foreach (DashboardCard::defaultOrder() as $card) {
+            $row += $card->columnSpan();
+
+            self::assertLessThanOrEqual(6, $row, 'the row holding ' . $card->value . ' overflows the grid');
+
+            $row %= 6;
         }
+
+        self::assertSame(0, $row, 'the last row of the default arrangement is unfinished');
     }
 
     /**
@@ -128,24 +137,42 @@ final class DashboardCardTest extends TestCase
      * row in `dashboard_cards` that holds it, and the account that arranged it
      * silently loses the card.
      *
-     * `spend_history` joined the list rather than replacing anything, and
-     * `trials` moved from the head of it to sit beside the new chart. The
+     * `spend_history` took the slot `spend_chart` held, and `trials` is a
+     * full-width callout again now that the chart it sat beside has gone. The
      * order is a default, so an account that has already arranged its
      * dashboard keeps its own — `DashboardLayoutService`'s rule, and the
      * reason moving a case here is a change of first impression rather than a
      * change to anybody's saved screen.
      *
-     * `per_period` and `recent` are deliberately absent: both tiles were
-     * removed because another screen is the same subject's home — the
-     * Analytics page for the four per-period figures, the Subscriptions page
-     * for the list — and rows still naming them are passed over rather than
-     * migrated away.
+     * `member_shares` is last because it is newest: appending is what lets an
+     * account that has already arranged its dashboard keep its arrangement and
+     * find the new tile at the bottom, rather than have the redesign shuffle
+     * the screen it chose.
+     *
+     * `per_period`, `recent` and now `spend_chart` are deliberately absent:
+     * each tile was removed because another screen is the same subject's home
+     * — the Analytics page for the four per-period figures and for the year
+     * ahead, the Subscriptions page for the list — and rows still naming them
+     * are passed over rather than migrated away.
      */
     public function testTheStoredKeysAreUnchanged(): void
     {
         self::assertSame(
-            ['totals', 'spend_chart', 'budget_usage', 'spend_history', 'trials', 'upcoming', 'by_category'],
+            ['totals', 'spend_history', 'budget_usage', 'trials', 'upcoming', 'by_category', 'member_shares'],
             array_map(static fn (DashboardCard $card): string => $card->value, DashboardCard::cases()),
         );
+    }
+
+    /**
+     * A card that left is a key that must never come back as something else.
+     *
+     * `spend_chart` rows are still in `dashboard_cards` on any instance whose
+     * users had arranged their dashboard, and they are passed over because no
+     * case answers to the string. Re-using it for a different card would hand
+     * those accounts a tile they never chose, in a position they did choose.
+     */
+    public function testARetiredKeyIsNotReused(): void
+    {
+        self::assertNull(DashboardCard::tryFromString('spend_chart'));
     }
 }

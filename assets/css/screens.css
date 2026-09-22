@@ -969,16 +969,67 @@ tr.is-passed > td {
     min-width: 0;
 }
 
-/* Year over year and the notable card, as a pair that becomes a stack. */
-.analytics-pair {
+/*
+ * The review: the figures to read in one column — year over year, the notable
+ * pair and the same cost by period — and the cost-per-use table beside them.
+ *
+ * The table takes the wider share because it is the only six-column thing on
+ * the page, and it breaks at the same 1100px the charts above it do, so the
+ * screen reflows once on the way down rather than at two widths of its own.
+ * Horizontal gap only, like every other grid here: the cards bring their own
+ * vertical margin.
+ */
+.analytics-review {
     display: grid;
     gap: 0 1rem;
     align-items: start;
 }
 
-@media (min-width: 60rem) {
-    .analytics-pair {
-        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+@media (min-width: 1100px) {
+    .analytics-review {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    }
+}
+
+/* The same reason `.analytics-main` needs it: a grid item refuses to be
+   narrower than its content by default, which is how the wide table would push
+   the page sideways instead of scrolling inside `.table-scroll`. */
+.analytics-review > * {
+    min-width: 0;
+}
+
+/*
+ * The figures in the review column are quieter than the ones at the top.
+ *
+ * The KPI row states three numbers the page is about; these nine restate parts
+ * of them, sliced by year, by extreme and by period. At the full KPI size they
+ * shout as loudly as the row they are derived from, and in a column this
+ * narrow they also stack into a very tall wall of digits beside a table. One
+ * step down the scale settles both: the hierarchy reads correctly and the
+ * column ends up roughly the height of the thing it sits next to.
+ */
+.analytics-review-figures {
+    --size-kpi: 1.75rem;
+}
+
+/*
+ * How many of those figures stand abreast, decided per card.
+ *
+ * `.columns` and `.stat-grid` both key off the viewport, not the container, so
+ * the moment the review splits they size themselves for a page they are no
+ * longer as wide as. These two minimums are layout thresholds rather than text
+ * measurements: year over year has three figures and looks wrong as two and an
+ * orphan, so its minimum is set high enough to keep it a clean stack until the
+ * column can take all three; the four per-period figures pair up happily, so
+ * theirs is set to let two stand side by side at a laptop width.
+ */
+@media (min-width: 1100px) {
+    .analytics-review-figures .columns {
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    }
+
+    .analytics-review-figures .stat-grid {
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
     }
 }
 
@@ -1137,6 +1188,104 @@ tr.is-passed > td {
 
 .stat-grid-inline .stat {
     padding: 0;
+}
+
+/* -------------------------------------------------------------- household */
+
+/*
+ * A card per member, on the same grid the budgets use. Twenty rem is the width
+ * at which a name, a pair of figures and a row of permission chips stop
+ * wrapping awkwardly, and `min(100%, …)` is what keeps a single card from
+ * overflowing a narrow screen rather than shrinking to fit it.
+ */
+.member-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: 1rem;
+}
+
+.member-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* The card's header sits flush with the content below it. */
+.member-card .member-identity {
+    align-items: center;
+}
+
+/*
+ * The two figures on a card, side by side while there is room for them.
+ *
+ * `auto-fit` rather than two fixed columns: a member whose spending is in two
+ * currencies gets a taller cell, and at the narrow end the pair stacks instead
+ * of squeezing a money figure into nine characters' width.
+ */
+.member-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+    gap: 0.75rem;
+}
+
+/*
+ * The KPI type is for a tile with one number on it. A member card carries two,
+ * and a table cell carries one of many, so both ask the shared spend macro for
+ * its figure at a size that belongs to a list rather than to a headline. The
+ * markup is the same markup; only the scale changes.
+ */
+.member-figures .stat-value,
+.member-figure .stat-value {
+    font-size: var(--size-heading);
+    margin-bottom: 0;
+}
+
+.member-figure .stat-lines {
+    align-items: flex-end;
+}
+
+/*
+ * The ladder of what a role can do.
+ *
+ * A stacked list rather than a row of chips, because every card carries every
+ * rung — including the ones this member has not got — and five short phrases
+ * read down a column where five wrapped pills read as a crowd. Stacking also
+ * makes the cards comparable line for line, which is the point of putting
+ * people beside each other.
+ */
+.capability-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: var(--size-label);
+}
+
+.capability {
+    display: grid;
+    grid-template-columns: 1rem 1fr;
+    gap: 0.4rem;
+    align-items: baseline;
+}
+
+.capability-mark {
+    color: var(--success-text);
+    text-align: center;
+    line-height: 1;
+}
+
+/*
+ * Not held: greyed, and dimmer than the muted text around it so the two are
+ * distinguishable rather than merely both quiet. The mark loses its colour
+ * with the words, because a green tick beside faded text would be the one
+ * thing on the row still claiming a yes.
+ */
+.capability.is-absent,
+.capability.is-absent .capability-mark {
+    color: var(--text-muted);
+    opacity: 0.65;
 }
 
 /* ---------------------------------------------------------------- density */

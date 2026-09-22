@@ -574,8 +574,14 @@ Four rules hold the design together:
   It grants **no** access to household data — an admin who is not a member of a
   household sees nothing of it, by construction.
 - **Household roles**, per membership: **Owner/Admin** (everything, including
-  household settings), **Editor** (create, edit and delete subscriptions),
+  household settings), **Editor** (create, edit and delete any subscription in
+  the household), **Contributor** (sees every subscription, and creates and
+  edits only their own — plus their own prices, splits, invoices and budget; not
+  the household's shared categories and tags, and no import or bulk edit),
   **Viewer** (read only — any mutating endpoint returns 403).
+- A Contributor's fence is applied by the scoping layer, not by the interface:
+  the permission says they may edit a subscription and the repository decides
+  whose, so a forged request is refused by the `UPDATE` itself.
 - **Isolation mode**, instance-wide: **SHARED** (default; everyone in a
   household sees its subscriptions) or **ISOLATED** (each member sees only the
   ones they own). Every subscription stores both `household_id` and

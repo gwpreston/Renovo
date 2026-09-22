@@ -9,6 +9,7 @@ use App\Domain\BillingCycle;
 use App\Domain\IsolationMode;
 use App\Domain\BudgetPeriod;
 use App\Domain\NoticePeriod;
+use App\Domain\Entity\Subscription;
 use App\Domain\Permission;
 use App\Domain\PriceChangeSource;
 use App\Domain\Role;
@@ -80,6 +81,7 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('csrf_token', fn (): string => $this->csrf->token()),
             new TwigFunction('csrf_field', $this->csrfField(...), ['is_safe' => ['html']]),
             new TwigFunction('can', $this->can(...)),
+            new TwigFunction('can_edit_row', $this->canEditRow(...)),
             new TwigFunction('navigation', $this->navigationFor(...)),
             new TwigFunction('cycle_label', $this->cycleLabel(...)),
             new TwigFunction('type_label', $this->typeLabel(...)),
@@ -257,6 +259,31 @@ final class AppExtension extends AbstractExtension
         $resolved = Permission::tryFrom($permission);
 
         return $scope !== null && $resolved !== null && $this->permissions->allows($scope, $resolved);
+    }
+
+    /**
+     * Whether this user may change *this row*, as against rows of its kind.
+     *
+     * `can()` answers a question about a role — "may they edit a subscription"
+     * — and for most of this application's life that was the whole answer,
+     * because everybody who could see a row could change it. Two things break
+     * that: a split participant sees a subscription in ISOLATED mode without
+     * owning it, and a Contributor sees the whole household and owns only part
+     * of it. Both would be drawn a Pause and a Delete button by a permission
+     * check alone, and both would be answered 404 for using them.
+     *
+     * So a control attached to one row asks this instead, which is
+     * `Scope::mayWriteRow()` — the same rule the repository compiles into the
+     * UPDATE. This decides whether a button is *drawn*; the repository is still
+     * what refuses a forged request, and neither stands in for the other.
+     */
+    public function canEditRow(?Scope $scope, ?Subscription $subscription): bool
+    {
+        if ($scope === null || $subscription === null) {
+            return false;
+        }
+
+        return $scope->mayWriteRow($subscription->householdId, $subscription->ownerUserId);
     }
 
     /**

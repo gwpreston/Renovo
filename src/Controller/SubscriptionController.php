@@ -176,7 +176,12 @@ final class SubscriptionController extends Controller
         $scope = $this->scope($request);
         $subscription = $this->subscriptions->find($scope, (int) $id);
 
-        if ($subscription === null) {
+        // Readable is not editable. A split participant in ISOLATED mode and a
+        // Contributor both see rows they may not change, and handing either of
+        // them a filled-in form that cannot be saved is a worse answer than not
+        // opening it — the read-only view of somebody else's subscription is
+        // its cost page.
+        if ($subscription === null || !$scope->mayWriteRow($subscription->householdId, $subscription->ownerUserId)) {
             // Out of scope and non-existent are deliberately the same answer:
             // a 403 here would confirm that somebody else's row exists.
             throw $this->notFound($request);

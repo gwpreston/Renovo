@@ -5,7 +5,10 @@
 {% block heading %}{{ subscription.name }}{% endblock %}
 
 {% block page_actions %}
-    <a class="button button-quiet" href="/subscriptions/{{ subscription.id }}/edit">{{ t('subscriptions_form.edit_title') }}</a>
+    {% if can(scope, 'subscription.update') and can_edit_row(scope, subscription) %}
+        <a class="button button-quiet"
+           href="/subscriptions/{{ subscription.id }}/edit">{{ t('subscriptions_form.edit_title') }}</a>
+    {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -65,7 +68,7 @@
                 </ol>
             {% endif %}
 
-            {% if can(scope, 'price.manage') %}
+            {% if can(scope, 'price.manage') and can_edit_row(scope, subscription) %}
                 <form method="post" action="/subscriptions/{{ subscription.id }}/price-changes" class="stack">
                     {{ csrf_field() }}
                     <h3>{{ t('subscriptions_money.schedule_a_price_change') }}</h3>
@@ -176,7 +179,7 @@
             {% endif %}
         </p>
 
-        {% if can(scope, 'usage.record') %}
+        {% if can(scope, 'usage.record') and can_edit_row(scope, subscription) %}
             <div class="form-actions">
                 <form method="post" action="/subscriptions/{{ subscription.id }}/usage" class="inline">
                     {{ csrf_field() }}
@@ -236,7 +239,7 @@
                             <td class="muted">{{ attachment.humanSize() }}</td>
                             <td class="muted">{{ attachment.createdAt|local_date('d MMM y') }}</td>
                             <td>
-                                {% if can(scope, 'attachment.manage') %}
+                                {% if can(scope, 'attachment.manage') and can_edit_row(scope, subscription) %}
                                     <form method="post"
                                           action="/subscriptions/{{ subscription.id }}/attachments/{{ attachment.id }}/delete"
                                           class="inline"
@@ -253,7 +256,7 @@
             </div>
         {% endif %}
 
-        {% if can(scope, 'attachment.manage') %}
+        {% if can(scope, 'attachment.manage') and can_edit_row(scope, subscription) %}
             <form method="post" action="/subscriptions/{{ subscription.id }}/attachments"
                   enctype="multipart/form-data" class="stack">
                 {{ csrf_field() }}

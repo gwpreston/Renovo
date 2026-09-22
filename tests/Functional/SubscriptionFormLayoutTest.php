@@ -147,6 +147,44 @@ final class SubscriptionFormLayoutTest extends DatabaseTestCase
     }
 
     /**
+     * The "belongs to" select, where writes are confined to their owner.
+     *
+     * Two things have to move together here and the template is the only place
+     * they can come apart: the control is disabled, and it names a hint saying
+     * why. The hint's id is in `aria-describedby` unconditionally on that same
+     * branch, so a note drawn on a narrower condition is a description pointing
+     * at nothing.
+     *
+     * It is asserted through the rendered page rather than by reading the
+     * template because of how this fails. Twig is not in strict mode, so
+     * `scope.somethingThatNoLongerExists` is null rather than an error: rename
+     * the method behind it and the select quietly stops being disabled, on
+     * every instance, with nothing anywhere saying so. That is not a
+     * hypothetical — it is what this test was written for.
+     */
+    public function testTheOwnerSelectIsDisabledWhereWritesAreConfinedToTheirOwner(): void
+    {
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $container->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
+
+        $form = $this->form($this->get('/subscriptions/new'));
+
+        $select = $this->query($form, './/select[@id="owner_user_id"]');
+        self::assertCount(1, $select, 'The form no longer offers an owner select at all.');
+        self::assertTrue(
+            $select[0]->hasAttribute('disabled'),
+            'The owner select is editable on an instance that confines writes to their owner.',
+        );
+
+        self::assertCount(
+            1,
+            $this->query($form, './/*[@id="owner_user_id-hint"]'),
+            'The select is described by a hint that was not rendered.',
+        );
+    }
+
+    /**
      * @dataProvider forms
      */
     public function testEveryHintIsPointedAtByTheControlItExplains(string $path): void

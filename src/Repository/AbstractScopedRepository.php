@@ -82,19 +82,46 @@ abstract class AbstractScopedRepository extends AbstractRepository
      */
     final protected function scopePredicate(Scope $scope, array &$params): string
     {
+        return $this->householdAndOwner($scope, $params, $scope->restrictsWritesToOwner(), true);
+    }
+
+    /**
+     * The household clause, with the owner clause when the caller asks for it.
+     *
+     * The one place either predicate is built, and it takes the restriction as
+     * an argument rather than asking the scope itself. That is the whole point:
+     * reads and writes are restricted by different questions — an ISOLATED
+     * instance narrows both, a Contributor's role narrows only writes — and a
+     * helper that asked would have to pick one of them and be wrong for the
+     * other. The read predicate used to be defined as "the write predicate,
+     * optionally widened", which was true while one flag answered for both and
+     * would now hand a Contributor an owner clause on every SELECT.
+     *
+     * @param array<string, mixed> $params
+     * @param bool $restrictToOwner Whether to confine the rows to this user's own.
+     * @param bool $qualified       Whether columns carry the table alias.
+     */
+    private function householdAndOwner(
+        Scope $scope,
+        array &$params,
+        bool $restrictToOwner,
+        bool $qualified,
+    ): string {
         if (!$scope->hasHousehold()) {
             // No household membership: no rows. This is the path an instance
             // admin takes, and it is deliberate.
             return '1 = 0';
         }
 
+        $column = fn (string $name): string => $qualified ? $this->qualify($name) : $this->quote($name);
+
         $params[self::SCOPE_HOUSEHOLD_PARAM] = $scope->householdId;
-        $predicate = $this->qualify($this->householdColumn()) . ' = :' . self::SCOPE_HOUSEHOLD_PARAM;
+        $predicate = $column($this->householdColumn()) . ' = :' . self::SCOPE_HOUSEHOLD_PARAM;
 
         $ownerColumn = $this->ownerColumn();
-        if ($ownerColumn !== null && $scope->isOwnerRestricted()) {
+        if ($ownerColumn !== null && $restrictToOwner) {
             $params[self::SCOPE_OWNER_PARAM] = $scope->userId;
-            $predicate .= ' AND ' . $this->qualify($ownerColumn) . ' = :' . self::SCOPE_OWNER_PARAM;
+            $predicate .= ' AND ' . $column($ownerColumn) . ' = :' . self::SCOPE_OWNER_PARAM;
         }
 
         return $predicate;
@@ -130,7 +157,13 @@ abstract class AbstractScopedRepository extends AbstractRepository
     }
 
     /**
-     * The predicate for reads: the write predicate, optionally widened.
+     * The predicate for reads: the household, narrowed by the *isolation mode*
+     * alone and then optionally widened.
+     *
+     * Deliberately not "the write predicate, optionally widened". A role may
+     * confine what somebody changes without confining what they see, so the two
+     * predicates are built side by side from the same helper rather than one
+     * from the other.
      *
      * @param array<string, mixed> $params
      */
@@ -140,16 +173,21 @@ abstract class AbstractScopedRepository extends AbstractRepository
             return '1 = 0';
         }
 
+        $restricted = $scope->restrictsReadsToOwner();
+
         $ownerColumn = $this->ownerColumn();
-        if ($ownerColumn === null || !$scope->isOwnerRestricted()) {
+        if ($ownerColumn === null || !$restricted) {
             // With no owner column, or in SHARED mode, the household predicate
-            // is already the whole answer and there is nothing to widen.
-            return $this->scopePredicate($scope, $params);
+            // is already the whole answer and there is nothing to widen. Built
+            // here rather than borrowed from the write predicate, which may be
+            // narrower than this one — a Contributor reads the household and
+            // writes only their own.
+            return $this->householdAndOwner($scope, $params, $restricted, true);
         }
 
         $extra = $this->readVisibilityPredicate($scope, $params);
         if ($extra === null) {
-            return $this->scopePredicate($scope, $params);
+            return $this->householdAndOwner($scope, $params, $restricted, true);
         }
 
         $params[self::SCOPE_HOUSEHOLD_PARAM] = $scope->householdId;
@@ -270,9 +308,11 @@ abstract class AbstractScopedRepository extends AbstractRepository
             $data[$ownerColumn] = $scope->userId;
         }
 
-        // In ISOLATED mode a user may only create rows they themselves own,
-        // otherwise they could create a row they would then be unable to see.
-        if ($ownerColumn !== null && $scope->isOwnerRestricted()) {
+        // A user whose writes are confined to their own rows may only create
+        // rows they own — in ISOLATED mode, or as a Contributor. Otherwise they
+        // could make a row they would then be refused when they tried to change
+        // it, and in ISOLATED could not even see.
+        if ($ownerColumn !== null && $scope->restrictsWritesToOwner()) {
             $data[$ownerColumn] = $scope->userId;
         }
 
@@ -294,7 +334,9 @@ abstract class AbstractScopedRepository extends AbstractRepository
         // The scope columns are not writable through an update.
         unset($data[$this->householdColumn()]);
         $ownerColumn = $this->ownerColumn();
-        if ($ownerColumn !== null && $scope->isOwnerRestricted()) {
+        if ($ownerColumn !== null && $scope->restrictsWritesToOwner()) {
+            // Handing a row to somebody else is itself a write outside your own
+            // rows, so the column is not writable by anybody fenced to them.
             unset($data[$ownerColumn]);
         }
 
@@ -349,19 +391,8 @@ abstract class AbstractScopedRepository extends AbstractRepository
      */
     final protected function scopePredicateUnqualified(Scope $scope, array &$params): string
     {
-        if (!$scope->hasHousehold()) {
-            return '1 = 0';
-        }
-
-        $params[self::SCOPE_HOUSEHOLD_PARAM] = $scope->householdId;
-        $predicate = $this->quote($this->householdColumn()) . ' = :' . self::SCOPE_HOUSEHOLD_PARAM;
-
-        $ownerColumn = $this->ownerColumn();
-        if ($ownerColumn !== null && $scope->isOwnerRestricted()) {
-            $params[self::SCOPE_OWNER_PARAM] = $scope->userId;
-            $predicate .= ' AND ' . $this->quote($ownerColumn) . ' = :' . self::SCOPE_OWNER_PARAM;
-        }
-
-        return $predicate;
+        // Its two callers are a DELETE and an UPDATE, so it is the write
+        // predicate wearing different quoting.
+        return $this->householdAndOwner($scope, $params, $scope->restrictsWritesToOwner(), false);
     }
 }

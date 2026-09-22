@@ -52,7 +52,7 @@
             </select>
             {% if errors.category_id is defined %}<p class="field-error">{{ error_message(errors.category_id) }}</p>{% endif %}
 
-            {% if not scope.isOwnerRestricted and members|length > 1 %}
+            {% if not scope.restrictsWritesToOwner and members|length > 1 %}
                 <label for="owner_user_id">{{ t('budgets_form.whose_budget') }}</label>
                 <select id="owner_user_id" name="owner_user_id">
                     {% for member in members %}

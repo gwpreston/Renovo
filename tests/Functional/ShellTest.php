@@ -121,13 +121,16 @@ final class ShellTest extends DatabaseTestCase
             'cancel-by' => ['/cancellations', '/cancellations'],
             'statistics' => ['/stats', '/stats'],
             'categories' => ['/categories', '/categories'],
+            'the household' => ['/household', '/household'],
             'settings' => ['/settings', '/settings'],
             'your own page' => ['/profile', '/profile'],
             'alerts' => ['/settings/notifications', '/settings/notifications'],
             'security' => ['/settings/security', '/settings'],
             'api tokens' => ['/settings/api-tokens', '/settings'],
             'backup' => ['/settings/backup', '/settings'],
-            'import' => ['/import', '/import'],
+            // Import has no rail row; the Settings item, which is where its
+            // button lives, stays lit while you are on it.
+            'import' => ['/import', '/settings'],
             'the audit log' => ['/audit', '/audit'],
         ];
     }
@@ -273,9 +276,10 @@ final class ShellTest extends DatabaseTestCase
     }
 
     /**
-     * What a Viewer is offered. They may read the household and configure their
-     * own reminders; they may not import or read the log, and the navigation
-     * says so rather than offering them a 403.
+     * What a Viewer is offered. They may read the subscriptions and configure
+     * their own reminders; they may not import, read the log or see what the
+     * rest of the household spends, and the navigation says so rather than
+     * offering them a 403.
      */
     public function testAViewerIsNotOfferedTheScreensTheyWouldBeRefused(): void
     {
@@ -287,6 +291,9 @@ final class ShellTest extends DatabaseTestCase
         self::assertStringContainsString('href="/settings/notifications"', $html);
         self::assertStringNotContainsString('href="/import"', $html);
         self::assertStringNotContainsString('href="/audit"', $html);
+        // The household screen shows what every other member spends, which is
+        // not part of being allowed to read the subscriptions.
+        self::assertStringNotContainsString('href="/household"', $html);
 
         // And the action they cannot take is not in the bar either.
         self::assertStringNotContainsString('topbar-add', $html);

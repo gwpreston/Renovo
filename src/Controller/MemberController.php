@@ -51,7 +51,7 @@ final class MemberController extends Controller
             'members' => $this->members->list($scope),
             'household' => $scope->hasHousehold() ? $this->households->findById((int) $scope->householdId) : null,
             'roles' => Role::assignable(),
-            'is_isolated' => $scope->isOwnerRestricted(),
+            'is_isolated' => $scope->restrictsReadsToOwner(),
             // Shown once and never again. It is carried across the redirect in
             // the session and taken straight back out, so a reload of the page
             // does not show it a second time and nothing persists it.
@@ -193,7 +193,7 @@ final class MemberController extends Controller
 
         return $this->render($request, $response, 'settings/member_remove.twig', [
             'member' => $member,
-            'is_isolated' => $scope->isOwnerRestricted(),
+            'is_isolated' => $scope->restrictsReadsToOwner(),
             'owned_rows' => $this->members->ownedRowCount($scope, $userId),
         ]);
     }

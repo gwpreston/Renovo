@@ -124,13 +124,15 @@ final class AccountSelfServiceTest extends DatabaseTestCase
 
         $body = (string) $this->request('GET', '/profile')->getBody();
 
-        foreach ([
+        $actions = [
             '/profile/name',
             '/profile/email',
             '/profile/password',
             '/profile/avatar',
             '/profile/preferences',
-        ] as $action) {
+        ];
+
+        foreach ($actions as $action) {
             self::assertStringContainsString(
                 'action="' . $action . '"',
                 $body,

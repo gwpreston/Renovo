@@ -29,7 +29,7 @@ import {
     Search,
     Settings,
     Tag,
-    Upload,
+    Users,
     Wallet,
     createElement,
 } from 'lucide';
@@ -45,7 +45,7 @@ const ICONS = {
     categories: Tag,
     dashboard: LayoutDashboard,
     forecast: ChartLine,
-    import: Upload,
+    household: Users,
     more: Ellipsis,
     notifications: BellRing,
     profile: CircleUserRound,

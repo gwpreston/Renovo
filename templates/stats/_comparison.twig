@@ -1,5 +1,9 @@
 {#
-    The comparative pair: year over year, and the notable subscriptions.
+    Year over year, and the notable subscriptions.
+
+    They stack, one above the other: the page puts them in the review column
+    beside the cost-per-use table, so the width they used to share side by
+    side is not there any more and each gets the full column instead.
 
     Year over year is reconstructed rather than recorded — this application
     tracks what is due, not a ledger of payments taken — so it is rebuilt from
@@ -14,83 +18,81 @@
     rate is left out and counted, the same answer year over year gives to the
     same kind of gap.
 #}
-<div class="analytics-pair">
-    <section class="card" id="analytics-year-over-year" aria-labelledby="analytics-yoy-heading">
-        <h2 id="analytics-yoy-heading">{{ t('stats.year_over_year') }}</h2>
-        {% set yoy = year_over_year %}
+<section class="card" id="analytics-year-over-year" aria-labelledby="analytics-yoy-heading">
+    <h2 id="analytics-yoy-heading">{{ t('stats.year_over_year') }}</h2>
+    {% set yoy = year_over_year %}
 
-        {% if yoy.current.amount_minor is null or yoy.previous.amount_minor is null %}
-            <p class="muted">{{ t('stats.year_over_year_empty') }}</p>
-        {% elseif yoy.previous.amount_minor == 0 %}
-            <p class="muted">
-                {{ t('stats.no_previous_year', {
-                    'amount': yoy.current.amount_minor|money(yoy.current.currency),
-                }) }}
-            </p>
-        {% else %}
-            <div class="columns">
-                <div>
-                    <h3 class="stat-label">{{ t('stats.last_12_months') }}</h3>
-                    <p class="stat-value">{{ yoy.current.amount_minor|money(yoy.current.currency) }}</p>
-                </div>
-                <div>
-                    <h3 class="stat-label">{{ t('stats.the_12_before_that') }}</h3>
-                    <p class="stat-value">{{ yoy.previous.amount_minor|money(yoy.previous.currency) }}</p>
-                </div>
-                <div>
-                    <h3 class="stat-label">{{ t('field.change') }}</h3>
-                    <p class="stat-value {{ yoy.change_minor > 0 ? 'is-increase' : 'is-decrease' }}">
-                        {{ yoy.change_minor|money(yoy.current.currency, true) }}
-                        {% if yoy.change_percent is not null %}
-                            <span class="stat-unit">({{ yoy.change_percent|percent(true) }})</span>
-                        {% endif %}
-                    </p>
-                </div>
+    {% if yoy.current.amount_minor is null or yoy.previous.amount_minor is null %}
+        <p class="muted">{{ t('stats.year_over_year_empty') }}</p>
+    {% elseif yoy.previous.amount_minor == 0 %}
+        <p class="muted">
+            {{ t('stats.no_previous_year', {
+                'amount': yoy.current.amount_minor|money(yoy.current.currency),
+            }) }}
+        </p>
+    {% else %}
+        <div class="columns">
+            <div>
+                <h3 class="stat-label">{{ t('stats.last_12_months') }}</h3>
+                <p class="stat-value">{{ yoy.current.amount_minor|money(yoy.current.currency) }}</p>
             </div>
+            <div>
+                <h3 class="stat-label">{{ t('stats.the_12_before_that') }}</h3>
+                <p class="stat-value">{{ yoy.previous.amount_minor|money(yoy.previous.currency) }}</p>
+            </div>
+            <div>
+                <h3 class="stat-label">{{ t('field.change') }}</h3>
+                <p class="stat-value {{ yoy.change_minor > 0 ? 'is-increase' : 'is-decrease' }}">
+                    {{ yoy.change_minor|money(yoy.current.currency, true) }}
+                    {% if yoy.change_percent is not null %}
+                        <span class="stat-unit">({{ yoy.change_percent|percent(true) }})</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    {% endif %}
+
+    <p class="hint">
+        {{ t('stats.year_over_year_note') }}
+        {% if yoy.excluded_count > 0 %}
+            {{ t('stats.year_over_year_excluded', {'count': yoy.excluded_count}) }}
         {% endif %}
+    </p>
+</section>
 
-        <p class="hint">
-            {{ t('stats.year_over_year_note') }}
-            {% if yoy.excluded_count > 0 %}
-                {{ t('stats.year_over_year_excluded', {'count': yoy.excluded_count}) }}
-            {% endif %}
-        </p>
-    </section>
+<section class="card" id="analytics-notable" aria-labelledby="analytics-notable-heading">
+    <h2 id="analytics-notable-heading">{{ t('stats.notable') }}</h2>
 
-    <section class="card" id="analytics-notable" aria-labelledby="analytics-notable-heading">
-        <h2 id="analytics-notable-heading">{{ t('stats.notable') }}</h2>
+    {% if notable.highest is null %}
+        <p class="muted empty">{{ t('stats.notable_empty') }}</p>
+    {% else %}
+        <ul class="plain notable-list">
+            {% for row in [notable.highest, notable.lowest]|filter(row => row is not null) %}
+                <li class="notable-row">
+                    <h3 class="stat-label">
+                        {{ loop.first ? t('stats.most_expensive') : t('stats.least_expensive') }}
+                    </h3>
+                    <p class="notable-name">
+                        <a href="/subscriptions/{{ row.subscription.id }}/money">{{ row.subscription.name }}</a>
+                    </p>
+                    {#
+                        Its own currency: the conversion decided the order
+                        and nothing else, so nobody is shown a price they
+                        have never been charged.
+                    #}
+                    <p class="stat-value">
+                        {{ row.monthly_minor|money(row.subscription.price.currency) }}
+                        <span class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
+                    </p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
 
-        {% if notable.highest is null %}
-            <p class="muted empty">{{ t('stats.notable_empty') }}</p>
-        {% else %}
-            <ul class="plain notable-list">
-                {% for row in [notable.highest, notable.lowest]|filter(row => row is not null) %}
-                    <li class="notable-row">
-                        <h3 class="stat-label">
-                            {{ loop.first ? t('stats.most_expensive') : t('stats.least_expensive') }}
-                        </h3>
-                        <p class="notable-name">
-                            <a href="/subscriptions/{{ row.subscription.id }}/money">{{ row.subscription.name }}</a>
-                        </p>
-                        {#
-                            Its own currency: the conversion decided the order
-                            and nothing else, so nobody is shown a price they
-                            have never been charged.
-                        #}
-                        <p class="stat-value">
-                            {{ row.monthly_minor|money(row.subscription.price.currency) }}
-                            <span class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
-                        </p>
-                    </li>
-                {% endfor %}
-            </ul>
+    <p class="hint">
+        {{ t('stats.notable_note') }}
+        {% if notable.excluded_count > 0 %}
+            {{ t('stats.notable_excluded', {'count': notable.excluded_count}) }}
         {% endif %}
-
-        <p class="hint">
-            {{ t('stats.notable_note') }}
-            {% if notable.excluded_count > 0 %}
-                {{ t('stats.notable_excluded', {'count': notable.excluded_count}) }}
-            {% endif %}
-        </p>
-    </section>
-</div>
+    </p>
+</section>

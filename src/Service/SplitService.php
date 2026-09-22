@@ -219,7 +219,7 @@ final class SplitService
         // In SHARED mode the household manages its own arrangements between
         // themselves. In ISOLATED mode only the owner can, because only the
         // owner can write the row at all.
-        return !$scope->isOwnerRestricted() || $subscription->ownerUserId === $scope->userId;
+        return !$scope->restrictsWritesToOwner() || $subscription->ownerUserId === $scope->userId;
     }
 
     /**

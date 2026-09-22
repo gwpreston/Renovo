@@ -72,7 +72,11 @@ bug, even if the code "works".
 
 - **Instance admin** (`is_instance_admin`): manages users and global settings.
   Cannot browse household data by default.
-- **Household roles** (per membership): **Owner/Admin**, **Editor**, **Viewer**.
+- **Household roles** (per membership): **Owner/Admin**, **Editor**,
+  **Contributor** (reads the whole household, writes only rows they own),
+  **Viewer**. A Contributor's fence is applied by the scoping layer, not by a
+  permission: `Scope::restrictsWritesToOwner()` is the role *or* the isolation
+  mode, and reads are narrowed by the mode alone.
 - **Isolation mode** (instance setting): **SHARED** (default) or **ISOLATED**.
   Every subscription stores both `household_id` and `owner_user_id`; visibility
   is applied centrally.

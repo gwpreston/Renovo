@@ -23,18 +23,36 @@ final class PermissionService
         return match ($permission) {
             Permission::ViewSubscriptions => $scope->canRead(),
 
+            // What any writer may do. A Contributor holds every one of these,
+            // and the scoping layer is what confines them to their own rows —
+            // the permission answers "may they edit a subscription", never
+            // "whose". Keeping the fence out of here is what stops a Contributor
+            // needing a parallel set of permissions nobody would remember to
+            // keep in step.
             Permission::CreateSubscription,
             Permission::UpdateSubscription,
             Permission::DeleteSubscription,
-            Permission::ManageCategories,
-            Permission::ManageTags,
             Permission::ManageBudgets,
             Permission::ManagePrices,
             Permission::ManageSplits,
             Permission::RecordUsage,
-            Permission::BulkEdit,
             Permission::ManageAttachments,
-            Permission::ImportData => $scope->canWrite(),
+            // Read-only, and still a writer's permission. The household screen
+            // shows what every member spends, which is a thing the people who
+            // take part in the household see and a Viewer — somebody given
+            // sight of the subscriptions and nothing else — does not.
+            Permission::ViewHousehold => $scope->canWrite(),
+
+            // What only a writer answerable for the whole household may do.
+            // None of these can be fenced to one member's own rows: a category
+            // and a tag are shared by every subscription that carries them, and
+            // an import and a bulk edit write across rows by definition. A
+            // Contributor is therefore refused them outright rather than being
+            // handed a scoped version that would not mean anything.
+            Permission::ManageCategories,
+            Permission::ManageTags,
+            Permission::BulkEdit,
+            Permission::ImportData => $scope->canManageShared(),
 
             // Restoring a backup replaces what the household holds, so it asks
             // for the role that may manage the household rather than the one

@@ -8,7 +8,6 @@ use App\Application\Middleware\AuthenticationMiddleware;
 use App\Domain\DashboardCard;
 use App\Domain\ExchangeRate;
 use App\Domain\IsolationMode;
-use App\Domain\Money;
 use App\Domain\Role;
 use App\Repository\DashboardCardRepository;
 use App\Repository\ExchangeRateRepository;
@@ -19,9 +18,7 @@ use App\Repository\UserRepository;
 use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Service\BudgetService;
-use App\Service\ForecastService;
 use App\Service\InstanceSettingsService;
-use App\Service\PriceHistoryService;
 use App\Service\StatsService;
 use App\Support\MoneyFormatter;
 use App\Tests\Integration\DatabaseTestCase;
@@ -40,8 +37,14 @@ use Symfony\Component\Mailer\MailerInterface;
  * The claim this phase makes is that every tile binds to a figure a service
  * already produces — so these assert the binding rather than the arithmetic,
  * which the forecast's and the budget's own tests already cover. The chart is
- * checked against the Forecast page's own call for the same data, because "the
- * dashboard and that page cannot disagree" is only true if it is the same call.
+ * checked against the reconstruction `StatsService` walks, because "the
+ * dashboard and the Analytics page cannot disagree" is only true if it is the
+ * same call.
+ *
+ * The screen draws one chart: the year behind. The year ahead was a card here
+ * and is now the Analytics page's trajectory alone — `AnalyticsScreenTest`
+ * holds the tests for what that chart's two lines mean, which used to live in
+ * this file because this is where the chart was.
  */
 final class DashboardTest extends DatabaseTestCase
 {
@@ -53,7 +56,6 @@ final class DashboardTest extends DatabaseTestCase
     private int $editorId;
     private int $viewerId;
     private int $householdId;
-    private int $trialId;
 
     protected function setUp(): void
     {
@@ -121,7 +123,7 @@ final class DashboardTest extends DatabaseTestCase
             'is_active' => true,
         ], []);
 
-        $this->trialId = $subscriptions->create($this->scopeFor($this->ownerId), [
+        $subscriptions->create($this->scopeFor($this->ownerId), [
             'name' => 'Trial plan',
             'price_minor' => 0,
             'currency' => 'GBP',
@@ -218,269 +220,6 @@ final class DashboardTest extends DatabaseTestCase
             $this->renewalsCount($body),
             'the renewals tile should count the subscriptions renewing inside the near window',
         );
-    }
-
-    public function testTheChartIsTheSameFiguresTheForecastPageShows(): void
-    {
-        $container = $this->app->getContainer();
-        self::assertNotNull($container);
-
-        $months = $container->get(ForecastService::class)->monthly(
-            $this->scopeFor($this->ownerId),
-            ForecastService::DEFAULT_MONTHS,
-        );
-
-        $payload = $this->chartPayload($this->body($this->get('/', $this->ownerId)));
-
-        self::assertNotNull($payload, 'the chart payload was not rendered');
-        self::assertCount(count($months), $payload['months']);
-
-        foreach ($months as $index => $month) {
-            self::assertSame(
-                $month['combined_minor'],
-                $payload['months'][$index]['minor'],
-                'month ' . $month['month'] . ' disagrees with the forecast',
-            );
-        }
-
-        // Integers all the way to the browser: the only decimal point in the
-        // payload belongs to a string ICU formatted.
-        foreach ($payload['months'] as $month) {
-            self::assertIsInt($month['minor']);
-        }
-        foreach ($payload['ticks'] as $tick) {
-            self::assertIsInt($tick['value']);
-            self::assertIsString($tick['label']);
-        }
-    }
-
-    /**
-     * The second line, and the one mistake it exists to avoid.
-     *
-     * The chart draws spend twice: every charge the horizon holds, and the
-     * same months with the trials taken out. The gap between them is what
-     * converting trials will add, and the fixture's trial converts inside the
-     * horizon and then renews monthly for the rest of it.
-     *
-     * So the gap is not one month wide. **That is the whole assertion.** A
-     * charge carries a `reason`, and only the conversion itself is reasoned
-     * `trial_conversion` — every renewal it causes afterwards is an ordinary
-     * `renewal`. Splitting on the reason would therefore show the conversion
-     * as trial-driven and then quietly count the ten renewals it caused as
-     * spend already committed, which is the opposite of what the line means.
-     * Splitting on `isTrial`, as the payload does, takes all of them out.
-     */
-    public function testTheCommittedLineExcludesEveryChargeATrialCausesNotJustItsConversion(): void
-    {
-        $payload = $this->chartPayload($this->body($this->get('/', $this->ownerId)));
-
-        self::assertNotNull($payload, 'the chart payload was not rendered');
-        self::assertTrue($payload['has_trials'], 'the fixture has a trial converting inside the horizon');
-
-        $withAGap = array_filter($payload['months'], static fn (array $month): bool => $month['trial_minor'] !== 0);
-
-        self::assertGreaterThanOrEqual(
-            10,
-            count($withAGap),
-            'the conversion and the renewals it causes must all sit outside the committed line; '
-            . 'exactly one month here would mean the split was made on the charge reason',
-        );
-
-        // By the far end of the horizon the trial has long since converted and
-        // is renewing at its converts-to price, in the base currency.
-        $last = $payload['months'][count($payload['months']) - 1];
-        self::assertSame(1299, $last['trial_minor']);
-        self::assertSame($last['minor'] - 1299, $last['committed_minor']);
-    }
-
-    /**
-     * The committed line is the total with things removed, never added to.
-     *
-     * Asserted across every month rather than at a point, because the two
-     * figures are combined from different subsets of the same charges and a
-     * currency conversion sits between the charges and the line. If the
-     * subtraction ever came out the other way, the chart would fill its band
-     * downwards and describe trials as a saving.
-     */
-    public function testTheCommittedLineIsNeverAboveTheTotalAndTheTwoAlwaysReconcile(): void
-    {
-        $payload = $this->chartPayload($this->body($this->get('/', $this->ownerId)));
-
-        self::assertNotNull($payload, 'the chart payload was not rendered');
-
-        foreach ($payload['months'] as $month) {
-            self::assertIsInt($month['committed_minor']);
-            self::assertIsInt($month['trial_minor']);
-            self::assertLessThanOrEqual(
-                $month['minor'],
-                $month['committed_minor'],
-                'month ' . $month['key'] . ' claims trials make it cheaper',
-            );
-            self::assertSame(
-                $month['minor'],
-                $month['committed_minor'] + $month['trial_minor'],
-                'month ' . $month['key'] . ' does not add up',
-            );
-        }
-    }
-
-    /**
-     * A subscription that is not a trial belongs to both lines, at whatever
-     * price will actually be charged.
-     *
-     * The committed line is not "today's price extended across the horizon" —
-     * it is the same forecast with one class of charge removed, so a scheduled
-     * increase has to reach it exactly as it reaches the total. A committed
-     * line that ignored the increase would sit below the total for a reason
-     * that has nothing to do with trials, and the band would blame them for it.
-     *
-     * Measured as the difference the schedule makes to one month, rather than
-     * the difference between two months: the fixture has other subscriptions
-     * falling in some months and not others, so month-to-month is not a
-     * reading of this subscription at all.
-     */
-    public function testAScheduledIncreaseOnANonTrialReachesBothLines(): void
-    {
-        $container = $this->app->getContainer();
-        self::assertNotNull($container);
-
-        $scope = $this->scopeFor($this->ownerId);
-        $effective = (new DateTimeImmutable('+100 days'));
-        // A month clear of the change, so the month being read holds one
-        // charge at the new price rather than straddling the two.
-        $settled = $effective->modify('+1 month')->format('Y-m');
-
-        $id = (new SubscriptionRepository($this->db))->create($scope, [
-            'name' => 'Dearer soon',
-            'price_minor' => 1000,
-            'currency' => 'GBP',
-            'subscription_type' => 'recurring',
-            'billing_cycle' => 'monthly',
-            'next_payment_date' => (new DateTimeImmutable('+5 days'))->format('Y-m-d'),
-            'start_date' => '2025-01-01',
-            'is_active' => true,
-        ], []);
-
-        $history = $container->get(PriceHistoryService::class);
-        $history->recordInitialPrice(
-            $scope,
-            $id,
-            Money::of(1000, 'GBP'),
-            new DateTimeImmutable('2025-01-01'),
-            $this->ownerId,
-        );
-
-        $before = $this->monthsByKey($this->body($this->get('/', $this->ownerId)));
-
-        $history->schedule($scope, $id, [
-            'price' => '25.00',
-            'currency' => 'GBP',
-            'effective_from' => $effective->format('Y-m-d'),
-        ]);
-
-        $after = $this->monthsByKey($this->body($this->get('/', $this->ownerId)));
-
-        self::assertArrayHasKey($settled, $before);
-        self::assertArrayHasKey($settled, $after);
-
-        // The same 1500 minor units on each line: an increase on something
-        // that is not a trial is committed spend.
-        self::assertSame(1500, $after[$settled]['minor'] - $before[$settled]['minor']);
-        self::assertSame(
-            1500,
-            $after[$settled]['committed_minor'] - $before[$settled]['committed_minor'],
-            'the increase reached the total but not the committed line',
-        );
-        self::assertSame(
-            $before[$settled]['trial_minor'],
-            $after[$settled]['trial_minor'],
-            'a price change on something that is not a trial moved the trial band',
-        );
-    }
-
-    /**
-     * The card that describes the chart says what the chart actually shows.
-     *
-     * The payload is JSON in a script tag and the picture is a canvas, so
-     * neither is what a reader without JavaScript — or with a screen reader —
-     * is given. That reader gets the legend and the table, and this is the
-     * only thing asserting they name both series.
-     */
-    public function testBothSeriesAreNamedInTheLegendAndTheTable(): void
-    {
-        $body = $this->body($this->get('/', $this->ownerId));
-        $figures = $this->chartFigures($body);
-
-        self::assertStringContainsString('chart-legend', $body);
-        self::assertStringContainsString('Including trial conversions', $figures);
-        self::assertStringContainsString('Excluding trial conversions', $figures);
-        self::assertSame(2, substr_count($figures, '<th scope="col" class="numeric">'));
-
-        // The description the canvas carries, which is the chart for a reader
-        // who is given one sentence rather than a picture.
-        self::assertStringContainsString('one line including trial conversions and one excluding them', $body);
-    }
-
-    /**
-     * The common case: no trial converting inside the horizon.
-     *
-     * The second line would then sit exactly on the first, so it is not drawn,
-     * and everything that describes it has to disappear with it — the legend,
-     * the table's second column, and the sentence in the canvas's own label
-     * promising two lines. A description of a chart that is not there is worse
-     * than no description, because it is the only chart some readers get.
-     */
-    public function testWithNoTrialInTheHorizonTheChartDropsToASingleSeries(): void
-    {
-        (new SubscriptionRepository($this->db))->delete($this->scopeFor($this->ownerId), $this->trialId);
-
-        $body = $this->body($this->get('/', $this->ownerId));
-        $payload = $this->chartPayload($body);
-
-        self::assertNotNull($payload, 'the chart payload was not rendered');
-        self::assertFalse($payload['has_trials']);
-
-        foreach ($payload['months'] as $month) {
-            self::assertSame($month['minor'], $month['committed_minor'], 'month ' . $month['key']);
-            self::assertSame(0, $month['trial_minor'], 'month ' . $month['key']);
-        }
-
-        self::assertStringNotContainsString('chart-legend', $body);
-
-        // Asserted against the table rather than the page: every page carries
-        // the browser's own copy of the catalogue, second series included, so
-        // a bare string match would find the label whatever the chart drew.
-        $figures = $this->chartFigures($body);
-        self::assertStringNotContainsString('Excluding trial conversions', $figures);
-        self::assertSame(1, substr_count($figures, '<th scope="col" class="numeric">'));
-
-        self::assertStringNotContainsString(
-            'one line including trial conversions and one excluding them',
-            $body,
-            'the canvas still describes a second line that is not drawn',
-        );
-    }
-
-    public function testAMissingRateWithholdsBothTheCombinedTotalAndTheChart(): void
-    {
-        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
-            'name' => 'Unconvertible',
-            'price_minor' => 5000,
-            'currency' => 'XOF',
-            'subscription_type' => 'recurring',
-            'billing_cycle' => 'monthly',
-            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
-            'is_active' => true,
-        ], []);
-
-        $body = $this->body($this->get('/', $this->ownerId));
-
-        self::assertNull(
-            $this->chartPayload($body),
-            'a month that cannot be combined must not be drawn as a short bar',
-        );
-        self::assertStringContainsString('XOF', $body);
-        self::assertStringContainsString('no exchange rate is available', $body);
     }
 
     public function testTheUpcomingAndTrialCardsCarryALogoOrTheFallbackMark(): void
@@ -633,26 +372,26 @@ final class DashboardTest extends DatabaseTestCase
     }
 
     /**
-     * Asserted on the forecast card's own payload id rather than on
-     * `data-chart="spend"`: the dashboard draws two of these charts now, the
-     * year behind and the year ahead, and the attribute they share cannot tell
-     * them apart. Each names its own payload, so the id is what identifies a
-     * card — and hiding one while the other stays is the stronger claim
-     * anyway.
+     * Asserted on the chart card's own payload id rather than on
+     * `data-chart="spend"`, which is an attribute every chart in the
+     * application carries and so cannot say which card drew one. The layout
+     * here names one visible card and one hidden one, so the assertion is
+     * that hiding took the chart away and left the rest of the screen alone.
      */
     public function testAHiddenCardStaysHidden(): void
     {
         (new DashboardCardRepository($this->db))->replaceFor($this->ownerId, [
-            ['card_key' => DashboardCard::SpendChart->value, 'position' => 0, 'visible' => false],
+            ['card_key' => DashboardCard::SpendHistory->value, 'position' => 0, 'visible' => false],
+            ['card_key' => DashboardCard::BudgetUsage->value, 'position' => 1, 'visible' => true],
         ]);
 
         $body = $this->body($this->get('/', $this->ownerId));
 
-        self::assertStringNotContainsString('dashboard-spend-data', $body);
+        self::assertStringNotContainsString('dashboard-history-data', $body);
         self::assertStringContainsString(
-            'dashboard-history-data',
+            'Where it goes',
             $body,
-            'hiding one card should not take the other chart with it',
+            'hiding one card should not take the rest of the screen with it',
         );
     }
 
@@ -673,32 +412,59 @@ final class DashboardTest extends DatabaseTestCase
     }
 
     /**
-     * The dashboard shows the year behind as well as the year ahead, and they
-     * are two charts rather than one drawn twice: each names its own payload,
-     * and the payloads cover different months.
+     * One chart, and it is the year behind.
+     *
+     * The dashboard drew the year ahead as well until the two twelve-month
+     * charts stacked on one screen became the thing a reader had to tell apart
+     * before either had said anything. The forecast is the Analytics page's
+     * trajectory and the Forecast page's whole subject, so this asserts both
+     * halves of the change: the history is drawn, ending with this month, and
+     * the forecast's payload is not on the page at all.
      */
-    public function testTheDashboardDrawsTheYearBehindBesideTheYearAhead(): void
+    public function testTheDashboardDrawsTheYearBehindAndLeavesTheYearAheadToAnalytics(): void
     {
         $body = $this->body($this->get('/', $this->ownerId));
 
-        $history = $this->chartPayload($body, 'dashboard-history-data');
-        $forecast = $this->chartPayload($body, 'dashboard-spend-data');
+        $history = $this->chartPayload($body);
 
         self::assertNotNull($history, 'the history payload was not rendered');
-        self::assertNotNull($forecast, 'the forecast payload was not rendered');
-
         self::assertCount(12, $history['months']);
-        self::assertNotSame($forecast['months'], $history['months']);
-
-        // The history ends where the forecast begins: the current month is the
-        // last bucket of one and the first of the other, which is what makes
-        // the two charts one continuous window rather than two overlapping
-        // ones.
         self::assertSame(
-            $forecast['months'][0]['key'],
+            (new DateTimeImmutable())->format('Y-m'),
             $history['months'][11]['key'],
-            'the two windows do not meet at this month',
+            'the window should end with the month it is being read in',
         );
+
+        self::assertNull(
+            $this->chartPayload($body, 'dashboard-spend-data'),
+            'the forecast chart is the Analytics page\'s; the dashboard should not draw it too',
+        );
+    }
+
+    /**
+     * A currency with no rate withholds the figure rather than understating
+     * it, and says which currency did it.
+     *
+     * The chart half of this claim moved to the Analytics screen with the
+     * chart; what is asserted here is the metric row, which is the dashboard's
+     * own and where a quietly wrong combined total would do the most damage.
+     */
+    public function testAMissingRateWithholdsTheCombinedTotal(): void
+    {
+        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
+            'name' => 'Unconvertible',
+            'price_minor' => 5000,
+            'currency' => 'XOF',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+            'is_active' => true,
+        ], []);
+
+        $body = $this->body($this->get('/', $this->ownerId));
+
+        self::assertStringContainsString('XOF', $body);
+        self::assertStringContainsString('no exchange rate is available', $body);
     }
 
     /**
@@ -762,13 +528,14 @@ final class DashboardTest extends DatabaseTestCase
      * A chart's payload, as the browser would read it, or null when the card
      * decided there was nothing honest to draw.
      *
-     * Named by id because the dashboard draws two of these: the forecast's
-     * `dashboard-spend-data` and the history's `dashboard-history-data`. The
-     * canvas finds its own the same way.
+     * Named by id, which is how the canvas finds its own: the dashboard draws
+     * the history and the argument for passing a name is that asking for the
+     * forecast's — `dashboard-spend-data`, which the Analytics trajectory
+     * still carries — should return nothing here.
      *
      * @return array<string, mixed>|null
      */
-    private function chartPayload(string $html, string $id = 'dashboard-spend-data'): ?array
+    private function chartPayload(string $html, string $id = 'dashboard-history-data'): ?array
     {
         $pattern = sprintf(
             '/<script id="%s" type="application\/json">(.*?)<\/script>/s',
@@ -782,40 +549,6 @@ final class DashboardTest extends DatabaseTestCase
         $payload = json_decode($matches[1], true, 512, JSON_THROW_ON_ERROR);
 
         return $payload;
-    }
-
-    /**
-     * The table of figures beside the chart — what a reader without
-     * JavaScript, or with a screen reader, is actually given.
-     *
-     * Read as its own fragment rather than matched against the whole page:
-     * the layout writes the browser's translation catalogue into every page,
-     * so both series' labels appear in the HTML whether the chart drew them
-     * or not.
-     */
-    private function chartFigures(string $html): string
-    {
-        if (preg_match('/<div class="chart-figures">(.*?)<\\/div>/s', $html, $matches) !== 1) {
-            self::fail('The page has no chart figures table.');
-        }
-
-        return $matches[1];
-    }
-
-    /**
-     * The chart's months, keyed by the month they are for.
-     *
-     * @return array<string, array<string, mixed>>
-     */
-    private function monthsByKey(string $html): array
-    {
-        $payload = $this->chartPayload($html);
-        self::assertNotNull($payload, 'the chart payload was not rendered');
-
-        /** @var array<string, array<string, mixed>> $keyed */
-        $keyed = array_column($payload['months'], null, 'key');
-
-        return $keyed;
     }
 
     /**

@@ -283,7 +283,7 @@ final class BudgetService
      */
     private function resolveOwner(Scope $scope, array $input, array &$errors): int
     {
-        if ($scope->isOwnerRestricted()) {
+        if ($scope->restrictsWritesToOwner()) {
             return $scope->userId;
         }
 

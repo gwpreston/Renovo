@@ -1,7 +1,10 @@
 {% extends 'layout.twig' %}
 
-{% block title %}{{ t('nav.import') }} — {{ instance_name }}{% endblock %}
-
+{#
+    No `title` block: the layout derives the tab's name from the heading, and
+    this page's heading is what it is called. The override said "Import", which
+    was the rail's label for it — and the rail no longer has one.
+#}
 {% block heading %}{{ t('import_start.import_subscriptions') }}{% endblock %}
 
 {% block content %}

@@ -395,7 +395,7 @@ final class HouseholdMemberService
         // Deleting is only offered where the rows were private. In SHARED the
         // household could already see them, so there is nothing to disclose by
         // handing them over and no question worth asking.
-        $delete = $deleteData && $scope->isOwnerRestricted();
+        $delete = $deleteData && $scope->restrictsReadsToOwner();
 
         // One transaction, in the repository: the split rows, the owned rows
         // and the membership either all go or none of them do.

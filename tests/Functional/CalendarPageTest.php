@@ -13,6 +13,8 @@ use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Security\Scope;
 use App\Security\SessionInterface;
+use App\Support\Clock;
+use App\Support\FrozenClock;
 use App\Service\InstanceSettingsService;
 use App\Tests\Integration\DatabaseTestCase;
 use App\Tests\Support\ArraySession;
@@ -39,6 +41,18 @@ final class CalendarPageTest extends DatabaseTestCase
     private const MONTH = '2026-09';
 
     /**
+     * The day the page believes it is, frozen.
+     *
+     * The fixture's charge is a one-off inside `MONTH`, and a one-off that has
+     * already been taken is not a charge the calendar has anything to say
+     * about. Left on the system clock these fixed months are a date the run
+     * eventually walks past — which is what happened — so the clock is
+     * replaced the way `config/bootstrap.php` says tests replace it, and every
+     * assertion below reads the same month it always did.
+     */
+    private const TODAY = self::MONTH . '-01 09:00:00';
+
+    /**
      * A month inside the horizon with nothing in it. The fixture charges once
      * and never again, which is what makes such a month reachable at all — a
      * monthly subscription puts a charge in every month of the horizon, and
@@ -60,6 +74,7 @@ final class CalendarPageTest extends DatabaseTestCase
         $this->app = $bootstrap(true, [
             SessionInterface::class => $this->session,
             MailerInterface::class => new RecordingMailer(),
+            Clock::class => FrozenClock::at(self::TODAY),
         ]);
 
         $container = $this->app->getContainer();

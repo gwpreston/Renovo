@@ -54,6 +54,7 @@ final class NavigationTest extends TestCase
             'a new budget' => ['/budgets/new', 'nav.budgets'],
             'cancel-by' => ['/cancellations', 'nav.cancellations'],
             'categories' => ['/categories', 'nav.categories'],
+            'the household' => ['/household', 'nav.household'],
             'settings' => ['/settings', 'nav.settings'],
             'your own page' => ['/profile', 'nav.profile'],
             // The three below all start with "/settings" and only one of them
@@ -63,8 +64,10 @@ final class NavigationTest extends TestCase
             'security is settings' => ['/settings/security', 'nav.settings'],
             'api tokens are settings' => ['/settings/api-tokens', 'nav.settings'],
             'backup is settings' => ['/settings/backup', 'nav.settings'],
-            'import' => ['/import', 'nav.import'],
-            'the import mapping step' => ['/import/map', 'nav.import'],
+            // Import has no rail row of its own; Settings, which carries the
+            // button that leads there, is what stays lit while you use it.
+            'import is settings' => ['/import', 'nav.settings'],
+            'the import mapping step' => ['/import/map', 'nav.settings'],
             'the audit log' => ['/audit', 'nav.audit'],
             // Deliberately claimed by nothing: a path that merely begins with
             // the same letters as a section is not part of it.
@@ -134,7 +137,6 @@ final class NavigationTest extends TestCase
 
         self::assertContains('nav.subscriptions', $labels);
         self::assertContains('nav.settings', $labels);
-        self::assertNotContains('nav.import', $labels, 'A Viewer cannot import and should not be invited to.');
         self::assertNotContains('nav.audit', $labels, 'A Viewer cannot read the audit log.');
     }
 

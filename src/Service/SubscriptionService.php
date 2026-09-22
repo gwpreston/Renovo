@@ -524,8 +524,8 @@ final class SubscriptionService
         );
 
         $ownerUserId = $this->positiveInt($input['owner_user_id'] ?? null) ?? $scope->userId;
-        if ($scope->isOwnerRestricted()) {
-            // In ISOLATED mode a user may only ever own their own rows.
+        if ($scope->restrictsWritesToOwner()) {
+            // Somebody fenced to their own rows may only ever own what they make.
             $ownerUserId = $scope->userId;
         } elseif (!in_array($ownerUserId, $memberIds, true)) {
             $errors['owner_user_id'] = 'error.member.not_in_household';

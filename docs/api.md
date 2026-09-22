@@ -145,25 +145,33 @@ allows cannot disagree.
 API exposes — several below are reachable solely through the web interface.
 The list arrives in the order shown.
 
-| Permission | Viewer | Editor | Owner/Admin |
-| --- | :-: | :-: | :-: |
-| `subscription.view` | ✓ | ✓ | ✓ |
-| `subscription.create` | | ✓ | ✓ |
-| `subscription.update` | | ✓ | ✓ |
-| `subscription.delete` | | ✓ | ✓ |
-| `category.manage` | | ✓ | ✓ |
-| `tag.manage` | | ✓ | ✓ |
-| `budget.manage` | | ✓ | ✓ |
-| `price.manage` | | ✓ | ✓ |
-| `split.manage` | | ✓ | ✓ |
-| `usage.record` | | ✓ | ✓ |
-| `subscription.bulk_edit` | | ✓ | ✓ |
-| `household.manage` | | | ✓ |
-| `attachment.manage` | | ✓ | ✓ |
-| `data.import` | | ✓ | ✓ |
-| `backup.manage` | | | ✓ |
-| `audit.view` | | | ✓ |
-| `instance.manage` | | | |
+| Permission | Viewer | Contributor | Editor | Owner/Admin |
+| --- | :-: | :-: | :-: | :-: |
+| `subscription.view` | ✓ | ✓ | ✓ | ✓ |
+| `subscription.create` | | ✓ | ✓ | ✓ |
+| `subscription.update` | | ✓ | ✓ | ✓ |
+| `subscription.delete` | | ✓ | ✓ | ✓ |
+| `category.manage` | | | ✓ | ✓ |
+| `tag.manage` | | | ✓ | ✓ |
+| `budget.manage` | | ✓ | ✓ | ✓ |
+| `price.manage` | | ✓ | ✓ | ✓ |
+| `split.manage` | | ✓ | ✓ | ✓ |
+| `usage.record` | | ✓ | ✓ | ✓ |
+| `subscription.bulk_edit` | | | ✓ | ✓ |
+| `household.view` | | ✓ | ✓ | ✓ |
+| `household.manage` | | | | ✓ |
+| `attachment.manage` | | ✓ | ✓ | ✓ |
+| `data.import` | | | ✓ | ✓ |
+| `backup.manage` | | | | ✓ |
+| `audit.view` | | | | ✓ |
+| `instance.manage` | | | | |
+
+A **Contributor** holds what a writer holds, minus the four that cannot be
+confined to one member's own rows: `category.manage` and `tag.manage` change
+names that every subscription in the household shares, and `data.import` and
+`subscription.bulk_edit` write across rows by definition. Everything a
+Contributor *can* write, the scoping layer fences to rows they own — the
+permission says they may edit a subscription, and the repository decides whose.
 
 So a **Viewer holds exactly one permission**, `subscription.view`. That is what
 makes "a Viewer's write-capable token still cannot write" concrete: the token's
@@ -301,6 +309,7 @@ curl -H "Authorization: Bearer rnv_..." \
       "split.manage",
       "usage.record",
       "subscription.bulk_edit",
+      "household.view",
       "attachment.manage",
       "data.import"
     ]
@@ -308,7 +317,8 @@ curl -H "Authorization: Bearer rnv_..." \
 }
 ```
 
-`role` is one of `owner_admin`, `editor`, `viewer`, or `null` when the account
+`role` is one of `owner_admin`, `editor`, `contributor`, `viewer`, or `null` when
+the account
 holds no household membership. `isolation_mode` is `shared` or `isolated`.
 
 Responses: `200`, `401`.

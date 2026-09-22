@@ -17,9 +17,15 @@ use DateTimeImmutable;
  * one an existing service already produces — the statistics, the forecast, the
  * budget projection, the subscription list — and this assembles them into the
  * shapes the tiles render. That is the whole point: the dashboard's twelve-month
- * chart is literally the call the Forecast page makes, so the two cannot show
- * different totals for the same data, and a figure fixed in one place is fixed
- * on both screens.
+ * chart is literally the walk the Analytics page reconstructs the past from, so
+ * the two cannot show different totals for the same data, and a figure fixed in
+ * one place is fixed on both screens.
+ *
+ * The forecast is still read here — the metric tiles and the budget widget are
+ * projections — but it is no longer drawn. The year ahead is the Analytics
+ * page's trajectory and the Forecast page's whole subject; two twelve-month
+ * charts on the landing screen asked a reader to tell them apart before either
+ * had said anything.
  *
  * **One near window.** "Renewing soon" is fourteen days — the window the
  * cancel-by view already calls urgent — and the renewals metric is counted
@@ -29,6 +35,7 @@ use DateTimeImmutable;
  *
  * @phpstan-import-type BudgetProgress from BudgetService
  * @phpstan-import-type MonthTotals from ForecastService
+ * @phpstan-import-type MemberOverview from HouseholdOverviewService
  */
 final class DashboardService
 {
@@ -53,18 +60,19 @@ final class DashboardService
         private readonly SubscriptionService $subscriptions,
         private readonly ExchangeRateService $rates,
         private readonly SpendChartService $spendChart,
+        private readonly HouseholdOverviewService $household,
     ) {
     }
 
     /**
-     * The whole screen: the metric row, the two charts and the usage widget.
+     * The whole screen: the metric row, the chart and the usage widget.
      *
      * @return array{
      *     stats: array<string, mixed>,
      *     metrics: array<string, mixed>,
-     *     chart: array<string, mixed>,
      *     history: array<string, mixed>,
-     *     usage: array<string, mixed>
+     *     usage: array<string, mixed>,
+     *     member_shares: list<MemberOverview>
      * }
      */
     public function overview(Scope $scope): array
@@ -80,15 +88,39 @@ final class DashboardService
         return [
             'stats' => $stats,
             'metrics' => $this->metrics($stats, $soon, $months),
-            'chart' => $this->chart($months),
-            // The year behind, drawn by the same builder as the year ahead and
-            // reconstructed by `StatsService` from the same walk the Analytics
-            // page's year-over-year card reads — so the two price a given past
+            // The year behind, drawn by the same builder the Analytics page's
+            // trajectory uses and reconstructed by `StatsService` from the same
+            // walk its year-over-year card reads — so the two price a given past
             // charge identically, even though their windows differ (twelve
             // calendar months here, a rolling year there).
             'history' => $this->spendChart->fromHistory($this->stats->monthlyHistory($scope)),
             'usage' => $this->usage($scope, $stats),
+            // Who carries what, from the same service the household screen
+            // reads, so the card and the page cannot put different figures
+            // against the same name. Empty — and the card therefore silent —
+            // for a Viewer, for a household of one, and in ISOLATED mode,
+            // where there is nothing to compare because there is nothing
+            // honest to say about anybody else's spending.
+            'member_shares' => $this->memberShares($scope),
         ];
+    }
+
+    /**
+     * The member-shares card's rows, or none at all.
+     *
+     * The decision about whether the comparison is worth drawing belongs to the
+     * service that knows what is in the rows, not to a template counting them:
+     * "more than one member whose figures are actually shown" is a judgement
+     * about isolation, and isolation is not a thing a Twig file should be
+     * reasoning about.
+     *
+     * @return list<MemberOverview>
+     */
+    private function memberShares(Scope $scope): array
+    {
+        $members = $this->household->members($scope);
+
+        return $this->household->isWorthComparing($members) ? $members : [];
     }
 
     /**
@@ -170,22 +202,6 @@ final class DashboardService
         }
 
         return null;
-    }
-
-    /**
-     * The twelve-month spend chart.
-     *
-     * Built by `SpendChartService`, which the analytics screen's spending
-     * trajectory also calls with the same months. That is what makes "the two
-     * screens agree by construction" true of the code rather than of a comment:
-     * there is one payload builder, so there is one answer about March.
-     *
-     * @param list<MonthTotals> $months
-     * @return array<string, mixed>
-     */
-    private function chart(array $months): array
-    {
-        return $this->spendChart->fromMonths($months);
     }
 
     /**

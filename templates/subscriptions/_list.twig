@@ -48,7 +48,17 @@
                             <div class="cell-name">
                                 {{ logo.mark(subscription) }}
                                 <div>
-                                    <a href="/subscriptions/{{ subscription.id }}/edit">{{ subscription.name }}</a>
+                                    {#
+                                        A row you may change opens for changing;
+                                        one you may only read opens at its costs,
+                                        which is the read-only view of it. The
+                                        name stays a link either way — a list
+                                        where some names lead somewhere and
+                                        others do not reads as a fault.
+                                    #}
+                                    <a href="/subscriptions/{{ subscription.id }}{{
+                                        can_edit_row(scope, subscription) ? '/edit' : '/money'
+                                    }}">{{ subscription.name }}</a>
                                     {% if not subscription.isActive %}<span class="badge">{{ t('state.paused') }}</span>{% endif %}
                                     {% if subscription.isTrial %}
                                         <span class="badge badge-warning">{{ t('state.trial') }}</span>
@@ -118,7 +128,7 @@
                         <td class="actions">
                             <a class="button button-quiet"
                                href="/subscriptions/{{ subscription.id }}/money">{{ t('subscriptions_list.cost') }}</a>
-                            {% if can(scope, 'subscription.update') %}
+                            {% if can(scope, 'subscription.update') and can_edit_row(scope, subscription) %}
                                 <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="inline">
                                     {{ csrf_field() }}
                                     <button type="submit" class="button button-quiet">
@@ -126,7 +136,7 @@
                                     </button>
                                 </form>
                             {% endif %}
-                            {% if can(scope, 'subscription.delete') %}
+                            {% if can(scope, 'subscription.delete') and can_edit_row(scope, subscription) %}
                                 <form method="post" action="/subscriptions/{{ subscription.id }}/delete" class="inline"
                                       onsubmit="return confirm('{{ t('confirm.delete_subscription', {'name': subscription.name})|e('js') }}')">
                                     {{ csrf_field() }}

@@ -44,6 +44,7 @@ use App\Controller\CancellationController;
 use App\Controller\CategoryController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
+use App\Controller\HouseholdController;
 use App\Controller\ImportController;
 use App\Controller\MemberController;
 use App\Controller\NotificationController;
@@ -303,6 +304,20 @@ return static function (App $app): void {
         // and every member of the household fetches every other member's. The
         // service answers 404 for anybody outside it.
         $group->get('/avatars/{id:[0-9]+}', [AccountController::class, 'avatar'])->setName('avatar');
+
+        // ------------------------------------------------------------------
+        // The household, read-only
+        //
+        // Not under /settings, and not behind ManageHousehold: it administers
+        // nothing. What it shows is each member's share of what the household
+        // spends, which is why it asks for a writer's permission rather than a
+        // reader's — a Viewer has been given sight of the subscriptions, not of
+        // what everybody else pays for them. Managing the people themselves is
+        // /settings/members, which this links to for whoever may use it.
+        // ------------------------------------------------------------------
+        $group->get('/household', [HouseholdController::class, 'index'])
+            ->setName('household')
+            ->add($requires(Permission::ViewHousehold));
 
         $group->get('/settings', [SettingsController::class, 'index'])->setName('settings');
 

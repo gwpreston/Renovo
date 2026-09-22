@@ -43,7 +43,7 @@ final class ApiDocCoverageTest extends TestCase
     /**
      * The header row of the role matrix.
      */
-    private const ROLE_TABLE = '| Permission | Viewer | Editor | Owner/Admin |';
+    private const ROLE_TABLE = '| Permission | Viewer | Contributor | Editor | Owner/Admin |';
 
     public function testEveryApiRouteIsDocumentedAndEveryDocumentedRouteExists(): void
     {
@@ -67,6 +67,7 @@ final class ApiDocCoverageTest extends TestCase
 
         $columns = [
             'Viewer' => Role::Viewer,
+            'Contributor' => Role::Contributor,
             'Editor' => Role::Editor,
             'Owner/Admin' => Role::OwnerAdmin,
         ];
@@ -120,7 +121,9 @@ final class ApiDocCoverageTest extends TestCase
     {
         $editor = [];
         foreach ($this->roleMatrix() as $value => $held) {
-            if ($held[1]) {
+            // Index 2: the columns are Viewer, Contributor, Editor, Owner/Admin,
+            // so an Editor is the third of the four.
+            if ($held[2]) {
                 $editor[] = $value;
             }
         }
@@ -208,6 +211,7 @@ final class ApiDocCoverageTest extends TestCase
                 $cells[1] !== '',
                 $cells[2] !== '',
                 $cells[3] !== '',
+                $cells[4] !== '',
             ];
         }
 
