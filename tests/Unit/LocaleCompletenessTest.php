@@ -94,6 +94,29 @@ final class LocaleCompletenessTest extends TestCase
     }
 
     /**
+     * No message carries an escape sequence as literal text.
+     *
+     * A catalogue entry in single quotes keeps `\n` as a backslash and an "n",
+     * so a mail body written that way arrives as one long line with the
+     * escapes printed in it. Messages that need a line break are written in
+     * double quotes; this catches one that is not, in any shipped locale.
+     */
+    public function testNoMessageHoldsALiteralEscapeSequence(): void
+    {
+        $loader = new CatalogLoader(dirname(__DIR__, 2) . '/translations');
+
+        foreach ($loader->availableLocales() as $locale) {
+            foreach ($loader->load($locale) as $key => $message) {
+                self::assertDoesNotMatchRegularExpression(
+                    '/\\\\[nrt]/',
+                    $message,
+                    sprintf('"%s" in locale "%s" holds a literal escape; write it in double quotes.', $key, $locale),
+                );
+            }
+        }
+    }
+
+    /**
      * The shipped catalogues, checked here as well as in CI so that a locale
      * cannot drift between pushes.
      */

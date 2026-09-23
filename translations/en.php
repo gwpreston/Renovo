@@ -141,18 +141,18 @@ return [
     'flash.password_changed_sessions' =>
         'Your password has been changed, and {count, plural, one {# other session was} other {# other sessions were}} signed out.',
     'mail.email_change.body' =>
-        'Hello {name},\n\nConfirm that you can read mail at this address, and it becomes the one '
-        . 'you sign in with:\n\n{link}\n\nThe link is valid for one hour. Until you follow it, '
+        "Hello {name},\n\nConfirm that you can read mail at this address, and it becomes the one "
+        . "you sign in with:\n\n{link}\n\nThe link is valid for one hour. Until you follow it, "
         . 'nothing changes. If you did not ask for this, you can ignore this message.',
     'mail.email_change.subject' => 'Confirm your new {instance} address',
     'mail.email_change_notice.body' =>
-        'Hello {name},\n\nSomebody asked to move your {instance} account to {new_email}. Nothing '
+        "Hello {name},\n\nSomebody asked to move your {instance} account to {new_email}. Nothing "
         . 'has changed yet: this address is still your sign-in until the new one is '
-        . 'confirmed.\n\nIf that was not you, sign in and change your password now.',
+        . "confirmed.\n\nIf that was not you, sign in and change your password now.",
     'mail.email_change_notice.subject' => 'A change of address was requested on {instance}',
     'mail.invite.body' =>
-        'Hello {name},\n\n{inviter} has added you to their household on {instance}, a shared '
-        . 'subscription tracker.\n\nChoose a password and you are in:\n\n{link}\n\nThe link is '
+        "Hello {name},\n\n{inviter} has added you to their household on {instance}, a shared "
+        . "subscription tracker.\n\nChoose a password and you are in:\n\n{link}\n\nThe link is "
         . 'valid for seven days. If you were not expecting this, you can ignore this message.',
     'mail.invite.subject' => '{inviter} has invited you to {instance}',
     'members.actions' => 'Actions',
@@ -1779,16 +1779,16 @@ return [
 
     // mail
     'mail.password_changed.body' =>
-        'Hello {name},\n\nYour password has just been changed. If this was not you, contact the '
+        "Hello {name},\n\nYour password has just been changed. If this was not you, contact the "
         . 'administrator of this instance immediately.',
     'mail.password_changed.subject' => 'Your {instance} password was changed',
     'mail.reset.body' =>
-        'Hello {name},\n\nSomeone asked to reset the password for this account. If it was you, follow '
-        . 'this link within the next hour:\n\n{link}\n\nIf it was not you, no action is needed — the '
+        "Hello {name},\n\nSomeone asked to reset the password for this account. If it was you, follow "
+        . "this link within the next hour:\n\n{link}\n\nIf it was not you, no action is needed — the "
         . 'password has not changed.',
     'mail.reset.subject' => 'Reset your {instance} password',
     'mail.verify.body' =>
-        'Hello {name},\n\nConfirm your email address to finish setting up your account:\n\n{link}\n\nThe '
+        "Hello {name},\n\nConfirm your email address to finish setting up your account:\n\n{link}\n\nThe "
         . 'link is valid for two days. If you did not create an account, you can ignore this message.',
     'mail.verify.subject' => 'Confirm your {instance} account',
 

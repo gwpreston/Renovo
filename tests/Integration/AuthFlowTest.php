@@ -312,6 +312,12 @@ final class AuthFlowTest extends DatabaseTestCase
 
         $this->resets->request('reset@example.test', '10.0.0.3');
 
+        // Paragraphs, not the two characters "\n": the catalogue once held
+        // these bodies in single quotes, which PHP does not unescape, and
+        // every mail arrived as one line with the escapes printed in it.
+        $body = $this->mailer->lastBody();
+        self::assertStringNotContainsString('\n', $body);
+        self::assertMatchesRegularExpression("/Hello [^\r\n]+,\r?\n\r?\nSomeone asked/", $body);
 
         $token = $this->mailer->lastToken();
         self::assertNotNull($token);
