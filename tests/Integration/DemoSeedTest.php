@@ -11,6 +11,7 @@ use App\Repository\UserRepository;
 use App\Security\ScopeFactory;
 use App\Service\BudgetService;
 use App\Service\DemoSeedService;
+use App\Service\PaymentMethodService;
 use App\Service\SubscriptionService;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
@@ -161,6 +162,33 @@ final class DemoSeedTest extends DatabaseTestCase
         }
 
         self::assertGreaterThan(0, $over, 'One of the contributor\'s budgets is deliberately blown.');
+    }
+
+    public function testTheHouseholdHasTheDefaultPaymentMethodsAndUsesThem(): void
+    {
+        $owner = $this->scopeFor(DemoSeedService::EMAIL);
+        $methods = $this->container->get(PaymentMethodService::class)->all($owner);
+
+        self::assertCount(10, $methods, 'the demo household is given the defaults, as every new household is');
+
+        $subscriptions = $this->container->get(SubscriptionService::class)->allForStats($owner, false);
+        $assigned = array_filter($subscriptions, static fn ($s): bool => $s->paymentMethodId !== null);
+
+        // Assigned across the household, so the breakdown has several segments —
+        // and one row deliberately left without, so it has the unassigned one.
+        self::assertCount(count($subscriptions) - 1, $assigned);
+        self::assertGreaterThanOrEqual(
+            5,
+            count(array_unique(array_map(static fn ($s): ?int => $s->paymentMethodId, $assigned))),
+        );
+
+        // The Contributor's rows are assigned too, and through their own scope.
+        $rowan = $this->member(DemoSeedService::CONTRIBUTOR_EMAIL);
+        $theirs = array_filter($assigned, static fn ($s): bool => $s->ownerUserId === $rowan);
+        self::assertNotSame([], $theirs);
+
+        $byMethod = $this->container->get(\App\Service\StatsService::class)->dashboard($owner)['by_payment_method'];
+        self::assertGreaterThanOrEqual(5, count($byMethod));
     }
 
     public function testSeedingTwiceChangesNothing(): void

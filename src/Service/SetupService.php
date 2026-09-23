@@ -38,6 +38,7 @@ final class SetupService
         private readonly InstanceSettingsService $settings,
         private readonly PasswordHasher $hasher,
         private readonly AuthService $auth,
+        private readonly PaymentMethodService $paymentMethods,
         private readonly Clock $clock,
     ) {
     }
@@ -101,6 +102,8 @@ final class SetupService
         if ($user === null) {
             throw new RuntimeException('The administrator account could not be read back after creation.');
         }
+
+        $this->paymentMethods->seedForNewHousehold($user, $householdId);
 
         return $user;
     }

@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Domain\IsolationMode;
+use App\Domain\Role;
+use App\Security\Scope;
+use App\Security\ScopeFactory;
+use App\Service\LogoStorage;
+use App\Service\PaymentMethodService;
+use App\Repository\PaymentMethodRepository;
 use App\Repository\AuditLogRepository;
 use App\Repository\AuthAttemptRepository;
 use App\Repository\HouseholdRepository;
@@ -87,6 +94,13 @@ final class AuthFlowTest extends DatabaseTestCase
             TestTranslator::create(),
             $locales,
             $audit,
+            new PaymentMethodService(
+                new PaymentMethodRepository($this->db),
+                new LogoStorage(sys_get_temp_dir() . '/renovo-test-logos', 1024 * 1024),
+                TestTranslator::create(),
+                $locales,
+                new ScopeFactory($memberships, $settings),
+            ),
             $this->clock,
             'https://renovo.test',
         );
@@ -147,6 +161,18 @@ final class AuthFlowTest extends DatabaseTestCase
 
         self::assertCount(1, $memberships);
         self::assertSame('owner_admin', $memberships[0]->role->value);
+
+        // And the household starts with the default payment methods, so there
+        // is something to choose from on the first subscription.
+        $methods = (new PaymentMethodRepository($this->db))->findAll(Scope::forMember(
+            $user->id,
+            false,
+            $memberships[0]->householdId,
+            Role::OwnerAdmin,
+            IsolationMode::Shared,
+        ));
+        self::assertCount(10, $methods);
+        self::assertContains('Direct Debit', array_map(static fn ($m): string => $m->name, $methods));
     }
 
     public function testDuplicateEmailIsRejectedRegardlessOfCase(): void
@@ -285,6 +311,7 @@ final class AuthFlowTest extends DatabaseTestCase
         $this->mailer->reset();
 
         $this->resets->request('reset@example.test', '10.0.0.3');
+
 
         $token = $this->mailer->lastToken();
         self::assertNotNull($token);

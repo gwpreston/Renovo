@@ -73,6 +73,7 @@ final class AnalyticsScreenService
      *     trajectory: array<string, mixed>,
      *     history: array<string, mixed>,
      *     categories: array<string, mixed>,
+     *     payment_methods: array<string, mixed>,
      *     year_over_year: array<string, mixed>,
      *     notable: array{highest: NotableRow|null, lowest: NotableRow|null, excluded_count: int},
      *     insights: list<Insight>,
@@ -95,6 +96,7 @@ final class AnalyticsScreenService
 
         $all = $this->subscriptions->allForStats($scope);
         $breakdown = $this->breakdown->fromStats($stats);
+        $byMethod = $this->breakdown->fromStats($stats, CategoryBreakdownService::BY_PAYMENT_METHOD);
 
         // Computed once and handed to both the insight rules and the ranking
         // at the foot of the page. It is a pure read of the rows above, but two
@@ -113,6 +115,9 @@ final class AnalyticsScreenService
             // than equal.
             'history' => $this->spendChart->fromHistory($this->stats->monthlyHistory($scope)),
             'categories' => $breakdown + ['donut' => $this->donut($breakdown)],
+            // The same breakdown and the same degrade, grouped by what each
+            // subscription is paid with rather than what it is for.
+            'payment_methods' => $byMethod + ['donut' => $this->donut($byMethod)],
             'year_over_year' => $this->stats->yearOverYear($scope),
             'notable' => $this->notable($all),
             // After the catch-up, like everything else here: insights read
@@ -201,6 +206,14 @@ final class AnalyticsScreenService
                 'display' => $this->money->formatMinor($row['amount_minor'], $currency),
                 'percent' => $row['percent'],
                 'is_other' => false,
+                // A payment method's own colour when it has one; null takes
+                // the palette. Categories carry none, so their donut is as it
+                // was.
+                'colour' => $row['colour'],
+                // The subscriptions with no payment method, which the
+                // statistics name with the empty string. Its label is the
+                // canvas's `data-unassigned-label`, like the tail's.
+                'is_unassigned' => $row['name'] === '',
             ];
         }
 
@@ -215,6 +228,8 @@ final class AnalyticsScreenService
                 'display' => $this->money->formatMinor($group['other']['amount_minor'], $currency),
                 'percent' => $group['other']['percent'],
                 'is_other' => true,
+                'colour' => null,
+                'is_unassigned' => false,
             ];
         }
 

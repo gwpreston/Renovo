@@ -1,5 +1,5 @@
 /**
- * The analytics screen's category donut.
+ * The analytics screen's donuts — spend by category and by payment method.
  *
  * The same contract as the spend chart, for the same reason: the server has
  * already done everything that involves money. Each segment arrives as integer
@@ -41,14 +41,27 @@ const SERIES = [
 
 const TAIL = ['--series-other', '#6b7280'];
 
-function configFor(data, otherLabel) {
-    const labels = data.slices.map((slice) => (slice.is_other ? otherLabel : slice.name));
+function labelFor(slice, otherLabel, unassignedLabel) {
+    if (slice.is_other) {
+        return otherLabel;
+    }
+
+    return slice.is_unassigned ? unassignedLabel : slice.name;
+}
+
+function configFor(data, otherLabel, unassignedLabel) {
+    const labels = data.slices.map((slice) => labelFor(slice, otherLabel, unassignedLabel));
     const values = data.slices.map((slice) => slice.minor);
 
     /* The tail always takes the muted hue, whichever position it lands in, so
        "everything else" reads as everything else rather than as a seventh
-       category. */
+       category. A segment that arrives with a colour of its own — a payment
+       method somebody chose one for — keeps it; the rest take the palette. */
     const colours = data.slices.map((slice, index) => {
+        if (!slice.is_other && typeof slice.colour === 'string' && slice.colour !== '') {
+            return slice.colour;
+        }
+
         const [name, fallback] = slice.is_other ? TAIL : SERIES[index % SERIES.length];
 
         return token(name, fallback);
@@ -126,6 +139,10 @@ export async function drawCategoryDonuts(root = document) {
         /* The tail's name is the one label that needed translating, so the
            server resolved it and put it on the canvas rather than sending a
            second copy of the catalogue. */
-        await drawInCard(canvas, configFor(data, canvas.dataset.otherLabel ?? ''));
+        await drawInCard(canvas, configFor(
+            data,
+            canvas.dataset.otherLabel ?? '',
+            canvas.dataset.unassignedLabel ?? '',
+        ));
     }));
 }

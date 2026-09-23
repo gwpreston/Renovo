@@ -10,6 +10,7 @@ use App\Domain\Role;
 use App\Domain\SplitMode;
 use App\Domain\WeekStart;
 use App\Repository\CategoryRepository;
+use App\Repository\PaymentMethodRepository;
 use App\Repository\ExchangeRateRepository;
 use App\Repository\HouseholdRepository;
 use App\Repository\InstanceSettingsRepository;
@@ -88,6 +89,7 @@ final class CalendarRailTest extends DatabaseTestCase
         $subscriptionService = new SubscriptionService(
             $this->subscriptions,
             new CategoryRepository($this->db),
+            new PaymentMethodRepository($this->db),
             new TagRepository($this->db),
             TestLogoFetcher::silent($this->db, $this->clock),
             $memberships,

@@ -21,6 +21,17 @@
         </section>
     {% endif %}
 
+    {% if can(scope, 'category.manage') %}
+        <section class="card">
+            <h2>{{ t('settings.lists') }}</h2>
+            <p class="muted">{{ t('settings.lists_intro') }}</p>
+            <div class="form-actions">
+                <a class="button" href="/categories">{{ t('nav.categories') }}</a>
+                <a class="button" href="/payment-methods">{{ t('nav.payment_methods') }}</a>
+            </div>
+        </section>
+    {% endif %}
+
     {% if household %}
         <section class="card">
             <h2>{{ t('settings.household') }}</h2>

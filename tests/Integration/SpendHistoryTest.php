@@ -10,6 +10,7 @@ use App\Domain\PriceChangeSource;
 use App\Domain\Role;
 use App\I18n\LocaleContext;
 use App\Repository\CategoryRepository;
+use App\Repository\PaymentMethodRepository;
 use App\Repository\ExchangeRateRepository;
 use App\Repository\HouseholdRepository;
 use App\Repository\InstanceSettingsRepository;
@@ -94,6 +95,7 @@ final class SpendHistoryTest extends DatabaseTestCase
         $subscriptionService = new SubscriptionService(
             $this->subscriptions,
             new CategoryRepository($this->db),
+            new PaymentMethodRepository($this->db),
             new TagRepository($this->db),
             TestLogoFetcher::silent($this->db, $clock),
             $memberships,

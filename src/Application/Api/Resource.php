@@ -7,6 +7,7 @@ namespace App\Application\Api;
 use App\Domain\Entity\ApiToken;
 use App\Domain\Entity\Attachment;
 use App\Domain\Entity\Category;
+use App\Domain\Entity\PaymentMethod;
 use App\Domain\Entity\Subscription;
 use App\Domain\Entity\Tag;
 use DateTimeImmutable;
@@ -56,6 +57,8 @@ final class Resource
             'is_active' => $subscription->isActive,
             'category_id' => $subscription->categoryId,
             'category_name' => $subscription->categoryName,
+            'payment_method_id' => $subscription->paymentMethodId,
+            'payment_method_name' => $subscription->paymentMethodName,
             'owner_user_id' => $subscription->ownerUserId,
             'payer_user_id' => $subscription->payerUserId,
             'tags' => array_map(static fn (Tag $tag): string => $tag->name, $subscription->tags),
@@ -85,6 +88,20 @@ final class Resource
             'id' => $category->id,
             'name' => $category->name,
             'colour' => $category->colour,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function paymentMethod(PaymentMethod $method): array
+    {
+        return [
+            'id' => $method->id,
+            'name' => $method->name,
+            'colour' => $method->colour,
+            'icon' => $method->icon,
+            'logo_path' => $method->logoPath,
         ];
     }
 

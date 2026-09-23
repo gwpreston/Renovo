@@ -9,6 +9,7 @@ use App\Domain\IsolationMode;
 use App\Domain\Role;
 use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
+use App\Repository\PaymentMethodRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Security\Scope;
@@ -72,9 +73,21 @@ final class AccessibilityTest extends DatabaseTestCase
         $this->householdId = $households->create('Household', $this->userId);
         $memberships->create($this->householdId, $this->userId, Role::OwnerAdmin);
 
+        $scope = Scope::forMember($this->userId, true, $this->householdId, Role::OwnerAdmin, IsolationMode::Shared);
+
+        // Two payment methods, one with an uploaded logo and one with only an
+        // icon, so the management rows, the form's badge and the list's badge
+        // are all rendered in their populated states — the empty list checks
+        // none of their controls.
+        $methods = new PaymentMethodRepository($this->db);
+        $logo = 'assets/logos/' . str_repeat('a', 32) . '.png';
+        $withLogo = $methods->create($scope, 'Joint card', '#1069bb', null, $logo);
+        $methods->create($scope, 'Direct Debit', null, 'payment-bank', null);
+
         $this->subscriptionId = (new SubscriptionRepository($this->db))->create(
-            Scope::forMember($this->userId, true, $this->householdId, Role::OwnerAdmin, IsolationMode::Shared),
+            $scope,
             [
+                'payment_method_id' => $withLogo,
                 'name' => 'A subscription',
                 'price_minor' => 999,
                 'currency' => 'GBP',
@@ -108,6 +121,7 @@ final class AccessibilityTest extends DatabaseTestCase
             ['/cancellations'],
             ['/stats'],
             ['/categories'],
+            ['/payment-methods'],
             ['/profile'],
             ['/settings'],
             ['/settings/notifications'],

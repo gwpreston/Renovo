@@ -22,7 +22,8 @@ use App\Domain\Entity\Subscription;
  *  - `is_trial` is `($input['is_trial'] ?? '0') !== '1'` read the other way
  *    round, so JSON `true` would clear the trial it was setting.
  *  - an absent `category_id`, `payer_user_id` or `notes` is written as null,
- *    silently clearing a field the client never mentioned.
+ *    silently clearing a field the client never mentioned. (`payment_method_id`
+ *    is the exception, and deliberately: see `toServiceInput()`.)
  *
  * The fix is to translate here rather than to loosen the service. Those rules
  * are load-bearing for the web form — the three-state `reminder_days` handling
@@ -75,6 +76,14 @@ final class SubscriptionPayload
             'tags' => self::tags($json),
             'reminder_days' => self::reminderDays($json),
         ];
+
+        // Present or absent, unlike `category_id`. The field arrived after the
+        // API did, and a client written before it sends a body without it; an
+        // absent key is left out of the input, which the service reads as
+        // "leave the assignment alone". Only an explicit null clears it.
+        if (array_key_exists('payment_method_id', $json)) {
+            $input['payment_method_id'] = self::intString($json, 'payment_method_id');
+        }
 
         // The logo is not part of this representation: it is a file, with its
         // own upload and delete endpoints. Carrying the stored path forward

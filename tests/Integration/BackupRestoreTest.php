@@ -15,6 +15,7 @@ use App\Service\AttachmentStorage;
 use App\Service\BackupService;
 use App\Service\BudgetService;
 use App\Service\CategoryService;
+use App\Service\PaymentMethodService;
 use App\Service\SubscriptionService;
 use App\Service\ValidationException;
 use App\Support\Clock;
@@ -450,6 +451,155 @@ final class BackupRestoreTest extends DatabaseTestCase
         );
 
         self::assertEqualsCanonicalizing(['Already here', 'From the archive'], $names);
+    }
+
+    public function testPaymentMethodsAndTheirAssignmentsSurviveTheRoundTrip(): void
+    {
+        $methods = $this->container->get(PaymentMethodService::class);
+
+        // The source has a method of its own, with a colour and an uploaded
+        // logo, and one that shares its name with a default.
+        $jointCard = $methods->create($this->source, 'Joint card', '#1069bb', FakeUpload::png('joint.png'));
+        $paypal = $methods->create($this->source, 'PayPal', null);
+
+        $this->subscriptions->create($this->source, [
+            'name' => 'Streaming',
+            'price' => '10.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'payment_method_id' => (string) $jointCard,
+        ]);
+        $this->subscriptions->create($this->source, [
+            'name' => 'Music',
+            'price' => '5.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'payment_method_id' => (string) $paypal,
+        ]);
+        $this->subscriptions->create($this->source, [
+            'name' => 'Unassigned',
+            'price' => '1.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ]);
+
+        // The target already has the defaults, as every new household does.
+        $methods->seedDefaults($this->target, 'en');
+        $targetPaypal = null;
+        foreach ($methods->all($this->target) as $method) {
+            if ($method->name === 'PayPal') {
+                $targetPaypal = $method->id;
+            }
+        }
+        self::assertNotNull($targetPaypal);
+
+        $archive = $this->export();
+        $summary = $this->backups->restore($this->target, $this->targetUser, $archive);
+
+        // "PayPal" merged into the one already there; only the new one counted.
+        self::assertSame(1, $summary['payment_methods']);
+        self::assertSame(3, $summary['subscriptions']);
+        self::assertSame(0, $summary['skipped']);
+
+        $restoredMethods = [];
+        foreach ($methods->all($this->target) as $method) {
+            $restoredMethods[$method->name] = $method;
+        }
+        self::assertCount(11, $restoredMethods);
+
+        $joint = $restoredMethods['Joint card'];
+        self::assertSame('#1069bb', $joint->colour);
+        self::assertNotNull($joint->logoPath);
+        self::assertMatchesRegularExpression('#^assets/logos/[0-9a-f]{32}\.png$#', (string) $joint->logoPath);
+        self::assertFileExists($this->logoDirectory . '/' . basename((string) $joint->logoPath));
+
+        $restored = [];
+        foreach ($this->subscriptions->allForStats($this->target, activeOnly: false) as $subscription) {
+            $restored[$subscription->name] = $subscription;
+        }
+
+        // By name, into the target's own rows — never the source's ids.
+        self::assertSame($joint->id, $restored['Streaming']->paymentMethodId);
+        self::assertSame($targetPaypal, $restored['Music']->paymentMethodId);
+        self::assertNull($restored['Unassigned']->paymentMethodId);
+        self::assertNotSame($jointCard, $restored['Streaming']->paymentMethodId);
+    }
+
+    public function testAnArchiveFromBeforePaymentMethodsStillRestores(): void
+    {
+        $this->subscriptions->create($this->source, [
+            'name' => 'Streaming',
+            'price' => '9.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ]);
+
+        $archive = $this->export();
+
+        // Rewrite the archive the way an older version wrote it: no list of
+        // payment methods and no assignment on the rows.
+        $data = $this->readArchiveJson($archive, 'data.json');
+        unset($data['payment_methods']);
+        foreach ($data['subscriptions'] as $index => $row) {
+            unset(
+                $data['subscriptions'][$index]['payment_method_id'],
+                $data['subscriptions'][$index]['payment_method_name'],
+            );
+        }
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($archive) === true);
+        $zip->addFromString('data.json', json_encode($data, JSON_THROW_ON_ERROR));
+        $zip->close();
+
+        $summary = $this->backups->restore($this->target, $this->targetUser, $archive);
+
+        self::assertSame(1, $summary['subscriptions']);
+        self::assertSame(0, $summary['payment_methods']);
+        self::assertNull($this->subscriptions->allForStats($this->target, activeOnly: false)[0]->paymentMethodId);
+    }
+
+    public function testAnIsolatedExportCarriesTheMethodsButOnlyTheExportersRows(): void
+    {
+        $methods = $this->container->get(PaymentMethodService::class);
+        $card = $methods->create($this->source, 'Owner card', null);
+
+        // The owner's row, paid with the owner's card.
+        $this->subscriptions->create($this->source, [
+            'name' => 'Owner only',
+            'price' => '9.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'payment_method_id' => (string) $card,
+        ]);
+
+        $partner = Scope::forMember(
+            $this->partnerId,
+            false,
+            (int) $this->source->householdId,
+            Role::Editor,
+            IsolationMode::Isolated,
+        );
+        $partnerUser = (new UserRepository($this->db))->findById($this->partnerId);
+        self::assertNotNull($partnerUser);
+
+        $path = $this->backups->export($partner, $partnerUser, 'Test instance');
+        $this->temporaryFiles[] = $path;
+        $data = $this->readArchiveJson($path, 'data.json');
+
+        // Household-wide labels travel, as categories do; somebody else's
+        // subscription does not, whatever it is paid with.
+        self::assertSame(['Owner card'], array_column($data['payment_methods'], 'name'));
+        self::assertSame([], $data['subscriptions']);
     }
 
     private function export(): string

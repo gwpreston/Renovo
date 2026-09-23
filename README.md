@@ -191,6 +191,19 @@ Built in phases:
   thing the offline rule does not permit, so it waits for a phase that can say
   so plainly rather than arriving with an asterisk. See
   [Notifications](#notifications).
+- **Phase 17 — payment methods — complete.** What each subscription is paid
+  with: a household-wide list managed beside Categories, a select on the
+  subscription form, a badge on the list, and a spend-by-payment-method donut
+  on Analytics that degrades to per-currency figures exactly as the category
+  one does. A payment method is a label with a picture — it holds no amount and
+  stores no card number. Every new household starts with ten defaults (cards,
+  direct debit, PayPal, the app stores…) drawn with generic icons rather than
+  anybody's trademark; a household that wants a brand's logo uploads it. A
+  household that predates the phase gets the same list from a button on the
+  empty screen. The API carries `payment_method_id` — where, unlike the older
+  fields, an absent key leaves the assignment alone so an existing client
+  cannot clear it — and backups carry the list, its logos and every
+  assignment, matched by name on the way back in.
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than

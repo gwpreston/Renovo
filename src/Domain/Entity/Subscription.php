@@ -65,6 +65,16 @@ final class Subscription
          * to an entity that predates it, like the display preferences on User.
          */
         public readonly bool $ownerHasAvatar = false,
+        /**
+         * What it is paid with, joined for display as the category is. The
+         * icon and logo are the method's, carried here so the list can draw
+         * a badge without a query per row.
+         */
+        public readonly ?int $paymentMethodId = null,
+        public readonly ?string $paymentMethodName = null,
+        public readonly ?string $paymentMethodIcon = null,
+        public readonly ?string $paymentMethodLogoPath = null,
+        public readonly ?string $paymentMethodColour = null,
     ) {
     }
 

@@ -14,6 +14,7 @@ use App\Repository\MembershipRepository;
 use App\Security\ScopeViolationException;
 use App\Security\SessionInterface;
 use App\Service\CategoryService;
+use App\Service\PaymentMethodService;
 use App\Service\LogoStorage;
 use App\Service\BulkActionService;
 use App\Service\CatchUpService;
@@ -39,6 +40,7 @@ final class SubscriptionController extends Controller
         Translator $translator,
         private readonly SubscriptionService $subscriptions,
         private readonly CategoryService $categories,
+        private readonly PaymentMethodService $paymentMethods,
         private readonly TagService $tags,
         private readonly MembershipRepository $memberships,
         private readonly LogoStorage $logos,
@@ -209,6 +211,7 @@ final class SubscriptionController extends Controller
             // would read as "use my usual schedule".
             'reminder_days' => $subscription->reminderDays === '' ? 'none' : $subscription->reminderDays,
             'category_id' => $subscription->categoryId,
+            'payment_method_id' => $subscription->paymentMethodId,
             'owner_user_id' => $subscription->ownerUserId,
             'payer_user_id' => $subscription->payerUserId,
             'notes' => $subscription->notes,
@@ -310,6 +313,7 @@ final class SubscriptionController extends Controller
             'errors' => $errors,
             'subscription_id' => $id,
             'categories' => $this->categories->all($scope),
+            'payment_methods' => $this->paymentMethods->all($scope),
             'members' => $scope->hasHousehold()
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],

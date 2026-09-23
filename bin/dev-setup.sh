@@ -600,6 +600,20 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
                 | head -1
         }
 
+        # The payment methods the setup wizard gave the household — the
+        # defaults every new household starts with — read back out of the same
+        # form, and out of that select alone, so a category and a method that
+        # happened to share a name could not be confused.
+        payment_method_id() {
+            local select="${CATEGORY_HTML#*name=\"payment_method_id\"}"
+            select="${select%%</select>*}"
+            printf '%s' "$select" \
+                | tr '\n' ' ' \
+                | tr '<' '\n' \
+                | sed -n "s|^option value=\"\([0-9]*\)\"[^>]*>$1\$|\1|p" \
+                | head -1
+        }
+
         # ------------------------------------------------- subscriptions
         CREATED=0
         LAST_ID=""
@@ -655,6 +669,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
             -d "next_payment_date=$(today_plus 5)"  -d "start_date=$(months_ago 26)" \
             -d "category_id=$(category_id Streaming)" \
+            -d "payment_method_id=$(payment_method_id 'Credit Card')" \
             -d "notice_period_amount=14" -d "notice_period_unit=days" \
             -d "tags=streaming, shared" -d "is_active=1"
         [ -n "$LAST_ID" ] && schedule_price_change "$LAST_ID" "17.99" "GBP" "$(today_plus 38)"
@@ -663,6 +678,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
             -d "next_payment_date=$(today_plus 21)" -d "start_date=$(months_ago 30)" \
             -d "category_id=$(category_id Music)" \
+            -d "payment_method_id=$(payment_method_id 'PayPal')" \
             -d "tags=music, shared" -d "is_active=1"
         [ -n "$LAST_ID" ] && schedule_price_change "$LAST_ID" "21.99" "GBP" "$(today_plus 52)"
 
@@ -670,12 +686,14 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=weekly" \
             -d "next_payment_date=$(today_plus 2)"  -d "start_date=$(months_ago 18)" \
             -d "category_id=$(category_id Health)" \
+            -d "payment_method_id=$(payment_method_id 'Debit Card')" \
             -d "tags=health" -d "is_active=1"
 
         add_subscription -d "name=Domain renewal" -d "price=11.00" -d "currency=USD" \
             -d "subscription_type=recurring" -d "billing_cycle=yearly" \
             -d "next_payment_date=$(today_plus 120)" -d "start_date=$(months_ago 25)" \
             -d "category_id=$(category_id Utilities)" \
+            -d "payment_method_id=$(payment_method_id 'Credit Card')" \
             -d "notice_period_amount=1" -d "notice_period_unit=months" \
             -d "tags=infrastructure" -d "is_active=1"
 
@@ -683,12 +701,14 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=custom_days" \
             -d "cycle_days=28" -d "next_payment_date=$(today_plus 9)" \
             -d "start_date=$(months_ago 20)" -d "category_id=$(category_id Health)" \
+            -d "payment_method_id=$(payment_method_id 'Direct Debit')" \
             -d "tags=health" -d "is_active=1"
 
         add_subscription -d "name=Cloud backup"   -d "price=59.00" -d "currency=GBP" \
             -d "subscription_type=recurring" -d "billing_cycle=yearly" \
             -d "next_payment_date=$(today_plus 64)" -d "start_date=$(months_ago 27)" \
             -d "category_id=$(category_id Software)" \
+            -d "payment_method_id=$(payment_method_id 'Credit Card')" \
             -d "tags=work" -d "is_active=1"
         [ -n "$LAST_ID" ] && schedule_price_change "$LAST_ID" "65.00" "GBP" "$(today_plus 71)"
 
@@ -696,6 +716,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
             -d "next_payment_date=$(today_plus 25)" -d "start_date=$(months_ago 14)" \
             -d "category_id=$(category_id Software)" \
+            -d "payment_method_id=$(payment_method_id 'PayPal')" \
             -d "tags=work" -d "is_active=1"
 
         # A trial, so the trials card and the conversion countdown have a row.
@@ -703,6 +724,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
             -d "next_payment_date=$(today_plus 9)" -d "start_date=$(days_ago 21)" \
             -d "category_id=$(category_id Streaming)" \
+            -d "payment_method_id=$(payment_method_id 'Debit Card')" \
             -d "is_trial=1" -d "trial_end_date=$(today_plus 9)" \
             -d "converts_to_price=14.99" -d "tags=trial" -d "is_active=1"
 
@@ -710,16 +732,19 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
         add_subscription -d "name=Old newspaper"  -d "price=8.00"  -d "currency=GBP" \
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
             -d "next_payment_date=$(today_plus 30)" -d "start_date=$(months_ago 22)" \
-            -d "category_id=$(category_id Streaming)" -d "is_active=0"
+            -d "category_id=$(category_id Streaming)" \
+            -d "payment_method_id=$(payment_method_id 'Direct Debit')" -d "is_active=0"
 
         add_subscription -d "name=Language app"   -d "price=9.99"  -d "currency=GBP" \
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
             -d "next_payment_date=$(today_plus 12)" -d "start_date=$(months_ago 16)" \
-            -d "category_id=$(category_id Software)" -d "is_active=0"
+            -d "category_id=$(category_id Software)" \
+            -d "payment_method_id=$(payment_method_id 'App Store')" -d "is_active=0"
 
         add_subscription -d "name=Sublime Text licence" -d "price=99.00" -d "currency=GBP" \
             -d "subscription_type=lifetime" -d "start_date=$(months_ago 15)" \
-            -d "category_id=$(category_id Software)" -d "tags=software" -d "is_active=1"
+            -d "category_id=$(category_id Software)" \
+            -d "payment_method_id=$(payment_method_id 'PayPal')" -d "tags=software" -d "is_active=1"
 
         # ------------------------------------------------ shape, not volume
         #
@@ -747,6 +772,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=yearly" \
             -d "next_payment_date=$(today_plus 150)" -d "start_date=$(months_ago 19)" \
             -d "category_id=$(category_id Home)" \
+            -d "payment_method_id=$(payment_method_id 'Direct Debit')" \
             -d "notice_period_amount=1" -d "notice_period_unit=months" \
             -d "tags=household" -d "is_active=1"
 
@@ -756,6 +782,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=quarterly" \
             -d "next_payment_date=$(today_plus 20)" -d "start_date=$(months_ago 23)" \
             -d "category_id=$(category_id Home)" \
+            -d "payment_method_id=$(payment_method_id 'Direct Debit')" \
             -d "tags=household" -d "is_active=1"
 
         # A second yearly, in a different month again, so the year behind has
@@ -764,6 +791,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=yearly" \
             -d "next_payment_date=$(today_plus 290)" -d "start_date=$(months_ago 14)" \
             -d "category_id=$(category_id Software)" \
+            -d "payment_method_id=$(payment_method_id 'Google Play')" \
             -d "tags=photos" -d "is_active=1"
 
         # Recent enough to be a step rather than a level: the months before it
@@ -772,6 +800,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             -d "subscription_type=recurring" -d "billing_cycle=monthly" \
             -d "next_payment_date=$(today_plus 16)" -d "start_date=$(months_ago 4)" \
             -d "category_id=$(category_id Home)" \
+            -d "payment_method_id=$(payment_method_id 'Debit Card')" \
             -d "tags=food" -d "is_active=1"
 
         if [ "$CREATED" -eq 15 ]; then
@@ -906,12 +935,14 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
                 -d "subscription_type=recurring" -d "billing_cycle=monthly" \
                 -d "next_payment_date=$(today_plus 8)" -d "start_date=$(months_ago 18)" \
                 -d "category_id=$(category_id Utilities)" \
+                -d "payment_method_id=$(payment_method_id 'Direct Debit')" \
                 -d "tags=household" -d "is_active=1"
 
             add_subscription -d "name=Music streaming" -d "price=10.99" -d "currency=GBP" \
                 -d "subscription_type=recurring" -d "billing_cycle=monthly" \
                 -d "next_payment_date=$(today_plus 2)" -d "start_date=$(months_ago 20)" \
                 -d "category_id=$(category_id Music)" \
+                -d "payment_method_id=$(payment_method_id 'Debit Card')" \
                 -d "tags=music" -d "is_active=1"
             # A Contributor may schedule a rise on their own subscription, and
             # not on anybody else's. This one is theirs.
@@ -921,6 +952,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
                 -d "subscription_type=recurring" -d "billing_cycle=monthly" \
                 -d "next_payment_date=$(today_plus 16)" -d "start_date=$(months_ago 10)" \
                 -d "category_id=$(category_id Health)" \
+                -d "payment_method_id=$(payment_method_id 'Standing Order')" \
                 -d "tags=health" -d "is_active=1"
 
             add_subscription -d "name=Travel insurance" -d "price=64.00" -d "currency=GBP" \
@@ -933,6 +965,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
                 -d "subscription_type=recurring" -d "billing_cycle=yearly" \
                 -d "next_payment_date=$(today_plus 275)" -d "start_date=$(months_ago 15)" \
                 -d "category_id=$(category_id Software)" \
+                -d "payment_method_id=$(payment_method_id 'App Store')" \
                 -d "tags=work" -d "is_active=1"
 
             # Rowan's budgets are Rowan's: the form does not offer a

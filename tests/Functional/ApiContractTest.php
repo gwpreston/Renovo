@@ -140,8 +140,13 @@ final class ApiContractTest extends ApiTestCase
             'name' => 'Household',
         ]))['data']['id'];
 
+        $paymentMethodId = (int) $this->decode($this->api('POST', '/api/v1/payment-methods', $this->ownerToken, [
+            'name' => 'Joint card',
+        ]))['data']['id'];
+
         $id = $this->createSubscription([
             'category_id' => $categoryId,
+            'payment_method_id' => $paymentMethodId,
             'tags' => ['home'],
             'notes' => 'Original note',
             'notice_period_amount' => 14,
@@ -169,8 +174,8 @@ final class ApiContractTest extends ApiTestCase
         foreach (
             [
             'price_minor', 'currency', 'subscription_type', 'billing_cycle', 'cycle_days',
-            'next_payment_date', 'start_date', 'notes', 'category_id', 'owner_user_id',
-            'payer_user_id', 'is_active', 'is_trial', 'notice_period_amount',
+            'next_payment_date', 'start_date', 'notes', 'category_id', 'payment_method_id',
+            'payment_method_name', 'owner_user_id', 'payer_user_id', 'is_active', 'is_trial', 'notice_period_amount',
             'notice_period_unit', 'reminder_days', 'logo_path', 'monthly_minor',
             ] as $field
         ) {
@@ -350,6 +355,85 @@ final class ApiContractTest extends ApiTestCase
             204,
             $this->api('DELETE', '/api/v1/categories/' . $id, $this->ownerToken)->getStatusCode(),
         );
+    }
+
+    public function testPaymentMethodsRoundTripThroughTheTaxonomyEndpoints(): void
+    {
+        $created = $this->decode($this->api('POST', '/api/v1/payment-methods', $this->ownerToken, [
+            'name' => 'Joint card',
+            'colour' => '#1069bb',
+        ]));
+
+        self::assertSame('Joint card', $created['data']['name']);
+        self::assertSame('#1069bb', $created['data']['colour']);
+        self::assertArrayHasKey('icon', $created['data']);
+        self::assertNull($created['data']['logo_path']);
+        $id = $created['data']['id'];
+
+        $updated = $this->decode($this->api('PUT', '/api/v1/payment-methods/' . $id, $this->ownerToken, [
+            'name' => 'Joint account',
+            'colour' => null,
+        ]));
+        self::assertSame('Joint account', $updated['data']['name']);
+        self::assertNull($updated['data']['colour']);
+
+        $listed = $this->decode($this->api('GET', '/api/v1/payment-methods', $this->ownerToken))['data'];
+        self::assertContains('Joint account', array_column($listed, 'name'));
+
+        $duplicate = $this->api('POST', '/api/v1/payment-methods', $this->ownerToken, ['name' => 'joint ACCOUNT']);
+        self::assertSame(422, $duplicate->getStatusCode());
+
+        self::assertSame(
+            204,
+            $this->api('DELETE', '/api/v1/payment-methods/' . $id, $this->ownerToken)->getStatusCode(),
+        );
+        self::assertSame(
+            404,
+            $this->api('PUT', '/api/v1/payment-methods/' . $id, $this->ownerToken, ['name' => 'Gone'])
+                ->getStatusCode(),
+        );
+    }
+
+    public function testAPaymentMethodAssignmentRoundTripsAndOnlyAnExplicitNullClearsIt(): void
+    {
+        $card = (int) $this->decode($this->api('POST', '/api/v1/payment-methods', $this->ownerToken, [
+            'name' => 'Joint card',
+        ]))['data']['id'];
+
+        $id = $this->createSubscription(['payment_method_id' => $card]);
+        $created = $this->fetch($id);
+        self::assertSame($card, $created['payment_method_id']);
+        self::assertSame('Joint card', $created['payment_method_name']);
+
+        // A client written before the field existed sends a body without it.
+        // That PUT must not unassign what somebody chose on the form.
+        $legacy = $created;
+        unset($legacy['payment_method_id'], $legacy['payment_method_name']);
+        $legacy['name'] = 'Renamed by an old client';
+        self::assertSame(200, $this->api('PUT', '/api/v1/subscriptions/' . $id, $this->ownerToken, $legacy)
+            ->getStatusCode());
+        self::assertSame($card, $this->fetch($id)['payment_method_id']);
+
+        // An explicit null does clear it.
+        $cleared = $this->fetch($id);
+        $cleared['payment_method_id'] = null;
+        self::assertSame(200, $this->api('PUT', '/api/v1/subscriptions/' . $id, $this->ownerToken, $cleared)
+            ->getStatusCode());
+        self::assertNull($this->fetch($id)['payment_method_id']);
+        self::assertNull($this->fetch($id)['payment_method_name']);
+
+        // And an id that is not the household's is a field error.
+        $response = $this->api('POST', '/api/v1/subscriptions', $this->ownerToken, [
+            'name' => 'Bad method',
+            'price_minor' => 100,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'payment_method_id' => 999999,
+        ]);
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringContainsString('payment_method_id', (string) $response->getBody());
     }
 
     /**

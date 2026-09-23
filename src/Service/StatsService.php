@@ -31,6 +31,13 @@ use DateTimeImmutable;
  * @phpstan-type CurrencyTotals array{currency: string, monthly_minor: int, yearly_minor: int, count: int}
  * @phpstan-type OneOffTotals array{currency: string, total_minor: int, count: int}
  * @phpstan-type CategoryTotals array{name: string, currency: string, monthly_minor: int, count: int}
+ * @phpstan-type PaymentMethodTotals array{
+ *     name: string,
+ *     colour: string|null,
+ *     currency: string,
+ *     monthly_minor: int,
+ *     count: int
+ * }
  * @phpstan-type Combined array{currency: string, amount_minor: int|null, unconvertible: list<string>}
  * @phpstan-import-type MonthTotals from ForecastService
  * @phpstan-type UpcomingRow array{
@@ -89,6 +96,7 @@ final class StatsService
      *     recurring: list<CurrencyTotals>,
      *     one_off: list<OneOffTotals>,
      *     by_category: list<CategoryTotals>,
+     *     by_payment_method: list<PaymentMethodTotals>,
      *     active_count: int,
      *     upcoming: list<UpcomingRow>,
      *     upcoming_totals: list<OneOffTotals>,
@@ -117,6 +125,7 @@ final class StatsService
         $recurring = [];
         $oneOff = [];
         $byCategory = [];
+        $byPaymentMethod = [];
         $activeCount = 0;
 
         foreach ($all as $subscription) {
@@ -155,11 +164,31 @@ final class StatsService
             ];
             $byCategory[$key]['monthly_minor'] += $monthly;
             $byCategory[$key]['count']++;
+
+            // The same grouping by what it is paid with. The unassigned bucket
+            // is named by the empty string rather than by a word: this service
+            // has no locale, and the screen that draws it says "No payment
+            // method" in the reader's language.
+            $methodName = $subscription->paymentMethodName ?? '';
+            $key = $methodName . '|' . $currency;
+            $byPaymentMethod[$key] ??= [
+                'name' => $methodName,
+                'colour' => $subscription->paymentMethodColour,
+                'currency' => $currency,
+                'monthly_minor' => 0,
+                'count' => 0,
+            ];
+            $byPaymentMethod[$key]['monthly_minor'] += $monthly;
+            $byPaymentMethod[$key]['count']++;
         }
 
         ksort($recurring);
         ksort($oneOff);
         uasort($byCategory, static fn (array $a, array $b): int => $b['monthly_minor'] <=> $a['monthly_minor']);
+        uasort(
+            $byPaymentMethod,
+            static fn (array $a, array $b): int => $b['monthly_minor'] <=> $a['monthly_minor'],
+        );
 
         $upcoming = $this->upcomingRows($this->subscriptions->upcoming($scope, self::UPCOMING_WINDOW_DAYS));
         $trials = $this->subscriptions->trialsEndingSoon($scope, 30);
@@ -177,6 +206,7 @@ final class StatsService
             'recurring' => array_values($recurring),
             'one_off' => array_values($oneOff),
             'by_category' => array_values($byCategory),
+            'by_payment_method' => array_values($byPaymentMethod),
             'active_count' => $activeCount,
             'upcoming' => $upcoming,
             // Summed from the rows the card actually draws, not from the query

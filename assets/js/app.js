@@ -26,6 +26,7 @@
 import { renderChart } from './charts.js';
 import { drawCategoryDonuts } from './category-donut.js';
 import { hydrateIcons, icon, iconNames } from './icons.js';
+import { enhancePaymentMethodFields } from './payment-method-field.js';
 import { drawSpendCharts } from './spend-chart.js';
 import { enhanceTagFields } from './tag-field.js';
 
@@ -64,6 +65,7 @@ function drawCharts(root = document) {
 function hydrate() {
     hydrateIcons(document);
     enhanceTagFields(document);
+    enhancePaymentMethodFields(document);
     drawCharts();
 }
 
@@ -80,6 +82,7 @@ document.addEventListener('htmx:afterSwap', (event) => {
     // The quick-add dialog loads the subscription form through htmx, so the
     // tag field arrives after this module first ran.
     enhanceTagFields(root);
+    enhancePaymentMethodFields(root);
 });
 
 /*

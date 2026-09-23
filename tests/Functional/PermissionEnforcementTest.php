@@ -144,6 +144,13 @@ final class PermissionEnforcementTest extends DatabaseTestCase
             ['POST', '/categories/1'],
             ['POST', '/categories/1/delete'],
             ['POST', '/tags/1/delete'],
+            // Phase 17: the payment-method list is managed by whoever manages
+            // categories, and a Viewer is neither.
+            ['POST', '/payment-methods'],
+            ['POST', '/payment-methods/defaults'],
+            ['POST', '/payment-methods/1'],
+            ['POST', '/payment-methods/1/logo/clear'],
+            ['POST', '/payment-methods/1/delete'],
             // Phase 2. Every one of these changes money or the record of it,
             // so every one of them is closed to a read-only role — and the
             // corresponding pages that only *display* those things are not,

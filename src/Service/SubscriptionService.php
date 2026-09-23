@@ -14,6 +14,7 @@ use App\Domain\SubscriptionFilter;
 use App\Domain\SubscriptionType;
 use App\Persistence\Database;
 use App\Repository\CategoryRepository;
+use App\Repository\PaymentMethodRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TagRepository;
@@ -37,6 +38,7 @@ final class SubscriptionService
     public function __construct(
         private readonly SubscriptionRepository $subscriptions,
         private readonly CategoryRepository $categories,
+        private readonly PaymentMethodRepository $paymentMethods,
         private readonly TagRepository $tags,
         private readonly LogoFetcher $logoFetcher,
         private readonly MembershipRepository $memberships,
@@ -518,6 +520,11 @@ final class SubscriptionService
             $errors['category_id'] = 'error.category.not_found';
         }
 
+        $paymentMethodId = $this->positiveInt($input['payment_method_id'] ?? null);
+        if ($paymentMethodId !== null && $this->paymentMethods->find($scope, $paymentMethodId) === null) {
+            $errors['payment_method_id'] = 'error.payment_method.not_found';
+        }
+
         $memberIds = array_map(
             static fn (array $member): int => $member['id'],
             $scope->hasHousehold() ? $this->memberships->findMembersOfHousehold((int) $scope->householdId) : [],
@@ -581,6 +588,7 @@ final class SubscriptionService
             'converts_to_cycle_days' => $trial['converts_to_cycle_days'],
             'is_active' => ($input['is_active'] ?? '1') !== '0',
             'category_id' => $categoryId,
+            'payment_method_id' => $paymentMethodId,
             'owner_user_id' => $ownerUserId,
             'payer_user_id' => $payerUserId,
             'logo_path' => $this->logoPath($scope, $input, $existingId, $commits ? $website : null),
@@ -590,6 +598,13 @@ final class SubscriptionService
             // Absent rather than empty: a form that does not carry the field
             // must not clear a schedule it never displayed.
             unset($data['reminder_days']);
+        }
+
+        if (!array_key_exists('payment_method_id', $input)) {
+            // The same rule, for the same reason: an API client written before
+            // payment methods existed does not send the field, and an edit it
+            // makes must not unassign a method somebody chose on the form.
+            unset($data['payment_method_id']);
         }
 
         return [$data, $tagIds];

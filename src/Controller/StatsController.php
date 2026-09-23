@@ -61,6 +61,7 @@ final class StatsController extends Controller
             // own behalf rather than leaving the reader to assume a ledger.
             'history' => $overview['history'],
             'categories' => $overview['categories'],
+            'payment_methods' => $overview['payment_methods'],
             'year_over_year' => $overview['year_over_year'],
             'notable' => $overview['notable'],
             // The per-period figures derive from the annual one rather than

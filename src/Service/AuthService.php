@@ -43,6 +43,7 @@ final class AuthService
         private readonly Translator $translator,
         private readonly Locales $locales,
         private readonly AuditLogService $audit,
+        private readonly PaymentMethodService $paymentMethods,
         private readonly Clock $clock,
         private readonly string $appUrl,
     ) {
@@ -87,6 +88,8 @@ final class AuthService
         if ($user === null) {
             throw new \RuntimeException('The account could not be read back after creation.');
         }
+
+        $this->paymentMethods->seedForNewHousehold($user, $householdId);
 
         $this->sendVerificationEmail($user);
 

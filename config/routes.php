@@ -42,6 +42,7 @@ use App\Controller\BudgetController;
 use App\Controller\CalendarController;
 use App\Controller\CancellationController;
 use App\Controller\CategoryController;
+use App\Controller\PaymentMethodController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
 use App\Controller\HouseholdController;
@@ -271,6 +272,27 @@ return static function (App $app): void {
 
         $group->post('/tags/{id:[0-9]+}/delete', [CategoryController::class, 'deleteTag'])
             ->add($requires(Permission::ManageTags));
+
+        // Payment methods are the same kind of household metadata as
+        // categories, and the same people look after them.
+        $group->get('/payment-methods', [PaymentMethodController::class, 'index'])
+            ->setName('payment-methods')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post('/payment-methods', [PaymentMethodController::class, 'create'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->post('/payment-methods/defaults', [PaymentMethodController::class, 'seedDefaults'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->post('/payment-methods/{id:[0-9]+}', [PaymentMethodController::class, 'update'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->post('/payment-methods/{id:[0-9]+}/logo/clear', [PaymentMethodController::class, 'clearLogo'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->post('/payment-methods/{id:[0-9]+}/delete', [PaymentMethodController::class, 'delete'])
+            ->add($requires(Permission::ManageCategories));
 
         // Your own page. Changing how Renovo looks to you needs no permission
         // beyond being signed in: it alters what one account sees and nothing
@@ -602,6 +624,18 @@ return static function (App $app): void {
             ->add($requires(Permission::ManageCategories));
 
         $group->delete('/categories/{id:[0-9]+}', [TaxonomyApiController::class, 'deleteCategory'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->get('/payment-methods', [TaxonomyApiController::class, 'paymentMethods'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post('/payment-methods', [TaxonomyApiController::class, 'createPaymentMethod'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->put('/payment-methods/{id:[0-9]+}', [TaxonomyApiController::class, 'updatePaymentMethod'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->delete('/payment-methods/{id:[0-9]+}', [TaxonomyApiController::class, 'deletePaymentMethod'])
             ->add($requires(Permission::ManageCategories));
 
         $group->get('/tags', [TaxonomyApiController::class, 'tags'])

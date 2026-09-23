@@ -10,6 +10,7 @@ use App\Notification\NotifierRegistry;
 use App\Repository\BudgetAlertStateRepository;
 use App\Repository\BudgetRepository;
 use App\Repository\CategoryRepository;
+use App\Repository\PaymentMethodRepository;
 use App\Repository\ExchangeRateRepository;
 use App\Repository\HouseholdRepository;
 use App\Repository\InstanceSettingsRepository;
@@ -117,6 +118,7 @@ abstract class NotificationTestCase extends DatabaseTestCase
         $this->subscriptionService = new SubscriptionService(
             $this->subscriptions,
             $categories,
+            new PaymentMethodRepository($this->db),
             new TagRepository($this->db),
             TestLogoFetcher::silent($this->db, $this->clock),
             $this->memberships,

@@ -153,6 +153,7 @@ abstract class DatabaseTestCase extends TestCase
             'exchange_rates',
             'tags',
             'categories',
+            'payment_methods',
             'auth_tokens',
             'auth_attempts',
             'sessions',

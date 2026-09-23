@@ -12,6 +12,7 @@ use App\Domain\Money;
 use App\Domain\Entity\Attachment;
 use App\Domain\Entity\Budget;
 use App\Domain\Entity\Category;
+use App\Domain\Entity\PaymentMethod;
 use App\Domain\Entity\Subscription;
 use App\Domain\Entity\Tag;
 use App\Domain\Entity\User;
@@ -56,7 +57,7 @@ use ZipArchive;
  * before anything is extracted, and every file in it is re-validated by its
  * magic bytes exactly as an upload would be.
  *
- * @phpstan-type RestoreSummary array{subscriptions: int, categories: int, tags: int,
+ * @phpstan-type RestoreSummary array{subscriptions: int, categories: int, payment_methods: int, tags: int,
  *     budgets: int, attachments: int, skipped: int}
  */
 final class BackupService
@@ -77,6 +78,7 @@ final class BackupService
     public function __construct(
         private readonly SubscriptionService $subscriptions,
         private readonly CategoryService $categories,
+        private readonly PaymentMethodService $paymentMethods,
         private readonly TagService $tags,
         private readonly TagRepository $tagRepository,
         private readonly BudgetService $budgets,
@@ -139,6 +141,16 @@ final class BackupService
             }
         }
 
+        // Payment methods before the logos are written, because a method's
+        // logo joins the same list: it is filed in the same directory by the
+        // same storage, and goes into the archive the same way.
+        // A loop rather than `array_map`: an arrow function captures `$logos`
+        // by value, and the entries it added would never reach the archive.
+        $paymentMethods = [];
+        foreach ($this->paymentMethods->all($scope) as $method) {
+            $paymentMethods[] = $this->exportPaymentMethod($method, $logos);
+        }
+
         foreach ($logos as $storedPath => $entryName) {
             $absolute = $this->logoAbsolutePath($storedPath);
             if ($absolute !== null) {
@@ -156,6 +168,7 @@ final class BackupService
                 static fn (Category $category): array => ['name' => $category->name, 'colour' => $category->colour],
                 $this->categories->all($scope),
             ),
+            'payment_methods' => $paymentMethods,
             'tags' => array_map(
                 static fn (Tag $tag): array => ['name' => $tag->name],
                 $this->tags->all($scope),
@@ -177,6 +190,7 @@ final class BackupService
             'counts' => [
                 'subscriptions' => count($data['subscriptions']),
                 'categories' => count($data['categories']),
+                'payment_methods' => count($data['payment_methods']),
                 'tags' => count($data['tags']),
                 'budgets' => count($data['budgets']),
                 'attachments' => count($data['attachments']),
@@ -263,6 +277,7 @@ final class BackupService
         $summary = [
             'subscriptions' => 0,
             'categories' => 0,
+            'payment_methods' => 0,
             'tags' => 0,
             'budgets' => 0,
             'attachments' => 0,
@@ -270,6 +285,15 @@ final class BackupService
         ];
 
         $categoryIds = $this->restoreCategories($scope, $data['categories'] ?? [], $summary);
+        // Absent from an archive written before payment methods existed, which
+        // restores exactly as it always did.
+        $paymentMethodIds = $this->restorePaymentMethods(
+            $scope,
+            $zip,
+            $data['payment_methods'] ?? [],
+            $written,
+            $summary,
+        );
         $summary['tags'] = $this->restoreTags($scope, $data['tags'] ?? []);
         $owners = $this->memberIdsByEmail($scope);
 
@@ -283,7 +307,7 @@ final class BackupService
                 continue;
             }
 
-            $input = $this->subscriptionInput($scope, $row, $categoryIds, $owners);
+            $input = $this->subscriptionInput($scope, $row, $categoryIds, $paymentMethodIds, $owners);
 
             $logo = $this->restoreLogo($zip, $row, $written);
             if ($logo !== null) {
@@ -342,6 +366,77 @@ final class BackupService
     }
 
     /**
+     * Put the household's payment methods back, merged by name.
+     *
+     * The household being restored into almost certainly has payment methods
+     * already — every new household is given the defaults — so merging is the
+     * ordinary case rather than the edge one. A method that exists keeps its
+     * id, its name and its colour; it gains the archive's logo only if it has
+     * none of its own, so a restore never replaces a picture somebody chose.
+     *
+     * @param mixed $rows
+     * @param list<array{kind: string, path: string}> $written
+     * @param RestoreSummary $summary
+     * @return array<string, int> Lower-cased name => id.
+     */
+    private function restorePaymentMethods(
+        Scope $scope,
+        ZipArchive $zip,
+        mixed $rows,
+        array &$written,
+        array &$summary,
+    ): array {
+        $ids = [];
+        $hasLogo = [];
+
+        foreach ($this->paymentMethods->all($scope) as $existing) {
+            $key = mb_strtolower($existing->name);
+            $ids[$key] = $existing->id;
+            $hasLogo[$key] = $existing->logoPath !== null;
+        }
+
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            if (!is_array($row) || !is_string($row['name'] ?? null)) {
+                continue;
+            }
+
+            $key = mb_strtolower(trim($row['name']));
+            if ($key === '') {
+                continue;
+            }
+
+            if (!isset($ids[$key])) {
+                try {
+                    $ids[$key] = $this->paymentMethods->create(
+                        $scope,
+                        trim($row['name']),
+                        is_string($row['colour'] ?? null) ? $row['colour'] : null,
+                        null,
+                        is_string($row['icon'] ?? null) ? $row['icon'] : null,
+                    );
+                    $hasLogo[$key] = false;
+                    $summary['payment_methods']++;
+                } catch (ValidationException) {
+                    $summary['skipped']++;
+                    continue;
+                }
+            }
+
+            if ($hasLogo[$key]) {
+                continue;
+            }
+
+            $logo = $this->restoreLogo($zip, $row, $written);
+            if ($logo !== null) {
+                $this->paymentMethods->attachStoredLogo($scope, $ids[$key], $logo);
+                $hasLogo[$key] = true;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Put the household's tag vocabulary back.
      *
      * Tags carried *on* a subscription are restored with it, so this covers the
@@ -373,15 +468,29 @@ final class BackupService
     /**
      * @param array<string, mixed> $row
      * @param array<string, int> $categoryIds
+     * @param array<string, int> $paymentMethodIds
      * @param array<string, int> $owners
      * @return array<string, mixed>
      */
-    private function subscriptionInput(Scope $scope, array $row, array $categoryIds, array $owners): array
-    {
+    private function subscriptionInput(
+        Scope $scope,
+        array $row,
+        array $categoryIds,
+        array $paymentMethodIds,
+        array $owners,
+    ): array {
         $input = SubscriptionPayload::toServiceInput($row);
 
         $categoryName = is_string($row['category_name'] ?? null) ? mb_strtolower(trim($row['category_name'])) : '';
         $input['category_id'] = $categoryIds[$categoryName] ?? '';
+
+        // By name, like the category: the archive's `payment_method_id` is an
+        // id in the household it left, and would name the wrong row here — or
+        // another household's.
+        $methodName = is_string($row['payment_method_name'] ?? null)
+            ? mb_strtolower(trim($row['payment_method_name']))
+            : '';
+        $input['payment_method_id'] = $paymentMethodIds[$methodName] ?? '';
 
         // The archive names members by email. In ISOLATED mode the service
         // forces the owner to the restoring user anyway; in SHARED mode a
@@ -608,6 +717,30 @@ final class BackupService
         if ($subscription->logoPath !== null && $this->logoAbsolutePath($subscription->logoPath) !== null) {
             $entry = 'files/logos/' . basename($subscription->logoPath);
             $logos[$subscription->logoPath] = $entry;
+            $row['logo_entry'] = $entry;
+        }
+
+        return $row;
+    }
+
+    /**
+     * A payment method as the archive holds it: by name, like a category, with
+     * its logo as an entry beside the subscriptions' logos.
+     *
+     * @param array<string, string> $logos Stored path => archive entry name.
+     * @return array<string, mixed>
+     */
+    private function exportPaymentMethod(PaymentMethod $method, array &$logos): array
+    {
+        $row = [
+            'name' => $method->name,
+            'colour' => $method->colour,
+            'icon' => $method->icon,
+        ];
+
+        if ($method->logoPath !== null && $this->logoAbsolutePath($method->logoPath) !== null) {
+            $entry = 'files/logos/' . basename($method->logoPath);
+            $logos[$method->logoPath] = $entry;
             $row['logo_entry'] = $entry;
         }
 

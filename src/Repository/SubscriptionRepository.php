@@ -657,6 +657,10 @@ final class SubscriptionRepository extends AbstractScopedRepository
 
         return 'SELECT ' . $subscriptions . '.*,'
             . ' c.' . $this->quote('name') . ' AS category_name,'
+            . ' pm.' . $this->quote('name') . ' AS payment_method_name,'
+            . ' pm.' . $this->quote('icon') . ' AS payment_method_icon,'
+            . ' pm.' . $this->quote('logo_path') . ' AS payment_method_logo_path,'
+            . ' pm.' . $this->quote('colour') . ' AS payment_method_colour,'
             . ' owner_user.' . $this->quote('display_name') . ' AS owner_name,'
             // Whether, not where: the path is never rendered, because an
             // avatar is fetched through the scoped route by the owner's id.
@@ -665,6 +669,8 @@ final class SubscriptionRepository extends AbstractScopedRepository
             . ' FROM ' . $subscriptions
             . ' LEFT JOIN ' . $this->quote('categories') . ' c'
             . ' ON c.' . $this->quote('id') . ' = ' . $this->qualify('category_id')
+            . ' LEFT JOIN ' . $this->quote('payment_methods') . ' pm'
+            . ' ON pm.' . $this->quote('id') . ' = ' . $this->qualify('payment_method_id')
             . ' LEFT JOIN ' . $this->quote('users') . ' owner_user'
             . ' ON owner_user.' . $this->quote('id') . ' = ' . $this->qualify('owner_user_id')
             . ' LEFT JOIN ' . $this->quote('users') . ' payer_user'
@@ -818,6 +824,11 @@ final class SubscriptionRepository extends AbstractScopedRepository
             tags: $tags,
             createdAt: new DateTimeImmutable((string) $row['created_at']),
             updatedAt: new DateTimeImmutable((string) $row['updated_at']),
+            paymentMethodId: $this->nullableInt($row['payment_method_id'] ?? null),
+            paymentMethodName: $this->nullableString($row['payment_method_name'] ?? null),
+            paymentMethodIcon: $this->nullableString($row['payment_method_icon'] ?? null),
+            paymentMethodLogoPath: $this->nullableString($row['payment_method_logo_path'] ?? null),
+            paymentMethodColour: $this->nullableString($row['payment_method_colour'] ?? null),
         );
     }
 

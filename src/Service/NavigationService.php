@@ -100,6 +100,13 @@ final class NavigationService
                 matches: ['/categories'],
                 permission: Permission::ViewSubscriptions,
             ),
+            new NavItem(
+                labelKey: 'nav.payment_methods',
+                href: '/payment-methods',
+                icon: 'payment-methods',
+                matches: ['/payment-methods'],
+                permission: Permission::ViewSubscriptions,
+            ),
             // The people, rather than the subscriptions. It asks for a
             // permission of its own because it is the one screen that shows
             // what somebody *else* spends, and that is not part of being

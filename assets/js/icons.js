@@ -3,7 +3,7 @@
  *
  * Lucide ships a thousand icons as individual modules, so the ones named here
  * are the only ones bundled — importing the package's index instead would put
- * every icon in the bundle to use seventeen of them.
+ * every icon in the bundle to use a couple of dozen of them.
  *
  * Adding an icon is adding a line to this map. There is no lazy path and does
  * not need one: each icon is a few hundred bytes of path data.
@@ -14,6 +14,8 @@
  */
 
 import {
+    ArrowLeftRight,
+    Banknote,
     BellRing,
     CalendarDays,
     CalendarX2,
@@ -23,14 +25,19 @@ import {
     CircleUserRound,
     CreditCard,
     Ellipsis,
+    Gift,
+    Landmark,
     LayoutDashboard,
     Plus,
+    Repeat,
     ScrollText,
     Search,
     Settings,
+    Smartphone,
     Tag,
     Users,
     Wallet,
+    WalletCards,
     createElement,
 } from 'lucide';
 
@@ -48,6 +55,19 @@ const ICONS = {
     household: Users,
     more: Ellipsis,
     notifications: BellRing,
+    'payment-methods': WalletCards,
+    /* The generic pictures a payment method can carry. Deliberately not
+       anybody's logo: PayPal is a wallet here and the App Store a phone, and
+       a household that wants the real mark uploads it. The list of keys is
+       mirrored in `App\Domain\DefaultPaymentMethods::ICONS`. */
+    'payment-bank': Landmark,
+    'payment-card': CreditCard,
+    'payment-cash': Banknote,
+    'payment-gift': Gift,
+    'payment-phone': Smartphone,
+    'payment-repeat': Repeat,
+    'payment-transfer': ArrowLeftRight,
+    'payment-wallet': Wallet,
     profile: CircleUserRound,
     search: Search,
     settings: Settings,

@@ -1,0 +1,17 @@
+{#
+    The payment-method donut: the same recurring spend, grouped by what each
+    subscription is paid with. Segments take each method's own colour when it
+    has one, and the palette otherwise.
+#}
+{% include 'stats/_breakdown.twig' with {
+    breakdown: payment_methods,
+    card_id: 'analytics-payment-methods',
+    data_id: 'analytics-payment-donut-data',
+    heading: t('stats.payment_methods_heading'),
+    empty_text: t('stats.payment_methods_empty'),
+    alt_key: 'stats.payment_donut_alt',
+    per_currency_key: 'stats.payment_donut_per_currency',
+    other_key: 'stats.other_payment_methods',
+    column_label: t('field.payment_method'),
+    unassigned_label: t('stats.no_payment_method'),
+} only %}

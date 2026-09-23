@@ -83,6 +83,18 @@ final class SetupWizardTest extends DatabaseTestCase
         $household = (new HouseholdRepository($this->db))->findById($ownMemberships[0]->householdId);
         self::assertNotNull($household);
         self::assertSame('Home', $household->name);
+
+        // Seeded once, with the household: the defaults, in the instance's
+        // language, and not a second copy on any later request.
+        $count = static fn ($db): int => (int) $db->fetchValue(
+            'SELECT COUNT(*) FROM ' . $db->platform()->quoteIdentifier('payment_methods')
+            . ' WHERE ' . $db->platform()->quoteIdentifier('household_id') . ' = :household',
+            ['household' => $household->id],
+        );
+        self::assertSame(10, $count($this->db));
+
+        $this->request('GET', '/setup');
+        self::assertSame(10, $count($this->db));
     }
 
     public function testInstanceSettingsAreLeftAtTheirDefaults(): void

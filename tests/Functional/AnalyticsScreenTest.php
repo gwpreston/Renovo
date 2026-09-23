@@ -12,6 +12,7 @@ use App\Domain\Role;
 use App\Repository\ExchangeRateRepository;
 use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
+use App\Repository\PaymentMethodRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Security\Scope;
@@ -573,6 +574,94 @@ final class AnalyticsScreenTest extends DatabaseTestCase
         self::assertStringContainsString('XOF', $card);
         self::assertStringContainsString('>GBP<', $card);
         self::assertStringContainsString('meter-fill', $card);
+    }
+
+    /**
+     * The same breakdown grouped by what each subscription is paid with: a
+     * method's segment is the sum of its subscriptions' monthly costs, the
+     * unassigned ones are named rather than dropped, and a method's own colour
+     * rides through to its segment.
+     */
+    public function testThePaymentMethodDonutSumsEachMethodAndNamesTheUnassigned(): void
+    {
+        $owner = $this->scopeFor($this->ownerId);
+        $methods = new PaymentMethodRepository($this->db);
+        $card = $methods->create($owner, 'Joint card', '#123456', 'payment-card', null);
+        $cash = $methods->create($owner, 'Cash', null, 'payment-cash', null);
+
+        // £9.99 a month and £120 a year: £19.99 a month between them.
+        $this->assignByName('Streaming', $card);
+        $this->assignByName('Hosting', $card);
+        // A lifetime purchase is not recurring spend, whatever pays for it.
+        $this->assignByName('Lifetime licence', $cash);
+
+        $container = $this->container();
+        $stats = $container->get(StatsService::class)->dashboard($owner);
+        $total = $stats['combined_monthly']['amount_minor'];
+        self::assertNotNull($total);
+
+        $body = $this->body($this->get('/stats', $this->ownerId));
+        $donut = $this->payload($body, 'analytics-payment-donut-data');
+
+        $byName = [];
+        foreach ($donut['slices'] as $slice) {
+            $byName[$slice['is_unassigned'] ? '(none)' : (string) $slice['name']] = $slice;
+        }
+
+        self::assertSame(999 + 1000, $byName['Joint card']['minor']);
+        self::assertSame('#123456', $byName['Joint card']['colour']);
+        // The European row, at the fixture's rate, and the free trial.
+        self::assertSame(2000, $byName['(none)']['minor']);
+        self::assertArrayNotHasKey('Cash', $byName, 'a lifetime purchase has no monthly cost to break down');
+
+        self::assertSame($total, $donut['total_minor']);
+        self::assertSame($total, (int) array_sum(array_column($donut['slices'], 'minor')));
+
+        $card = $this->section($body, 'analytics-payment-methods');
+        self::assertStringContainsString('No payment method', $card);
+        self::assertStringContainsString('data-unassigned-label="No payment method"', $card);
+
+        // And it is a second chart, not the category one drawn twice.
+        self::assertNotSame($this->payload($body, 'analytics-donut-data'), $donut);
+    }
+
+    public function testThePaymentMethodDonutDegradesToPerCurrencyFigures(): void
+    {
+        $owner = $this->scopeFor($this->ownerId);
+        $card = (new PaymentMethodRepository($this->db))->create($owner, 'Joint card', null, null, null);
+        $this->assignByName('Streaming', $card);
+
+        (new SubscriptionRepository($this->db))->create($owner, [
+            'name' => 'Unconvertible',
+            'price_minor' => 5000,
+            'currency' => 'XOF',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+            'payment_method_id' => $card,
+            'is_active' => true,
+        ], []);
+
+        $body = $this->body($this->get('/stats', $this->ownerId));
+        $section = $this->section($body, 'analytics-payment-methods');
+
+        self::assertStringNotContainsString('data-chart="donut"', $section);
+        self::assertStringNotContainsString('analytics-payment-donut-data', $body);
+        self::assertStringContainsString('XOF', $section);
+        self::assertStringContainsString('>GBP<', $section);
+        self::assertStringContainsString('Joint card', $section);
+        self::assertStringContainsString('meter-fill', $section);
+    }
+
+    private function assignByName(string $name, int $methodId): void
+    {
+        $platform = $this->db->platform();
+        $this->db->execute(
+            'UPDATE ' . $platform->quoteIdentifier('subscriptions')
+            . ' SET ' . $platform->quoteIdentifier('payment_method_id') . ' = :method'
+            . ' WHERE ' . $platform->quoteIdentifier('name') . ' = :name',
+            ['method' => $methodId, 'name' => $name],
+        );
     }
 
     public function testNotableRanksOnCostPerMonthRatherThanOnTheFacePrice(): void

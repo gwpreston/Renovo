@@ -15,6 +15,8 @@
 #}
 {% extends is_htmx ? 'partials/bare.twig' : 'layout.twig' %}
 
+{% import 'partials/payment_method.twig' as payment_method %}
+
 {% set is_edit = subscription_id is not null %}
 
 {#
@@ -74,6 +76,38 @@
                     </select>
                     {% if errors.category_id is defined %}
                         <p class="field-error" id="category_id-error">{{ error_message(errors.category_id) }}</p>
+                    {% endif %}
+                </div>
+
+                {#
+                    What it is paid with. A native select, so the option text is
+                    the method's name and nothing else — a browser cannot draw a
+                    picture inside an <option>. The badge beneath shows the
+                    chosen method's logo or icon, and `payment-method-field.js`
+                    keeps it in step with the select from the data attributes
+                    each option carries.
+                #}
+                <div class="field">
+                    <label for="payment_method_id">{{ t('field.payment_method') }}</label>
+                    <select id="payment_method_id" name="payment_method_id"
+                            data-payment-method-select="payment_method_id-preview"
+                            aria-describedby="payment_method_id-preview{% if errors.payment_method_id is defined %} payment_method_id-error{% endif %}">
+                        <option value="">{{ t('state.none') }}</option>
+                        {% for method in payment_methods %}
+                            <option value="{{ method.id }}" data-icon-name="{{ method.icon ?: 'payment-card' }}"
+                                    data-logo="{{ method.logoPath ? '/' ~ method.logoPath : '' }}"
+                                    {{ values.payment_method_id|default('') == method.id ? 'selected' : '' }}>{{ method.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="hint payment-method-preview" id="payment_method_id-preview" aria-live="polite">
+                        {%- for method in payment_methods -%}
+                            {%- if values.payment_method_id|default('') == method.id -%}
+                                {{ payment_method.badge(method.name, method.icon, method.logoPath) }}
+                            {%- endif -%}
+                        {%- endfor -%}
+                    </p>
+                    {% if errors.payment_method_id is defined %}
+                        <p class="field-error" id="payment_method_id-error">{{ error_message(errors.payment_method_id) }}</p>
                     {% endif %}
                 </div>
 

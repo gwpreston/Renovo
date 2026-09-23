@@ -26,9 +26,16 @@ use App\Support\Distribution;
  * separated, never blended: a bar or a segment drawn across currencies with no
  * rate between them would be a comparison nobody can make.
  *
+ * **It breaks down more than categories.** Payment methods have the same shape
+ * and the same currency problem, so the statistics carry `by_payment_method`
+ * beside `by_category` and this takes the key to read. A row may carry a
+ * `colour` — payment methods store one for their segment — which rides through
+ * to the group untouched; a row without one is coloured by the palette.
+ *
  * @phpstan-import-type Bars from Distribution
+ * @phpstan-type Source list<array{name: string, currency: string, monthly_minor: int, colour?: string|null}>
  * @phpstan-type Group array{
- *     rows: list<array{name: string, amount_minor: int, percent: int}>,
+ *     rows: list<array{name: string, amount_minor: int, percent: int, colour: string|null}>,
  *     other: array{count: int, amount_minor: int, percent: int}|null,
  *     currency: string,
  *     total_minor: int
@@ -39,6 +46,9 @@ final class CategoryBreakdownService
 {
     /** Distribution slices past this many are a legend, not a picture. */
     public const BARS = 6;
+
+    public const BY_CATEGORY = 'by_category';
+    public const BY_PAYMENT_METHOD = 'by_payment_method';
 
     public function __construct(
         private readonly ExchangeRateService $rates,
@@ -54,14 +64,15 @@ final class CategoryBreakdownService
      * two answers to one question waiting to differ.
      *
      * @param array<string, mixed> $stats
+     * @param self::BY_* $key Which grouping of the statistics to break down.
      * @return Breakdown
      */
-    public function fromStats(array $stats): array
+    public function fromStats(array $stats, string $key = self::BY_CATEGORY): array
     {
         /** @var array{currency: string, amount_minor: int|null, unconvertible: list<string>} $combined */
         $combined = $stats['combined_monthly'];
-        /** @var list<array{name: string, currency: string, monthly_minor: int, count: int}> $byCategory */
-        $byCategory = $stats['by_category'];
+        /** @var Source $byCategory */
+        $byCategory = $stats[$key];
         /** @var list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring */
         $recurring = $stats['recurring'];
 
@@ -83,7 +94,7 @@ final class CategoryBreakdownService
     /**
      * One group: every category converted into the base currency.
      *
-     * @param list<array{name: string, currency: string, monthly_minor: int, count: int}> $byCategory
+     * @param Source $byCategory
      * @return list<Group>
      */
     private function combinedGroup(array $byCategory, string $currency, int $total): array
@@ -93,9 +104,11 @@ final class CategoryBreakdownService
         }
 
         $byName = [];
+        $colours = [];
         foreach ($byCategory as $row) {
             $byName[$row['name']][$row['currency']] = ($byName[$row['name']][$row['currency']] ?? 0)
                 + $row['monthly_minor'];
+            $colours[$row['name']] ??= $row['colour'] ?? null;
         }
 
         $rows = [];
@@ -107,7 +120,7 @@ final class CategoryBreakdownService
         }
 
         /** @var Group $group */
-        $group = Distribution::bars($rows, $total, self::BARS) + [
+        $group = $this->withColours(Distribution::bars($rows, $total, self::BARS), $colours) + [
             'currency' => $currency,
             'total_minor' => $total,
         ];
@@ -121,14 +134,16 @@ final class CategoryBreakdownService
      * The denominators are the per-currency subtotals the spend figures show,
      * so a share here and a total up there are two readings of one figure.
      *
-     * @param list<array{name: string, currency: string, monthly_minor: int, count: int}> $byCategory
+     * @param Source $byCategory
      * @param list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring
      * @return list<Group>
      */
     private function perCurrencyGroups(array $byCategory, array $recurring): array
     {
         $rowsByCurrency = [];
+        $colours = [];
         foreach ($byCategory as $row) {
+            $colours[$row['name']] ??= $row['colour'] ?? null;
             $rowsByCurrency[$row['currency']][] = [
                 'name' => $row['name'],
                 'amount_minor' => $row['monthly_minor'],
@@ -145,7 +160,7 @@ final class CategoryBreakdownService
             }
 
             /** @var Group $group */
-            $group = Distribution::bars($rows, $subtotal['monthly_minor'], self::BARS) + [
+            $group = $this->withColours(Distribution::bars($rows, $subtotal['monthly_minor'], self::BARS), $colours) + [
                 'currency' => $currency,
                 'total_minor' => $subtotal['monthly_minor'],
             ];
@@ -154,5 +169,24 @@ final class CategoryBreakdownService
         }
 
         return $groups;
+    }
+
+    /**
+     * Put each row's colour back after `Distribution` has ordered and cut the
+     * rows — it keeps only what it needs to do that, by design.
+     *
+     * @param Bars $bars
+     * @param array<string, string|null> $colours
+     * @return array{rows: list<array{name: string, amount_minor: int, percent: int, colour: string|null}>,
+     *     other: array{count: int, amount_minor: int, percent: int}|null}
+     */
+    private function withColours(array $bars, array $colours): array
+    {
+        $bars['rows'] = array_map(
+            static fn (array $row): array => $row + ['colour' => $colours[$row['name']] ?? null],
+            $bars['rows'],
+        );
+
+        return $bars;
     }
 }

@@ -40,6 +40,9 @@ final class ApiPermissionTest extends ApiTestCase
             ['POST', '/api/v1/categories'],
             ['PUT', '/api/v1/categories/1'],
             ['DELETE', '/api/v1/categories/1'],
+            ['POST', '/api/v1/payment-methods'],
+            ['PUT', '/api/v1/payment-methods/1'],
+            ['DELETE', '/api/v1/payment-methods/1'],
             ['DELETE', '/api/v1/tags/1'],
         ];
     }
@@ -75,6 +78,7 @@ final class ApiPermissionTest extends ApiTestCase
             '/api/v1/subscriptions/' . $id,
             '/api/v1/subscriptions/' . $id . '/attachments',
             '/api/v1/categories',
+            '/api/v1/payment-methods',
             '/api/v1/tags',
             ] as $path
         ) {

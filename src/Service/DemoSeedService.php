@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\Entity\User;
 use App\Domain\BillingCycle;
 use App\Domain\BudgetPeriod;
 use App\Domain\Money;
@@ -47,11 +48,43 @@ final class DemoSeedService
     public const EMAIL = 'demo@renovo.local';
     public const CONTRIBUTOR_EMAIL = 'rowan@renovo.local';
 
+    /**
+     * What each demo subscription is paid with, by the default it uses.
+     *
+     * Spread across most of the list so the breakdown has more than one
+     * segment worth reading, with the direct debits — the household's big
+     * bills — as the largest. Travel insurance is deliberately left without
+     * one: an unassigned row is the ordinary state for a household that has
+     * not filled everything in, and the breakdown names it rather than
+     * hiding it.
+     */
+    private const PAYMENT_METHODS = [
+        'Streamly' => 'credit_card',
+        'Podcatcher Plus' => 'paypal',
+        'Fibre broadband' => 'direct_debit',
+        'Cloud backup' => 'credit_card',
+        'Design suite' => 'paypal',
+        'Recipe box' => 'debit_card',
+        'Home insurance' => 'direct_debit',
+        'Domain renewal' => 'credit_card',
+        'Boiler cover' => 'direct_debit',
+        'Daily news' => 'app_store',
+        'Photo cloud' => 'google_play',
+        'Gym membership' => 'standing_order',
+        'Coworking desk' => 'bank_transfer',
+        'Language tutor' => 'app_store',
+        'Mobile plan' => 'direct_debit',
+        'Soundstream' => 'debit_card',
+        'Studio membership' => 'standing_order',
+        'Notebook app' => 'app_store',
+    ];
+
     public function __construct(
         private readonly UserRepository $users,
         private readonly HouseholdRepository $households,
         private readonly MembershipRepository $memberships,
         private readonly CategoryService $categories,
+        private readonly PaymentMethodService $paymentMethods,
         private readonly SubscriptionService $subscriptions,
         private readonly PriceHistoryService $priceHistory,
         private readonly BudgetService $budgets,
@@ -115,7 +148,12 @@ final class DemoSeedService
             $categories[$name] = $this->categories->create($scope, $name, $colour);
         }
 
-        $count = $this->seedSubscriptions($scope, $userId, $categories, $this->fixtures());
+        // The defaults every new household is given, exactly as registration
+        // gives them — and then assigned across the subscriptions below, so
+        // the payment-method breakdown has something to draw.
+        $methods = $this->paymentMethods->seedForNewHousehold($this->userFor($userId), $householdId);
+
+        $count = $this->seedSubscriptions($scope, $userId, $categories, $this->fixtures(), $methods);
 
         // The second member, and everything of theirs written as they would
         // have written it. A Contributor's scope confines its own writes, so
@@ -141,6 +179,7 @@ final class DemoSeedService
             $contributorId,
             $categories,
             $this->contributorFixtures(),
+            $methods,
         );
 
         // Budgets last, because what they measure has to exist first. Each
@@ -171,12 +210,17 @@ final class DemoSeedService
      */
     private function scopeFor(int $userId, int $householdId): Scope
     {
+        return $this->scopes->forUser($this->userFor($userId), $householdId);
+    }
+
+    private function userFor(int $userId): User
+    {
         $user = $this->users->findById($userId);
         if ($user === null) {
             throw new \RuntimeException('A demo account could not be read back after creation.');
         }
 
-        return $this->scopes->forUser($user, $householdId);
+        return $user;
     }
 
     /**
@@ -200,10 +244,16 @@ final class DemoSeedService
      *     scheduled: array{price: string, from: string}|null,
      *     tags: string
      * }> $fixtures
+     * @param array<string, int> $methods Catalogue key => id, from the defaults.
      * @return int How many were created.
      */
-    private function seedSubscriptions(Scope $scope, int $userId, array $categories, array $fixtures): int
-    {
+    private function seedSubscriptions(
+        Scope $scope,
+        int $userId,
+        array $categories,
+        array $fixtures,
+        array $methods,
+    ): int {
         $today = $this->clock->today();
         $count = 0;
 
@@ -231,6 +281,7 @@ final class DemoSeedService
                 'next_payment_date' => $due->format('Y-m-d'),
                 'start_date' => $start->format('Y-m-d'),
                 'category_id' => (string) $categories[$fixture['category']],
+                'payment_method_id' => $this->paymentMethodId($fixture['name'], $methods),
                 'is_active' => $fixture['active'] ? '1' : '0',
                 'is_trial' => $fixture['trial'] === null ? '0' : '1',
                 'trial_end_date' => $fixture['trial'] === null
@@ -445,6 +496,17 @@ final class DemoSeedService
                 'tags' => 'work',
             ]),
         ];
+    }
+
+    /**
+     * @param array<string, int> $methods Catalogue key => id.
+     */
+    private function paymentMethodId(string $fixtureName, array $methods): string
+    {
+        $default = self::PAYMENT_METHODS[$fixtureName] ?? null;
+        $id = $default === null ? null : ($methods['payment_methods.default.' . $default] ?? null);
+
+        return $id === null ? '' : (string) $id;
     }
 
     /**

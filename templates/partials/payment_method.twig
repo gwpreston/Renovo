@@ -1,0 +1,30 @@
+{#
+    A payment method as a small badge: its picture, then its name.
+
+    The picture is the household's uploaded logo when there is one, and
+    otherwise the method's generic icon from the application's own set — a
+    `data-icon` slot that `assets/js/icons.js` fills, like the navigation's.
+    Without script the slot stays empty and the name alone identifies it, which
+    is why the picture is decorative in both forms.
+
+    `name`       the method's name
+    `icon`       a key of the icon map, or null for the generic card
+    `logo_path`  the stored logo's web-relative path, or null
+#}
+{% macro badge(name, icon, logo_path) %}
+    <span class="payment-badge">
+        {%- if logo_path -%}
+            <img class="payment-badge-logo" src="/{{ logo_path }}" alt="" width="16" height="16">
+        {%- else -%}
+            <span class="payment-badge-icon" data-icon="{{ icon ?: 'payment-card' }}" aria-hidden="true"></span>
+        {%- endif -%}
+        <span class="payment-badge-name">{{ name }}</span>
+    </span>
+{% endmacro %}
+
+{# The badge for whatever a subscription is paid with, or nothing. #}
+{% macro for_subscription(subscription) %}
+    {%- if subscription.paymentMethodName -%}
+        {{ _self.badge(subscription.paymentMethodName, subscription.paymentMethodIcon, subscription.paymentMethodLogoPath) }}
+    {%- endif -%}
+{% endmacro %}

@@ -24,7 +24,7 @@ generating.
   - [Subscriptions](#subscriptions)
   - [Logos](#logos)
   - [Attachments](#attachments)
-  - [Categories and tags](#categories-and-tags)
+  - [Categories, payment methods and tags](#categories-payment-methods-and-tags)
   - [Calendar feed](#calendar-feed)
 - [Schemas](#schemas)
 - [Not in version 1](#not-in-version-1)
@@ -129,6 +129,10 @@ the same values `GET /me` returns in its `permissions` array.
 | `POST` | `/categories` | `category.manage` |
 | `PUT` | `/categories/{id}` | `category.manage` |
 | `DELETE` | `/categories/{id}` | `category.manage` |
+| `GET` | `/payment-methods` | `subscription.view` |
+| `POST` | `/payment-methods` | `category.manage` |
+| `PUT` | `/payment-methods/{id}` | `category.manage` |
+| `DELETE` | `/payment-methods/{id}` | `category.manage` |
 | `GET` | `/tags` | `subscription.view` |
 | `DELETE` | `/tags/{id}` | `tag.manage` |
 | `GET` | `/calendar.ics` | `subscription.view` |
@@ -220,7 +224,7 @@ easiest mistake to make:
 **Dates** are `YYYY-MM-DD`. **Timestamps** are ISO 8601 date-times.
 
 **Read-only fields** are returned but ignored on write: `id`, `anchor_day`,
-`category_name`, `split_mode`, `usage_count`, `usage_rating`, `logo_path`,
+`category_name`, `payment_method_name`, `split_mode`, `usage_count`, `usage_rating`, `logo_path`,
 `monthly_minor`, `yearly_minor`, `next_charge_date`, `cancellation_deadline`,
 `days_until_next_payment`, `created_at`, `updated_at`.
 
@@ -471,7 +475,7 @@ Delete it. Responses: `204`, `401`, `403`, `404`.
 
 ---
 
-### Categories and tags
+### Categories, payment methods and tags
 
 #### `GET /api/v1/categories`
 
@@ -493,6 +497,35 @@ Responses: `201`/`200`, `401`, `403`, `404` (on `PUT`), `422`.
 #### `DELETE /api/v1/categories/{id}`
 
 Responses: `204`, `401`, `403`, `404`.
+
+#### `GET /api/v1/payment-methods`
+
+What the household's subscriptions are paid with. Like categories, these are
+household-wide labels, visible to every member in either isolation mode, and
+managed with `category.manage`. A payment method is a label only: it holds no
+amount and no card number. Responses: `200`, `401`, `403`.
+
+#### `POST /api/v1/payment-methods` · `PUT /api/v1/payment-methods/{id}`
+
+Create, or rename and recolour. Body:
+
+```json
+{ "name": "Joint account", "colour": "#1069bb" }
+```
+
+The same rules as a category: `name` is required, maximum 60 characters, and
+unique in the household ignoring case; `colour` is nullable and must match
+`^#[0-9a-fA-F]{6}$`. A null colour takes the theme's palette in the breakdown.
+Logos are uploaded on the web screen, not here — the same line the subscription
+resource draws around its own logo.
+
+Responses: `201`/`200`, `401`, `403`, `404` (on `PUT`), `422`.
+
+#### `DELETE /api/v1/payment-methods/{id}`
+
+Removes the method and unassigns it: every subscription paid with it gets a
+null `payment_method_id`. No subscription is deleted. Responses: `204`, `401`,
+`403`, `404`.
 
 #### `GET /api/v1/tags`
 
@@ -559,6 +592,7 @@ The writable half of a subscription. Required: `name`, `price_minor`,
 | `converts_to_cycle_days` | integer, null | |
 | `is_active` | boolean | Default `true`. |
 | `category_id` | integer, null | |
+| `payment_method_id` | integer, null | An absent key leaves the current assignment alone — unlike the other fields, so a client written before it existed does not clear it. Send `null` to clear it. |
 | `owner_user_id` | integer, null | Must be a household member. Ignored in ISOLATED mode, where a user may own only their own rows. |
 | `payer_user_id` | integer, null | |
 | `tags` | string[] | Max 25, each max 50 chars. Created by name if they do not exist. |
@@ -572,6 +606,7 @@ Everything in `SubscriptionInput`, plus these read-only fields:
 | `id` | integer | |
 | `anchor_day` | integer, null | The day of the month billing returns to after a short month. |
 | `category_name` | string, null | |
+| `payment_method_name` | string, null | |
 | `split_mode` | string | Shared-cost splits are read here, written in the web interface. |
 | `usage_count` | integer | |
 | `usage_rating` | integer, null | |
@@ -602,11 +637,12 @@ Returned by `GET /me`. Fields: `user` (`id`, `email`, `display_name`,
 `editor`, `viewer`, or null), `isolation_mode` (`shared`, `isolated`),
 `permissions` (array of strings).
 
-### Category · Tag · Attachment
+### Category · PaymentMethod · Tag · Attachment
 
 | Schema | Fields |
 | --- | --- |
 | `Category` | `id`, `name`, `colour` (nullable) |
+| `PaymentMethod` | `id`, `name`, `colour` (nullable), `icon` (nullable; a generic icon key, never a brand mark), `logo_path` (nullable, read-only) |
 | `Tag` | `id`, `name` |
 | `Attachment` | `id`, `subscription_id`, `filename`, `mime_type`, `size_bytes`, `period_date` (nullable date), `created_at` |
 

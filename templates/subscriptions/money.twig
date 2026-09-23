@@ -1,5 +1,7 @@
 {% extends 'layout.twig' %}
 
+{% import 'partials/payment_method.twig' as payment_method %}
+
 {% block title %}{{ subscription.name }} — {{ t('subscriptions_money.title') }} — {{ instance_name }}{% endblock %}
 
 {% block heading %}{{ subscription.name }}{% endblock %}
@@ -13,6 +15,13 @@
 
 {% block content %}
     {% include 'partials/errors.twig' %}
+
+    {% if subscription.paymentMethodName %}
+        <p class="muted">
+            <span class="visually-hidden">{{ t('field.payment_method') }}</span>
+            {{ payment_method.for_subscription(subscription) }}
+        </p>
+    {% endif %}
 
     {% if subscription.isTrial and subscription.trialEndDate %}
         <section class="card callout">

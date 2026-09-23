@@ -435,6 +435,9 @@ return [
     'error.category.duplicate' => 'A category with that name already exists.',
     'error.category.colour_required' => 'Choose a colour.',
 
+    'error.payment_method.not_found' => 'That payment method does not exist.',
+    'error.payment_method.name_required' => 'Enter a name for the payment method.',
+    'error.payment_method.duplicate' => 'A payment method with that name already exists.',
     'error.price_change.date_required' => 'Enter the date the new price starts.',
     'error.price_change.date_past' => 'Choose a future date. To change the price now, edit the subscription.',
 
@@ -489,6 +492,11 @@ return [
     'flash.category_added' => 'Category added.',
     'flash.category_renamed' => 'Category renamed.',
     'flash.category_deleted' => 'Category deleted.',
+    'flash.payment_method_added' => 'Payment method added.',
+    'flash.payment_method_saved' => 'Payment method saved.',
+    'flash.payment_method_logo_cleared' => 'Logo removed.',
+    'flash.payment_method_deleted' => 'Payment method deleted. Its subscriptions no longer say how they are paid.',
+    'flash.payment_methods_defaults_added' => 'The default payment methods have been added.',
     'flash.tag_deleted' => 'Tag deleted.',
 
     'flash.channel_added' => 'Notification channel added. Send a test message to check it works.',
@@ -531,6 +539,7 @@ return [
     'flash.restore_finished' =>
         'Restored {subscriptions, plural, one {# subscription} other {# subscriptions}},'
         . ' {categories, plural, one {# category} other {# categories}},'
+        . ' {payment_methods, plural, one {# payment method} other {# payment methods}},'
         . ' {tags, plural, one {# tag} other {# tags}},'
         . ' {budgets, plural, one {# budget} other {# budgets}}'
         . ' and {attachments, plural, one {# attachment} other {# attachments}}.',
@@ -814,6 +823,8 @@ return [
     // application can show.
     'confirm.delete_subscription' => 'Delete {name}?',
     'confirm.delete_category' => 'Delete {name}?',
+    'confirm.delete_payment_method' =>
+        'Delete {name}? Subscriptions paid with it are kept; they just stop saying how they are paid.',
     'confirm.delete_budget' => 'Delete this budget?',
     'confirm.delete_attachment' => 'Delete this file?',
     'confirm.reset_usage' => 'Reset the usage count to zero?',
@@ -927,6 +938,7 @@ return [
     'field.alert' => 'Alert',
     'field.amount' => 'Amount',
     'field.category' => 'Category',
+    'field.payment_method' => 'Payment method',
     'field.change' => 'Change',
     'field.channel' => 'Channel',
     'field.confirm_password' => 'Confirm password',
@@ -1087,6 +1099,7 @@ return [
     'nav.calendar' => 'Billing Calendar',
     'nav.cancellations' => 'Cancel by',
     'nav.categories' => 'Categories',
+    'nav.payment_methods' => 'Payment methods',
     'nav.dashboard' => 'Dashboard',
     'nav.forecast' => 'Forecast',
     'nav.household' => 'Household',
@@ -1267,6 +1280,8 @@ return [
     'settings.you' => '(you)',
     'settings.your_data' => 'Your data',
 
+    'settings.lists' => 'Lists',
+    'settings.lists_intro' => 'The labels a subscription can carry: what it is for, and what it is paid with.',
     // setup_notifications
     'setup_notifications.configured' => 'Configured',
     'setup_notifications.finish' => 'Finish',
@@ -1318,6 +1333,17 @@ return [
         'Shown per currency rather than as one chart: no exchange rate is available for {currencies}, so '
         . 'there is no single total for the categories to be shares of. Each figure below is a share of '
         . 'its own currency\'s monthly total.',
+    'stats.payment_methods_heading' => 'How it is paid',
+    'stats.payment_methods_empty' => 'No recurring spend to break down by payment method yet.',
+    'stats.payment_donut_alt' =>
+        'Doughnut chart of recurring monthly spend by payment method, in {currency}. The same figures are in '
+        . 'the table that follows.',
+    'stats.payment_donut_per_currency' =>
+        'Shown per currency rather than as one chart: no exchange rate is available for {currencies}, so '
+        . 'there is no single total for the payment methods to be shares of. Each figure below is a share of '
+        . 'its own currency\'s monthly total.',
+    'stats.no_payment_method' => 'No payment method',
+    'stats.other_payment_methods' => '{count, plural, one {# other method} other {# other methods}}',
     'stats.last_12_months' => 'Last 12 months',
     'stats.least_expensive' => 'Least expensive',
     'stats.most_expensive' => 'Most expensive',
@@ -1702,6 +1728,7 @@ return [
     'error.api.attachment_missing' => 'That file is no longer stored.',
     'error.api.attachment_unreadable' => 'The attachment could not be read back.',
     'error.api.category_not_found' => 'No such category.',
+    'error.api.payment_method_not_found' => 'No such payment method.',
     'error.api.read_only_tokens_only' => 'This endpoint accepts read-only tokens only.',
     'error.api.subscription_not_found' => 'No such subscription.',
     'error.api.subscription_unreadable' => 'The subscription could not be read back.',
@@ -1774,6 +1801,38 @@ return [
         . 'which other bases are derived.',
     'rate_provider.frankfurter' =>
         'Free, no account needed. European Central Bank reference rates, updated each working day.',
+
+    // payment_methods
+    'payment_methods.title' => 'Payment methods',
+    'payment_methods.intro' =>
+        'What your subscriptions are paid with. A payment method is only a label: Renovo never stores a card '
+        . 'number and never takes a payment.',
+    'payment_methods.none_yet' => 'No payment methods yet.',
+    'payment_methods.defaults_hint' =>
+        'Start from the usual list — cards, direct debit, PayPal and the rest — and rename or remove what you '
+        . 'do not use.',
+    'payment_methods.add_defaults' => 'Add the default list',
+    'payment_methods.name_of' => 'Name of {name}',
+    'payment_methods.colour_of' => 'Colour of {name}',
+    'payment_methods.logo_of' => 'New logo for {name}',
+    'payment_methods.colour_automatic' => 'Automatic colour',
+    'payment_methods.colour_automatic_of' => 'Automatic colour for {name}',
+    'payment_methods.clear_logo' => 'Remove logo',
+    'payment_methods.new_method' => 'New payment method',
+    'payment_methods.logo' => 'Logo',
+    'payment_methods.logo_hint' =>
+        'Optional. PNG, JPEG, GIF or WebP. Without one, the method is shown with a generic icon.',
+    'payment_methods.add_method' => 'Add payment method',
+    'payment_methods.default.credit_card' => 'Credit Card',
+    'payment_methods.default.debit_card' => 'Debit Card',
+    'payment_methods.default.direct_debit' => 'Direct Debit',
+    'payment_methods.default.bank_transfer' => 'Bank Transfer',
+    'payment_methods.default.standing_order' => 'Standing Order',
+    'payment_methods.default.paypal' => 'PayPal',
+    'payment_methods.default.cash' => 'Cash',
+    'payment_methods.default.gift_card' => 'Gift Card',
+    'payment_methods.default.app_store' => 'App Store',
+    'payment_methods.default.google_play' => 'Google Play',
 
     // token_ability
     'token_ability.read' => 'Read-only',

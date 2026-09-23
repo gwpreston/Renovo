@@ -107,6 +107,7 @@ final class BackupController extends Controller
         $this->flash('success', 'flash.restore_finished', [
             'subscriptions' => $summary['subscriptions'],
             'categories' => $summary['categories'],
+            'payment_methods' => $summary['payment_methods'],
             'tags' => $summary['tags'],
             'budgets' => $summary['budgets'],
             'attachments' => $summary['attachments'],
