@@ -81,6 +81,16 @@
                 .then(function (html) {
                     body.innerHTML = html;
 
+                    // Inserted by hand rather than swapped by htmx, so htmx has
+                    // not seen the form's own attributes — the price's
+                    // conversion note asks the server through them — and the
+                    // bundle's enhancements have not seen the form at all. The
+                    // first is `process()`; the second listens for this event.
+                    if (window.htmx) {
+                        window.htmx.process(body);
+                    }
+                    body.dispatchEvent(new CustomEvent('renovo:content-loaded', {bubbles: true}));
+
                     var first = body.querySelector('input, select, textarea');
                     if (first) {
                         first.focus();

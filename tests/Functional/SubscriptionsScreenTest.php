@@ -18,6 +18,9 @@ use App\Security\CsrfTokenManager;
 use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Service\CancellationService;
+use App\Service\Import\ImportPreset;
+use App\Service\Import\RowTranslator;
+use App\Service\Import\SourceFile;
 use App\Service\InstanceSettingsService;
 use App\Service\SplitService;
 use App\Service\StatsService;
@@ -894,6 +897,61 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
 
         self::assertSame("'=HYPERLINK(\"https://evil.example\")", $row[0]);
         self::assertSame("'@SUM(A1)", $row[count($row) - 1]);
+    }
+
+    /**
+     * The README's claim, held to account: an exported file is read back by
+     * the importer's automatic preset with no mapping chosen by hand, and every
+     * row passes the same validation a new subscription does.
+     */
+    public function testTheExportReadsBackThroughTheImportersOwnPreset(): void
+    {
+        $subscriptions = new SubscriptionRepository($this->db);
+        $owner = $this->scopeFor($this->ownerId);
+        $subscriptions->create($owner, [
+            'name' => 'Every six weeks',
+            'price_minor' => 4200,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'custom_days',
+            'cycle_days' => 42,
+            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+            'is_active' => true,
+        ], []);
+        $subscriptions->create($owner, [
+            'name' => 'Once only',
+            'price_minor' => 1500,
+            'currency' => 'GBP',
+            'subscription_type' => 'one_off',
+            'is_active' => true,
+        ], []);
+
+        $path = (string) tempnam(sys_get_temp_dir(), 'renovo-export');
+        file_put_contents($path, $this->body($this->get('/subscriptions/export.csv', $this->ownerId)));
+
+        try {
+            $file = SourceFile::parse($path, 'subscriptions.csv');
+        } finally {
+            unlink($path);
+        }
+
+        $mapping = ImportPreset::guess(ImportPreset::AUTOMATIC, $file->headers);
+        $translator = new RowTranslator($mapping, 'GBP');
+        $service = $this->container()->get(SubscriptionService::class);
+
+        $read = [];
+        foreach ($file->rows as $row) {
+            $input = $translator->translate($row);
+            self::assertSame([], $service->validationErrors($owner, $input), 'row "' . $input['name'] . '" fails');
+            $read[(string) $input['name']] = $input;
+        }
+
+        self::assertCount(11, $read);
+        self::assertSame('custom_days', $read['Every six weeks']['billing_cycle']);
+        self::assertSame('42', (string) $read['Every six weeks']['cycle_days']);
+        self::assertSame('one_off', $read['Once only']['subscription_type']);
+        self::assertSame('0', $read['Paused thing']['is_active']);
+        self::assertSame('EUR', $read['European thing']['currency']);
     }
 
     public function testAViewerMayExportWhatTheyMayRead(): void

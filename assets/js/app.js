@@ -74,11 +74,14 @@ if (document.readyState === 'loading') {
     hydrate();
 }
 
-document.addEventListener('htmx:afterSwap', (event) => {
+/*
+ * Content that arrived after this module first ran: an htmx swap, or the
+ * quick-add dialog's form, which `public/assets/app.js` inserts itself and
+ * announces with `renovo:content-loaded`.
+ */
+function enhanceArrived(event) {
     const root = event.target instanceof Element ? event.target : document;
 
-    // The quick-add dialog loads the subscription form through htmx, so the
-    // tag field arrives after this module first ran.
     enhanceTagFields(root);
     enhancePaymentMethodFields(root);
     enhanceSubscriptionForms(root);
@@ -87,7 +90,10 @@ document.addEventListener('htmx:afterSwap', (event) => {
     // The whole document rather than the event's target: an outerHTML swap's
     // target is the element that was just replaced.
     enhanceSubscriptionLists(document);
-});
+}
+
+document.addEventListener('htmx:afterSwap', enhanceArrived);
+document.addEventListener('renovo:content-loaded', enhanceArrived);
 
 /*
  * Redraw when the palette or the theme changes.

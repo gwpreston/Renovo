@@ -200,6 +200,38 @@ final class AccessibilityTest extends DatabaseTestCase
     }
 
     /**
+     * The quick-add dialog's content: the form fragment htmx loads into it.
+     *
+     * A fragment has no landmarks, heading or skip link of its own — the page
+     * it is loaded into carries those — so only the checks that apply to the
+     * markup it brings are made: every control named, every table header
+     * scoped, every image described or decorative.
+     */
+    public function testTheQuickAddDialogsFormIsNamedAndDescribed(): void
+    {
+        $response = $this->app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('GET', 'http://localhost/subscriptions/new', ['REMOTE_ADDR' => '127.0.0.1'])
+                ->withHeader('HX-Request', 'true'),
+        );
+        self::assertSame(200, $response->getStatusCode());
+        $html = (string) $response->getBody();
+
+        self::assertStringNotContainsString('<html', $html, 'The dialog was sent a whole document.');
+        self::assertSame([], $this->unnamedControls($html), 'The dialog has controls a screen reader cannot name.');
+
+        preg_match_all('/<th\b([^>]*)>/', $html, $headers);
+        foreach ($headers[1] as $attributes) {
+            self::assertStringContainsString('scope=', $attributes);
+        }
+
+        preg_match_all('/<img\b([^>]*)>/', $html, $images);
+        foreach ($images[1] as $attributes) {
+            self::assertStringContainsString('alt=', $attributes);
+        }
+    }
+
+    /**
      * Controls with neither a wrapping label, a `for=`, nor an aria-label.
      *
      * @return list<string>

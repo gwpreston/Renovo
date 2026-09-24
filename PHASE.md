@@ -175,7 +175,7 @@ today.
       conversion note; custom shares; custom cycle; type; converts-to
 - [x] Quick-add modal and full page render the same template
 - [x] New strings in `translations/en.php`
-- [x] `composer check`, `i18n:check` green on both engines (2433 tests on
+- [x] `composer check`, `i18n:check` green on both engines (2435 tests on
       PostgreSQL 16 and MySQL 8.4)
 
 ### Notes from the build
@@ -195,6 +195,12 @@ today.
   had laid the cost page's price history on top of itself.
 - The top bar's subtitle now shrinks before the title, and page actions keep
   their words on one line.
+- **The quick-add dialog** inserts its form by hand, so it now runs
+  `htmx.process()` over it and announces `renovo:content-loaded` for the
+  bundle's enhancements. Before this, the dialog's tag and payment-method
+  enhancements had never run there either.
+- `scope=mine` is web-only: the API builds its own filter and ignores it, so
+  the API contract is unchanged.
 - The strip's Active tile excludes trials (it is the Active filter's count); the
   dashboard's Active tile, unchanged, still includes them.
 
