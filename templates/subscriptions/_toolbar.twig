@@ -1,0 +1,161 @@
+{#
+    The toolbar's filter-dependent parts.
+
+    Every control here is a link or a GET form that swaps `#subscription-list`
+    through htmx — and, without script, is an ordinary link or form that loads
+    the page. What they link *to* depends on the rest of the filter: the
+    "Trials" link keeps the search and the category, the category chips keep
+    the status. So after a swap each of them has to be redrawn from the new
+    filter, and the list request only replaces the list.
+
+    This file is therefore rendered twice over a page's life: once in place by
+    the full page (`oob` false), and again at the end of every list fragment
+    with `hx-swap-oob`, so each part is replaced by its id alongside the list.
+    htmx applies out-of-band swaps to the whole response before `hx-select`
+    narrows it to `#subscription-list`, so the sort and pager links — which do
+    select — carry these too. The search box itself is not in here: replacing
+    an input while somebody is typing into it would take their cursor away.
+
+    `oob` is read with `??` rather than `|default`, because `default` treats a
+    deliberate `false` as unset — see the long note in `_list.twig`.
+#}
+{% import _self as bar %}
+{% set oob = oob ?? true %}
+
+{#
+    Category chips, tag chips, status and scope.
+#}
+<div id="list-filters" class="list-filters"{% if oob %} hx-swap-oob="true"{% endif %}>
+    <nav class="chip-row" aria-label="{{ t('field.category') }}">
+        {{ bar.link(filter.toQueryString({'category': null, 'page': null}), t('state.all'), filter.categoryId is null, 'chip chip-action') }}
+        {% for category in categories %}
+            {{ bar.link(filter.toQueryString({'category': category.id, 'page': null}), category.name,
+                filter.categoryId == category.id, 'chip chip-action') }}
+        {% endfor %}
+    </nav>
+
+    {% if tags is not empty %}
+        <nav class="chip-row chip-row-tags" aria-label="{{ t('field.tags') }}">
+            {% for tag in tags %}
+                {{ bar.link(filter.queryTogglingTag(tag.id), '#' ~ tag.name, tag.id in filter.tagIds, 'chip chip-action chip-tag') }}
+            {% endfor %}
+        </nav>
+    {% endif %}
+
+    <div class="list-segments">
+        <div class="list-segment">
+            <span class="group-label" id="status-filter-label">{{ t('field.status') }}</span>
+            <nav class="segmented" aria-labelledby="status-filter-label">
+                {{ bar.link(filter.toQueryString({'status': null, 'page': null}), t('state.all'), filter.status is null, 'segmented-option') }}
+                {% for status in statuses %}
+                    {{ bar.link(filter.toQueryString({'status': status.value, 'page': null}),
+                        t('subscriptions.status_filter.' ~ status.value), filter.status == status, 'segmented-option') }}
+                {% endfor %}
+            </nav>
+        </div>
+
+        {#
+            Household / Mine. "Mine" is what the viewer owns or has a share of a
+            split in. Not drawn where the viewer can only see their own rows
+            anyway — both choices would be the same list.
+        #}
+        {% if offers_scope %}
+            <div class="list-segment">
+                <span class="group-label" id="scope-filter-label">{{ t('subscriptions.scope') }}</span>
+                <nav class="segmented" aria-labelledby="scope-filter-label">
+                    {{ bar.link(filter.toQueryString({'scope': null, 'page': null}), t('visibility.household'), not filter.mine, 'segmented-option') }}
+                    {{ bar.link(filter.toQueryString({'scope': 'mine', 'page': null}), t('subscriptions.scope_mine'), filter.mine, 'segmented-option') }}
+                </nav>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{#
+    Saved views, density and export: the end of the toolbar.
+#}
+<div id="list-tools" class="list-tools"{% if oob %} hx-swap-oob="true"{% endif %}>
+    {#
+        Saved views. Ordinary links, not an htmx swap: applying one is a change
+        of view, and the address bar should say so — a saved view that cannot be
+        bookmarked or shared is barely saved at all.
+    #}
+    <details class="menu saved-views">
+        <summary class="button button-quiet">
+            {{ icon('filter') }}<span>{{ t('saved_views.heading') }}</span>
+        </summary>
+        <div class="menu-panel">
+            {% if saved_views is empty %}
+                <p class="muted">{{ t('saved_views.empty') }}</p>
+            {% else %}
+                <ul class="plain saved-view-list">
+                    {% for view in saved_views %}
+                        <li>
+                            <a href="{{ view.path }}">{{ view.name }}</a>
+                            <form method="post" action="/saved-views/{{ view.id }}/delete" class="inline">
+                                {{ csrf_field() }}
+                                <button type="submit" class="button-icon"
+                                        aria-label="{{ t('saved_views.forget', {'name': view.name}) }}">{{ icon('close') }}</button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            <form method="post" action="/saved-views" class="inline-form">
+                {{ csrf_field() }}
+                {#
+                    What "save this view" stores: the filter as the list itself
+                    writes it, `SubscriptionFilter::toQueryString()`, rather than
+                    something the browser reconstructed from the address bar. It
+                    is refreshed with the rest of this block on every filter,
+                    sort and page request — a field left holding the query the
+                    page was *loaded* with is how a view saved after filtering
+                    once came out empty.
+                #}
+                <input type="hidden" id="saved-view-query" name="query" value="{{ current_query }}">
+                <label for="saved-view-name" class="visually-hidden">{{ t('saved_views.name_label') }}</label>
+                <input type="text" id="saved-view-name" name="name" maxlength="60"
+                       placeholder="{{ t('saved_views.name_placeholder') }}">
+                <button type="submit" class="button">{{ t('saved_views.save_current') }}</button>
+            </form>
+        </div>
+    </details>
+
+    {#
+        Density: the same preference the profile page sets, written on its own.
+        A form, because it changes something stored; it returns to this list
+        with the filter it was showing.
+
+        Which option is current is drawn by the stylesheet from the root's
+        `data-density`, not written into these buttons: density is the one
+        setting that must not change the markup, so a screen reader hears the
+        same page at either — `PersonalisationTest` compares the two as text.
+    #}
+    <form method="post" action="/subscriptions/density" class="segmented density-toggle"
+          role="group" aria-label="{{ t('settings.density') }}">
+        {{ csrf_field() }}
+        <input type="hidden" name="query" value="{{ current_query }}">
+        {% for option in ['comfortable', 'compact'] %}
+            <button type="submit" name="density" value="{{ option }}"
+                    class="segmented-option density-{{ option }}">{{ t('density.' ~ option) }}</button>
+        {% endfor %}
+    </form>
+
+    <a class="button button-quiet" href="/subscriptions/export.csv{{ current_query ? '?' ~ current_query : '' }}" download>
+        {{ icon('download') }}<span>{{ t('subscriptions.export') }}</span>
+    </a>
+</div>
+
+{#
+    One filter link. `aria-current` marks the chosen one, which is what the
+    chip and segment styles key on, so what the eye reads from the fill is what
+    a screen reader is told.
+#}
+{% macro link(query, label, active, class) %}
+    <a class="{{ class }}" href="/subscriptions{{ query ? '?' ~ query : '' }}"
+       hx-get="/subscriptions{{ query ? '?' ~ query : '' }}"
+       hx-target="#subscription-list" hx-select="#subscription-list"
+       hx-swap="outerHTML" hx-push-url="true"
+       {% if active %}aria-current="true"{% endif %}>{{ label }}</a>
+{% endmacro %}

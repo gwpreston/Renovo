@@ -158,6 +158,21 @@ return static function (App $app): void {
             ->setName('subscriptions')
             ->add($requires(Permission::ViewSubscriptions));
 
+        // The list as a CSV file: the same filter and the same scoped query, so
+        // it holds no row the list itself would not show.
+        $group->get('/subscriptions/export.csv', [SubscriptionController::class, 'export'])
+            ->setName('subscriptions-export')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        // The form's "≈ base at today's rate" note. It discloses an exchange
+        // rate and nothing about any subscription.
+        $group->get('/subscriptions/conversion-note', [SubscriptionController::class, 'conversionNote'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        // The list's density toggle — a personal preference, like the theme,
+        // so it needs no permission.
+        $group->post('/subscriptions/density', [SubscriptionController::class, 'density']);
+
         $group->get('/subscriptions/new', [SubscriptionController::class, 'createForm'])
             ->setName('subscription-new')
             ->add($requires(Permission::CreateSubscription));

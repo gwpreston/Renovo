@@ -107,6 +107,27 @@ abstract class Controller
         return $this->redirect($response, $location);
     }
 
+    /**
+     * Where an action on one subscription sends the member back to: its edit
+     * page when the form said it came from there, otherwise its cost page.
+     *
+     * The price-change, attachment and cancel controls appear on both pages.
+     * Only these two exact paths are honoured — never an arbitrary one — so
+     * the field can never become a redirect to somewhere unexpected.
+     */
+    protected function subscriptionReturn(ServerRequestInterface $request, int $id, string $fallback = ''): string
+    {
+        $body = $this->body($request);
+        $target = is_scalar($body['return_to'] ?? null) ? (string) $body['return_to'] : '';
+        $edit = '/subscriptions/' . $id . '/edit';
+        $money = '/subscriptions/' . $id . '/money';
+
+        return match ($target) {
+            $edit, $money => $target,
+            default => $fallback !== '' ? $fallback : $money,
+        };
+    }
+
     protected function user(ServerRequestInterface $request): User
     {
         $user = $request->getAttribute(AuthenticationMiddleware::ATTRIBUTE_USER);

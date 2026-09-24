@@ -425,7 +425,12 @@ tr.is-passed > td {
 
 /* ---------------------------------------------------------- price history */
 
-.timeline {
+/*
+ * A subscription's price history. Its own names: the household dashboard's
+ * thirty-day line is `.timeline`, positioned absolutely, and sharing the class
+ * laid these rows on top of one another.
+ */
+.price-timeline {
     list-style: none;
     margin: 0 0 1rem;
     padding: 0;
@@ -434,17 +439,17 @@ tr.is-passed > td {
     gap: 0.75rem;
 }
 
-.timeline li {
+.price-timeline li {
     border-left: 2px solid var(--border);
     padding-left: 0.75rem;
 }
 
-.timeline li.is-scheduled {
+.price-timeline li.is-scheduled {
     border-left-style: dashed;
     border-left-color: var(--warn);
 }
 
-.timeline-date {
+.price-timeline-date {
     font-size: var(--size-label);
     color: var(--muted);
     display: flex;
@@ -452,7 +457,7 @@ tr.is-passed > td {
     align-items: center;
 }
 
-.timeline-amount {
+.price-timeline-amount {
     font-weight: var(--weight-semibold);
     display: flex;
     gap: 0.5rem;
@@ -530,26 +535,6 @@ tr.is-passed > td {
 .channel-list > li:last-child {
     padding-bottom: 0;
     border-bottom: 0;
-}
-
-/* ----------------------------------------------------------- saved views */
-
-.saved-views {
-    display: grid;
-    gap: 0.6rem;
-}
-
-.saved-view-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-}
-
-.saved-view-list a {
-    text-decoration: none;
 }
 
 /* ---------------------------------------------------------------- profile */
@@ -834,33 +819,474 @@ tr.is-passed > td {
 
 /* ------------------------------------------------------- my subscriptions */
 
-/*
- * The screen's shape: the list and the sections beneath it in one column, the
- * category widget alongside on a wide screen and below on a narrow one.
- *
- * The gap is horizontal only. Cards space themselves vertically with their own
- * margin, and a row gap on top of that would be a double space on every phone.
- */
-.subscriptions-layout {
-    display: grid;
-    gap: 0 1rem;
-    align-items: start;
+/* The KPI tiles give up their card margin; the strip keeps the row's spacing. */
+#subscription-strip {
+    margin-bottom: 1rem;
 }
 
-@media (min-width: 1100px) {
-    .subscriptions-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
+/*
+ * The toolbar: the category chips and the search box on the first line, the
+ * status and scope segments with saved views, density and export on the
+ * second. Everything wraps rather than scrolling — on a phone the chips are
+ * two lines, not a sideways strip nobody finds the end of.
+ */
+.subscriptions-toolbar {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.list-search {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.list-search-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    max-width: 24rem;
+}
+
+.list-search-field svg {
+    position: absolute;
+    left: 0.65rem;
+    width: 1rem;
+    height: 1rem;
+    color: var(--faint);
+    pointer-events: none;
+}
+
+.list-search-field input {
+    padding-left: 2.1rem;
+}
+
+.list-filters {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.list-filters .chip-row {
+    margin-bottom: 0;
+}
+
+.chip-action[aria-current='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+}
+
+.chip-tag {
+    background: var(--surface);
+}
+
+.list-segments,
+.list-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.25rem;
+}
+
+.list-segment {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.list-segment .group-label {
+    margin: 0;
+}
+
+/* A segment that is a link rather than a radio: chosen is `aria-current`. */
+a.segmented-option {
+    text-decoration: none;
+}
+
+.segmented-option[aria-current='true'] {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow);
+}
+
+.list-tools {
+    gap: 0.5rem;
+}
+
+/* The current density, read from the root rather than written into the markup. */
+:root:not([data-density='compact']) .density-toggle .density-comfortable,
+:root[data-density='compact'] .density-toggle .density-compact {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow);
+}
+
+.list-tools .button svg,
+.menu > summary svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/*
+ * A menu that is a <details>: it opens with no script, closes with a second
+ * click, and the panel floats over the content below rather than pushing it.
+ */
+.menu {
+    position: relative;
+}
+
+.menu > summary {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+
+.menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.menu-panel {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    display: grid;
+    gap: 0.6rem;
+    min-width: 16rem;
+    max-width: min(22rem, calc(100vw - 2rem));
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    box-shadow: var(--shadow);
+}
+
+.saved-view-list {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.saved-view-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.saved-view-list a {
+    text-decoration: none;
+}
+
+/* The summary line above the table: "12 of 14 · £84.20/mo". */
+.list-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0 0 0.75rem;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+}
+
+/*
+ * The bulk bar. Drawn open so it works without script; the list script hides
+ * it until a row is selected. It is its own form, which the row checkboxes
+ * join through their `form` attribute.
+ */
+.bulk-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+}
+
+.bulk-bar[hidden] {
+    display: none;
+}
+
+.bulk-count {
+    margin: 0 0.5rem 0 0;
+    font-weight: var(--weight-semibold);
+}
+
+/*
+ * The base form styles stretch every control to the width of its container,
+ * which is right in a stacked form and wrong in a toolbar.
+ */
+.bulk-bar select,
+.bulk-bar input {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 8rem;
+}
+
+.bulk-hint {
+    flex-basis: 100%;
+    margin: 0;
+}
+
+.select-column {
+    width: 2.5rem;
+}
+
+.select-column input {
+    width: auto;
+}
+
+/* The service cell: tile, name and lock, then "Plan · Payment method". */
+.service-tile {
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    background: var(--surface-2);
+}
+
+.service-initial {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--weight-heavy);
+    font-size: var(--size-label);
+    color: var(--text);
+}
+
+.cell-name {
+    align-items: center;
+}
+
+.cell-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-weight: var(--weight-bold);
+}
+
+.cell-title a {
+    color: var(--text);
+    text-decoration: none;
+}
+
+.cell-title a:hover {
+    text-decoration: underline;
+}
+
+.private-mark {
+    display: inline-flex;
+    color: var(--faint);
+}
+
+.private-mark svg {
+    width: 0.8rem;
+    height: 0.8rem;
+}
+
+.cell-subline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+}
+
+.subscription-list .hint {
+    display: block;
+    margin: 0.1rem 0 0;
+}
+
+.subscription-list .hint.is-near {
+    color: var(--warn);
+}
+
+.subscription-list td .member-identity {
+    align-items: flex-start;
+}
+
+.member-name {
+    font-weight: var(--weight-semibold);
+}
+
+.price-figure {
+    white-space: nowrap;
+}
+
+.price-figure .num {
+    font-weight: var(--weight-bold);
+}
+
+.subscription-list .badge {
+    margin-left: 0;
+}
+
+.actions-column {
+    text-align: right;
+}
+
+/*
+ * The row's actions, as icons with their words kept for a screen reader and
+ * as a tooltip. Square, the same size, one row.
+ */
+.subscription-list .row-actions {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+}
+
+.icon-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.icon-action:hover {
+    background: var(--surface-2);
+}
+
+.icon-action svg {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+
+.icon-action-danger {
+    color: var(--bad);
+    background: var(--bad-bg);
+    border-color: transparent;
+}
+
+/* The word is for assistive technology; the tooltip is the title. */
+.icon-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/*
+ * Below 768px the table gives way to cards. Both are in the markup, and only
+ * one is ever displayed, so a screen reader meets the list once.
+ */
+.subscription-cards {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .subscription-table {
+        display: none;
+    }
+
+    .subscription-cards {
+        display: grid;
     }
 }
 
-/*
- * Either column can hold a table, and a grid item defaults to refusing to be
- * narrower than its content — which is how a wide table pushes a whole page
- * sideways instead of scrolling inside its own wrapper.
- */
-.subscriptions-main,
-.subscriptions-side {
+.subscription-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.subscription-card:last-child {
+    border-bottom: 0;
+}
+
+.subscription-card .service-tile {
+    width: 2.4rem;
+    height: 2.4rem;
+}
+
+.subscription-card-main {
     min-width: 0;
+}
+
+.subscription-card-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--weight-bold);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.subscription-card-figure {
+    display: grid;
+    justify-items: end;
+    gap: 0.2rem;
+}
+
+.subscription-card-figure .price-base {
+    display: none;
+}
+
+.row-menu .menu-panel {
+    left: auto;
+    right: 0;
+    min-width: 0;
+}
+
+/* In the menu the words are shown: a column of labelled actions, not icons. */
+.row-menu .row-actions {
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 11rem;
+}
+
+.row-menu .row-actions form {
+    display: block;
+}
+
+.row-menu .icon-action {
+    justify-content: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    height: 2.5rem;
+    padding: 0 0.75rem;
+}
+
+.row-menu .icon-action-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+}
+
+.row-menu > summary {
+    width: 2.75rem;
+    height: 2.75rem;
+    justify-content: center;
+}
+
+.row-menu > summary svg {
+    width: 1.1rem;
+    height: 1.1rem;
 }
 
 .section-heading {
@@ -934,10 +1360,157 @@ tr.is-passed > td {
     padding-left: 0.5rem;
 }
 
-/* Each currency's bars are a block of their own when they cannot be combined. */
-.category-widget h3 {
-    margin: 1rem 0 0;
+/* The cancel-by card beneath the list: compact rows, a link to the full view. */
+.cancel-by .deadline {
+    grid-template-columns: minmax(0, 1fr);
 }
+
+@media (min-width: 30rem) {
+    .cancel-by .deadline {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+}
+
+.cancel-by .card-header .button svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ------------------------------------------------------ subscription form */
+
+/*
+ * What a choice reveals — "every N days" for a custom cycle, the weights for
+ * custom shares, the trial's dates, the reminder days — is shown from the
+ * checked state, so it works with no script. Hidden fields are never
+ * disabled: the server reads what the choice makes relevant and ignores the
+ * rest.
+ */
+.subscription-form .reveal {
+    display: none;
+}
+
+.subscription-form:has(input[name='billing_cycle'][value='custom_days']:checked) .reveal-custom-cycle,
+.subscription-form:has(input[name='reminder_mode'][value='days']:checked) .reveal-reminder-days,
+.subscription-form:has(input[name='split_mode'][value='equal']:checked) .reveal-split-equal,
+.subscription-form:has(input[name='split_mode'][value='custom']:checked) .reveal-split-custom,
+.subscription-form:has(#is_trial:checked) .reveal-trial,
+.subscription-form:has(#converts_to_billing_cycle option[value='custom_days']:checked) .reveal-trial-custom-cycle {
+    display: grid;
+}
+
+.subscription-form .reveal-trial {
+    gap: 0.75rem;
+}
+
+/* A one-off or a lifetime purchase has no cycle, no next charge and no trial. */
+.subscription-form:has(input[name='subscription_type'][value='one_off']:checked) .recurring-only,
+.subscription-form:has(input[name='subscription_type'][value='lifetime']:checked) .recurring-only {
+    display: none;
+}
+
+.chip-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.subscription-form .segmented + .chip-choices,
+.subscription-form .segmented + .share-grid {
+    margin-top: 0.5rem;
+}
+
+.member-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-heavy);
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.filter-chip:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.segmented-option:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.share-grid {
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: 0.5rem;
+}
+
+.share-field {
+    display: grid;
+    gap: 0.25rem;
+    font-size: var(--size-label);
+}
+
+.conversion-note {
+    margin: 0.35rem 0 0;
+    font-size: var(--size-label);
+    color: var(--muted);
+}
+
+.conversion-note:empty {
+    display: none;
+}
+
+.choice.toggle {
+    align-items: flex-start;
+    padding: 0.75rem;
+    background: var(--surface-2);
+    border-radius: var(--radius-control);
+}
+
+.choice-title {
+    display: block;
+    font-weight: var(--weight-semibold);
+}
+
+.choice-note {
+    display: block;
+    font-size: var(--size-label);
+    color: var(--muted);
+}
+
+.more-details {
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+}
+
+.more-details > summary {
+    cursor: pointer;
+    font-weight: var(--weight-semibold);
+}
+
+.more-details-body {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.dialog-subtitle {
+    margin: 0 0 0.75rem;
+}
+
+.edit-sections {
+    display: grid;
+    max-width: 46rem;
+    margin: 1rem auto 0;
+}
+
+.danger-zone h2 {
+    margin-top: 0;
+}
+
 
 .category-widget h3:first-of-type {
     margin-top: 0.5rem;

@@ -28,6 +28,8 @@ import { drawCategoryDonuts } from './category-donut.js';
 import { icon } from './icons.js';
 import { enhancePaymentMethodFields } from './payment-method-field.js';
 import { drawSpendCharts } from './spend-chart.js';
+import { enhanceSubscriptionForms } from './subscription-form.js';
+import { enhanceSubscriptionLists } from './subscription-list.js';
 import { enhanceTagFields } from './tag-field.js';
 
 /*
@@ -61,6 +63,8 @@ function drawCharts(root = document) {
 function hydrate() {
     enhanceTagFields(document);
     enhancePaymentMethodFields(document);
+    enhanceSubscriptionForms(document);
+    enhanceSubscriptionLists(document);
     drawCharts();
 }
 
@@ -77,6 +81,12 @@ document.addEventListener('htmx:afterSwap', (event) => {
     // tag field arrives after this module first ran.
     enhanceTagFields(root);
     enhancePaymentMethodFields(root);
+    enhanceSubscriptionForms(root);
+    // The list fragment replaces `#subscription-list` whole, so its bulk bar
+    // arrives drawn open again and needs hiding until something is chosen.
+    // The whole document rather than the event's target: an outerHTML swap's
+    // target is the element that was just replaced.
+    enhanceSubscriptionLists(document);
 });
 
 /*

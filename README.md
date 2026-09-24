@@ -262,13 +262,22 @@ Built in phases:
   cancelled subscription at its cancellation date. **Upgrading resets every
   saved dashboard layout once** (see [Upgrading](#upgrading)). Three
   migrations. See [The dashboard](#the-dashboard).
+- **Phase 22 — subscriptions: the list and the form — complete.** The list and
+  the add/edit form rebuilt to the prototype with every existing capability
+  kept: a strip of Active, Trials, Paused and Per month; a toolbar of category
+  and tag chips, status, Household/Mine scope, saved views, density and a CSV
+  export of the filtered list; a table with logos, split notes, base-currency
+  equivalents and status badges, cards below 768px, and the bulk bar back. The
+  form shows the prototype's fields, keeps the rest under More details, saves
+  the split with the row and computes its currency note on the server. No
+  migrations. See [My subscriptions](#my-subscriptions).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-The current phase is **Phase 21 — the dashboard: Overview and Household**.
+The current phase is **Phase 22 — subscriptions: the list and the form**.
 `PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
 archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
@@ -1080,49 +1089,68 @@ because dates are UTC.
 
 ## My subscriptions
 
-The subscriptions screen carries the list and, around it, the four things a
-person opens it to find out.
+The subscriptions screen is the list, arranged to the prototype: four figures,
+a toolbar, the table, and the cancel-by deadlines beneath it. Free trials and
+the category breakdown live on [the dashboard](#the-dashboard).
 
 ### The strip
 
-Active count, yearly spend and renewals in the near window. The yearly figure
-follows the rule the rest of the application follows — per-currency subtotals,
-with a combined total only when every currency in play converts — through the
-same partial the dashboard's tiles use, so the two screens cannot come to
-different conclusions about the same money. A single clean number is the common
-case, not the only one.
+**Active**, **Trials** and **Paused** are the list's own statuses — each is the
+number of rows the status filter of the same name would page through, so Active
+leaves the trials beside it out. **Per month** is the recurring monthly total,
+by the rule the rest of the application follows: per-currency subtotals, with a
+combined figure only when every currency in play converts, drawn by the same
+partial as the dashboard's tiles. One-off, lifetime, paused and cancelled rows
+add nothing to it.
+
+### The toolbar
+
+- **Search**, **category chips**, **tag chips**, **Status** (All, Active,
+  Trials, Paused, Cancelled) and **Scope** — Household or Mine, where *Mine* is
+  what you own or have a share of a split in. Scope is not offered when you can
+  only see your own rows anyway.
+- **Saved views**, **density** and **Export** at the end. Export is a CSV of the
+  list as filtered — every matched row, through the same query, so it holds
+  nothing the list would not show. Its headings are the importer's own, so the
+  file imports elsewhere without mapping, and a cell that a spreadsheet would
+  read as a formula is written as text.
+- A summary line above the table: *N of M · £X/mo*, the monthly figure over
+  every matched row rather than the page on screen.
+
+Every control is a link or a GET form. With script, htmx swaps only
+`#subscription-list` and pushes the query string; without, it is an ordinary
+page load. The list fragment carries fresh copies of the toolbar's
+filter-dependent parts out of band, so a chip clicked after a search still
+links to the search.
 
 ### The list is the list
 
-It is the existing list fragment, restyled and rearranged rather than rebuilt,
-which is why **saved views** still store the query the list itself produced,
-**density** still tightens the same markup, and scope and permissions are
-exactly what the repository and the middleware already enforced. Filtering,
-sorting and paging still swap that fragment alone: the sections around it are
-computed for a whole page and not for a keystroke.
+It is the existing list fragment, rearranged rather than rebuilt, which is why
+**saved views** still store the query the list itself produced, **density**
+still tightens the same markup (the toggle's current option is drawn from the
+root's `data-density`, not written into the buttons), and scope and
+permissions are exactly what the repository and the middleware already
+enforce. Each row shows the service with its plan and payment method, who pays
+and how it is split, the price with its base-currency equivalent, the monthly
+figure in the base currency (a gap, never a zero, when there is no rate), the
+next charge — with "in N days", "Trial ends", or the cancel-by date when that is
+the deadline to meet — and a status badge in words. Below 768px the table is a
+list of cards with the same actions in a menu.
 
-### Two deadlines, not one
+Edit, Pause/Resume, Cancel/Undo cancel and Delete are drawn only where the role
+allows them **and** the row is one you may change: under ISOLATED isolation a
+member can see a shared cost they contribute to without being able to change
+it, and a Contributor changes only their own rows. Each endpoint refuses on its
+own either way. Ticking rows brings up the **bulk bar**, which is its own form
+the row checkboxes join, so no form ever sits inside another.
 
-- **Renewing soon** — a charge falling inside the near window, which is the
-  cancel-by view's fourteen days, referenced rather than re-chosen.
-- **Cancel by** — the last day notice can be given, shown only for a
-  subscription that *has* a notice period. Without one that deadline is the
-  renewal date, and a second card repeating it would be noise. A deadline
-  already missed is kept and marked: nothing can be done about it, but being
-  committed to another period is worth knowing.
+### Cancel by
 
-Each row offers Pause only to a member who could actually use it — their role
-may change a subscription **and** the isolation mode leaves that row writable.
-Under ISOLATED isolation a member can see a shared cost they contribute to
-without being able to change it, so the button that would be refused is not
-drawn. The refusal itself still lives in the repository.
-
-### Free trials
-
-Every trial that has not converted yet, not a window of them. **The last day of
-a trial is the day of its first charge**, so the countdown runs to that day and
-the amount shown is the price it converts to. A trial is the subscription it
-will become, so pausing it here pauses the subscription.
+The last day notice can be given, for every subscription with a notice period
+whose deadline falls inside the near window — the cancel-by view's fourteen
+days, referenced rather than re-chosen. Without a notice period that deadline
+*is* the renewal date, which the table's "Renewing soon" badge already says. A
+deadline already missed is kept and marked.
 
 ### Paused, cancelled, and only me
 
@@ -1145,13 +1173,31 @@ will become, so pausing it here pauses the subscription.
 - **Plan** is the tier a subscription is on — "Standard", "Family" — free text
   on the form, the list, the API, the importer and the backup.
 
-### Category spending
+### The form
 
-The Statistics page's category breakdown as proportion bars. What each bar is a
-share *of* is stated rather than assumed: the combined monthly total when every
-currency converts, and otherwise one group per currency against that currency's
-own total. Two currencies with no rate between them are never blended into one
-bar, because comparing them is precisely the claim a bar makes.
+One definition of a subscription: the quick-add dialog, the full page and the
+edit screen all render it. The prototype's fields are always shown — name and
+plan, price and currency (every ISO currency) with an "≈ base at today's rate"
+note the server computes as you type, category, type, billing cycle (Custom
+reveals "every N days"), next charge, payment method, **Remind me** (your
+defaults, never, or chosen days), **Paid by**, **Cost split** (payer only, split
+equally, or custom shares), **Visible to**, and the free trial with what it
+converts to. Everything the application had besides sits under **More details**
+— notice period, tags, website and logo, start date, who actually pays if that
+is someone else, notes — which opens by itself when one of those fields comes
+back with an error.
+
+The split is saved with the row, in one transaction, so a save is both or
+neither. "Only me" and a split cannot both be chosen; whichever is set rules the
+other out on the form, and the server refuses the pair regardless. A reminder
+day set before the chips existed (60, say) gets a chip of its own, so an edit
+cannot drop it.
+
+The edit page adds the price history, newest first, with **Schedule a price
+change**; invoices and receipts; and Cancel or Undo cancel, and Delete. Each is
+a form of its own after the main one, and comes back to the edit page. The cost
+page stays as the read-only view of a subscription and is where usage is
+recorded.
 
 ## Money features
 

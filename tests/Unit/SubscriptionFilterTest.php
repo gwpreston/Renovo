@@ -105,4 +105,50 @@ final class SubscriptionFilterTest extends TestCase
         self::assertFalse($web->includeCancelled);
         self::assertSame(SubscriptionStatus::Trial, $web->status, 'the wither keeps the chosen status');
     }
+
+    public function testMineIsReadFromTheScopeParameterAndSurvivesTheWithers(): void
+    {
+        $filter = SubscriptionFilter::fromQueryParams(['scope' => 'mine', 'q' => 'x']);
+
+        self::assertTrue($filter->mine);
+        self::assertTrue($filter->hasActiveFilters());
+        self::assertStringContainsString('scope=mine', $filter->toQueryString());
+        self::assertTrue($filter->withIncludeInactive()->mine);
+        self::assertTrue($filter->unpaged()->mine);
+
+        // Anything else is the household.
+        self::assertFalse(SubscriptionFilter::fromQueryParams(['scope' => 'everyone'])->mine);
+        self::assertStringNotContainsString('scope=', SubscriptionFilter::fromQueryParams([])->toQueryString());
+    }
+
+    public function testUnpagedKeepsTheFilterAndDropsThePaging(): void
+    {
+        $filter = SubscriptionFilter::fromQueryParams(['q' => 'gym', 'page' => '4', 'status' => 'paused'])
+            ->withIncludeInactive();
+        $unpaged = $filter->unpaged();
+
+        self::assertTrue($filter->isPaged());
+        self::assertFalse($unpaged->isPaged());
+        self::assertSame('gym', $unpaged->search);
+        self::assertSame(SubscriptionStatus::Paused, $unpaged->status);
+        self::assertFalse($unpaged->includeCancelled);
+        self::assertSame(1, $unpaged->page);
+    }
+
+    public function testATagChipTogglesItsOwnTagAndKeepsTheOthers(): void
+    {
+        $filter = SubscriptionFilter::fromQueryParams(['tag' => ['2', '5'], 'page' => '3']);
+
+        $adding = $filter->queryTogglingTag(9);
+        self::assertStringContainsString('tag[]=2', $adding);
+        self::assertStringContainsString('tag[]=5', $adding);
+        self::assertStringContainsString('tag[]=9', $adding);
+
+        $removing = $filter->queryTogglingTag(5);
+        self::assertStringContainsString('tag[]=2', $removing);
+        self::assertStringNotContainsString('tag[]=5', $removing);
+
+        // Back to the first page: the set of rows has changed under the pager.
+        self::assertStringNotContainsString('page=', $adding);
+    }
 }

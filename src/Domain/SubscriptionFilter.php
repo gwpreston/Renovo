@@ -44,6 +44,13 @@ final class SubscriptionFilter
          * cancelled row is found there under its own filter.
          */
         public readonly bool $includeCancelled = true,
+        /**
+         * "Mine": the rows the viewer owns or has a share of a split in. A
+         * narrowing of what the scope already admits, never a widening — the
+         * repository applies it inside the scoped query, so it cannot reach a
+         * row the viewer could not have paged to anyway.
+         */
+        public readonly bool $mine = false,
     ) {
     }
 
@@ -83,6 +90,7 @@ final class SubscriptionFilter
             page: max(1, (int) ($query['page'] ?? 1)),
             perPage: self::DEFAULT_PER_PAGE,
             status: SubscriptionStatus::tryFrom(is_string($query['status'] ?? null) ? $query['status'] : ''),
+            mine: ($query['scope'] ?? '') === 'mine',
         );
     }
 
@@ -118,7 +126,38 @@ final class SubscriptionFilter
             perPage: $this->perPage,
             status: $this->status,
             includeCancelled: $includeCancelled,
+            mine: $this->mine,
         );
+    }
+
+    /**
+     * The same filter with no paging, for the callers that need every row it
+     * matches rather than one page of them: the summary line's monthly total
+     * and the CSV export.
+     */
+    public function unpaged(): self
+    {
+        return new self(
+            search: $this->search,
+            categoryId: $this->categoryId,
+            tagIds: $this->tagIds,
+            ownerUserId: $this->ownerUserId,
+            currency: $this->currency,
+            type: $this->type,
+            includeInactive: $this->includeInactive,
+            sort: $this->sort,
+            direction: $this->direction,
+            page: 1,
+            perPage: 0,
+            status: $this->status,
+            includeCancelled: $this->includeCancelled,
+            mine: $this->mine,
+        );
+    }
+
+    public function isPaged(): bool
+    {
+        return $this->perPage > 0;
     }
 
     /**
@@ -139,7 +178,8 @@ final class SubscriptionFilter
             || $this->ownerUserId !== null
             || $this->currency !== null
             || $this->type !== null
-            || $this->status !== null;
+            || $this->status !== null
+            || $this->mine;
     }
 
     /**
@@ -147,8 +187,10 @@ final class SubscriptionFilter
      * headers and pager links so they keep the rest of the filter intact.
      *
      * @param array<string, string|int|null> $overrides
+     * @param list<int>|null $tagIds The tag chips to carry instead of this
+     *        filter's own, for a chip link that toggles one of them.
      */
-    public function toQueryString(array $overrides = []): string
+    public function toQueryString(array $overrides = [], ?array $tagIds = null): string
     {
         $params = array_filter([
             'q' => $this->search !== '' ? $this->search : null,
@@ -157,6 +199,7 @@ final class SubscriptionFilter
             'currency' => $this->currency,
             'type' => $this->type?->value,
             'status' => $this->status?->value,
+            'scope' => $this->mine ? 'mine' : null,
             'inactive' => $this->includeInactive ? '1' : null,
             'sort' => $this->sort,
             'dir' => $this->direction,
@@ -172,11 +215,25 @@ final class SubscriptionFilter
         }
 
         $query = http_build_query($params);
-        foreach ($this->tagIds as $tagId) {
+        foreach ($tagIds ?? $this->tagIds as $tagId) {
             $query .= ($query === '' ? '' : '&') . 'tag[]=' . $tagId;
         }
 
         return $query;
+    }
+
+    /**
+     * The query a tag chip links to: this filter with that tag switched —
+     * added when it is not chosen, taken away when it is — and back to the
+     * first page, since the set of rows has changed under the pager.
+     */
+    public function queryTogglingTag(int $tagId): string
+    {
+        $tagIds = in_array($tagId, $this->tagIds, true)
+            ? array_values(array_filter($this->tagIds, static fn (int $id): bool => $id !== $tagId))
+            : [...$this->tagIds, $tagId];
+
+        return $this->toQueryString(['page' => null], $tagIds);
     }
 
     private static function positiveIntOrNull(mixed $value): ?int

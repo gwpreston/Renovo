@@ -119,12 +119,13 @@ final class SubscriptionFormLayoutTest extends DatabaseTestCase
         $form = $this->form($this->get($path));
 
         $legends = [];
-        foreach ($this->query($form, './/fieldset[@class="form-section"]/legend') as $legend) {
+        $sections = './/fieldset[contains(concat(" ", @class, " "), " form-section ")]/legend';
+        foreach ($this->query($form, $sections) as $legend) {
             $legends[] = trim($legend->textContent);
         }
 
         self::assertSame(
-            ['What it is', 'What it costs', 'When it’s billed', 'Free trial', 'Who it’s for'],
+            ['What it is', 'What it costs', 'When it’s billed', 'Who it’s for', 'Free trial'],
             $legends,
             $path . ' does not render the five sections in order.',
         );
@@ -141,28 +142,30 @@ final class SubscriptionFormLayoutTest extends DatabaseTestCase
 
         self::assertCount(
             0,
-            $this->query($form, './/fieldset[@class="form-section"]//fieldset'),
+            $this->query($form, './/fieldset[contains(concat(" ", @class, " "), " form-section ")]//fieldset'),
             'A form section contains another: its legends will be announced together.',
         );
     }
 
     /**
-     * The "belongs to" select, where writes are confined to their owner.
+     * "Paid by", where writes are confined to their owner.
      *
-     * Two things have to move together here and the template is the only place
-     * they can come apart: the control is disabled, and it names a hint saying
-     * why. The hint's id is in `aria-describedby` unconditionally on that same
-     * branch, so a note drawn on a narrower condition is a description pointing
-     * at nothing.
+     * The chips set the owner — the member the cost belongs to, which is what
+     * isolation keys on. Two things have to move together here and the
+     * template is the only place they can come apart: the choice is disabled
+     * (and offers nobody but the member themselves), and it names a hint
+     * saying why. The hint's id is in `aria-describedby` on that same branch,
+     * so a note drawn on a narrower condition is a description pointing at
+     * nothing.
      *
      * It is asserted through the rendered page rather than by reading the
      * template because of how this fails. Twig is not in strict mode, so
      * `scope.somethingThatNoLongerExists` is null rather than an error: rename
-     * the method behind it and the select quietly stops being disabled, on
+     * the method behind it and the choice quietly stops being disabled, on
      * every instance, with nothing anywhere saying so. That is not a
      * hypothetical — it is what this test was written for.
      */
-    public function testTheOwnerSelectIsDisabledWhereWritesAreConfinedToTheirOwner(): void
+    public function testTheOwnerChoiceIsDisabledWhereWritesAreConfinedToTheirOwner(): void
     {
         $container = $this->app->getContainer();
         self::assertNotNull($container);
@@ -170,18 +173,32 @@ final class SubscriptionFormLayoutTest extends DatabaseTestCase
 
         $form = $this->form($this->get('/subscriptions/new'));
 
-        $select = $this->query($form, './/select[@id="owner_user_id"]');
-        self::assertCount(1, $select, 'The form no longer offers an owner select at all.');
+        $choices = $this->query($form, './/input[@name="owner_user_id"]');
+        self::assertCount(1, $choices, 'A member confined to their own rows was offered somebody else to own it.');
         self::assertTrue(
-            $select[0]->hasAttribute('disabled'),
-            'The owner select is editable on an instance that confines writes to their owner.',
+            $choices[0]->hasAttribute('disabled'),
+            'The owner choice is editable on an instance that confines writes to their owner.',
         );
 
         self::assertCount(
             1,
             $this->query($form, './/*[@id="owner_user_id-hint"]'),
-            'The select is described by a hint that was not rendered.',
+            'The choice is described by a hint that was not rendered.',
         );
+    }
+
+    /**
+     * And where the household shares its rows, every member is offered.
+     */
+    public function testTheOwnerChoiceOffersEveryMemberWhereTheHouseholdShares(): void
+    {
+        $form = $this->form($this->get('/subscriptions/new'));
+
+        $choices = $this->query($form, './/input[@name="owner_user_id"]');
+        self::assertNotEmpty($choices);
+        foreach ($choices as $choice) {
+            self::assertFalse($choice->hasAttribute('disabled'));
+        }
     }
 
     /**
@@ -341,7 +358,7 @@ final class SubscriptionFormLayoutTest extends DatabaseTestCase
 
         self::assertSame(
             5,
-            substr_count($fragment, 'class="form-section"'),
+            preg_match_all('/<fieldset class="form-section[" ]/', $fragment),
             'The dialog renders a different number of sections from the page.',
         );
     }

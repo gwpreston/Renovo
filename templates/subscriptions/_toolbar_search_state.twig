@@ -1,0 +1,19 @@
+{#
+    Lives inside the search form on the full page, and is refreshed out of
+    band from the list fragment like the rest of the toolbar (`_list.twig`
+    includes it with `oob` true). An out-of-band swap finds its target by id,
+    wherever that is, so it can stay inside the form it belongs to.
+#}
+{#
+    What the search form sends besides the words typed into it: the rest of the
+    filter, so typing narrows the list you are looking at rather than starting
+    over. Always back to the first page, since the rows have changed.
+#}
+<div id="list-search-state" hidden{% if oob ?? false %} hx-swap-oob="true"{% endif %}>
+    {% if filter.categoryId %}<input type="hidden" name="category" value="{{ filter.categoryId }}">{% endif %}
+    {% for tagId in filter.tagIds %}<input type="hidden" name="tag[]" value="{{ tagId }}">{% endfor %}
+    {% if filter.status %}<input type="hidden" name="status" value="{{ filter.status.value }}">{% endif %}
+    {% if filter.mine %}<input type="hidden" name="scope" value="mine">{% endif %}
+    <input type="hidden" name="sort" value="{{ filter.sort }}">
+    <input type="hidden" name="dir" value="{{ filter.direction }}">
+</div>

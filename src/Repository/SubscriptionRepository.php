@@ -142,8 +142,13 @@ final class SubscriptionRepository extends AbstractScopedRepository
         // this list depended on which database the instance happened to run.
         $criteria = $this->criteriaFor($filter)
             ->orderBy('is_active', 'desc')
-            ->orderBy(self::SORT_COLUMNS[$filter->sort], $filter->direction, nullsLast: true)
-            ->paginate($filter->page, $filter->perPage);
+            ->orderBy(self::SORT_COLUMNS[$filter->sort], $filter->direction, nullsLast: true);
+
+        // Unpaged for the summary line's total and the CSV export, which need
+        // every row the filter matches rather than the page on screen.
+        if ($filter->isPaged()) {
+            $criteria = $criteria->paginate($filter->page, $filter->perPage);
+        }
 
         // A stable secondary sort keeps pagination deterministic when the
         // primary column has ties or NULLs.
@@ -153,6 +158,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
         $sql = $this->selectWithJoins()
             . $this->scopedWhere($scope, $criteria, $params)
             . $this->tagFilterClause($filter, $params)
+            . $this->mineClause($scope, $filter, $params)
             . $this->compileOrderBy($criteria)
             . $this->compileLimit($criteria, $params);
 
@@ -199,7 +205,8 @@ final class SubscriptionRepository extends AbstractScopedRepository
         $params = [];
         $sql = 'SELECT COUNT(*) FROM ' . $this->quote('subscriptions')
             . $this->scopedWhere($scope, $this->criteriaFor($filter), $params)
-            . $this->tagFilterClause($filter, $params);
+            . $this->tagFilterClause($filter, $params)
+            . $this->mineClause($scope, $filter, $params);
 
         return (int) $this->db->fetchValue($sql, $params);
     }
@@ -771,6 +778,32 @@ final class SubscriptionRepository extends AbstractScopedRepository
         return ' AND EXISTS (SELECT 1 FROM ' . $this->quote('subscription_tags') . ' st'
             . ' WHERE st.' . $this->quote('subscription_id') . ' = ' . $this->qualify('id')
             . ' AND st.' . $this->quote('tag_id') . ' IN (' . implode(', ', $placeholders) . '))';
+    }
+
+    /**
+     * "Mine": rows the viewer owns, or has a share of a split in.
+     *
+     * AND-ed after the scoped WHERE, so it only ever narrows what the scope
+     * already admits — a private row somebody else owns stays out because the
+     * privacy predicate has already removed it, not because this remembers to.
+     * The split half is an EXISTS rather than a join for the same reason as the
+     * tag filter: a row must not appear once per participant.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function mineClause(Scope $scope, SubscriptionFilter $filter, array &$params): string
+    {
+        if (!$filter->mine) {
+            return '';
+        }
+
+        $params['mine_owner'] = $scope->userId;
+        $params['mine_participant'] = $scope->userId;
+
+        return ' AND (' . $this->qualify('owner_user_id') . ' = :mine_owner'
+            . ' OR EXISTS (SELECT 1 FROM ' . $this->quote('subscription_splits') . ' mine_split'
+            . ' WHERE mine_split.' . $this->quote('subscription_id') . ' = ' . $this->qualify('id')
+            . ' AND mine_split.' . $this->quote('user_id') . ' = :mine_participant))';
     }
 
     private function selectWithJoins(): string

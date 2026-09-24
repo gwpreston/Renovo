@@ -43,66 +43,13 @@
         </section>
     {% endif %}
 
+    {#
+        The read-only view of a subscription's costs — what the list opens for a
+        row the member cannot change. Scheduling a price, the split and the
+        attachments are edited on the edit form; usage is recorded here.
+    #}
     <div class="columns">
-        <section class="card">
-            <h2>{{ t('subscriptions_money.price_history') }}</h2>
-            <p class="muted">{{ t('subscriptions_money.history_note') }}</p>
-
-            {% if trend is empty %}
-                <p class="muted empty">{{ t('subscriptions_money.history_empty') }}</p>
-            {% else %}
-                <ol class="timeline">
-                    {% for entry in trend %}
-                        <li class="{{ entry.is_scheduled ? 'is-scheduled' : '' }}">
-                            <div class="timeline-date">
-                                {{ entry.change.effectiveFrom|local_date('d MMM y') }}
-                                {% if entry.is_scheduled %}
-                                    <span class="badge badge-warn">{{ t('subscriptions_money.scheduled') }}</span>
-                                {% endif %}
-                            </div>
-                            <div class="timeline-amount num">
-                                {{ entry.change.price.amountMinor|money(entry.change.price.currency) }}
-                                {% if entry.difference_minor is not null and entry.difference_minor != 0 %}
-                                    <span class="{{ entry.difference_minor > 0 ? 'is-increase' : 'is-decrease' }}">
-                                        {{ entry.difference_minor|money(entry.change.price.currency, true) }}
-                                    </span>
-                                {% endif %}
-                            </div>
-                            <div class="hint">
-                                {{ price_change_label(entry.change.source.value) }}
-                                {% if entry.change.note %} · {{ entry.change.note }}{% endif %}
-                                {% if entry.change.createdByName %} · {{ entry.change.createdByName }}{% endif %}
-                            </div>
-                        </li>
-                    {% endfor %}
-                </ol>
-            {% endif %}
-
-            {% if can(scope, 'price.manage') and can_edit_row(scope, subscription) %}
-                <form method="post" action="/subscriptions/{{ subscription.id }}/price-changes" class="stack">
-                    {{ csrf_field() }}
-                    <h3>{{ t('subscriptions_money.schedule_a_price_change') }}</h3>
-                    <p class="hint">{{ t('subscriptions_money.schedule_note') }}</p>
-
-                    <label for="price">{{ t('subscriptions_money.new_price') }}</label>
-                    <div class="field-row">
-                        <input type="text" id="price" name="price" inputmode="decimal" placeholder="{{ 12.99|decimal(2) }}" required>
-                        <select name="currency" aria-label="{{ t('field.currency') }}">
-                            <option value="{{ subscription.price.currency }}">{{ subscription.price.currency }}</option>
-                        </select>
-                    </div>
-
-                    <label for="effective_from">{{ t('subscriptions_money.starts_on') }}</label>
-                    <input type="date" id="effective_from" name="effective_from" required>
-
-                    <label for="note">{{ t('subscriptions_money.note_optional') }}</label>
-                    <input type="text" id="note" name="note" maxlength="255"
-                           placeholder="{{ t('subscriptions_money.price_note_placeholder') }}">
-
-                    <button type="submit" class="button">{{ t('subscriptions_money.schedule_change') }}</button>
-                </form>
-            {% endif %}
-        </section>
+        {% include 'subscriptions/_price_history.twig' with {'editable': false} %}
 
         <section class="card">
             <h2>{{ t('subscriptions_money.shared_cost') }}</h2>
@@ -135,46 +82,17 @@
                 <p class="hint">{{ t('subscriptions_money.split_note') }}</p>
             {% endif %}
 
+            {#
+                The split is changed on the edit form now, saved with the rest
+                of the row. This page is the read-only view of it.
+            #}
             {% if subscription.isPrivate %}
                 {# A private row is paid by one person; a split would show it to others. #}
                 <p class="hint" data-split-closed>{{ t('subscriptions_money.private_no_split') }}</p>
             {% elseif can_edit_split and can(scope, 'split.manage') %}
-                <form method="post" action="/subscriptions/{{ subscription.id }}/split" class="stack">
-                    {{ csrf_field() }}
-
-                    <label for="split_mode">{{ t('subscriptions_money.how_it_is_split') }}</label>
-                    <select id="split_mode" name="split_mode">
-                        <option value="none" {{ subscription.splitMode.value == 'none' ? 'selected' : '' }}>
-                            {{ t('subscriptions_money.not_split') }}
-                        </option>
-                        <option value="equal" {{ subscription.splitMode.value == 'equal' ? 'selected' : '' }}>
-                            {{ t('subscriptions_money.split_equal') }}
-                        </option>
-                        <option value="custom" {{ subscription.splitMode.value == 'custom' ? 'selected' : '' }}>
-                            {{ t('subscriptions_money.by_the_shares_below') }}
-                        </option>
-                    </select>
-
-                    <fieldset class="stack">
-                        <legend>{{ t('settings.members') }}</legend>
-                        <p class="hint">{{ t('subscriptions_money.shares_hint') }}</p>
-                        {% for member in members %}
-                            {% set current = 0 %}
-                            {% for participant in participants %}
-                                {% if participant.userId == member.id %}{% set current = participant.shareUnits %}{% endif %}
-                            {% endfor %}
-                            <label class="field-row">
-                                <span class="field-label">{{ member.display_name }}</span>
-                                <input type="number" name="shares[{{ member.id }}]" min="0" max="10000"
-                                       value="{{ current }}">
-                            </label>
-                        {% endfor %}
-                    </fieldset>
-
-                    <button type="submit" class="button">{{ t('subscriptions_money.save_split') }}</button>
-                </form>
+                <p><a href="/subscriptions/{{ subscription.id }}/edit">{{ t('subscriptions_money.change_split') }}</a></p>
             {% elseif subscription.splitMode.isSplit %}
-                <p class="hint">{{ t('error.split.owner_only') }}</p>
+                <p class="muted">{{ t('error.split.owner_only') }}</p>
             {% endif %}
         </section>
     </div>
@@ -223,67 +141,5 @@
         {% endif %}
     </section>
 
-    <section class="card">
-        <h2>{{ t('subscriptions_money.invoices_and_receipts') }}</h2>
-
-        {% if attachments is empty %}
-            <p class="muted">{{ t('subscriptions_money.nothing_attached_yet') }}</p>
-        {% else %}
-            <div class="table-wrap">
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th scope="col">{{ t('field.file') }}</th>
-                        <th scope="col">{{ t('field.period') }}</th>
-                        <th scope="col">{{ t('field.size') }}</th>
-                        <th scope="col">{{ t('field.added') }}</th>
-                        <th scope="col"><span class="visually-hidden">{{ t('field.actions') }}</span></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for attachment in attachments %}
-                        <tr>
-                            <td>
-                                <a href="/subscriptions/{{ subscription.id }}/attachments/{{ attachment.id }}">
-                                    {{ attachment.originalFilename }}
-                                </a>
-                            </td>
-                            <td class="num">{{ attachment.periodDate ? attachment.periodDate|local_date('MMM y') : '—' }}</td>
-                            <td class="muted">{{ attachment.humanSize() }}</td>
-                            <td class="muted num">{{ attachment.createdAt|local_date('d MMM y') }}</td>
-                            <td>
-                                {% if can(scope, 'attachment.manage') and can_edit_row(scope, subscription) %}
-                                    <form method="post"
-                                          action="/subscriptions/{{ subscription.id }}/attachments/{{ attachment.id }}/delete"
-                                          class="inline"
-                                          onsubmit="return confirm('{{ t('confirm.delete_attachment')|e('js') }}')">
-                                        {{ csrf_field() }}
-                                        <button type="submit" class="button button-quiet">{{ t('action.delete') }}</button>
-                                    </form>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endif %}
-
-        {% if can(scope, 'attachment.manage') and can_edit_row(scope, subscription) %}
-            <form method="post" action="/subscriptions/{{ subscription.id }}/attachments"
-                  enctype="multipart/form-data" class="stack">
-                {{ csrf_field() }}
-
-                <label for="attachment-file">{{ t('subscriptions_money.attach_a_file') }}</label>
-                <input type="file" id="attachment-file" name="file"
-                       accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,application/pdf,image/*" required>
-                <p class="field-hint">{{ t('subscriptions_money.attachment_hint') }}</p>
-
-                <label for="attachment-period">{{ t('subscriptions_money.attachment_period_label') }}</label>
-                <input type="date" id="attachment-period" name="period_date">
-
-                <button type="submit" class="button">{{ t('action.upload') }}</button>
-            </form>
-        {% endif %}
-    </section>
+    {% include 'subscriptions/_attachments.twig' with {'editable': false} %}
 {% endblock %}

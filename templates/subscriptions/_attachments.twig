@@ -1,0 +1,73 @@
+{#
+    Invoices and receipts for one subscription. Shared by the edit page, where
+    `editable` adds the upload and delete forms, and the cost page, which is the
+    read-only view. Downloading goes through the scoped route either way.
+#}
+<section class="card attachments" aria-labelledby="attachments-heading">
+    <h2 id="attachments-heading">{{ t('subscriptions_money.invoices_and_receipts') }}</h2>
+
+    {% if attachments is empty %}
+        <p class="muted">{{ t('subscriptions_money.nothing_attached_yet') }}</p>
+    {% else %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.file') }}</th>
+                    <th scope="col">{{ t('field.period') }}</th>
+                    <th scope="col">{{ t('field.size') }}</th>
+                    <th scope="col">{{ t('field.added') }}</th>
+                    {% if editable %}
+                        <th scope="col"><span class="visually-hidden">{{ t('field.actions') }}</span></th>
+                    {% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for attachment in attachments %}
+                    <tr>
+                        <td>
+                            <a href="/subscriptions/{{ subscription.id }}/attachments/{{ attachment.id }}">
+                                {{ attachment.originalFilename }}
+                            </a>
+                        </td>
+                        <td class="num">{{ attachment.periodDate ? attachment.periodDate|local_date('MMM y') : '—' }}</td>
+                        <td class="muted">{{ attachment.humanSize() }}</td>
+                        <td class="muted num">{{ attachment.createdAt|local_date('d MMM y') }}</td>
+                        {% if editable %}
+                            <td>
+                                <form method="post"
+                                      action="/subscriptions/{{ subscription.id }}/attachments/{{ attachment.id }}/delete"
+                                      class="inline"
+                                      onsubmit="return confirm('{{ t('confirm.delete_attachment')|e('js') }}')">
+                                    {{ csrf_field() }}
+                                    <input type="hidden" name="return_to" value="{{ return_to }}">
+                                    <button type="submit" class="button button-quiet">{{ t('action.delete') }}</button>
+                                </form>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if editable %}
+        <form method="post" action="/subscriptions/{{ subscription.id }}/attachments"
+              enctype="multipart/form-data" class="stack">
+            {{ csrf_field() }}
+            <input type="hidden" name="return_to" value="{{ return_to }}">
+
+            <label for="attachment-file">{{ t('subscriptions_money.attach_a_file') }}</label>
+            <input type="file" id="attachment-file" name="file"
+                   accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,application/pdf,image/*" required
+                   aria-describedby="attachment-file-hint">
+            <p class="hint" id="attachment-file-hint">{{ t('subscriptions_money.attachment_hint') }}</p>
+
+            <label for="attachment-period">{{ t('subscriptions_money.attachment_period_label') }}</label>
+            <input type="date" id="attachment-period" name="period_date">
+
+            <button type="submit" class="button">{{ t('action.upload') }}</button>
+        </form>
+    {% endif %}
+</section>

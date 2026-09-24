@@ -2,20 +2,21 @@
     The list fragment. Rendered on its own for htmx filter, sort and page
     requests, and included by the full page for a normal load, so the two can
     never drift apart.
+
+    `#subscription-list` has to stay the outermost element of this file: the
+    filter controls select it and swap it whole. Everything after it is sent
+    out of band.
 #}
 {% import 'partials/logo.twig' as logo %}
 {% import 'partials/payment_method.twig' as payment_method %}
 {% import 'partials/avatar.twig' as avatar %}
 {% import _self as list %}
 
-{#
-    There is no bulk bar on this screen and so no form around the table: the
-    row checkboxes went with the "with selected" controls, because a checkbox
-    that posts nowhere is worse than no checkbox. The endpoint, the service
-    behind it and its permission are untouched; what went is the screen that
-    drove them.
-#}
-<section id="subscription-list" class="card">
+{% set can_bulk = can(scope, 'subscription.bulk_edit') %}
+
+<section id="subscription-list" class="card subscription-list">
+    {{ list.summary(summary) }}
+
     {% if subscriptions is empty %}
         <p class="muted empty">
             {% if filter.hasActiveFilters %}
@@ -28,155 +29,167 @@
             {% endif %}
         </p>
     {% else %}
-        <div class="table-scroll">
+        {#
+            The bulk bar is its own form, not a form around the table: the row
+            actions are forms of their own, and a form cannot contain another.
+            The row checkboxes join it with the `form` attribute instead. It is
+            drawn open, so it works without script; `subscription-list.js`
+            hides it until something is selected and keeps the count.
+
+            A plain POST rather than an htmx swap: a bulk edit changes rows that
+            may drop out of the current filter, so a full reload is the honest
+            response.
+        #}
+        {% if can_bulk %}
+            <form id="bulk-form" class="bulk-bar" method="post" action="/subscriptions/bulk" data-bulk-bar>
+                {{ csrf_field() }}
+                <p class="bulk-count" data-bulk-count aria-live="polite"
+                   data-count-label="{{ t('subscriptions_list.selected_count', {'count': '%d'}) }}">
+                    {{ t('subscriptions_list.with_selected') }}
+                </p>
+
+                <label for="bulk-action" class="visually-hidden">{{ t('subscriptions_list.with_selected') }}</label>
+                <select id="bulk-action" name="action">
+                    <option value="category">{{ t('subscriptions_list.set_category') }}</option>
+                    <option value="add_tag">{{ t('subscriptions_list.add_tag') }}</option>
+                    <option value="remove_tag">{{ t('subscriptions_list.remove_tag') }}</option>
+                    <option value="owner">{{ t('subscriptions_list.set_member') }}</option>
+                    <option value="payer">{{ t('subscriptions_list.set_payer') }}</option>
+                    <option value="currency">{{ t('subscriptions_list.convert_currency') }}</option>
+                    <option value="activate">{{ t('subscriptions_list.resume') }}</option>
+                    <option value="deactivate">{{ t('subscriptions_list.pause') }}</option>
+                </select>
+
+                <select name="category_id" aria-label="{{ t('field.category') }}">
+                    <option value="">{{ t('subscriptions_list.no_category') }}</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <input type="text" name="tag" placeholder="{{ t('field.tag') }}" aria-label="{{ t('field.tag') }}">
+
+                <select name="user_id" aria-label="{{ t('field.member') }}">
+                    <option value="">{{ t('subscriptions_list.nobody') }}</option>
+                    {% for member in members %}
+                        <option value="{{ member.id }}">{{ member.display_name }}</option>
+                    {% endfor %}
+                </select>
+
+                <select name="currency" aria-label="{{ t('field.currency') }}">
+                    {% for code in all_currencies %}
+                        <option value="{{ code }}">{{ code }}</option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit" class="button">{{ t('action.apply') }}</button>
+                <p class="hint bulk-hint">{{ t('subscriptions_list.convert_note') }}</p>
+            </form>
+        {% endif %}
+
+        <div class="table-scroll subscription-table">
             <table class="table">
                 <thead>
                 <tr>
-                    <th scope="col">{{ list.sort_link('name', t('field.name'), filter) }}</th>
+                    {% if can_bulk %}
+                        <th scope="col" class="select-column">
+                            <input type="checkbox" data-select-all hidden
+                                   aria-label="{{ t('subscriptions_list.select_all') }}">
+                            <span class="visually-hidden">{{ t('subscriptions_list.select') }}</span>
+                        </th>
+                    {% endif %}
+                    <th scope="col">{{ list.sort_link('name', t('subscriptions_list.service'), filter) }}</th>
                     <th scope="col">{{ t('field.category') }}</th>
-                    <th scope="col">{{ t('field.member') }}</th>
-                    <th scope="col">{{ t('field.cycle') }}</th>
-                    <th scope="col">{{ list.sort_link('next_payment', t('field.next_charge'), filter) }}</th>
+                    <th scope="col">{{ t('subscriptions_form.paid_by') }}</th>
                     <th scope="col" class="numeric">{{ list.sort_link('price', t('field.price'), filter) }}</th>
-                    <th scope="col" class="numeric">{{ t('field.per_month') }}</th>
-                    <th scope="col"><span class="visually-hidden">{{ t('field.actions') }}</span></th>
+                    <th scope="col" class="numeric">{{ t('subscriptions_list.monthly_in', {'currency': base_currency}) }}</th>
+                    <th scope="col">{{ list.sort_link('next_payment', t('field.next_charge'), filter) }}</th>
+                    <th scope="col">{{ t('field.status') }}</th>
+                    <th scope="col" class="actions-column">{{ t('field.actions') }}</th>
                 </tr>
                 </thead>
                 <tbody>
-                {% for subscription in subscriptions %}
-                    <tr class="{{ subscription.isActive ? '' : 'is-paused' }}">
+                {% for row in rows %}
+                    {% set subscription = row.subscription %}
+                    <tr class="{{ subscription.isActive ? 'is-running' : 'is-paused' }}">
+                        {% if can_bulk %}
+                            <td class="select-column">
+                                <input type="checkbox" name="ids[]" value="{{ subscription.id }}" form="bulk-form"
+                                       data-bulk-select
+                                       aria-label="{{ t('subscriptions_list.select_one', {'name': subscription.name}) }}">
+                            </td>
+                        {% endif %}
+                        <td>{{ list.service(row) }}</td>
                         <td>
-                            <div class="cell-name">
-                                {{ logo.mark(subscription) }}
-                                <div>
-                                    {#
-                                        A row you may change opens for changing;
-                                        one you may only read opens at its costs,
-                                        which is the read-only view of it. The
-                                        name stays a link either way — a list
-                                        where some names lead somewhere and
-                                        others do not reads as a fault.
-                                    #}
-                                    <a href="/subscriptions/{{ subscription.id }}{{
-                                        can_edit_row(scope, subscription) ? '/edit' : '/money'
-                                    }}">{{ subscription.name }}</a>
-                                    {% if subscription.plan %}<span class="muted">{{ subscription.plan }}</span>{% endif %}
-                                    {# The status, derived in one place: Cancelled, Paused, Trial, or nothing for Active. #}
-                                    {% set status = subscription.status.value %}
-                                    {% if status == 'trial' %}
-                                        <span class="badge badge-warn">{{ t('state.trial') }}</span>
-                                    {% elseif status != 'active' %}
-                                        <span class="badge" data-status="{{ status }}">{{ t(subscription.status.labelKey) }}</span>
-                                    {% endif %}
-                                    {% if subscription.isPrivate %}
-                                        <span class="badge" title="{{ t('subscriptions_form.only_me_note') }}">{{ t('visibility.payer') }}</span>
-                                    {% endif %}
-                                    {% if subscription.splitMode.isSplit %}
-                                        <span class="badge"
-                                              title="{{ split_label(subscription.splitMode.value) }}">{{ t('state.shared') }}</span>
-                                    {% endif %}
-                                    {% if subscription.paymentMethodName %}
-                                        <div>{{ payment_method.for_subscription(subscription) }}</div>
-                                    {% endif %}
-                                    {% if subscription.tags %}
-                                        <div class="tag-list">
-                                            {% for tag in subscription.tags %}
-                                                <span class="chip chip-static">{{ tag.name }}</span>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
+                            {% if subscription.categoryName %}
+                                <span class="chip chip-static">{{ subscription.categoryName }}</span>
+                            {% else %}
+                                <span class="muted">{{ t('common.none_symbol') }}</span>
+                            {% endif %}
                         </td>
-                        <td>{{ subscription.categoryName ?? '—' }}</td>
                         <td>
-                            {% if subscription.ownerName %}
-                                <span class="member-identity">
-                                    {{ avatar.face(
-                                        subscription.ownerUserId,
-                                        subscription.ownerName,
-                                        subscription.ownerName|initials,
-                                        subscription.ownerHasAvatar,
-                                        24
-                                    ) }}
-                                    <span>{{ subscription.ownerName }}</span>
+                            <span class="member-identity">
+                                {{ avatar.face(
+                                    subscription.ownerUserId,
+                                    subscription.ownerName ?? '',
+                                    (subscription.ownerName ?? '')|initials,
+                                    subscription.ownerHasAvatar,
+                                    24
+                                ) }}
+                                <span>
+                                    <span class="member-name">{{ subscription.ownerName ?? t('common.none_symbol') }}</span>
+                                    {% if row.split %}
+                                        <span class="hint">{{ t(row.split.key, row.split.params) }}</span>
+                                    {% endif %}
                                 </span>
-                            {% else %}
-                                {{ t('common.none_symbol') }}
-                            {% endif %}
+                            </span>
                         </td>
-                        <td>
-                            {{ type_label(subscription.type.value) }}
-                            {% if subscription.billingCycle %}
-                                · {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays) }}
-                            {% endif %}
-                        </td>
-                        <td>
-                            {# For a trial this is the conversion, not the stale payment date. #}
-                            {% if subscription.nextChargeDate %}
-                                <span class="num">{{ subscription.nextChargeDate|local_date('d MMM y') }}</span>
-                                {% if subscription.isTrial %}
-                                    <div class="hint">{{ t('state.trial_converts') }}</div>
-                                {% endif %}
-                                {% set deadline = subscription.cancellationDeadline %}
-                                {% if deadline %}
-                                    <div class="hint">{{ t('subscriptions_list.cancel_by', {
-                                        'date': deadline|local_date('d MMM y'),
-                                    }) }}</div>
-                                {% endif %}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td class="numeric num">{{ subscription.price.amountMinor|money(subscription.price.currency) }}</td>
-                        <td class="numeric num">
-                            {% if subscription.monthlyMinor is not null %}
-                                {{ subscription.monthlyMinor|money(subscription.price.currency) }}
-                            {% else %}
-                                <span class="muted" title="{{ t('subscriptions_list.not_amortised') }}">—</span>
-                            {% endif %}
-                        </td>
-                        <td class="actions">
-                            <a class="button button-quiet"
-                               href="/subscriptions/{{ subscription.id }}/money">{{ t('subscriptions_list.cost') }}</a>
-                            {% if can(scope, 'subscription.update') and can_edit_row(scope, subscription) %}
-                                {% if subscription.isCancelled %}
-                                    {# Undoing a cancel lands on Paused, so it cannot restart charges unasked. #}
-                                    <form method="post" action="/subscriptions/{{ subscription.id }}/uncancel" class="inline">
-                                        {{ csrf_field() }}
-                                        <button type="submit" class="button button-quiet">
-                                            {{ t('subscriptions_list.uncancel') }}
-                                        </button>
-                                    </form>
-                                {% else %}
-                                    <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="inline">
-                                        {{ csrf_field() }}
-                                        <button type="submit" class="button button-quiet">
-                                            {{ subscription.isActive ? t('subscriptions_list.pause') : t('subscriptions_list.resume') }}
-                                        </button>
-                                    </form>
-                                    <form method="post" action="/subscriptions/{{ subscription.id }}/cancel" class="inline"
-                                          onsubmit="return confirm('{{ t('confirm.cancel_subscription', {'name': subscription.name})|e('js') }}')">
-                                        {{ csrf_field() }}
-                                        <button type="submit" class="button button-quiet">
-                                            {{ subscription.isTrial ? t('subscriptions_list.cancel_trial') : t('subscriptions_list.cancel') }}
-                                        </button>
-                                    </form>
-                                {% endif %}
-                            {% endif %}
-                            {% if can(scope, 'subscription.delete') and can_edit_row(scope, subscription) %}
-                                <form method="post" action="/subscriptions/{{ subscription.id }}/delete" class="inline"
-                                      onsubmit="return confirm('{{ t('confirm.delete_subscription', {'name': subscription.name})|e('js') }}')">
-                                    {{ csrf_field() }}
-                                    <button type="submit" class="button button-danger">{{ t('action.delete') }}</button>
-                                </form>
-                            {% endif %}
-                        </td>
+                        <td class="numeric">{{ list.price(row) }}</td>
+                        <td class="numeric">{{ list.monthly(row, subscription) }}</td>
+                        <td>{{ list.next(row) }}</td>
+                        <td>{{ list.badge(row) }}</td>
+                        <td class="actions">{{ list.actions(row) }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        {#
+            Below 768px the table is a list of cards: name, owner and next
+            charge, the amount, the status, and the same actions behind a menu.
+            The same rows and the same actions — only one of the two is ever
+            displayed, so a screen reader meets the list once.
+        #}
+        <ul class="plain subscription-cards">
+            {% for row in rows %}
+                {% set subscription = row.subscription %}
+                <li class="subscription-card {{ subscription.isActive ? 'is-running' : 'is-paused' }}">
+                    {{ logo.tile(subscription, 38) }}
+                    <div class="subscription-card-main">
+                        <a class="subscription-card-name" href="/subscriptions/{{ subscription.id }}{{
+                            row.can_update ? '/edit' : '/money'
+                        }}">{{ subscription.name }}</a>
+                        <span class="hint">
+                            {{ subscription.ownerName ?? t('common.none_symbol') }}
+                            {% if row.next.date %} · <span class="num">{{ row.next.date|local_date('d MMM') }}</span>{% endif %}
+                        </span>
+                    </div>
+                    <div class="subscription-card-figure">
+                        {{ list.price(row) }}
+                        {{ list.badge(row) }}
+                    </div>
+                    {% if row.can_update or row.can_delete %}
+                        <details class="menu row-menu">
+                            <summary class="button-icon" aria-label="{{ t('subscriptions_list.actions_for', {'name': subscription.name}) }}">
+                                {{ icon('more') }}
+                            </summary>
+                            <div class="menu-panel">{{ list.actions(row) }}</div>
+                        </details>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
 
         {% if page_count > 1 %}
             <nav class="pager" aria-label="{{ t('subscriptions_list.pagination') }}">
@@ -205,31 +218,19 @@
 </section>
 
 {#
-    The saved-views form's hidden field, refreshed out of band.
+    The toolbar's filter-dependent parts, refreshed out of band.
 
     This fragment is what an htmx filter, sort or page request returns, and it
-    is all that request returns — the saved-views card above the list is not
-    re-rendered. So the field that says "this is the view you are looking at"
-    would keep the value the page was first loaded with, and saving a view
-    after filtering would store an empty query. It did.
+    is all that request returns — the toolbar above the list is not
+    re-rendered. So the chips would keep linking to the filter the page was
+    first loaded with, and "save this view" would store it. It did, once, with
+    the saved-view field alone.
 
-    Sending a replacement alongside the list fixes that at the source: the
-    value is still `SubscriptionFilter::toQueryString()`, so what gets saved is
-    what the list itself would have written, rather than something the browser
-    reconstructed from the address bar.
-
-    Out of band and not part of the swap, because the field lives inside a form
-    in the card above and this section is the only thing the list request is
-    allowed to replace. htmx applies out-of-band swaps to the whole response
-    before `hx-select` narrows it to `#subscription-list`, so the sort and
-    pagination links — which do select — carry this too.
-
-    Defaulting to *sending* it is deliberate. Twig here runs with
+    Defaulting to *sending* them is deliberate. Twig here runs with
     `strict_variables` off, so a caller that forgets to pass this flag gets
     whatever the default is and no warning either way. Defaulting to false would
-    make that silence reintroduce the stale-field bug — the fragment would
-    render without its replacement and nothing would say so. Defaulting to true
-    makes the same mistake produce a duplicated id on the full page instead,
+    make that silence reintroduce the stale-toolbar bug; defaulting to true
+    makes the same mistake produce duplicated ids on the full page instead,
     which `PersonalisationTest::savedViewQuery()` asserts against. Both are
     mistakes; only one of them fails a test.
 
@@ -240,13 +241,206 @@
     `??` and not `|default`, which is the trap here: Twig's `default` filter
     substitutes when the value is *empty*, and `false` is empty — so
     `oob_query|default(true)` reads a deliberate `false` as "unset" and helpfully
-    turns the field back on. `??` substitutes only for undefined and null, which
+    turns the swap back on. `??` substitutes only for undefined and null, which
     is the question actually being asked.
 #}
 {% if oob_query ?? true %}
-    <input type="hidden" id="saved-view-query" name="query"
-           value="{{ current_query }}" hx-swap-oob="true">
+    {% include 'subscriptions/_toolbar.twig' with {'oob': true} %}
+    {% include 'subscriptions/_toolbar_search_state.twig' with {'oob': true} %}
 {% endif %}
+
+{#
+    "N of M · £X/mo": how many rows the filter matched, out of the list as it
+    stands with nothing chosen, and what the matched running rows cost a month
+    — every matched row, not the page on screen, by the per-currency rule.
+#}
+{% macro summary(summary) %}
+    <p class="list-summary" id="list-summary">
+        <span class="num">{{ t('subscriptions_list.summary', {'matched': summary.matched, 'of': summary.of}) }}</span>
+        {% set figures = summary.per_month %}
+        {% if figures.totals is not empty %}
+            <span aria-hidden="true">·</span>
+            {% if figures.totals|length == 1 %}
+                <span class="num">{{ t('subscriptions_list.per_month', {
+                    'amount': figures.totals[0].amount_minor|money(figures.totals[0].currency),
+                }) }}</span>
+            {% elseif figures.combined.amount_minor is not null %}
+                <span class="num">{{ t('subscriptions_list.per_month', {
+                    'amount': figures.combined.amount_minor|money(figures.combined.currency),
+                }) }}</span>
+            {% else %}
+                {# No rate for one of them, so there is no total — only the subtotals. #}
+                <span class="num">
+                    {%- for total in figures.totals -%}
+                        {{ t('subscriptions_list.per_month', {'amount': total.amount_minor|money(total.currency)}) }}
+                        {{- not loop.last ? ' · ' : '' -}}
+                    {%- endfor -%}
+                </span>
+                <span class="hint">{{ t('dashboard.unconvertible', {
+                    'currencies': figures.combined.unconvertible|join(', '),
+                }) }}</span>
+            {% endif %}
+        {% endif %}
+    </p>
+{% endmacro %}
+
+{#
+    The service cell: the tile, the name (to the edit form for a row the member
+    may change, to its cost page — the read-only view — otherwise), the lock
+    for a private row, and "Plan · Payment method" beneath.
+#}
+{% macro service(row) %}
+    {% import 'partials/logo.twig' as logo %}
+    {% import 'partials/payment_method.twig' as payment_method %}
+    {% set subscription = row.subscription %}
+    <div class="cell-name">
+        {{ logo.tile(subscription) }}
+        <div>
+            <span class="cell-title">
+                <a href="/subscriptions/{{ subscription.id }}{{ row.can_update ? '/edit' : '/money' }}">{{ subscription.name }}</a>
+                {% if subscription.isPrivate %}
+                    <span class="private-mark" title="{{ t('subscriptions_form.only_me_note') }}">
+                        {{ icon('lock') }}<span class="visually-hidden">{{ t('visibility.payer') }}</span>
+                    </span>
+                {% endif %}
+            </span>
+            {% if subscription.plan or subscription.paymentMethodName %}
+                <span class="hint cell-subline">
+                    {{- subscription.plan -}}
+                    {%- if subscription.plan and subscription.paymentMethodName %} · {% endif -%}
+                    {%- if subscription.paymentMethodName -%}
+                        {{ payment_method.for_subscription(subscription) }}
+                    {%- endif -%}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+{% endmacro %}
+
+{#
+    The price in its own currency and cycle, with the base-currency equivalent
+    beneath when the two differ. A one-off or a lifetime purchase says so where
+    the cycle would be.
+#}
+{% macro price(row) %}
+    {% set subscription = row.subscription %}
+    <span class="price-figure">
+        <span class="num">{{ subscription.price.amountMinor|money(subscription.price.currency) }}</span>
+        <span class="muted">
+            {%- if subscription.billingCycle -%}
+                {{ t('subscriptions_list.per_cycle.' ~ subscription.billingCycle.value, {'days': subscription.cycleDays ?? 0}) }}
+            {%- else -%}
+                {{ ' ' ~ type_label(subscription.type.value) }}
+            {%- endif -%}
+        </span>
+    </span>
+    {% if row.price_base %}
+        <span class="hint num price-base">{{ t('subscriptions_list.approximately', {
+            'amount': row.price_base.amountMinor|money(row.price_base.currency),
+        }) }}</span>
+    {% endif %}
+{% endmacro %}
+
+{% macro monthly(row, subscription) %}
+    {% if row.monthly.state == 'ok' %}
+        <span class="num">{{ row.monthly.amount_minor|money(row.monthly.currency) }}</span>
+    {% elseif row.monthly.state == 'no_rate' %}
+        <span class="muted" title="{{ t('subscriptions_list.no_rate', {'currency': subscription.price.currency}) }}">
+            {{- t('common.none_symbol') -}}
+        </span>
+        <span class="hint">{{ t('subscriptions_list.no_rate', {'currency': subscription.price.currency}) }}</span>
+    {% else %}
+        <span class="muted" title="{{ t('subscriptions_list.not_amortised') }}">{{ t('common.none_symbol') }}</span>
+    {% endif %}
+{% endmacro %}
+
+{#
+    The next charge: for a trial the conversion, not the stale payment date;
+    beneath it how near it is, "trial ends", or the cancel-by date when that is
+    the deadline still to be met.
+#}
+{% macro next(row) %}
+    {% if row.next.date %}
+        <span class="num">{{ row.next.date|local_date('d MMM y') }}</span>
+        {% set hint = row.next.hint %}
+        {% if hint %}
+            {% set params = hint.date ? hint.params|merge({'date': hint.date|local_date('d MMM')}) : hint.params %}
+            <span class="hint {{ row.next.is_near ? 'is-near' : '' }}">{{ t(hint.key, params) }}</span>
+        {% endif %}
+    {% else %}
+        <span class="muted">{{ t('common.none_symbol') }}</span>
+    {% endif %}
+{% endmacro %}
+
+{# The status, with its word always: colour is never the only signal. #}
+{% macro badge(row) %}
+    <span class="badge{{ row.badge.tone != 'neutral' ? ' badge-' ~ row.badge.tone : '' }}"
+          data-status="{{ row.subscription.status.value }}">{{ t(row.badge.key) }}</span>
+{% endmacro %}
+
+{#
+    Edit; Pause or Resume; Cancel or Undo cancel; Delete — each drawn only where
+    the role allows it *and* this row is one the member may change. Drawing is
+    not the enforcement: every one of these endpoints refuses on its own.
+#}
+{% macro actions(row) %}
+    {% set subscription = row.subscription %}
+    <div class="row-actions">
+        {% if row.can_update %}
+            <a class="icon-action" href="/subscriptions/{{ subscription.id }}/edit"
+               title="{{ t('action.edit') }}" aria-label="{{ t('subscriptions_list.edit_name', {'name': subscription.name}) }}">
+                {{ icon('edit') }}<span class="icon-action-label">{{ t('action.edit') }}</span>
+            </a>
+            {% if subscription.isCancelled %}
+                {# Undoing a cancel lands on Paused, so it cannot restart charges unasked. #}
+                <form method="post" action="/subscriptions/{{ subscription.id }}/uncancel" class="inline">
+                    {{ csrf_field() }}
+                    <button type="submit" class="icon-action" title="{{ t('subscriptions_list.uncancel') }}"
+                            aria-label="{{ t('subscriptions_list.uncancel_name', {'name': subscription.name}) }}">
+                        {{ icon('refresh') }}<span class="icon-action-label">{{ t('subscriptions_list.uncancel') }}</span>
+                    </button>
+                </form>
+            {% else %}
+                {% set pause_label = subscription.isActive ? t('subscriptions_list.pause') : t('subscriptions_list.resume') %}
+                <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="inline">
+                    {{ csrf_field() }}
+                    <button type="submit" class="icon-action" title="{{ pause_label }}"
+                            aria-label="{{ subscription.isActive
+                                ? t('subscriptions_list.pause_name', {'name': subscription.name})
+                                : t('subscriptions_list.resume_name', {'name': subscription.name}) }}">
+                        {{ icon(subscription.isActive ? 'pause' : 'play') }}<span class="icon-action-label">{{ pause_label }}</span>
+                    </button>
+                </form>
+                {% set cancel_label = subscription.isTrial ? t('subscriptions_list.cancel_trial') : t('subscriptions_list.cancel') %}
+                <form method="post" action="/subscriptions/{{ subscription.id }}/cancel" class="inline"
+                      onsubmit="return confirm('{{ t('confirm.cancel_subscription', {'name': subscription.name})|e('js') }}')">
+                    {{ csrf_field() }}
+                    <button type="submit" class="icon-action" title="{{ cancel_label }}"
+                            aria-label="{{ t('subscriptions_list.cancel_name', {'name': subscription.name}) }}">
+                        {{ icon('close') }}<span class="icon-action-label">{{ cancel_label }}</span>
+                    </button>
+                </form>
+            {% endif %}
+        {% endif %}
+        {% if row.can_delete %}
+            <form method="post" action="/subscriptions/{{ subscription.id }}/delete" class="inline"
+                  onsubmit="return confirm('{{ t('confirm.delete_subscription', {'name': subscription.name})|e('js') }}')">
+                {{ csrf_field() }}
+                <button type="submit" class="icon-action icon-action-danger" title="{{ t('action.delete') }}"
+                        aria-label="{{ t('subscriptions_list.delete_name', {'name': subscription.name}) }}">
+                    {{ icon('delete') }}<span class="icon-action-label">{{ t('action.delete') }}</span>
+                </button>
+            </form>
+        {% endif %}
+        {% if not row.can_update %}
+            <a class="icon-action" href="/subscriptions/{{ subscription.id }}/money"
+               title="{{ t('subscriptions_list.cost') }}"
+               aria-label="{{ t('subscriptions_list.view_name', {'name': subscription.name}) }}">
+                {{ icon('arrow-right') }}<span class="icon-action-label">{{ t('subscriptions_list.cost') }}</span>
+            </a>
+        {% endif %}
+    </div>
+{% endmacro %}
 
 {% macro sort_link(key, label, filter) %}
     {% set direction = (filter.sort == key and filter.direction == 'asc') ? 'desc' : 'asc' %}

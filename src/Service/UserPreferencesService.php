@@ -64,6 +64,19 @@ final class UserPreferencesService
     }
 
     /**
+     * List density on its own, from the toggle on the subscriptions toolbar.
+     * Coerced like the theme: either value only changes padding.
+     */
+    public function updateDensity(int $userId, ?string $density): Density
+    {
+        $resolved = Density::fromString($density);
+
+        $this->users->updatePreferences($userId, ['density' => $resolved->value]);
+
+        return $resolved;
+    }
+
+    /**
      * The palette, on its own form.
      *
      * The one preference that is *rejected* rather than coerced. Every other

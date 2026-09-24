@@ -165,17 +165,38 @@ today.
 
 ## Status
 
-- [ ] Stats strip (per-currency)
-- [ ] Toolbar: search, category chips, status (incl. Cancelled), scope, saved
+- [x] Stats strip (per-currency)
+- [x] Toolbar: search, category chips, status (incl. Cancelled), scope, saved
       views menu, density, export, summary
-- [ ] Table + mobile cards; actions gated by `mayWriteRow`
-- [ ] Bulk selection and bar restyled
-- [ ] Cancel-by card beneath the list
-- [ ] Form: always-shown fields, More details, edit-only sections; server-side
+- [x] Table + mobile cards; actions gated by `mayWriteRow`
+- [x] Bulk selection and bar restyled
+- [x] Cancel-by card beneath the list
+- [x] Form: always-shown fields, More details, edit-only sections; server-side
       conversion note; custom shares; custom cycle; type; converts-to
-- [ ] Quick-add modal and full page render the same template
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check` green on both engines
+- [x] Quick-add modal and full page render the same template
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check` green on both engines (2433 tests on
+      PostgreSQL 16 and MySQL 8.4)
+
+### Notes from the build
+
+- **Currencies** are a list of the ISO 4217 codes in circulation
+  (`Currency::all()`), not ICU's table: ICU also carries every withdrawn
+  currency and PHP cannot ask it which are still tendered. A row in a code no
+  longer on the list keeps it as an extra option.
+- **Density toggle**: the current option is styled from the root's
+  `data-density`, not marked in the buttons, so the two densities still render
+  identical markup (`PersonalisationTest`).
+- **Remind me** posts `reminder_mode` + `reminder_day[]`, which
+  `SubscriptionFormService` maps onto `reminder_days`; "chosen days" with none
+  ticked is refused rather than read as the defaults.
+- **The price history's classes** were renamed `price-timeline*`: Phase 21's
+  household "next 30 days" card reused `.timeline`, positioned absolutely, which
+  had laid the cost page's price history on top of itself.
+- The top bar's subtitle now shrinks before the title, and page actions keep
+  their words on one line.
+- The strip's Active tile excludes trials (it is the Active filter's count); the
+  dashboard's Active tile, unchanged, still includes them.
 
 ## Definition of done
 

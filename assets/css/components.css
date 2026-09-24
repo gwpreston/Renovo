@@ -239,6 +239,33 @@ main.container {
     display: none;
 }
 
+/*
+ * The page's own actions keep their words on one line, and the subtitle is
+ * what gives way when the bar runs short: it shrinks (and ellipsises) well
+ * before the title does, so "Edit Home insurance" stays readable beside a
+ * long subtitle and two buttons.
+ */
+.topbar-page-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.5rem;
+}
+
+.topbar-page-actions .button {
+    white-space: nowrap;
+}
+
+.topbar-title {
+    flex: 0 1 auto;
+}
+
+.topbar-subtitle {
+    flex: 0 100 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .topbar-actions {
     display: flex;
     align-items: center;
