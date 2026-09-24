@@ -55,6 +55,13 @@ final class DashboardService
     /** Forecast months the chart shows after this one. */
     public const CHART_FUTURE_MONTHS = 6;
 
+    /**
+     * Coming up's rows. The rest of the window is counted, not listed: the
+     * card is a glance at what is next, and the three narrow cards stacked
+     * beside it are what its height is measured against.
+     */
+    private const COMING_UP_ROWS = 8;
+
     /** The budgets card's rows: enough to be a summary, not the budgets page. */
     private const BUDGET_ROWS = 4;
 
@@ -127,7 +134,11 @@ final class DashboardService
             'where_it_goes' => $breakdown + ['donut' => $this->breakdown->donut($breakdown)],
             'coming_up' => [
                 'days' => self::COMING_UP_DAYS,
-                'rows' => array_map(fn (array $charge): array => $this->chargeRow($charge), $comingUp),
+                'rows' => array_map(
+                    fn (array $charge): array => $this->chargeRow($charge),
+                    array_slice($comingUp, 0, self::COMING_UP_ROWS),
+                ),
+                'more' => max(0, count($comingUp) - self::COMING_UP_ROWS),
             ] + $this->chargeTotals($comingUp),
             'budgets' => $this->budgets->thisMonth($scope, self::BUDGET_ROWS),
             'trials' => array_map(fn (Subscription $trial): array => $this->trialRow($scope, $trial), $trials),

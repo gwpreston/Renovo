@@ -164,18 +164,19 @@ Both with explicit `down()`, verified on both engines.
 
 ## Status
 
-- [ ] Migrations 1–2
-- [ ] View toggle, saved per account; per-view card lists
-- [ ] `SpendHistoryService` extracted from year-over-year (YoY figures unchanged)
-- [ ] Overview: four KPIs, spend chart (reconstructed + forecast + budget line),
+- [x] Migrations 1–2
+- [x] View toggle, saved per account; per-view card lists
+- [x] `SpendHistoryService` extracted from year-over-year (YoY figures unchanged)
+- [x] Overview: four KPIs, spend chart (reconstructed + forecast + budget line),
       donut with degrade, coming up, budgets, free trials with Cancel trial,
       price-change banner
-- [ ] Household: month-so-far hero, hero figures, 30-day timeline, who pays
+- [x] Household: month-so-far hero, hero figures, 30-day timeline, who pays
       (scoped), year vs budget pace, by category
-- [ ] Phase 10 cards mapped/retired; subscriptions table optional
-- [ ] Narrow layout: one column, charts legible at 390px
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check` green on both engines
+- [x] Phase 10 cards mapped/retired; subscriptions table optional
+- [ ] Narrow layout: one column, charts legible at 390px (CSS in place; not yet
+      checked in a browser at 390px)
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check` green on both engines
 
 ## Definition of done
 

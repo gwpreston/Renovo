@@ -1319,6 +1319,30 @@ tr.is-passed > td {
     grid-row: span 3;
 }
 
+/*
+ * A card fills the height of its row, so the chart and the donut beside it
+ * end level, and the cards stacked beside Coming up close up into one column
+ * instead of floating with gaps between them.
+ */
+.bento-item {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+}
+
+.bento-item > .card {
+    flex: 1;
+}
+
+/* Restated after the rule above, which would otherwise show an empty card's slot again. */
+.bento-item:not(:has(*)) {
+    display: none;
+}
+
+.coming-up-more {
+    margin: 0.75rem 0 0;
+}
+
 @media (max-width: 767px) {
     .bento-rows-3 {
         grid-row: auto;

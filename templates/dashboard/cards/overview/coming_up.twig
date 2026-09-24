@@ -57,5 +57,11 @@
                 </li>
             {% endfor %}
         </ul>
+        {% if coming_up.more > 0 %}
+            <p class="hint coming-up-more">
+                {{ t('dashboard.coming_up_more', {'count': coming_up.more, 'days': coming_up.days}) }}
+                <a href="/calendar">{{ t('nav.calendar') }}</a>
+            </p>
+        {% endif %}
     {% endif %}
 </section>

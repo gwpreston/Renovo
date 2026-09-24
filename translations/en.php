@@ -912,6 +912,8 @@ return [
         . 'a month missing one of its currencies would be drawn as a cheap month rather than an unknown '
         . 'one. The forecast shows those months per currency.',
     'dashboard.coming_up' => 'Coming up',
+    'dashboard.coming_up_more' =>
+        'And {count, plural, one {# more charge} other {# more charges}} in the next {days} days.',
     'dashboard.coming_up_note' => 'Charges and trial conversions in the next {days} days',
     'dashboard.converts_to' => 'Converts to',
     'dashboard.converts_on' => 'converts {date}',
