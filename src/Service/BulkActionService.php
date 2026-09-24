@@ -95,7 +95,13 @@ final class BulkActionService
             self::ACTION_OWNER => $this->setMember($scope, $ids, $input, 'owner_user_id'),
             self::ACTION_PAYER => $this->setMember($scope, $ids, $input, 'payer_user_id'),
             self::ACTION_CURRENCY => $this->convertCurrency($scope, $ids, $input),
-            self::ACTION_ACTIVATE => $this->subscriptions->updateMany($scope, $ids, ['is_active' => true]),
+            // Resuming skips cancelled rows: they are finished, and only an
+            // explicit un-cancel (which lands on Paused) may bring one back.
+            self::ACTION_ACTIVATE => $this->subscriptions->updateMany(
+                $scope,
+                $this->subscriptions->withoutCancelled($scope, $ids),
+                ['is_active' => true],
+            ),
             self::ACTION_DEACTIVATE => $this->subscriptions->updateMany($scope, $ids, ['is_active' => false]),
             default => throw new ValidationException(['action' => 'error.bulk.no_action']),
         };
@@ -205,7 +211,14 @@ final class BulkActionService
             throw new ValidationException(['user_id' => 'error.member.not_in_household']);
         }
 
-        return $this->subscriptions->updateMany($scope, $ids, [$column => $userId]);
+        // A private row is its owner's and paid by its owner, so neither may be
+        // handed to somebody else in bulk any more than on the form — the row
+        // would vanish from the screen of the person who moved it.
+        return $this->subscriptions->updateMany(
+            $scope,
+            $this->subscriptions->withoutPrivate($scope, $ids),
+            [$column => $userId],
+        );
     }
 
     /**

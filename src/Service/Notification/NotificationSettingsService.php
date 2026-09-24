@@ -142,7 +142,18 @@ final class NotificationSettingsService
             throw new ValidationException($errors);
         }
 
-        $this->preferences->save(new NotificationPreferences($userId, $leadDays, $mode, $day));
+        $this->preferences->save(new NotificationPreferences(
+            $userId,
+            $leadDays,
+            $mode,
+            $day,
+            // The form carries a hidden "0" before the checkbox, so a post from
+            // it always names the setting. A caller that does not name it has
+            // not asked, and keeps what is stored.
+            array_key_exists('price_change_alerts', $input)
+                ? $this->str($input, 'price_change_alerts') === '1'
+                : $this->preferences->findForUser($userId)->priceChangeAlerts,
+        ));
     }
 
     /**
@@ -157,9 +168,10 @@ final class NotificationSettingsService
      * Save routing from the settings form.
      *
      * The form submits a checkbox per channel per alert type. A channel with
-     * every box ticked is stored as four rows rather than as "all", so that
-     * adding a fifth alert type in a later phase does not silently subscribe
-     * everybody to it.
+     * every box ticked is stored as a row per type rather than as "all", so
+     * that adding an alert type in a later phase does not silently subscribe
+     * everybody to it. (The one type that arrived on by default — price
+     * changes — did so through a migration copying each renewal route.)
      *
      * @param array<int|string, mixed> $input routes[channelId][] = alertType
      */

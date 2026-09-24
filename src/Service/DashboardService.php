@@ -224,11 +224,13 @@ final class DashboardService
     }
 
     /**
-     * The signed-in member's own budget, or null if they have not set one.
+     * The budget measuring the signed-in member, or null if there is none.
      *
-     * A budget measures one member's share, so in SHARED isolation — where an
-     * Owner can see everybody's — theirs is the only one that belongs on their
-     * dashboard. Somebody with several gets the one that covers the most
+     * Chosen by subject, not owner: a budget an Owner/Admin set for this
+     * member is theirs to watch, and one this member set for the household or
+     * for somebody else is not a reading of their own spending. In SHARED
+     * isolation — where an Owner can see everybody's — only theirs belongs on
+     * their dashboard. Somebody with several gets the one that covers the most
      * ground: the overall budget before a per-category one, the shorter period
      * before the longer, and the older before the newer so the choice is
      * stable rather than a matter of row order.
@@ -239,7 +241,7 @@ final class DashboardService
     {
         $own = array_values(array_filter(
             $this->budgets->progress($scope),
-            static fn (array $row): bool => $row['budget']->ownerUserId === $scope->userId,
+            static fn (array $row): bool => $row['budget']->subjectUserId === $scope->userId,
         ));
 
         if ($own === []) {

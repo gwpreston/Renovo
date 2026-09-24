@@ -33,6 +33,8 @@ final class ApiPermissionTest extends ApiTestCase
             ['POST', '/api/v1/subscriptions'],
             ['PUT', '/api/v1/subscriptions/{id}'],
             ['DELETE', '/api/v1/subscriptions/{id}'],
+            ['POST', '/api/v1/subscriptions/{id}/cancel'],
+            ['POST', '/api/v1/subscriptions/{id}/uncancel'],
             ['POST', '/api/v1/subscriptions/{id}/logo'],
             ['DELETE', '/api/v1/subscriptions/{id}/logo'],
             ['POST', '/api/v1/subscriptions/{id}/attachments'],

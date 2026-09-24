@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\Domain\SubscriptionFilter;
+use App\Domain\SubscriptionStatus;
 use App\Domain\SubscriptionType;
 use PHPUnit\Framework\TestCase;
 
@@ -83,5 +84,25 @@ final class SubscriptionFilterTest extends TestCase
         self::assertSame('price', $widened->sort);
         self::assertSame('desc', $widened->direction);
         self::assertSame(3, $widened->page);
+    }
+
+    public function testAStatusIsReadFromTheQueryAndWrittenBack(): void
+    {
+        $filter = SubscriptionFilter::fromQueryParams(['status' => 'cancelled']);
+
+        self::assertSame(SubscriptionStatus::Cancelled, $filter->status);
+        self::assertTrue($filter->hasActiveFilters());
+        self::assertStringContainsString('status=cancelled', $filter->toQueryString());
+        self::assertNull(SubscriptionFilter::fromQueryParams(['status' => 'deleted'])->status);
+    }
+
+    public function testTheWebListLeavesCancelledRowsToTheirOwnFilter(): void
+    {
+        $api = SubscriptionFilter::fromQueryParams(['inactive' => '1']);
+        $web = SubscriptionFilter::fromQueryParams(['status' => 'trial'])->withIncludeInactive();
+
+        self::assertTrue($api->includeCancelled, 'the API\'s inactive=1 still means everything switched off');
+        self::assertFalse($web->includeCancelled);
+        self::assertSame(SubscriptionStatus::Trial, $web->status, 'the wither keeps the chosen status');
     }
 }

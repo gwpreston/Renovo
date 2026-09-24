@@ -531,8 +531,10 @@ final class MemberAdministrationTest extends DatabaseTestCase
         // A budget too, and one the Owner also has a counterpart for. Every
         // table carrying an `owner_user_id` has to be moved, not just the one
         // the screen happens to show — a budget left behind is a foreign key
-        // pointing at somebody who is no longer in the household.
-        $theirBudget = $this->budgetOwnedBy($this->editorId, 'Theirs');
+        // pointing at somebody who is no longer in the household. This one
+        // measures the household, so it outlives them; one measuring *them*
+        // does not (see the next test).
+        $theirBudget = $this->budgetOwnedBy($this->editorId, 'Theirs', null);
         $this->budgetOwnedBy($this->ownerId, 'Mine');
 
         $this->signIn($this->ownerId);
@@ -557,6 +559,64 @@ final class MemberAdministrationTest extends DatabaseTestCase
         self::assertSame(0, $this->rowsOwnedBy($this->editorId), 'Nothing may still name them.');
 
         self::assertTrue($this->hasAudit(AuditAction::MemberRemoved, $this->editorId));
+    }
+
+    public function testBudgetsMeasuringTheDepartedMemberGoWithThemWhoeverSetThem(): void
+    {
+        $theirOwn = $this->budgetOwnedBy($this->editorId, 'Their own');
+        $setForThem = $this->budgetOwnedBy($this->ownerId, 'Set for them', $this->editorId);
+        $ownersOwn = $this->budgetOwnedBy($this->ownerId, 'Mine');
+
+        $this->signIn($this->ownerId);
+        $this->request('POST', '/settings/members/' . $this->editorId . '/remove', ['data' => 'reassign']);
+
+        self::assertNull($this->ownerOfBudget($theirOwn), 'A budget over nobody\'s spending measures nothing.');
+        self::assertNull($this->ownerOfBudget($setForThem));
+        self::assertSame($this->ownerId, $this->ownerOfBudget($ownersOwn));
+    }
+
+    public function testASharedRemovalAsksAboutPrivateSubscriptionsAndCanDeleteThem(): void
+    {
+        $public = $this->subscriptionOwnedBy($this->editorId);
+        $private = $this->subscriptionOwnedBy($this->editorId, private: true);
+
+        $this->signIn($this->ownerId);
+        $page = (string) $this->request('GET', '/settings/members/' . $this->editorId . '/remove')->getBody();
+        self::assertStringContainsString('name="private_data"', $page, 'nobody else has seen these, so ask');
+
+        $this->request('POST', '/settings/members/' . $this->editorId . '/remove', [
+            'data' => 'reassign',
+            'private_data' => 'delete',
+        ]);
+
+        self::assertSame($this->ownerId, $this->ownerOf($public));
+        self::assertNull($this->ownerOf($private));
+        self::assertSame(0, $this->rowsOwnedBy($this->editorId));
+    }
+
+    public function testASharedRemovalThatReassignsAPrivateSubscriptionKeepsItPrivate(): void
+    {
+        $private = $this->subscriptionOwnedBy($this->editorId, private: true);
+        $this->db->execute(
+            'UPDATE ' . $this->q('subscriptions') . ' SET ' . $this->q('payer_user_id') . ' = :payer'
+            . ' WHERE ' . $this->q('id') . ' = :id',
+            ['payer' => $this->editorId, 'id' => $private],
+        );
+
+        $this->signIn($this->ownerId);
+        $this->request('POST', '/settings/members/' . $this->editorId . '/remove', [
+            'data' => 'reassign',
+            'private_data' => 'reassign',
+        ]);
+
+        $row = $this->db->fetchOne(
+            'SELECT * FROM ' . $this->q('subscriptions') . ' WHERE ' . $this->q('id') . ' = :id',
+            ['id' => $private],
+        );
+        self::assertNotNull($row);
+        self::assertSame($this->ownerId, (int) $row['owner_user_id']);
+        self::assertSame('payer', $row['visibility'], 'private to its new owner, not published');
+        self::assertNull($row['payer_user_id'], 'a private row is paid by its owner or nobody named');
     }
 
     public function testARemovedMembersApiTokenNoLongerReachesTheHousehold(): void
@@ -628,7 +688,7 @@ final class MemberAdministrationTest extends DatabaseTestCase
         $container->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
     }
 
-    private function subscriptionOwnedBy(int $userId): int
+    private function subscriptionOwnedBy(int $userId, bool $private = false): int
     {
         $scope = Scope::forMember($userId, false, $this->householdId, Role::Editor, IsolationMode::Shared);
 
@@ -640,10 +700,16 @@ final class MemberAdministrationTest extends DatabaseTestCase
             'billing_cycle' => 'monthly',
             'next_payment_date' => '2026-12-01',
             'is_active' => true,
+            'visibility' => $private ? 'payer' : 'household',
         ], []);
     }
 
-    private function budgetOwnedBy(int $userId, string $name): int
+    /**
+     * @param int|null|false $subjectUserId Whose spending it measures: false
+     *                                      (the default) for the owner, null
+     *                                      for the household.
+     */
+    private function budgetOwnedBy(int $userId, string $name, int|null|false $subjectUserId = false): int
     {
         $scope = Scope::forMember($userId, false, $this->householdId, Role::Editor, IsolationMode::Shared);
 
@@ -653,6 +719,7 @@ final class MemberAdministrationTest extends DatabaseTestCase
             'amount_minor' => 10000,
             'currency' => 'GBP',
             'is_active' => true,
+            'subject_user_id' => $subjectUserId === false ? $userId : $subjectUserId,
         ]);
     }
 

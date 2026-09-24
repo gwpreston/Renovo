@@ -60,6 +60,7 @@ use App\Notification\NotifierRegistry;
 use App\Service\ExchangeRateService;
 use App\Service\InstanceSettingsService;
 use App\Service\Notification\AlertScanner;
+use App\Service\Notification\PriceChangeScanner;
 use App\Service\Notification\NotificationDispatcher;
 use App\Service\Notification\NotificationRateLimiter;
 use App\Service\Notification\ReminderRunner;
@@ -241,6 +242,11 @@ return static function (ContainerBuilder $builder, array $settings): void {
         // The links in a notification have to be absolute: the message is read
         // somewhere that has no idea what host the application is on.
         AlertScanner::class => autowire()->constructorParameter(
+            'appUrl',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
+
+        PriceChangeScanner::class => autowire()->constructorParameter(
             'appUrl',
             factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
         ),

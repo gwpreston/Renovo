@@ -19,6 +19,12 @@
             {{ t('backup.export_exclusions') }}
         </p>
 
+        {% if private_left_out > 0 %}
+            <p class="muted" data-private-left-out="{{ private_left_out }}">
+                {{ t('backup.private_left_out', {'count': private_left_out}) }}
+            </p>
+        {% endif %}
+
         <form method="post" action="/settings/backup/export" class="inline">
             {{ csrf_field() }}
             <button type="submit" class="button button-primary">{{ t('backup.download_backup') }}</button>

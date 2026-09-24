@@ -12,6 +12,7 @@ use App\Domain\NoticePeriod;
 use App\Domain\PriceChangeSource;
 use App\Domain\SubscriptionFilter;
 use App\Domain\SubscriptionType;
+use App\Domain\Visibility;
 use App\Persistence\Database;
 use App\Repository\CategoryRepository;
 use App\Repository\PaymentMethodRepository;
@@ -68,11 +69,17 @@ final class SubscriptionService
 
     /**
      * @param array<string, mixed> $input
+     * @param bool $restoring True only for a backup being put back. Two things
+     *        differ, both because the row is being returned rather than made:
+     *        a private row may belong to the member it belonged to, not only to
+     *        the person restoring it, and `cancelled_at` — read-only everywhere
+     *        else — is written with the row, so a cancelled subscription comes
+     *        back cancelled in the same statement that creates it.
      * @throws ValidationException
      */
-    public function create(Scope $scope, array $input): int
+    public function create(Scope $scope, array $input, bool $restoring = false): int
     {
-        [$data, $tagIds] = $this->validate($scope, $input);
+        [$data, $tagIds] = $this->validate($scope, $input, restoring: $restoring);
 
         // The subscription and the first row of its price history are one
         // fact, so they are written as one. A subscription with no history
@@ -303,9 +310,73 @@ final class SubscriptionService
         $this->subscriptions->update($scope, $id, ['logo_path' => $logoPath], $this->currentTagIds($scope, $id));
     }
 
+    /**
+     * Pause or resume.
+     *
+     * A cancelled subscription cannot be resumed from here: it is finished,
+     * and the way back is `uncancel()`, which lands on Paused. Letting resume
+     * skip that step would leave a row that is active and cancelled at once —
+     * counted in every total while every screen called it cancelled.
+     *
+     * @throws ValidationException when resuming a cancelled subscription.
+     * @throws \App\Security\ScopeViolationException when the row is not this
+     *         scope's to change.
+     */
     public function setActive(Scope $scope, int $id, bool $active): void
     {
+        if ($active && $this->subscriptions->find($scope, $id)?->isCancelled() === true) {
+            throw ValidationException::field('is_active', 'error.subscription.cancelled_resume');
+        }
+
         $this->subscriptions->update($scope, $id, ['is_active' => $active], $this->currentTagIds($scope, $id));
+    }
+
+    /**
+     * Cancel a subscription: finished, as of today.
+     *
+     * Available for anything, surfaced first on trials — and on a trial it is
+     * what stops the conversion, because every catch-up query skips a
+     * cancelled row. Cancelling twice keeps the first date.
+     *
+     * The write goes through the write predicate like any other, so a Viewer
+     * never reaches it (the route refuses them) and a Contributor or an
+     * ISOLATED member can cancel only their own.
+     *
+     * @throws \App\Security\ScopeViolationException when the row is not
+     *         this scope's to change.
+     */
+    public function cancel(Scope $scope, int $id): void
+    {
+        $subscription = $this->subscriptions->findForWrite($scope, $id);
+        if ($subscription === null) {
+            throw \App\Security\ScopeViolationException::forRow('subscriptions', $id);
+        }
+
+        if ($subscription->isCancelled()) {
+            return;
+        }
+
+        $this->subscriptions->setCancelled($scope, $id, $this->clock->today());
+    }
+
+    /**
+     * Undo a cancel. The row returns to Paused, never straight to Active: an
+     * accidental cancel corrected must not silently restart the charges.
+     *
+     * @throws \App\Security\ScopeViolationException
+     */
+    public function uncancel(Scope $scope, int $id): void
+    {
+        $subscription = $this->subscriptions->findForWrite($scope, $id);
+        if ($subscription === null) {
+            throw \App\Security\ScopeViolationException::forRow('subscriptions', $id);
+        }
+
+        if (!$subscription->isCancelled()) {
+            return;
+        }
+
+        $this->subscriptions->setCancelled($scope, $id, null);
     }
 
     /**
@@ -414,6 +485,15 @@ final class SubscriptionService
     }
 
     /**
+     * How many subscriptions in the household are private to another member
+     * — a count only, for the backup screen to say what it leaves out.
+     */
+    public function countPrivateToOthers(Scope $scope): int
+    {
+        return $this->subscriptions->countPrivateToOthers($scope);
+    }
+
+    /**
      * The switched-off subscriptions, for the strip's paused figure.
      *
      * @return list<Subscription>
@@ -442,14 +522,21 @@ final class SubscriptionService
         array $input,
         ?int $existingId = null,
         bool $commits = true,
+        bool $restoring = false,
     ): array {
         $errors = [];
+        $existing = $existingId === null ? null : $this->subscriptions->find($scope, $existingId);
 
         $name = trim($this->str($input, 'name'));
         if ($name === '') {
             $errors['name'] = 'error.name.required';
         } elseif (mb_strlen($name) > 150) {
             $errors['name'] = 'error.name.too_long_150';
+        }
+
+        $plan = trim($this->str($input, 'plan'));
+        if (mb_strlen($plan) > 60) {
+            $errors['plan'] = 'error.plan.too_long_60';
         }
 
         $currency = Currency::normalise($this->str($input, 'currency'));
@@ -545,6 +632,9 @@ final class SubscriptionService
             $payerUserId = null;
         }
 
+        $visibility = $this->visibility($input, $existing, $ownerUserId, $payerUserId, $scope, $restoring, $errors);
+        $cancelledAt = $restoring ? $this->date($this->str($input, 'cancelled_at')) : null;
+
         $website = $this->website($input, $errors);
 
         $notes = trim($this->str($input, 'notes'));
@@ -586,7 +676,14 @@ final class SubscriptionService
             'converts_to_price_minor' => $trial['converts_to_price_minor'],
             'converts_to_billing_cycle' => $trial['converts_to_billing_cycle'],
             'converts_to_cycle_days' => $trial['converts_to_cycle_days'],
-            'is_active' => ($input['is_active'] ?? '1') !== '0',
+            // A cancelled row stays switched off whatever the form, the API or
+            // an import says: `cancelled_at` set means `is_active` false, and
+            // only `uncancel()` may take the first step back.
+            'is_active' => $existing?->isCancelled() === true || $cancelledAt !== null
+                ? false
+                : ($input['is_active'] ?? '1') !== '0',
+            'plan' => $plan === '' ? null : $plan,
+            'visibility' => $visibility->value,
             'category_id' => $categoryId,
             'payment_method_id' => $paymentMethodId,
             'owner_user_id' => $ownerUserId,
@@ -607,7 +704,76 @@ final class SubscriptionService
             unset($data['payment_method_id']);
         }
 
+        // And again for the two Phase 20 fields. An absent visibility on an
+        // edit keeps the current setting; it was still validated above,
+        // because an edit that changes the owner of a private row is refused
+        // whether or not it mentions the visibility.
+        if ($cancelledAt !== null) {
+            $data['cancelled_at'] = $cancelledAt->format('Y-m-d');
+        }
+
+        foreach (['visibility', 'plan'] as $column) {
+            if ($existing !== null && !array_key_exists($column, $input)) {
+                unset($data[$column]);
+            }
+        }
+
         return [$data, $tagIds];
+    }
+
+    /**
+     * Who the subscription is visible to, and whether that is allowed.
+     *
+     * "Only me" means *the person saving it*. Three rules, each closing a way
+     * to make a row disappear from under somebody:
+     *
+     *  - the owner must be the actor — an Owner/Admin marking another member's
+     *    row private, or handing their own private row to somebody else, would
+     *    create a row that vanished from their own screen on save;
+     *  - the payer, if named, must be the owner — "private to its payer" is one
+     *    person, and a payer who cannot see what they pay is nonsense;
+     *  - it must not be split — a split is always visible to its participants,
+     *    so the two cannot coexist. SplitService refuses the reverse.
+     *
+     * An absent field is the current setting (or Household on a new row), and
+     * is checked all the same. A restore may put a private row back with the
+     * member it belonged to — it is being returned, not handed over.
+     *
+     * @param array<string, mixed>                  $input
+     * @param array<string, ValidationError|string> $errors
+     */
+    private function visibility(
+        array $input,
+        ?Subscription $existing,
+        int $ownerUserId,
+        ?int $payerUserId,
+        Scope $scope,
+        bool $restoring,
+        array &$errors,
+    ): Visibility {
+        $visibility = array_key_exists('visibility', $input)
+            ? Visibility::tryFromString($this->str($input, 'visibility'))
+            : ($existing->visibility ?? Visibility::Household);
+
+        if ($visibility === null) {
+            $errors['visibility'] = 'error.visibility.invalid';
+
+            return $existing->visibility ?? Visibility::Household;
+        }
+
+        if (!$visibility->isPrivate()) {
+            return $visibility;
+        }
+
+        if ($ownerUserId !== $scope->userId && !$restoring) {
+            $errors['visibility'] = 'error.visibility.owner_only';
+        } elseif ($payerUserId !== null && $payerUserId !== $ownerUserId) {
+            $errors['visibility'] = 'error.visibility.payer_is_owner';
+        } elseif ($existing !== null && $existing->splitMode->isSplit()) {
+            $errors['visibility'] = 'error.visibility.split';
+        }
+
+        return $visibility;
     }
 
     /**

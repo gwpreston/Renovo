@@ -21,7 +21,10 @@
         {% set row = usage.budget %}
         <p class="stat-label">{{ row.budget.name }}</p>
 
-        {% if row.projected is null %}
+        {% if row.unavailable %}
+            <p class="stat-value num">{{ t('common.none_symbol') }}</p>
+            <p class="muted">{{ t('budgets.unavailable') }}</p>
+        {% elseif row.projected is null %}
             <p class="stat-value num">{{ t('common.none_symbol') }}</p>
             <p class="field-error">
                 {{ t('budgets.unconvertible', {'currencies': row.unconvertible|join(', ')}) }}

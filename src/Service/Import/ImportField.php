@@ -33,6 +33,7 @@ enum ImportField: string
     case Category = 'category';
     case Tags = 'tags';
     case Notes = 'notes';
+    case Plan = 'plan';
     case IsActive = 'is_active';
     case NoticePeriodAmount = 'notice_period_amount';
     case NoticePeriodUnit = 'notice_period_unit';

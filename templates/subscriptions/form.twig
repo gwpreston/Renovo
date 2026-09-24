@@ -53,6 +53,16 @@
             </div>
 
             <div class="field">
+                <label for="plan">{{ t('field.plan') }}</label>
+                <input type="text" id="plan" name="plan" maxlength="60" value="{{ values.plan|default('') }}"
+                       placeholder="{{ t('subscriptions_form.plan_placeholder') }}"
+                       {% if errors.plan is defined %}aria-describedby="plan-error"{% endif %}>
+                {% if errors.plan is defined %}
+                    <p class="field-error" id="plan-error">{{ error_message(errors.plan) }}</p>
+                {% endif %}
+            </div>
+
+            <div class="field">
                 <label for="website_url">{{ t('field.website') }}</label>
                 <input type="url" id="website_url" name="website_url" inputmode="url"
                        value="{{ values.website_url|default('') }}"
@@ -418,6 +428,41 @@
                         <p class="field-error" id="payer_user_id-error">{{ error_message(errors.payer_user_id) }}</p>
                     {% endif %}
                 </div>
+            </div>
+
+            {#
+                Who sees it. "Only me" hides it from everybody else in the
+                household, Owner/Admins included, and is refused for a row
+                that is split — a split is always visible to its members — so
+                on a split row the choice is drawn but cannot be made. The
+                split control on the cost page is closed to a private row for
+                the same reason.
+            #}
+            {% set visibility = values.visibility|default('household') %}
+            {#
+                A radio group rather than a nested fieldset: the section is
+                already a fieldset, and a second one inside it would have its
+                legend announced as "Who it's for, Visible to" before each
+                choice. The group is named by its label instead.
+            #}
+            <div class="field" role="radiogroup" aria-labelledby="visibility-label"
+                 aria-describedby="visibility-hint{% if errors.visibility is defined %} visibility-error{% endif %}">
+                <span class="group-label" id="visibility-label">{{ t('subscriptions_form.visible_to') }}</span>
+                <label class="choice">
+                    <input type="radio" name="visibility" value="household" {{ visibility == 'household' ? 'checked' : '' }}>
+                    <span>{{ t('visibility.household') }}</span>
+                </label>
+                <label class="choice">
+                    <input type="radio" name="visibility" value="payer" {{ visibility == 'payer' ? 'checked' : '' }}
+                           {{ is_split ? 'disabled' : '' }}>
+                    <span>{{ t('visibility.payer') }}</span>
+                </label>
+                <p class="hint" id="visibility-hint">
+                    {{ is_split ? t('subscriptions_form.only_me_split_note') : t('subscriptions_form.only_me_note') }}
+                </p>
+                {% if errors.visibility is defined %}
+                    <p class="field-error" id="visibility-error">{{ error_message(errors.visibility) }}</p>
+                {% endif %}
             </div>
 
             <div class="field">

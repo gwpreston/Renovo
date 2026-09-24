@@ -28,6 +28,8 @@ final class NotificationPreferences
         array $leadDays,
         public readonly DigestMode $digestMode,
         public readonly int $digestDay,
+        /** Whether to be told when a price is changed or scheduled. On unless turned off. */
+        public readonly bool $priceChangeAlerts = true,
     ) {
         $days = array_values(array_unique(array_filter($leadDays, static fn (int $d): bool => $d >= 0)));
         rsort($days);

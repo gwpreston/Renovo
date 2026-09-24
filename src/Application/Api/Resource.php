@@ -55,6 +55,10 @@ final class Resource
             'converts_to_billing_cycle' => $subscription->convertsToBillingCycle?->value,
             'converts_to_cycle_days' => $subscription->convertsToCycleDays,
             'is_active' => $subscription->isActive,
+            'plan' => $subscription->plan,
+            'visibility' => $subscription->visibility->value,
+            // Read-only: moved by the cancel and uncancel endpoints only.
+            'cancelled_at' => self::date($subscription->cancelledAt),
             'category_id' => $subscription->categoryId,
             'category_name' => $subscription->categoryName,
             'payment_method_id' => $subscription->paymentMethodId,
@@ -69,6 +73,7 @@ final class Resource
             'website_url' => $subscription->websiteUrl,
             // Derived, and read-only. A client that recomputed these would have
             // to reimplement the billing-cycle normalisation to get them right.
+            'status' => $subscription->status()->value,
             'monthly_minor' => $subscription->monthlyMinor(),
             'yearly_minor' => $subscription->yearlyMinor(),
             'next_charge_date' => self::date($subscription->nextChargeDate()),

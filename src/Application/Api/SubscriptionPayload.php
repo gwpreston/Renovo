@@ -85,6 +85,17 @@ final class SubscriptionPayload
             $input['payment_method_id'] = self::intString($json, 'payment_method_id');
         }
 
+        // The same rule for the Phase 20 fields, for the same reason: absent
+        // keeps what is there. A private subscription must not become visible
+        // to the household because a client that predates the field put it
+        // back. (`cancelled_at` and `status` are read-only and never read.)
+        if (array_key_exists('visibility', $json)) {
+            $input['visibility'] = self::string($json, 'visibility') ?? '';
+        }
+        if (array_key_exists('plan', $json)) {
+            $input['plan'] = self::string($json, 'plan') ?? '';
+        }
+
         // The logo is not part of this representation: it is a file, with its
         // own upload and delete endpoints. Carrying the stored path forward
         // keeps a PUT from wiping an image the client was never shown.

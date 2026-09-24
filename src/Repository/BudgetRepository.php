@@ -14,15 +14,33 @@ use DateTimeImmutable;
 /**
  * Budgets, scoped like any other household data.
  *
- * No read-visibility widening here: a budget is a personal target, not a shared
- * bill. In ISOLATED mode a member sees only their own, which is the ordinary
- * rule and exactly what the mode is for.
+ * In ISOLATED mode a member sees their own budgets and, through the one
+ * widening below, the budgets that measure *them* — set by somebody else in
+ * SHARED days, before the instance switched. Nothing wider: a budget is a
+ * personal target, not a shared bill.
  */
 final class BudgetRepository extends AbstractScopedRepository
 {
     protected function table(): string
     {
         return 'budgets';
+    }
+
+    /**
+     * A member may see a budget that measures their own spending.
+     *
+     * Read-only by construction, like every use of this hook: the write
+     * predicate is not widened, so the subject cannot edit or delete a budget
+     * somebody else set. Only reached in ISOLATED mode — in SHARED the
+     * household predicate already shows every budget to every member.
+     *
+     * @param array<string, mixed> $params
+     */
+    protected function readVisibilityPredicate(Scope $scope, array &$params): string
+    {
+        $params['__subject'] = $scope->userId;
+
+        return $this->qualify('subject_user_id') . ' = :__subject';
     }
 
     protected function filterableColumns(): array
@@ -37,6 +55,7 @@ final class BudgetRepository extends AbstractScopedRepository
             'amount_minor',
             'currency',
             'is_active',
+            'subject_user_id',
         ];
     }
 
@@ -106,12 +125,15 @@ final class BudgetRepository extends AbstractScopedRepository
 
         return 'SELECT ' . $budgets . '.*,'
             . ' c.' . $this->quote('name') . ' AS category_name,'
-            . ' owner_user.' . $this->quote('display_name') . ' AS owner_name'
+            . ' owner_user.' . $this->quote('display_name') . ' AS owner_name,'
+            . ' subject_user.' . $this->quote('display_name') . ' AS subject_name'
             . ' FROM ' . $budgets
             . ' LEFT JOIN ' . $this->quote('categories') . ' c'
             . ' ON c.' . $this->quote('id') . ' = ' . $this->qualify('category_id')
             . ' LEFT JOIN ' . $this->quote('users') . ' owner_user'
-            . ' ON owner_user.' . $this->quote('id') . ' = ' . $this->qualify('owner_user_id');
+            . ' ON owner_user.' . $this->quote('id') . ' = ' . $this->qualify('owner_user_id')
+            . ' LEFT JOIN ' . $this->quote('users') . ' subject_user'
+            . ' ON subject_user.' . $this->quote('id') . ' = ' . $this->qualify('subject_user_id');
     }
 
     /**
@@ -133,6 +155,8 @@ final class BudgetRepository extends AbstractScopedRepository
             warnThresholdPercent: $threshold === null ? null : (int) $threshold,
             isActive: $this->db->platform()->toBoolean($row['is_active']),
             ownerName: ($row['owner_name'] ?? null) === null ? null : (string) $row['owner_name'],
+            subjectUserId: ($row['subject_user_id'] ?? null) === null ? null : (int) $row['subject_user_id'],
+            subjectName: ($row['subject_name'] ?? null) === null ? null : (string) $row['subject_name'],
         );
     }
 }

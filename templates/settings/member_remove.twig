@@ -36,6 +36,27 @@
             {% else %}
                 <input type="hidden" name="data" value="reassign">
                 <p class="muted">{{ t('members.remove_data_shared') }}</p>
+
+                {#
+                    Their "only me" subscriptions are the exception in SHARED
+                    mode: nobody else has seen them, so they are asked about
+                    exactly as ISOLATED asks about everything.
+                #}
+                {% if private_rows > 0 %}
+                    <fieldset class="stack">
+                        <legend>{{ t('members.remove_private_legend', { 'count': private_rows }) }}</legend>
+
+                        <label class="choice">
+                            <input type="radio" name="private_data" value="reassign" checked>
+                            <span>{{ t('members.remove_private_reassign') }}</span>
+                        </label>
+
+                        <label class="choice">
+                            <input type="radio" name="private_data" value="delete">
+                            <span>{{ t('members.remove_private_delete') }}</span>
+                        </label>
+                    </fieldset>
+                {% endif %}
             {% endif %}
 
             <div class="form-actions">

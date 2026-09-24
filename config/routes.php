@@ -171,6 +171,12 @@ return static function (App $app): void {
         $group->post('/subscriptions/{id:[0-9]+}/toggle', [SubscriptionController::class, 'toggle'])
             ->add($requires(Permission::UpdateSubscription));
 
+        $group->post('/subscriptions/{id:[0-9]+}/cancel', [SubscriptionController::class, 'cancel'])
+            ->add($requires(Permission::UpdateSubscription));
+
+        $group->post('/subscriptions/{id:[0-9]+}/uncancel', [SubscriptionController::class, 'uncancel'])
+            ->add($requires(Permission::UpdateSubscription));
+
         $group->post('/subscriptions/{id:[0-9]+}/delete', [SubscriptionController::class, 'delete'])
             ->add($requires(Permission::DeleteSubscription));
 
@@ -592,6 +598,12 @@ return static function (App $app): void {
 
         $group->delete('/subscriptions/{id:[0-9]+}', [SubscriptionApiController::class, 'delete'])
             ->add($requires(Permission::DeleteSubscription));
+
+        $group->post('/subscriptions/{id:[0-9]+}/cancel', [SubscriptionApiController::class, 'cancel'])
+            ->add($requires(Permission::UpdateSubscription));
+
+        $group->post('/subscriptions/{id:[0-9]+}/uncancel', [SubscriptionApiController::class, 'uncancel'])
+            ->add($requires(Permission::UpdateSubscription));
 
         $group->post('/subscriptions/{id:[0-9]+}/logo', [SubscriptionApiController::class, 'uploadLogo'])
             ->add($requires(Permission::UpdateSubscription));

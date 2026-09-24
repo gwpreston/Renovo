@@ -36,10 +36,13 @@
                     <p class="muted">
                         {{ budget_period_label(budget.period.value) }} ·
                         {{ budget.isOverall ? t('budgets.all_categories') : budget.categoryName }}
-                        {% if budget.ownerName %} · {{ budget.ownerName }}{% endif %}
+                        · {{ budget.isHousehold ? t('budgets.household') : budget.subjectName }}
                     </p>
 
-                    {% if row.projected is null %}
+                    {% if row.unavailable %}
+                        <p class="stat-value num">{{ t('common.none_symbol') }}</p>
+                        <p class="muted" data-budget-unavailable>{{ t('budgets.unavailable') }}</p>
+                    {% elseif row.projected is null %}
                         <p class="stat-value num">—</p>
                         <p class="field-error">
                             {{ t('budgets.unconvertible', {'currencies': row.unconvertible|join(', ')}) }}

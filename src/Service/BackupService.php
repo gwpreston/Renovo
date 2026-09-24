@@ -187,6 +187,10 @@ final class BackupService
             'generated_at' => $this->clock->now()->format(DATE_ATOM),
             'instance' => $instanceName,
             'isolation_mode' => $scope->isolationMode->value,
+            // Other members' "only me" subscriptions are not in the archive:
+            // it holds what the exporter could see, and a private row is one
+            // they cannot. Said here so the file itself admits the gap.
+            'private_left_out' => $this->subscriptions->countPrivateToOthers($scope),
             'counts' => [
                 'subscriptions' => count($data['subscriptions']),
                 'categories' => count($data['categories']),
@@ -206,6 +210,15 @@ final class BackupService
         ], $scope->householdId);
 
         return $path;
+    }
+
+    /**
+     * How many of the household's subscriptions an export by this scope will
+     * leave out for being private to somebody else.
+     */
+    public function privateLeftOut(Scope $scope): int
+    {
+        return $this->subscriptions->countPrivateToOthers($scope);
     }
 
     public function suggestedFilename(string $instanceName): string
@@ -315,7 +328,7 @@ final class BackupService
             }
 
             try {
-                $subscriptionIds[(int) $index] = $this->subscriptions->create($scope, $input);
+                $subscriptionIds[(int) $index] = $this->subscriptions->create($scope, $input, restoring: true);
                 $summary['subscriptions']++;
             } catch (ValidationException) {
                 $summary['skipped']++;
@@ -499,6 +512,10 @@ final class BackupService
         $input['owner_user_id'] = $this->resolveMember($row['owner_email'] ?? null, $owners) ?? $scope->userId;
         $input['payer_user_id'] = $this->resolveMember($row['payer_email'] ?? null, $owners) ?? '';
 
+        // Read-only in the API, and so dropped by the payload translation; a
+        // restore writes it with the row. Absent from older archives.
+        $input['cancelled_at'] = is_string($row['cancelled_at'] ?? null) ? $row['cancelled_at'] : '';
+
         return $input;
     }
 
@@ -532,6 +549,7 @@ final class BackupService
                     'warn_threshold_percent' => (string) ($row['warn_threshold_percent'] ?? ''),
                     'is_active' => ($row['is_active'] ?? true) ? '1' : '0',
                     'owner_user_id' => $this->resolveMember($row['owner_email'] ?? null, $owners) ?? $scope->userId,
+                    'subject_user_id' => $this->budgetSubject($row, $owners),
                 ]);
                 $summary['budgets']++;
             } catch (ValidationException) {
@@ -762,7 +780,32 @@ final class BackupService
             'warn_threshold_percent' => $budget->warnThresholdPercent,
             'is_active' => $budget->isActive,
             'owner_email' => $emails[(string) $budget->ownerUserId] ?? null,
+            // Null when the budget measures the whole household.
+            'subject_email' => $budget->subjectUserId === null
+                ? null
+                : ($emails[(string) $budget->subjectUserId] ?? null),
+            'is_household' => $budget->isHousehold(),
         ];
+    }
+
+    /**
+     * Whose spending a restored budget measures, as BudgetService reads it:
+     * a member id, `household`, or empty for "the owner".
+     *
+     * An archive written before budgets had a subject has neither key, and its
+     * budgets measured their owner — which empty restores. A subject who is
+     * no longer a member falls back the same way rather than failing the row.
+     *
+     * @param array<string, mixed> $row
+     * @param array<string, int>   $owners
+     */
+    private function budgetSubject(array $row, array $owners): string
+    {
+        if (($row['is_household'] ?? false) === true) {
+            return BudgetService::SUBJECT_HOUSEHOLD;
+        }
+
+        return (string) ($this->resolveMember($row['subject_email'] ?? null, $owners) ?? '');
     }
 
     /**

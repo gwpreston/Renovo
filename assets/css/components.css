@@ -1543,7 +1543,10 @@ body.no-shell .footer {
 
 /* ------------------------------------------------------------------ forms */
 
-label {
+/* `.group-label` names a radio group that cannot be a fieldset — one inside
+   a form section, which already is — and reads as the label it stands for. */
+label,
+.group-label {
     font-weight: var(--weight-medium);
     font-size: var(--size-label);
 }

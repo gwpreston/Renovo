@@ -102,6 +102,9 @@ return [
     'error.avatar.dimensions' => 'That image is too large to work with. Try a smaller one.',
     'error.avatar.too_large' => 'A picture must be {kilobytes} KB or smaller.',
     'error.avatar.type' => 'That file is not a PNG, JPEG, WebP or GIF image.',
+    'error.budget.household_isolated' =>
+        'A household budget is not available while members\' subscriptions are kept separate.',
+    'error.budget.subject_self_only' => 'You can set a budget for your own spending only.',
     'error.email.no_mailbox' =>
         'This account has no mailbox of its own, so it cannot confirm a new address. An Owner of your '
         . 'household can change it for you.',
@@ -140,7 +143,8 @@ return [
     'flash.member_role_changed' => 'Their role has been changed.',
     'flash.name_saved' => 'Your name has been saved.',
     'flash.password_changed_sessions' =>
-        'Your password has been changed, and {count, plural, one {# other session was} other {# other sessions were}} signed out.',
+        'Your password has been changed, and {count, plural, one {# other session was} other {# other '
+        . 'sessions were}} signed out.',
     'mail.email_change.body' =>
         "Hello {name},\n\nConfirm that you can read mail at this address, and it becomes the one "
         . "you sign in with:\n\n{link}\n\nThe link is valid for one hour. Until you follow it, "
@@ -186,6 +190,11 @@ return [
     'members.remove_heading' => 'Remove {name}?',
     'members.remove_intro' =>
         '{name} will lose access to this household immediately, and will be signed out everywhere.',
+    'members.remove_private_delete' => 'Delete them, with their price history and documents.',
+    'members.remove_private_legend' =>
+        'They keep {count, plural, one {# subscription} other {# subscriptions}} to themselves, which '
+        . 'nobody else has seen. What should happen to {count, plural, one {it} other {them}}?',
+    'members.remove_private_reassign' => 'Give them to me. They stay private — to me.',
     'members.resend_invite' => 'Resend invitation',
     'members.restore_login' => 'Restore login',
     'members.revoke_login' => 'Revoke login',
@@ -238,6 +247,11 @@ return [
     'notice.weeks' => '{count, plural, one {# week} other {# weeks}}',
     'notice.months' => '{count, plural, one {# month} other {# months}}',
 
+    'alert.price_change' => 'Price change',
+    'alert.price_change.line' => '{old} → {new} from {date}',
+    'alert.price_change.title_fall' => '{name} is going down',
+    'alert.price_change.title_rise' => '{name} is going up',
+    'alert.price_change.yearly' => '{amount} a year',
     'alert.renewal' => 'Upcoming renewal',
     'alert.trial_conversion' => 'Trial about to convert',
     'alert.cancel_by' => 'Cancellation deadline',
@@ -298,6 +312,11 @@ return [
     // Validation messages. Raised by services as keys and resolved by whoever
     // is rendering — a Twig form, or the API's error envelope.
     // -----------------------------------------------------------------------
+    'error.plan.too_long_60' => 'Keep the plan to 60 characters.',
+    'error.split.private' =>
+        'Only you can see this subscription, so it cannot be split. Make it visible to the household first.',
+    'error.subscription.cancelled_resume' =>
+        'A cancelled subscription cannot be resumed. Undo the cancellation first; it comes back paused.',
     'error.subscription.not_found' => 'That subscription does not exist.',
     'error.currency.required' => 'Choose a currency.',
     'error.member.not_in_household' => 'Choose a member of this household.',
@@ -351,6 +370,13 @@ return [
     'error.passkey.unreadable' => 'The browser sent a response we could not read.',
 
     'error.url.required' => 'Enter a URL.',
+    'error.visibility.invalid' => 'Choose who can see this subscription.',
+    'error.visibility.owner_only' => 'Only a subscription that belongs to you can be kept to yourself.',
+    'error.visibility.payer_is_owner' =>
+        'A subscription kept to yourself is paid by you. Clear "Paid by" or choose yourself.',
+    'error.visibility.split' =>
+        'This subscription is split, and a shared cost is always visible to the people sharing it. '
+        . 'Remove the split first.',
     'error.website.too_long' => 'That address is too long.',
     'error.url.invalid' => 'Enter a valid URL, including https://.',
     'error.url.scheme' => 'The URL must start with https:// or http://.',
@@ -472,7 +498,8 @@ return [
     'error.trusted_host.required' => 'Enter a host name, address or CIDR range.',
     'error.trusted_host.too_long' => 'That is too long to be a host or range.',
     'error.trusted_host.invalid' =>
-        'Enter a host name (gotify.lan), a suffix (.lan), an address (192.168.1.10) or a range (100.64.0.0/10).',
+        'Enter a host name (gotify.lan), a suffix (.lan), an address (192.168.1.10) or a range '
+        . '(100.64.0.0/10).',
     'error.trusted_host.duplicate' => 'That is already on the list.',
 
     // -----------------------------------------------------------------------
@@ -480,6 +507,9 @@ return [
     // next one, so what is stored is the key and its arguments.
     // -----------------------------------------------------------------------
     'flash.raw' => '{message}',
+    'flash.subscription_cancelled' => 'Subscription cancelled.',
+    'flash.subscription_uncancelled' =>
+        'Cancellation undone. The subscription is paused until you resume it.',
     'flash.welcome_back' => 'Welcome back, {name}.',
     'flash.signed_out' => 'You have been signed out.',
     'flash.email_confirmed' => 'Your email address is confirmed. You can sign in now.',
@@ -729,6 +759,9 @@ return [
     'backup.export_scope' =>
         'It contains what you can see. If this instance keeps members\' data separate, your export has '
         . 'your own subscriptions and not other members\'.',
+    'backup.private_left_out' =>
+        '{count, plural, one {# subscription} other {# subscriptions}} that another member keeps to '
+        . 'themselves will not be in the backup.',
     'backup.restore' => 'Restore',
     'backup.restore_is_additive' =>
         'Reads a backup archive back into this household. It adds — nothing is deleted or overwritten, '
@@ -744,6 +777,7 @@ return [
         . 'arrives in a later version.',
     'budgets.all_categories' => 'All categories',
     'budgets.empty' => 'No budgets yet.',
+    'budgets.household' => 'Whole household',
     'budgets.intro' =>
         'A budget measures projected spend, not spend so far: scheduled price rises and trials about to '
         . 'convert are counted before they happen, which is while there is still something you can do '
@@ -755,6 +789,9 @@ return [
     'budgets.over' => '{percent}% — over by {amount}.',
     'budgets.remaining' => '{percent}% · {remaining} left.',
     'budgets.set_one_up' => 'Set one up.',
+    'budgets.unavailable' =>
+        'Not available to you: it measures spending you cannot see while members\' subscriptions are '
+        . 'kept separate.',
     'budgets.unconvertible' =>
         'Cannot be calculated: no exchange rate is available for {currencies}. Rather than leave that '
         . 'spending out and show a figure that looks comfortable, no figure is shown.',
@@ -765,15 +802,16 @@ return [
     'budgets_form.edit_title' => 'Edit budget',
     'budgets_form.everything' => 'Everything',
     'budgets_form.limit' => 'Limit',
-    'budgets_form.owner_hint' => 'A budget counts only this member\'s own share of what is spent.',
     'budgets_form.period_hint' =>
         'Both are rolling windows measured from today, so the figure is always a complete one. This '
         . 'application tracks what is due rather than what has been paid, so a calendar month would have '
         . 'to leave out whatever was already charged earlier in it.',
     'budgets_form.save_budget' => 'Save budget',
+    'budgets_form.subject_hint' =>
+        'A member\'s budget counts only their share of what is spent. A household budget counts all of it.',
     'budgets_form.threshold_hint' => 'Flag the budget once projected spend reaches this share of the limit.',
     'budgets_form.warn_at_optional' => 'Warn at (optional)',
-    'budgets_form.whose_budget' => 'Whose budget',
+    'budgets_form.whose_spending' => 'Whose spending',
 
     // calendar
     'calendar.caption' => 'Renewals and trial conversions in {month}',
@@ -834,6 +872,8 @@ return [
     // sentences rather than labels, and they are here rather than written into
     // an onsubmit attribute so that one check covers every string the
     // application can show.
+    'confirm.cancel_subscription' =>
+        'Cancel {name}? It stops counting from today. You can undo it, and it comes back paused.',
     'confirm.delete_subscription' => 'Delete {name}?',
     'confirm.delete_category' => 'Delete {name}?',
     'confirm.delete_payment_method' =>
@@ -976,6 +1016,7 @@ return [
     'field.per_month' => 'Per month',
     'field.per_year' => 'Per year',
     'field.period' => 'Period',
+    'field.plan' => 'Plan',
     'field.price' => 'Price',
     'field.rating' => 'Rating',
     'field.result' => 'Result',
@@ -1199,6 +1240,10 @@ return [
         'Separate with commas, for example {example}. Each one is a separate reminder. Leave blank for '
         . 'no advance reminders. A single subscription can override this on its own page.',
     'notifications.lead_days_label' => 'Remind me this many days before a charge',
+    'notifications.price_change_hint' =>
+        'When a price is edited or a future one is scheduled, on any subscription you can see. Routed '
+        . 'like the other alerts below.',
+    'notifications.price_change_toggle' => 'Tell me when a price changes',
     'notifications.recently_sent' => 'Recently sent',
     'notifications.routing_hint' =>
         'Leave every box ticked — or every box clear — to send everything to every channel.',
@@ -1376,6 +1421,7 @@ return [
     // state
     'state.active' => 'Active',
     'state.all' => 'All',
+    'state.cancelled' => 'Cancelled',
     'state.expired' => 'Expired',
     'state.never' => 'Never',
     'state.none' => 'None',
@@ -1489,7 +1535,7 @@ return [
     'subscriptions.expiring_heading' => 'Expiring soon',
     'subscriptions.include_paused' => 'Include paused',
     'subscriptions.name_or_notes' => 'Name or notes',
-    'subscriptions.paused_heading' => 'Paused / inactive',
+    'subscriptions.paused_heading' => 'Paused',
     'subscriptions.paused_if_resumed' => 'a year if resumed',
     'subscriptions.paused_note' => 'Switched off, and costing nothing while they are.',
     'subscriptions.renewing_note' => 'A charge falling in the next {days, plural, one {# day} other {# days}}.',
@@ -1518,6 +1564,12 @@ return [
     'subscriptions_form.is_trial' => 'This is a free trial',
     'subscriptions_form.isolated_owner_note' =>
         'This instance keeps members\' subscriptions separate, so new entries belong to you.',
+    'subscriptions_form.only_me_note' =>
+        'Only you will see it, in either isolation mode — nobody else in the household, Owner/Admins '
+        . 'included, and it stays out of their totals.',
+    'subscriptions_form.only_me_split_note' =>
+        'A shared cost is always visible to the people sharing it, so a split subscription cannot be '
+        . 'kept to yourself.',
     'subscriptions_form.own_rows_owner_note' =>
         'Your role covers the entries you own, so new ones belong to you.',
     'subscriptions_form.logo' => 'Logo',
@@ -1528,6 +1580,7 @@ return [
     'subscriptions_form.notice_period' => 'Notice period',
     'subscriptions_form.notice_period_unit' => 'Notice period unit',
     'subscriptions_form.paid_by' => 'Paid by',
+    'subscriptions_form.plan_placeholder' => 'Standard, Family, Premium…',
     'subscriptions_form.reminders' => 'Reminders',
     'subscriptions_form.reminders_hint' =>
         'Days before the charge, for example {example} — or {never} to never be reminded about this one. '
@@ -1551,6 +1604,7 @@ return [
     'subscriptions_form.type_hint' => 'One-off and lifetime entries are tracked but left out of monthly totals.',
     'subscriptions_form.use_my_usual_reminders' => 'Use my usual reminders',
 
+    'subscriptions_form.visible_to' => 'Visible to',
     'subscriptions_form.website_hint' =>
         'Used for the link on this subscription, and to fetch its icon if you have not uploaded one.',
     'subscriptions_form.website_placeholder' => 'https://example.com',
@@ -1558,7 +1612,9 @@ return [
     // subscriptions_list
     'subscriptions_list.add_tag' => 'Add tag',
     'subscriptions_list.add_the_first_one' => 'Add the first one.',
+    'subscriptions_list.cancel' => 'Cancel',
     'subscriptions_list.cancel_by' => 'Cancel by {date}',
+    'subscriptions_list.cancel_trial' => 'Cancel trial',
     'subscriptions_list.convert_currency' => 'Convert currency',
     'subscriptions_list.convert_note' =>
         'Converting currency uses today\'s exchange rate and records the result in each subscription\'s '
@@ -1579,6 +1635,7 @@ return [
     'subscriptions_list.set_category' => 'Set category',
     'subscriptions_list.set_member' => 'Set member',
     'subscriptions_list.set_payer' => 'Set payer',
+    'subscriptions_list.uncancel' => 'Undo cancel',
     'subscriptions_list.with_selected' => 'With selected',
 
     // subscriptions_money
@@ -1605,6 +1662,8 @@ return [
     'subscriptions_money.nothing_attached_yet' => 'Nothing attached yet.',
     'subscriptions_money.price_history' => 'Price history',
     'subscriptions_money.price_note_placeholder' => 'Announced in their email of 3 March',
+    'subscriptions_money.private_no_split' =>
+        'Only you can see this subscription, so it is paid by you alone and cannot be split.',
     'subscriptions_money.reset_count' => 'Reset count',
     'subscriptions_money.save_rating' => 'Save rating',
     'subscriptions_money.save_split' => 'Save split',
@@ -1735,7 +1794,8 @@ return [
     'channel_field.ntfy.priority_hint' => '1–5. 3 is the default; 5 bypasses Do Not Disturb.',
     'channel_field.ntfy.server' => 'Server URL',
     'channel_field.ntfy.server_hint' =>
-        'Leave blank for https://ntfy.sh. A self-hosted server on a private address must be on the trusted-host list.',
+        'Leave blank for https://ntfy.sh. A self-hosted server on a private address must be on the '
+        . 'trusted-host list.',
     'channel_field.ntfy.tags' => 'Tags',
     'channel_field.ntfy.tags_hint' => 'Optional, comma-separated. Emoji shortcodes such as warning become icons.',
     'channel_field.ntfy.token' => 'Access token',
@@ -1825,6 +1885,7 @@ return [
     'import_field.notice_period_amount.label' => 'Notice period',
     'import_field.notice_period_unit.hint' => 'days, weeks or months',
     'import_field.notice_period_unit.label' => 'Notice period unit',
+    'import_field.plan.label' => 'Plan',
     'import_field.price.hint' => 'A decimal amount, for example 9.99',
     'import_field.price.label' => 'Price',
     'import_field.price_minor.hint' =>
@@ -1899,4 +1960,6 @@ return [
     // token_ability
     'token_ability.read' => 'Read-only',
     'token_ability.write' => 'Read and write',
+    'visibility.household' => 'Household',
+    'visibility.payer' => 'Only me',
 ];

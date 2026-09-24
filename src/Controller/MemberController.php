@@ -195,6 +195,7 @@ final class MemberController extends Controller
             'member' => $member,
             'is_isolated' => $scope->restrictsReadsToOwner(),
             'owned_rows' => $this->members->ownedRowCount($scope, $userId),
+            'private_rows' => $this->members->privateRowCount($scope, $userId),
         ]);
     }
 
@@ -205,13 +206,20 @@ final class MemberController extends Controller
     ): ResponseInterface {
         $body = $this->body($request);
         $deleteData = ($body['data'] ?? 'reassign') === 'delete';
+        $deletePrivate = ($body['private_data'] ?? 'reassign') === 'delete';
 
         return $this->act(
             $request,
             $response,
             'flash.member_removed',
-            function () use ($request, $id, $deleteData): void {
-                $this->members->remove($this->user($request), $this->scope($request), (int) $id, $deleteData);
+            function () use ($request, $id, $deleteData, $deletePrivate): void {
+                $this->members->remove(
+                    $this->user($request),
+                    $this->scope($request),
+                    (int) $id,
+                    $deleteData,
+                    $deletePrivate,
+                );
             },
         );
     }

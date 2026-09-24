@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Domain\Visibility;
 use App\Persistence\Criteria;
 use App\Security\Scope;
 use App\Security\ScopeViolationException;
@@ -54,6 +55,7 @@ abstract class AbstractScopedRepository extends AbstractRepository
 {
     private const SCOPE_HOUSEHOLD_PARAM = '__scope_household';
     private const SCOPE_OWNER_PARAM = '__scope_owner';
+    private const PRIVACY_VIEWER_PARAM = '__private_viewer';
 
     /**
      * The column holding the household a row belongs to.
@@ -124,7 +126,68 @@ abstract class AbstractScopedRepository extends AbstractRepository
             $predicate .= ' AND ' . $column($ownerColumn) . ' = :' . self::SCOPE_OWNER_PARAM;
         }
 
-        return $predicate;
+        return $predicate . $this->privacyClause($scope, $params, $qualified);
+    }
+
+    /**
+     * A condition that hides rows from everybody but one member, AND-ed onto
+     * every predicate this class builds — read, write and unqualified alike.
+     *
+     * The one use is a subscription marked "only me": invisible to the rest of
+     * the household in either isolation mode, Owner/Admins included. It is the
+     * opposite of `readVisibilityPredicate()` in every respect that matters:
+     *
+     *  - it narrows rather than widens, so it is AND-ed, never OR-ed;
+     *  - it applies in SHARED mode as well as ISOLATED, which is why it lives
+     *    in the helper both modes pass through rather than in the widened
+     *    branch of `readPredicate()` that only ISOLATED reaches;
+     *  - it applies to writes too — a row somebody cannot see is not one they
+     *    may pause, bulk-edit or delete by guessing its id;
+     *  - in ISOLATED mode it is applied *after* the widening, outside the OR
+     *    group, so no split participation can re-expose a private row.
+     *
+     * Returning null — the default — means no such rows.
+     *
+     * @param string $viewerParam The placeholder holding the viewer's id,
+     *                            already bound by the caller.
+     * @param bool   $qualified   Whether columns carry the table alias.
+     */
+    protected function privacyPredicate(string $viewerParam, bool $qualified): ?string
+    {
+        return null;
+    }
+
+    /**
+     * The privacy predicate for a table whose rows belong to a subscription:
+     * hidden whenever the parent is private to somebody else.
+     *
+     * Price-history and attachment rows carry a copy of the owner but not of
+     * the visibility, so they ask the parent. `NOT EXISTS` rather than a join,
+     * so the clause can be AND-ed into any statement, a DELETE included.
+     */
+    final protected function privateParentPredicate(string $viewerParam, bool $qualified): string
+    {
+        $foreign = $qualified ? $this->qualify('subscription_id') : $this->quote('subscription_id');
+
+        return 'NOT EXISTS (SELECT 1 FROM ' . $this->quote('subscriptions') . ' private_parent'
+            . ' WHERE private_parent.' . $this->quote('id') . ' = ' . $foreign
+            . ' AND private_parent.' . $this->quote('visibility') . " = '" . Visibility::Payer->value . "'"
+            . ' AND private_parent.' . $this->quote('owner_user_id') . ' <> :' . $viewerParam . ')';
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function privacyClause(Scope $scope, array &$params, bool $qualified): string
+    {
+        $predicate = $this->privacyPredicate(self::PRIVACY_VIEWER_PARAM, $qualified);
+        if ($predicate === null) {
+            return '';
+        }
+
+        $params[self::PRIVACY_VIEWER_PARAM] = $scope->userId;
+
+        return ' AND ' . $predicate;
     }
 
     /**
@@ -193,9 +256,13 @@ abstract class AbstractScopedRepository extends AbstractRepository
         $params[self::SCOPE_HOUSEHOLD_PARAM] = $scope->householdId;
         $params[self::SCOPE_OWNER_PARAM] = $scope->userId;
 
+        // The privacy clause goes after the OR group, never inside it: a split
+        // participation may widen what somebody sees, and must not widen it to
+        // a row its payer has kept to themselves.
         return $this->qualify($this->householdColumn()) . ' = :' . self::SCOPE_HOUSEHOLD_PARAM
             . ' AND (' . $this->qualify($ownerColumn) . ' = :' . self::SCOPE_OWNER_PARAM
-            . ' OR ' . $extra . ')';
+            . ' OR ' . $extra . ')'
+            . $this->privacyClause($scope, $params, true);
     }
 
     /**

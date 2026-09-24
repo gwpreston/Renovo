@@ -4,252 +4,288 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 19 — the shell, rebuilt to the prototype
+# Phase 20 — the data-model additions the new screens need
 
-Every screen sits inside the sidebar ("rail") and the top bar. Phase 9 built that
-frame; this phase rebuilds it to the Claude Design prototype, on the tokens,
-palettes, fonts and icons Phase 18 put in place. It is still only the frame: it
-holds no figures of its own beyond three small, scoped reads (named below), and
-it changes no page's content. The page rebuilds — dashboard, subscriptions,
-analytics and the rest — are the phases after this one.
+The prototype assumes six things the application does not yet record or do. They
+were decided one by one (decisions 2, 5, 8, 9, 10 and 18) and are built here,
+**before any screen is rebuilt**, so Phases 21–28 display real behaviour rather
+than inventing it. Each addition goes through the existing service and repository
+layers, the central scoping layer, the API, backup/restore and the tests — the
+same edges Phase 17 moved for payment methods.
+
+No screen is redesigned in this phase. Where an addition needs a control to be
+usable at all (a field on the existing subscription form, a toggle in the existing
+notification preferences), the control is added to the **current** page in its
+current style; the redesigned versions arrive with each screen's own phase.
 
 ## Depends on
 
-- **Phase 18** — rail tokens (`--rail-*`), the accent rule, the `icon()` Twig
-  function, the component vocabulary, server-rendered `data-theme` /
-  `data-palette`.
-- **Phase 9** — `layout.twig`, the `heading` / `page_actions` blocks, the single
-  `<h1>` in the top bar, `NavigationService` and `NavigationTest`, the tab-bar and
-  drawer split, quick-add loading the real form.
-- **Phases 2 and 6** — the exchange-rate cache (for the rates chip) and global
-  search on the subscriptions list (for the search box).
-
-Before starting: tick Phase 18's status list and record its deviations in
-`PHASE-18.md`, as every earlier phase has, so this phase builds on what was
-built rather than what was planned.
+- **P1** — the scoping layer (`AbstractScopedRepository`, `Scope`), the
+  subscription model, `is_active`.
+- **P2** — budgets and `ForecastService`, splits and their read-only widening,
+  price history and `CatchUpService`.
+- **P3** — the alert dispatcher, `notification_log`, digests, per-user routing.
+- **P5** — the API, OpenAPI, `docs/api.md`, backup/restore, the importer.
+- **P13** — `PriceChangeSource`, used to tell a real rise from a trial conversion.
+- **The Contributor role** — already built; the permission rules below include it.
 
 ## In scope this phase (build ONLY these)
 
-### A. The rail
+### A. "Only payer" visibility (decision 2)
 
-Top to bottom, as in the prototype:
+A subscription can be marked private to its payer. It is hidden from **everyone
+else in the household, in either isolation mode**, including Owner/Admins.
 
-1. **Brand** — the mark (in `--logo-tile` on dark-rail palettes), "Renovo", and
-   the catalogued tagline "Household spend".
-2. **Household label** — house icon, the household's name, and
-   "N members · you're {role}" beneath. **A label, not a control**: no chevron,
-   no menu (decision 16 — no household switcher). The role is the viewer's own
-   membership role, catalogued, including Contributor.
-3. **Main navigation** — Dashboard, Subscriptions, Analytics.
-   Subscriptions carries a **count badge**: active subscriptions the viewer can
-   see, from a scoped count through the repository layer, so ISOLATED shows the
-   viewer's own rows plus splits they share, never the household's total.
-4. **"Household tools"** (catalogued group heading) — Budgets, Calendar,
-   Members & roles, Notifications, Settings.
-5. **Add subscription** — opens the existing quick-add dialog (the real form);
-   with no script it is a link to `/subscriptions/new`. Styled as a
-   **secondary** rail button, not an accent fill, because the top bar's
-   "Add new" is the one primary action on every screen (Phase 14's rule).
-6. **User card** — avatar (initials fallback), full name, email; the whole card
-   links to `/profile`, and a sign-out control sits beside it so signing out
-   stays one click from anywhere.
+- **Column** `subscriptions.visibility` — string, `household` (default) or
+  `payer`. Existing rows become `household`.
+- **Scoping.** The read predicate gains
+  `(visibility = 'household' OR owner_user_id = :viewer)`, applied **after** the
+  split-participant widening so no widening can re-expose a private row. Because
+  it lives in the one scoping layer, every consumer inherits it: the list, search,
+  stats, forecast, budgets, calendar, iCal feed, insights, the API, bulk actions,
+  tags and price-history decoration.
+- **Totals.** A private row counts only in its payer's figures. Other members'
+  household totals, budgets, forecasts and charts leave it out — its cost is not
+  visible by subtraction.
+- **No splits.** A private subscription is paid by one person. Validation rejects
+  `visibility = payer` with any split, and rejects adding a split to a private
+  row. (A split must be visible to its participants — a standing rule in
+  CLAUDE.md — so the two cannot coexist.)
+- **Alerts** for a private row go to its payer only (they already follow scope).
+- **Member removal** (Phase 15): a departing member's private rows are always
+  handled by the reassign-or-delete prompt, in SHARED as well as ISOLATED mode,
+  because nobody else can see them to take them over silently.
+- **API**: `visibility` in the payload, OpenAPI and `docs/api.md`; an absent
+  value on PUT keeps the current setting (the Phase 17 precedent).
+- **Backup**: see the open decision below.
+- **Form**: a "Visible to: Household / Only me" control on the current form;
+  choosing "Only me" disables the split control.
 
-Active item: `--rail-active` fill, `--rail-ink` text, 3px `--accent` left
-border, icon in `--rail-accent` — decided server-side by `NavigationService`,
-correct on first paint. Status is never colour alone: the active link also has
-`aria-current="page"`.
+### B. "Paused" is the name for inactive (decision 5)
 
-### B. Where every existing destination goes
+No schema change. A subscription with `is_active = false` and no
+`cancelled_at` is **Paused** everywhere the interface names a state: badges, the
+status filter, the stats strip. The existing pause/resume action is renamed to
+match. A paused row stays out of recurring totals, the forecast, reminders and
+the calendar, as inactive rows already do.
 
-The prototype's rail has fewer items than Phase 9's thirteen. Nothing loses its
-only route — every destination is either in the rail or claimed by one:
+### C. Cancelled (decision 18)
 
-| Destination | Reached from | Active item |
-| --- | --- | --- |
-| Dashboard | rail | Dashboard |
-| Subscriptions, cancel-by (`/cancellations`) | rail; cancel-by linked from the Subscriptions page | Subscriptions |
-| Statistics (`/stats`), Forecast (`/forecast`) | rail | Analytics |
-| Budgets | rail | Budgets |
-| Calendar | rail | Calendar |
-| Members & roles | rail | Members & roles |
-| Notification preferences (per-user, decision 13) | rail | Notifications |
-| Settings, Categories, Payment methods, Import, Audit log, API tokens | rail → Settings; the existing Settings page gains a row of links to each until the Settings rebuild phase gives them tabs | Settings |
-| Profile | user card | the user card (shown active on `/profile`) |
+A cancelled subscription is finished, unlike a paused one that may resume.
 
-**Members & roles** points at the Phase 15 member screen if it is built. If
-Phase 15 is not yet built, the item is **omitted** rather than pointed at a page
-that does not exist, and Phase 15 adds it — a seam, not a stub.
+- **Column** `subscriptions.cancelled_at` — nullable date.
+- **Cancel** (`SubscriptionService::cancel()`): sets `cancelled_at` to today and
+  `is_active` to false in one transaction. On a trial it also stops the
+  conversion: `CatchUpService` skips cancelled rows, so a cancelled trial never
+  becomes a paid subscription. Available for any subscription; the redesigned
+  screens surface it on trials first ("Cancel trial").
+- **Undo**: clearing `cancelled_at` returns the row to Paused (not Active), so an
+  accidental cancel cannot silently restart charges.
+- **Status order**, derived in one place: Cancelled → Paused → Trial → Active.
+- Cancelled rows are excluded from totals, forecast, budgets, reminders,
+  calendar and feed; listed under a **Cancelled** filter; still deletable.
+- Permission: the same as editing the subscription (`mayWriteRow`); a Viewer
+  gets 403.
+- API field `cancelled_at` (read-only in the payload; cancelling and undoing are
+  `POST /api/v1/subscriptions/{id}/cancel` and `.../uncancel`), OpenAPI and
+  `docs/api.md`; backup/restore carries it.
 
-### C. The top bar
+### D. Plan (decision 10)
 
-- **Page title and subtitle.** The title is the existing `heading` block (still
-  the page's only `<h1>`, still the source of `<title>`). A new
-  `{% block page_subtitle %}` holds the short line beneath; this phase gives each
-  existing page a **catalogued static** subtitle ("Limits against projected
-  spend", "Renewals, trials & deadlines"…). Subtitles that carry figures
-  ("12 tracked · £182/mo") belong to each page's own rebuild, where the
-  per-currency rule can be honoured. Hidden below 900px.
-- **Search** (≥1100px) — a GET form submitting `q` to the subscriptions list,
-  using the list's existing search, so it works with JavaScript off.
-- **Rates chip** — base currency and the date of the last successful rate
-  refresh ("GBP · rates 23 Sep", date via ICU). Three states: fresh; **stale**
-  (older than the cache TTL, warn badge); **unavailable** (no rates, warn badge,
-  "rates unavailable"). Links to the rate settings. Read from the existing
-  rate cache — no fetch is ever triggered by rendering it.
-- **Theme toggle** — switches the account between light and dark and saves it
-  (CSRF-protected POST, htmx swap of the root attributes; a plain form submit
-  without script). An account on "system" moves to the opposite of what it is
-  currently showing. Any member, including a Viewer, can set their own.
-- **Bell** — a **link**, not an inbox (decision 6), to the Calendar, labelled
-  "What's coming up". It shows a dot when a renewal, trial conversion or cancel-by
-  deadline falls within the near window (`CancellationService::URGENT_DAYS`),
-  reusing that query. The dot has a text equivalent for screen readers.
-- **Add new** — the primary accent button (`--accent` fill, `--accent-ink`
-  text), opening quick-add; a link without script. It replaces Phase 9's
-  prominent-action slot.
+- **Column** `subscriptions.plan` — nullable string, 60 ("Standard", "Family").
+- On the form, list and detail; in the API, OpenAPI, `docs/api.md`,
+  backup/restore, and as an optional mapped column in the CSV/JSON importer (a
+  plain text field, so trivial there).
 
-### D. Narrow screens (below 768px)
+### E. Budgets for a named member, and for the whole household (decision 8)
 
-- The rail is replaced by a **bottom tab bar**: Home, Subs, **Add** (the raised
-  accent button), Analytics, More.
-- **More** opens a sheet listing Budgets, Calendar, Members & roles,
-  Notifications, Settings and Profile. It is a `<details>`, so it opens with the
-  bundle blocked, and its summary carries the active marker when the current
-  page is one it holds.
-- The household label and the user card appear at the top of the More sheet.
-- Tabs + More = every destination, asserted by test rather than kept in step
-  by hand (the Phase 9 invariant, carried over).
+Today a budget is owned by a member and measures **that member's share**. The
+prototype's "Whose spending" adds two things: an Owner/Admin setting a budget for
+someone else, and a budget over the whole household.
 
-### E. Keyboard shortcuts
+- **Column** `budgets.subject_user_id` — nullable FK to `users`. Backfilled to
+  `owner_user_id`, so every existing budget keeps measuring exactly what it did.
+  `null` means **household**: the whole household's spend, not one share.
+- **Household budgets exist only in SHARED mode.** In ISOLATED mode nobody may
+  see the whole household's spend, so the option is not offered and the service
+  refuses it; an existing household budget on an instance switched to ISOLATED
+  is shown to its owner as unavailable rather than computed from a partial view.
+- **Who may set what**: Owner/Admin and Editor — any subject (Editor only in
+  SHARED for others, since in ISOLATED they cannot see others' rows);
+  Contributor — themselves only; Viewer — none (403).
+- **Visibility**: SHARED — household-wide, as now; ISOLATED — the owner and the
+  subject.
+- **Projection** still comes from `ForecastService`, now asked for the subject's
+  share or for the household; private rows follow section A (a household budget
+  counts a private row only for the payer viewing it — so a household budget is
+  computed from the scope of whoever views it, and the alert state machine
+  evaluates it from the **owner's** scope).
+- **Alerts** go to the owner and, when different, the subject — each by their
+  own routing preferences. The existing crossing/re-arm state is unchanged.
+- API, OpenAPI, `docs/api.md` and backup/restore carry `subject_user_id`
+  (matched by email on restore, like other member references).
 
-Every existing shortcut keeps working: `?` for the list, `n` for quick-add, and
-`g` then a letter (`g d`, `g s`, `g c`, `g f`, `g t` …). Each still has a link or
-button on the page. No new shortcuts are added in this phase.
+### F. "Price change" alert type (decision 9)
 
-## Explicitly out of scope (leave clean seams, do NOT stub)
+A new alert, on the existing dispatcher, for "a price was recorded or scheduled".
+This deliberately supersedes Phase 16's "no new alert types" for this one case.
 
-- Page content rebuilds: dashboard A/B, subscriptions, analytics, budgets,
-  calendar, members, profile, settings tabs — later phases.
-- A household switcher (decision 16), an in-app notification inbox (decision 6).
-- Figure-bearing subtitles (each page's own rebuild).
-- The data-model additions ("Only payer", member budgets, Plan, cancelled
-  trials, price-change alert) — the next phase.
+- **Fires once per price-history row** that is a genuine change: a manual price
+  edit or a newly scheduled future price. **Not** for a subscription's first
+  price, a trial conversion (`PriceChangeSource::TrialConversion`) or a bulk
+  currency conversion (the amount changed, the price did not).
+- **Occurrence key** = the price-history row id, so a re-run is silent. Sent on
+  the next scheduler run after the row is written; a scheduled rise produces one
+  alert when it is scheduled, not another when it takes effect.
+- **Recipients**: users who can see the subscription (scope decides), with the
+  alert enabled.
+- **Preferences**: a "Price changes" row in the **existing** per-user routing and
+  a toggle, default **on**, routed like renewals. Digest users get a
+  "Price changes" section in their digest.
+- New `AlertType` case, catalogue keys, and message text naming old price, new
+  price, effective date and yearly effect — in the subscription's own currency.
 
 ## Data-model changes
 
-**None.** No migration. The theme toggle writes the theme column that already
-exists; the badge, the household label and the bell dot are reads.
+Migrations, sequenced after the last existing one, each with an explicit
+`down()`, verified on PostgreSQL and MySQL:
 
-## New / changed files (indicative)
+1. `add_visibility_to_subscriptions` — `visibility` string(10), default
+   `household`, not null.
+2. `add_cancelled_at_to_subscriptions` — nullable date, indexed.
+3. `add_plan_to_subscriptions` — nullable string(60).
+4. `add_subject_user_id_to_budgets` — nullable FK to `users`
+   (`ON DELETE CASCADE`, matching how a departing member's own budgets already
+   go), indexed; data step backfills `subject_user_id = owner_user_id`.
 
-- `templates/layout.twig`, `templates/partials/rail.twig`, `topbar.twig`,
-  `tabbar.twig` — rebuilt.
-- `src/Service/NavigationService.php` — new item list, groups, the user card as
-  a claimable destination, Members omitted when its route does not exist.
-- `src/Service/ShellService.php` (new) — assembles the rail and top-bar context
-  (household label, subscription count, rates-chip state, bell dot) from
-  existing services, so no controller or template computes them.
-- `src/Controller/AppearanceController.php` (or the existing preference
-  controller) — the theme-toggle POST.
-- `templates/settings/index.twig` — the interim row of links.
-- `translations/en.php` — group heading, tagline, subtitles, chip states,
-  role phrase, bell label, More.
+No new table. The price-change alert reuses `notification_log`.
 
-## Decisions & assumptions (confirmed 2026-09-24)
+## Explicitly out of scope (leave clean seams, do NOT stub)
 
-- **Top-bar "Add new" stays secondary** (ink fill), as Phase 14/18 set it: the
-  one accent button on a screen is that page's own action. The rail's "Add
-  subscription" is secondary too. "No page renders more than one accent-filled
-  button" still holds. *(Overrides section C's "primary accent button".)*
-- **The bell links to the Calendar.** Its dot lights for a **trial conversion
-  or a cancel-by deadline** inside `CancellationService::URGENT_DAYS`, not for
-  plain renewals, which would light it almost permanently.
-- **Members & roles adapts:** it links to `/settings/members` for an Owner/Admin
-  and to `/household` for anyone else with ViewHousehold. It lights on both
-  paths. Phase 15 is built (its routes exist); the item is included.
-- **The Subscriptions badge counts active, visible subscriptions**: the list's
-  own count with the active filter. Paused rows are left out.
-- **Settings gains an interim link row** to Categories, Payment methods, Import,
-  Backup, Audit log (for whoever may read it) and API tokens until its own
-  rebuild.
-- **Rates chip** links to the rate settings for an instance admin. For
-  everyone else it is plain status text, because they cannot see that section.
-- **Theme toggle is light ↔ dark only.** It extends the existing
-  `POST /profile/theme`. Without script, a "system" account's form submits
-  `dark`, because the server cannot know what the OS is showing.
-- **Brand text is `instance_name`** (default "Renovo"), as the rail shows today.
+- A `paused_at` date (pausing stays a flag; past-spend reconstruction treats
+  paused rows as Phase 2's year-over-year already does).
+- Category groups (decision 4 — categories stay flat).
+- Any screen redesign — Phases 21–28.
+- "Spend removed by cancellations" as a figure (Phase 8's "Total Savings" seam)
+  — `cancelled_at` makes it computable later; not built now.
+
+## Decisions & assumptions (confirm or correct before build)
+
+- **Backup and private rows — decided: (b).** A backup **excludes** other
+  members' private subscriptions and states how many were left out (export
+  screen and manifest). It keeps the backup's standing rule — an archive holds
+  what the exporter can see, as ISOLATED already does — and avoids the one
+  unscoped read that would have let an Owner open a private row.
+- Cancelling is available for **every** subscription, surfaced first on trials.
+- Undoing a cancel returns the row to **Paused**, not Active.
+- Household budgets are **SHARED-mode only**.
+- The price-change alert defaults **on**.
 
 ## Status
 
-- [x] Phase 18 status ticked and deviations recorded
-- [x] Rail: brand, household label, main nav with scoped badge, tools group,
-      secondary add button, user card with sign-out
-- [x] Destination map (section B) applied; interim Settings link row
-- [x] Members & roles item (Phase 15 is built; adapts to `/household`)
-- [x] Top bar: title + static subtitle block, search, rates chip (3 states),
-      theme toggle, bell link + dot, Add new (secondary, per decisions)
-- [x] Narrow layout: tab bar + More sheet (`<details>`), tabs + More = all
-- [x] Existing shortcuts verified
+- [x] Migrations 1–4 (and 5–6, below) apply and roll back on both engines
+- [x] Visibility: column, scoping predicate after widening, no-split rule,
+      alerts, removal prompt, form control
+- [x] Paused: status derivation and labels
+- [x] Cancelled: cancel/undo service + routes, catch-up skip, exclusions,
+      Cancelled filter
+- [x] Plan: column, form, list, importer mapping
+- [x] Budget subject: column + backfill, household (SHARED) and member
+      subjects, permissions, alert recipients
+- [x] Price-change alert: type, finder, idempotency, preferences row, digest
+      section
+- [x] API + OpenAPI + `docs/api.md` for visibility, cancelled_at (+ cancel /
+      uncancel), plan; coverage tests green (`subject_user_id` has no API —
+      there is no budgets endpoint)
+- [x] Backup/restore carries all four columns
 - [x] New strings in `translations/en.php`
-- [x] `composer check`, `i18n:check`, offline guard green on PostgreSQL and MySQL
-- [ ] Visual pass in the browser (five palettes × light/dark/system, wide and narrow)
+- [x] `composer check`, `i18n:check`, API coverage green on both engines
 
-Built as approved, with these decisions:
+## Built as approved, with these decisions
 
-- **The tab bar's raised Add wears the ink fill**, not the accent, for the
-  same reason as the top bar's: on a phone the page's own action is on screen
-  beside it.
-- **The rail label for the calendar stays "Billing Calendar"**, the existing
-  catalogue entry and the page's own heading, rather than the prototype's
-  "Calendar".
-- **Two cross-links were added to pages** so no destination lost its route:
-  Subscriptions → Cancel by (page action), and Members → Household overview
-  (page action, for whoever may view it).
-- **The user card hides a placeholder address**: a member added without an
-  email of their own shows a name only.
-- **Contrast:** the shell draws `--rail-accent` as text (tagline, badge) and
-  `--rail-muted` on `--rail-tint` (household label). Both pairs are now in
-  `ThemeContrastTest`; paper-light and ocean-light `--rail-muted` darkened from
-  `#64748B` to `#5E6E84` (4.34 → 4.75:1) to clear them.
-- **Rates chip "no fetch" is asserted on pages whose own content fetches
-  nothing.** The dashboard still refreshes a stale cache before combining
-  currencies (`StatsService::dashboard`, which predates this phase). That is
-  the page's work, not the shell's.
-- **The theme endpoint takes a `return` path** (local paths only; `//host`,
-  `/\`, other hosts and control characters are refused), falling back to the
-  Referer. Through htmx it answers 204 with an `HX-Trigger` naming the saved
-  theme.
+- **Two more migrations.** `saveRoutes` deliberately never subscribes anybody
+  to a new alert type, so "default on, routed like renewals" needed both a
+  place for the toggle and routes to exist:
+  `add_price_change_alerts_to_notification_preferences` (boolean, default
+  true) and `copy_renewal_routes_to_price_change` (each renewal route gains a
+  price-change sibling; idempotent; `down()` deletes them). A preferences save
+  that does not name the toggle keeps it.
+- **Budgets: nobody measures another member in ISOLATED mode**, Owner/Admins
+  included — reads there are fenced by mode, not role, so the spec's reason for
+  excluding Editors applies to everybody. A budget set for somebody else before
+  a switch to ISOLATED shows its owner "unavailable", is visible to its subject
+  through a read-only widening on `BudgetRepository`, and is not evaluated for
+  alerts (its state row belongs to the owner, who cannot measure it).
+- **Budget alerts.** The crossing is evaluated once, in the owner's run and
+  scope; a subject who is not the owner is sent the recorded crossing in their
+  own run, keyed on its date. A subject whose run precedes the owner's hears on
+  the next run. A household budget's breach goes to its owner only.
+- **The owner of a budget is whoever set it.** The form's picker is now "Whose
+  spending" (`subject_user_id`: a member, `household`, or absent); an edit no
+  longer moves the owner, and a form without the picker keeps the subject.
+  The dashboard's usage card shows the budget whose *subject* is the viewer.
+- **"Only me" means the actor.** Allowed only when the owner is the person
+  saving it, the payer is unset or the owner, and the row is not split. A
+  restore may put a private row back with the member it belonged to.
+- **Privacy applies to writes too.** The clause is AND-ed onto the write
+  predicate as well as the read one, so bulk actions, pause, cancel and delete
+  cannot reach another member's private row. Price history and attachments
+  follow their subscription through a `NOT EXISTS` on the parent.
+- **The web list hides cancelled rows by default**; a new Status filter (All /
+  Active / Trial / Paused / Cancelled) finds them. The API keeps `inactive=1`
+  meaning paused *and* cancelled, gains a `status` parameter, and the resource
+  gains a read-only `status`. The strip's "Paused" figure excludes cancelled
+  rows, and the list's Pause/Resume labels now come from the catalogue.
+- **Cancel** is on every row (labelled "Cancel trial" on a trial), with a
+  confirm; a cancelled row offers "Undo cancel" instead of Pause/Resume.
+  Resume, a form or API save, a bulk resume and an import cannot reactivate a
+  cancelled row.
+- **Member removal.** In SHARED mode a departing member's private rows get
+  their own reassign-or-delete question; reassigned, they stay private (to the
+  new owner) and lose a payer. Budgets that measure the departing member are
+  deleted, whoever set them; budgets they set for others or the household move
+  to the admin like every other row.
+- **Price-change digests** include only changes recorded since the user's
+  previous *delivered* digest (from the ledger), so a change is never in two
+  digests and a digest that failed does not swallow what it carried; with no
+  delivered digest yet, a month back. Immediate users look back seven days and
+  the ledger makes each change once — which also means the first run after
+  upgrading announces manual and scheduled edits from the previous week.
+- **The "Visible to" control** is a `role="radiogroup"` rather than a nested
+  fieldset, which `SubscriptionFormLayoutTest` forbids; a `.group-label` class
+  styles its name as a label.
+- **Not done:** demo seed and dev-setup sample data do not yet use plans,
+  private rows or cancellations; a private row restored for another member
+  loses its attachments (the restorer cannot write to it).
 
 ## Definition of done
 
-Every existing page renders inside the rebuilt shell with exactly one correct
-active item, on wide and narrow viewports, in all five palettes × light, dark
-and system; no destination has lost its route; the shell's three reads are
-scoped; every control works with JavaScript off; the shortcuts still land; the
-quality gates, `i18n:check` and the offline guard pass on both engines. Then
-update `PHASE.md` to the next phase.
+Migrations apply and roll back; a private subscription is invisible to every
+other member in both modes and absent from their totals; paused and cancelled are
+distinct, correctly derived and correctly excluded; a cancelled trial never
+converts; plan round-trips; budgets can measure a named member or (in SHARED) the
+household; a price change sends exactly one alert; the API and backup carry every
+new field; all gates green on both engines. Then update `PHASE.md` to the next
+phase.
 
 ## Tests
 
-- **Navigation:** exactly one active item for every path the application serves
-  (the user card counts as an item); `/forecast` lights Analytics,
-  `/cancellations` lights Subscriptions, `/settings/notifications` lights
-  Notifications and not Settings, `/profile` lights the user card.
-- **Reach:** every route that had a nav entry in Phase 9 is reachable from the
-  rail, the Settings link row or a page that is.
-- **Narrow:** tabs + More sheet = the full destination list.
-- **Badge scope:** in ISOLATED mode the count excludes other members' rows and
-  includes splits the viewer shares; paused rows are excluded; a Viewer sees the
-  same count they could list.
-- **Household label:** shows the correct catalogued role for Owner/Admin,
-  Editor, Contributor and Viewer.
-- **Rates chip:** fresh, stale and unavailable states each render; rendering
-  triggers no outbound request (count requests through the fake client).
-- **Theme toggle:** persists; requires CSRF; allowed for a Viewer; one member's
-  toggle does not change another's; the plain-form fallback works.
-- **Bell:** links to the Calendar; the dot appears when, and only when, an item
-  falls inside the near window.
-- **Accessibility:** `AccessibilityTest` still passes on every page — one `<h1>`,
-  `main` landmark, skip link, named controls — plus `aria-current` on the active
-  item and a text equivalent for the bell dot.
-- **One primary action:** no page renders more than one accent-filled button.
+- **Visibility:** another member — Owner/Admin, Editor, Contributor, Viewer —
+  cannot list, find, search, total, forecast, calendar, feed or API-read a
+  private row, in SHARED and ISOLATED; the payer can. A private row cannot gain
+  a split and a split row cannot become private. Split widening does not expose a
+  private row (fails without the predicate ordering).
+- **Totals:** a household total viewed by a non-payer equals the total without
+  the private row.
+- **Cancelled:** cancelling a trial stops conversion on the next catch-up;
+  undo returns Paused; cancelled rows leave totals, forecast, budgets, reminders
+  and calendar; status derivation order holds; Viewer 403.
+- **Plan:** persists through form, API, import and backup.
+- **Budgets:** backfill leaves existing projections unchanged; a member budget
+  measures the subject's share; a household budget is refused in ISOLATED;
+  Contributor cannot set one for another member; alerts reach owner and subject.
+- **Price change:** exactly one alert per genuine change; none for first price,
+  trial conversion or currency conversion; re-run sends nothing; routing and the
+  toggle are honoured; digest aggregation includes it.
+- **Regression:** the Phase 2/3 suites (splits, catch-up, budget de-dup/re-arm,
+  idempotency) stay green.

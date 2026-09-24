@@ -32,6 +32,18 @@ final class SubscriptionFilter
         public readonly string $direction = 'asc',
         public readonly int $page = 1,
         public readonly int $perPage = self::DEFAULT_PER_PAGE,
+        /**
+         * One state only, from the status filter. Null is "every state the
+         * rest of the filter admits".
+         */
+        public readonly ?SubscriptionStatus $status = null,
+        /**
+         * Whether cancelled rows come along with the paused ones when no
+         * status is chosen. True by default so the API's `inactive=1` keeps
+         * meaning "everything switched off"; the web list turns it off, and a
+         * cancelled row is found there under its own filter.
+         */
+        public readonly bool $includeCancelled = true,
     ) {
     }
 
@@ -70,23 +82,28 @@ final class SubscriptionFilter
             direction: ($query['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc',
             page: max(1, (int) ($query['page'] ?? 1)),
             perPage: self::DEFAULT_PER_PAGE,
+            status: SubscriptionStatus::tryFrom(is_string($query['status'] ?? null) ? $query['status'] : ''),
         );
     }
 
     /**
-     * The same filter with paused subscriptions included.
+     * The same filter as the web list reads it: paused subscriptions included,
+     * cancelled ones left to their own filter.
      *
      * The web list has no "include paused" control any more: it always shows
-     * them, sunk to the bottom by the repository's ordering. The API keeps the
+     * them, sunk to the bottom by the repository's ordering. A cancelled row is
+     * finished rather than resting, and showing it among them would make the
+     * list read as a history of everything ever tracked. The API keeps the
      * `inactive` parameter and its default, which is why this is a wither the
      * web controller applies rather than a new default on the constructor.
      */
     public function withIncludeInactive(): self
     {
-        if ($this->includeInactive) {
-            return $this;
-        }
+        return $this->copy(includeInactive: true, includeCancelled: false);
+    }
 
+    private function copy(bool $includeInactive, bool $includeCancelled): self
+    {
         return new self(
             search: $this->search,
             categoryId: $this->categoryId,
@@ -94,11 +111,13 @@ final class SubscriptionFilter
             ownerUserId: $this->ownerUserId,
             currency: $this->currency,
             type: $this->type,
-            includeInactive: true,
+            includeInactive: $includeInactive,
             sort: $this->sort,
             direction: $this->direction,
             page: $this->page,
             perPage: $this->perPage,
+            status: $this->status,
+            includeCancelled: $includeCancelled,
         );
     }
 
@@ -119,7 +138,8 @@ final class SubscriptionFilter
             || $this->tagIds !== []
             || $this->ownerUserId !== null
             || $this->currency !== null
-            || $this->type !== null;
+            || $this->type !== null
+            || $this->status !== null;
     }
 
     /**
@@ -136,6 +156,7 @@ final class SubscriptionFilter
             'owner' => $this->ownerUserId,
             'currency' => $this->currency,
             'type' => $this->type?->value,
+            'status' => $this->status?->value,
             'inactive' => $this->includeInactive ? '1' : null,
             'sort' => $this->sort,
             'dir' => $this->direction,

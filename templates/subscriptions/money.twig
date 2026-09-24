@@ -135,7 +135,10 @@
                 <p class="hint">{{ t('subscriptions_money.split_note') }}</p>
             {% endif %}
 
-            {% if can_edit_split and can(scope, 'split.manage') %}
+            {% if subscription.isPrivate %}
+                {# A private row is paid by one person; a split would show it to others. #}
+                <p class="hint" data-split-closed>{{ t('subscriptions_money.private_no_split') }}</p>
+            {% elseif can_edit_split and can(scope, 'split.manage') %}
                 <form method="post" action="/subscriptions/{{ subscription.id }}/split" class="stack">
                     {{ csrf_field() }}
 

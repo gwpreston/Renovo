@@ -230,6 +230,25 @@ Built in phases:
   links until its own rebuild — and a test still proves every route is
   reachable from a phone. No migration. See
   [The application shell](#the-application-shell).
+- **Phase 20 — the data-model additions the new screens need — complete.** Six
+  behaviours the prototype assumes, built before any screen is rebuilt, on the
+  current pages in their current style:
+  - **Only me.** A subscription private to its payer, hidden from every other
+    member in either isolation mode (Owner/Admins included) and out of their
+    totals. The scoping layer enforces it on reads and writes.
+  - **Paused and Cancelled** are separate states. Cancelling a trial stops its
+    conversion, and undoing a cancel lands on Paused.
+  - **Plan** is a free-text tier.
+  - **Budgets** can measure a named member or, in SHARED mode, the whole
+    household.
+  - **Price change** is a new alert: once per change, on by default, and routed
+    like renewals.
+
+  Six migrations. The API, OpenAPI, `docs/api.md`, backup and the importer
+  carry every new field. A backup leaves out other members' private
+  subscriptions and says how many. See
+  [Paused, cancelled, and only me](#paused-cancelled-and-only-me),
+  [Budgets](#budgets) and [Notifications](#notifications).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
@@ -1047,6 +1066,27 @@ a trial is the day of its first charge**, so the countdown runs to that day and
 the amount shown is the price it converts to. A trial is the subscription it
 will become, so pausing it here pauses the subscription.
 
+### Paused, cancelled, and only me
+
+- **Paused** is a subscription switched off that may be switched back on. It
+  stays in the list, sunk to the bottom, and out of every total.
+- **Cancelled** is finished. Cancelling records the day and switches it off in
+  one step; on a trial it is what stops the conversion — a cancelled trial never
+  becomes a paid subscription. A cancelled row leaves the default list and is
+  found under the **Status** filter, where **Undo cancel** returns it to
+  *Paused*, never straight to Active, so a slip corrected cannot quietly restart
+  the charges. The status the interface shows is derived in one place, in the
+  order Cancelled, Paused, Trial, Active.
+- **Only me** keeps a subscription to the member who pays it. Nobody else in the
+  household sees it — in either isolation mode, Owner/Admins included — and it
+  is left out of their totals, forecast, budgets, calendar and feed, so its cost
+  cannot be worked out by subtraction. It is applied in the scoping layer, on
+  writes as well as reads, so another member cannot pause or delete it by
+  guessing its id either. A private subscription is paid by one person and so
+  cannot be split; a split one cannot be made private.
+- **Plan** is the tier a subscription is on — "Standard", "Family" — free text
+  on the form, the list, the API, the importer and the backup.
+
 ### Category spending
 
 The Statistics page's category breakdown as proportion bars. What each bar is a
@@ -1105,8 +1145,15 @@ trend as the step it is.
 
 ### Budgets
 
-A budget belongs to a member and measures **that member's own share** — their
-subscriptions, plus their portion of anything split. The trigger is **projected**
+A budget measures **one member's share** — their subscriptions, plus their
+portion of anything split — or, in SHARED mode, **the whole household**. Whoever
+sets it owns it; the member it measures is chosen under *Whose spending*. An
+Owner/Admin or Editor may set one for anybody in a SHARED household; a
+Contributor, and everybody in ISOLATED mode, only for themselves, since nobody
+there can see anybody else's spending. The figure is always computed from what
+the viewer can see, so another member's private subscription is never in it. A
+breach is announced to the owner and, when it is somebody else, to the member
+it measures. The trigger is **projected**
 spend, taken from the same forecast the Forecast page shows, so the two can
 never disagree. Both periods are rolling windows from today ("the next month",
 "the next 12 months") rather than calendar periods, because this application
@@ -1142,7 +1189,7 @@ spending that may never have happened. The page says how many were excluded.
 
 ## Notifications
 
-Renovo tells you before money moves, not after. Four things are worth an
+Renovo tells you before money moves, not after. Five things are worth an
 interruption and nothing else is:
 
 | Alert | Fires when |
@@ -1151,11 +1198,15 @@ interruption and nothing else is:
 | **Trial about to convert** | A free trial is about to start charging, quoting what it will cost. |
 | **Cancellation deadline** | The last day to give notice and avoid the next charge — only when a subscription has a notice period, since otherwise the deadline *is* the renewal date. |
 | **Budget projected to be exceeded** | A budget's projection crosses its limit. |
+| **Price change** | A price is edited or a future one is scheduled — once, when it is recorded, naming the old and new price, the date and the effect over a year. Not for a first price, a trial converting or a currency conversion. |
 
 Everything is configured per user under **Settings → Alerts**; each member of a
 household sets their own. You are notified about the subscriptions you own and
 the ones you pay for, not about everything in the household — a household of
-four would otherwise quadruple everybody's notifications.
+four would otherwise quadruple everybody's notifications. Price changes are the
+exception: everybody who can see the subscription hears about one, and it can
+be switched off with its own toggle. Upgrading routes it wherever renewals
+already go.
 
 ### Channels
 
@@ -1407,7 +1458,9 @@ JSON plus the original files. Nothing in it needs a database to read.
 
 It is built through the scoping layer rather than by dumping tables, which means
 it contains what *you* can see — on an ISOLATED instance, your own subscriptions
-and not other members'. Deliberately **not** included: user accounts, passwords,
+and not other members', and in either mode not another member's "only me"
+subscriptions. The export screen says how many of those it is leaving out, and
+the archive's manifest records the count. Deliberately **not** included: user accounts, passwords,
 API tokens, the audit log and instance-wide settings. Those belong to the server
 rather than to the household, and a household Owner who could round-trip them
 would be able to reconfigure the instance through the backup screen. Members are

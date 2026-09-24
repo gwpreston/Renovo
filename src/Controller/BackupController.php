@@ -40,6 +40,7 @@ final class BackupController extends Controller
     {
         return $this->render($request, $response, 'backup/index.twig', [
             'format_version' => BackupService::FORMAT_VERSION,
+            'private_left_out' => $this->backups->privateLeftOut($this->scope($request)),
         ]);
     }
 

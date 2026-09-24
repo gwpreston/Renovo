@@ -7,6 +7,7 @@ namespace App\Service\Notification;
 use App\Domain\AlertType;
 use App\Domain\Entity\NotificationPreferences;
 use App\Domain\Entity\Subscription;
+use App\Domain\Money;
 use App\Notification\Alert;
 use App\Repository\BudgetAlertStateRepository;
 use App\Security\Scope;
@@ -126,7 +127,8 @@ final class AlertScanner
 
     /**
      * Re-evaluate every budget this member owns and report the ones that have
-     * just crossed their limit.
+     * just crossed their limit — and tell them about budgets that measure
+     * *them* which somebody else's evaluation has found over.
      *
      * The state machine, and the three cases that matter:
      *
@@ -137,10 +139,21 @@ final class AlertScanner
      *  - **Under, and was over.** Re-arm silently, so the next crossing is
      *    announced.
      *
+     * The machine is advanced in exactly one place, the owner's run, from the
+     * owner's scope — a household budget is a figure computed from whoever is
+     * looking, and the owner is the one it belongs to. A subject who is not the
+     * owner does not re-evaluate; their run reads the recorded state and sends
+     * them the crossing it describes, keyed on the crossing's date, in their
+     * own language and by their own routing. The ledger makes that once per
+     * crossing; the cost of reading rather than evaluating is that a subject
+     * whose run comes before the owner's hears about it on the next run.
+     *
      * A projection of null is none of those. It means some of the spend is in a
      * currency with no rate to the budget's, so there is no honest total —
      * treating that as "under" would re-arm a budget that may well still be
-     * over, and the next real breach would then look like the first.
+     * over, and the next real breach would then look like the first. An
+     * unavailable budget — one this scope cannot measure whole — is skipped
+     * for the same reason.
      *
      * @return list<Alert>
      */
@@ -152,12 +165,20 @@ final class AlertScanner
 
         foreach ($this->budgets->progress($scope) as $progress) {
             $budget = $progress['budget'];
+
             if ($budget->ownerUserId !== $scope->userId) {
+                if ($budget->subjectUserId === $scope->userId) {
+                    $alert = $this->subjectAlert($scope, $progress);
+                    if ($alert !== null) {
+                        $alerts[] = $alert;
+                    }
+                }
+
                 continue;
             }
 
             $projected = $progress['projected'];
-            if ($projected === null) {
+            if ($projected === null || $progress['unavailable']) {
                 continue;
             }
 
@@ -193,31 +214,72 @@ final class AlertScanner
                 continue;
             }
 
-            $over = $projected->subtract($progress['limit']);
-
-            $alerts[] = new Alert(
-                AlertType::BudgetExceeded,
-                Alert::SUBJECT_BUDGET,
-                $budget->id,
-                // The date of the crossing. A budget that drops back under and
-                // goes over again later is a new occurrence and is announced
-                // again; the same crossing seen twice in one day is not.
-                $today->format('Y-m-d'),
-                $this->translator->trans('alert.budget.title', ['budget' => $budget->name]),
-                [
-                    $this->translator->trans('alert.budget.projected', [
-                        'projected' => $this->money->format($projected),
-                        'limit' => $this->money->format($progress['limit']),
-                    ]),
-                    $this->translator->trans('alert.budget.over', ['amount' => $this->money->format($over)]),
-                ],
-                $this->url('/budgets'),
-                null,
-                7,
-            );
+            // The date of the crossing. A budget that drops back under and
+            // goes over again later is a new occurrence and is announced
+            // again; the same crossing seen twice in one day is not.
+            $alerts[] = $this->budgetAlert($budget, $projected, $progress['limit'], $today);
         }
 
         return $alerts;
+    }
+
+    /**
+     * The crossing the owner's run recorded, for a subject who is not the
+     * owner — or null when the budget is not over.
+     *
+     * The figure quoted is the one recorded at evaluation, not one recomputed
+     * here, so both people are told the same number about the same breach.
+     *
+     * @param array{budget: \App\Domain\Entity\Budget, limit: Money, unavailable: bool} $progress
+     */
+    private function subjectAlert(Scope $scope, array $progress): ?Alert
+    {
+        if ($progress['unavailable']) {
+            return null;
+        }
+
+        $budget = $progress['budget'];
+        $state = $this->budgetState->findForBudget($scope, $budget->id);
+        if (
+            $state === null || !$state['is_breached'] || $state['last_alert_at'] === null
+            || $state['projected_minor'] === null
+        ) {
+            return null;
+        }
+
+        return $this->budgetAlert(
+            $budget,
+            Money::of($state['projected_minor'], $progress['limit']->currency),
+            $progress['limit'],
+            $state['last_alert_at'],
+        );
+    }
+
+    private function budgetAlert(
+        \App\Domain\Entity\Budget $budget,
+        Money $projected,
+        Money $limit,
+        DateTimeImmutable $crossedOn,
+    ): Alert {
+        return new Alert(
+            AlertType::BudgetExceeded,
+            Alert::SUBJECT_BUDGET,
+            $budget->id,
+            $crossedOn->format('Y-m-d'),
+            $this->translator->trans('alert.budget.title', ['budget' => $budget->name]),
+            [
+                $this->translator->trans('alert.budget.projected', [
+                    'projected' => $this->money->format($projected),
+                    'limit' => $this->money->format($limit),
+                ]),
+                $this->translator->trans('alert.budget.over', [
+                    'amount' => $this->money->format($projected->subtract($limit)),
+                ]),
+            ],
+            $this->url('/budgets'),
+            null,
+            7,
+        );
     }
 
     /**

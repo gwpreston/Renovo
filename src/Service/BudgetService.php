@@ -32,9 +32,13 @@ use InvalidArgumentException;
  * above a forecast saying otherwise. Sharing one implementation makes that
  * impossible rather than merely unlikely.
  *
- * Everything a budget measures is *one member's share*. Their own subscriptions
- * in full, their portion of anything split, and nothing belonging to anybody
- * else.
+ * A budget measures its **subject**: one member's share — their own
+ * subscriptions in full, their portion of anything split, nothing belonging to
+ * anybody else — or, with no subject, the whole household. The owner is only
+ * whoever set it. Either way the figure is computed in the scope of whoever is
+ * looking, so another member's "only me" subscription is never in it, and a
+ * figure that scope cannot honestly compute is reported as unavailable rather
+ * than as a partial total that looks like a whole one.
  *
  * Firing alerts is Phase 3. This phase computes the state and shows it.
  *
@@ -46,11 +50,15 @@ use InvalidArgumentException;
  *     is_over: bool,
  *     is_warning: bool,
  *     remaining: Money|null,
- *     unconvertible: list<string>
+ *     unconvertible: list<string>,
+ *     unavailable: bool
  * }
  */
 final class BudgetService
 {
+    /** The subject value that means "the whole household". */
+    public const SUBJECT_HOUSEHOLD = 'household';
+
     private const MAX_WARN_THRESHOLD = 100;
 
     public function __construct(
@@ -94,17 +102,58 @@ final class BudgetService
         $progress = [];
 
         foreach ($budgets as $budget) {
-            $key = $budget->ownerUserId . ':' . $budget->period->months();
+            if (!$this->isMeasurableBy($scope, $budget)) {
+                $progress[] = $this->unavailable($budget);
+                continue;
+            }
+
+            $key = ($budget->subjectUserId ?? 'household') . ':' . $budget->period->months();
             $chargeCache[$key] ??= $this->forecast->charges(
                 $scope,
                 $budget->period->months(),
-                $budget->ownerUserId,
+                $budget->subjectUserId,
             );
 
             $progress[] = $this->progressFor($budget, $chargeCache[$key]);
         }
 
         return $progress;
+    }
+
+    /**
+     * Whether this scope can see everything the budget measures.
+     *
+     * In ISOLATED mode a scope sees only its own rows (and splits it is in), so
+     * it can measure only itself. A household budget, or one whose subject is
+     * somebody else — both possible only if they were set before the instance
+     * switched — would be computed from a partial view and reported as though
+     * it were whole, which is worse than saying nothing.
+     */
+    public function isMeasurableBy(Scope $scope, Budget $budget): bool
+    {
+        if (!$scope->restrictsReadsToOwner()) {
+            return true;
+        }
+
+        return $budget->subjectUserId === $scope->userId;
+    }
+
+    /**
+     * @return BudgetProgress
+     */
+    private function unavailable(Budget $budget): array
+    {
+        return [
+            'budget' => $budget,
+            'projected' => null,
+            'limit' => $budget->amount,
+            'percent' => null,
+            'is_over' => false,
+            'is_warning' => false,
+            'remaining' => null,
+            'unconvertible' => [],
+            'unavailable' => true,
+        ];
     }
 
     /**
@@ -151,6 +200,7 @@ final class BudgetService
                 'is_warning' => false,
                 'remaining' => null,
                 'unconvertible' => $unconvertible,
+                'unavailable' => false,
             ];
         }
 
@@ -178,6 +228,7 @@ final class BudgetService
                 && $projectedMinor <= $limitMinor,
             'remaining' => Money::of($limitMinor - $projectedMinor, $target),
             'unconvertible' => [],
+            'unavailable' => false,
         ];
     }
 
@@ -196,7 +247,22 @@ final class BudgetService
      */
     public function update(Scope $scope, int $id, array $input): void
     {
-        $this->budgets->update($scope, $id, $this->validate($scope, $input));
+        $data = $this->validate($scope, $input);
+
+        // Editing a budget does not take it over. The owner is whoever set it,
+        // and only an explicit `owner_user_id` — which the form no longer
+        // sends — moves it.
+        if (!array_key_exists('owner_user_id', $input)) {
+            unset($data['owner_user_id']);
+        }
+
+        // Nor does a form that does not show the subject picker change whose
+        // spending the budget measures.
+        if (!array_key_exists('subject_user_id', $input)) {
+            unset($data['subject_user_id']);
+        }
+
+        $this->budgets->update($scope, $id, $data);
     }
 
     public function delete(Scope $scope, int $id): void
@@ -253,6 +319,7 @@ final class BudgetService
         }
 
         $ownerUserId = $this->resolveOwner($scope, $input, $errors);
+        $subjectUserId = $this->resolveSubject($scope, $input, $ownerUserId, $errors);
 
         if ($errors !== [] || $amount === null || $period === null) {
             throw new ValidationException($errors);
@@ -267,7 +334,72 @@ final class BudgetService
             'warn_threshold_percent' => $threshold,
             'is_active' => ($input['is_active'] ?? '1') !== '0',
             'owner_user_id' => $ownerUserId,
+            'subject_user_id' => $subjectUserId,
         ];
+    }
+
+    /**
+     * Whose spending the budget measures: a member id, or null for the whole
+     * household. Empty means the owner, which is what every budget measured
+     * before there was a choice.
+     *
+     *  - **The household** only in SHARED mode, where the setter can see the
+     *    whole of it, and only for a role that answers for the household — a
+     *    Contributor's writes are fenced to their own rows, and the budget is
+     *    one of them.
+     *  - **Another member** only for a scope not fenced to its own rows: an
+     *    Owner/Admin or Editor in SHARED mode. In ISOLATED nobody can see
+     *    another member's rows, whatever their role, so nobody measures them.
+     *  - **Yourself**, always.
+     *
+     * @param array<string, mixed>  $input
+     * @param array<string, string> $errors
+     */
+    private function resolveSubject(Scope $scope, array $input, int $ownerUserId, array &$errors): ?int
+    {
+        $raw = trim($this->str($input, 'subject_user_id'));
+
+        if ($raw === self::SUBJECT_HOUSEHOLD) {
+            if ($scope->restrictsReadsToOwner()) {
+                $errors['subject_user_id'] = 'error.budget.household_isolated';
+            } elseif ($scope->restrictsWritesToOwner()) {
+                $errors['subject_user_id'] = 'error.budget.subject_self_only';
+            }
+
+            return null;
+        }
+
+        $requested = $this->positiveInt($raw) ?? $ownerUserId;
+        if ($requested === $scope->userId) {
+            return $requested;
+        }
+
+        if ($scope->restrictsWritesToOwner()) {
+            $errors['subject_user_id'] = 'error.budget.subject_self_only';
+
+            return $scope->userId;
+        }
+
+        if (!in_array($requested, $this->memberIds($scope), true)) {
+            $errors['subject_user_id'] = 'error.member.not_in_household';
+
+            return $scope->userId;
+        }
+
+        return $requested;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function memberIds(Scope $scope): array
+    {
+        return $scope->hasHousehold()
+            ? array_map(
+                static fn (array $member): int => $member['id'],
+                $this->memberships->findMembersOfHousehold((int) $scope->householdId),
+            )
+            : [];
     }
 
     /**
@@ -292,14 +424,7 @@ final class BudgetService
             return $scope->userId;
         }
 
-        $memberIds = $scope->hasHousehold()
-            ? array_map(
-                static fn (array $member): int => $member['id'],
-                $this->memberships->findMembersOfHousehold((int) $scope->householdId),
-            )
-            : [];
-
-        if (!in_array($requested, $memberIds, true)) {
+        if (!in_array($requested, $this->memberIds($scope), true)) {
             $errors['owner_user_id'] = 'error.member.not_in_household';
 
             return $scope->userId;

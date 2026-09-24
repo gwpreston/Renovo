@@ -9,6 +9,7 @@ use App\Domain\BillingCycle;
 use App\Domain\Currency;
 use App\Domain\NoticePeriod;
 use App\Domain\SubscriptionFilter;
+use App\Domain\SubscriptionStatus;
 use App\Domain\SubscriptionType;
 use App\Repository\MembershipRepository;
 use App\Security\ScopeViolationException;
@@ -87,6 +88,7 @@ final class SubscriptionController extends Controller
             'page_count' => max(1, (int) ceil($total / $filter->perPage)),
             'categories' => $this->categories->all($scope),
             'tags' => $this->tags->all($scope),
+            'statuses' => SubscriptionStatus::cases(),
             'members' => $scope->hasHousehold()
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],
@@ -214,6 +216,8 @@ final class SubscriptionController extends Controller
             'payment_method_id' => $subscription->paymentMethodId,
             'owner_user_id' => $subscription->ownerUserId,
             'payer_user_id' => $subscription->payerUserId,
+            'visibility' => $subscription->visibility->value,
+            'plan' => $subscription->plan,
             'notes' => $subscription->notes,
             'is_active' => $subscription->isActive ? '1' : '0',
             'logo_path' => $subscription->logoPath,
@@ -280,9 +284,46 @@ final class SubscriptionController extends Controller
             $this->subscriptions->setActive($scope, $subscription->id, !$subscription->isActive);
         } catch (ScopeViolationException) {
             throw $this->notFound($request);
+        } catch (ValidationException) {
+            // Resuming a cancelled subscription: the way back is un-cancel.
+            $this->flash('error', 'error.subscription.cancelled_resume');
+
+            return $this->redirectAfterWrite($request, $response, '/subscriptions');
         }
 
         $this->flash('success', $subscription->isActive ? 'flash.subscription_paused' : 'flash.subscription_resumed');
+
+        return $this->redirectAfterWrite($request, $response, '/subscriptions');
+    }
+
+    public function cancel(ServerRequestInterface $request, ResponseInterface $response, string $id): ResponseInterface
+    {
+        return $this->changeCancellation($request, $response, (int) $id, true);
+    }
+
+    public function uncancel(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        return $this->changeCancellation($request, $response, (int) $id, false);
+    }
+
+    private function changeCancellation(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        int $id,
+        bool $cancel,
+    ): ResponseInterface {
+        $scope = $this->scope($request);
+
+        try {
+            $cancel ? $this->subscriptions->cancel($scope, $id) : $this->subscriptions->uncancel($scope, $id);
+        } catch (ScopeViolationException) {
+            throw $this->notFound($request);
+        }
+
+        $this->flash('success', $cancel ? 'flash.subscription_cancelled' : 'flash.subscription_uncancelled');
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions');
     }
@@ -312,6 +353,9 @@ final class SubscriptionController extends Controller
             'values' => $values,
             'errors' => $errors,
             'subscription_id' => $id,
+            // Whether the row is split, which rules out "only me" — a split is
+            // always visible to the people in it. Only an existing row can be.
+            'is_split' => $id !== null && ($this->subscriptions->find($scope, $id)?->splitMode->isSplit() ?? false),
             'categories' => $this->categories->all($scope),
             'payment_methods' => $this->paymentMethods->all($scope),
             'members' => $scope->hasHousehold()

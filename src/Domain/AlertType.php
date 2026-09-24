@@ -28,15 +28,23 @@ enum AlertType: string
     case BudgetExceeded = 'budget_exceeded';
 
     /**
+     * A price was changed or a future one scheduled. Told once, when it is
+     * recorded — a scheduled rise is announced when it is scheduled, while
+     * there is still time to act on it, not again when it takes effect.
+     */
+    case PriceChange = 'price_change';
+
+    /**
      * Whether the alert is anchored to a future date, and therefore fires on
      * the user's lead times.
      *
-     * A budget breach is the exception: it is a state the user is already in,
-     * not a date approaching, so "thirty days before" means nothing for it.
+     * A budget breach and a price change are the exceptions: each is something
+     * that has happened, not a date approaching, so "thirty days before" means
+     * nothing for them.
      */
     public function usesLeadTimes(): bool
     {
-        return $this !== self::BudgetExceeded;
+        return $this !== self::BudgetExceeded && $this !== self::PriceChange;
     }
 
     public function labelKey(): string

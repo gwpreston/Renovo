@@ -92,7 +92,7 @@ final class BudgetController extends Controller
             'amount' => $budget->amount->toDecimalString(),
             'currency' => $budget->amount->currency,
             'warn_threshold_percent' => $budget->warnThresholdPercent,
-            'owner_user_id' => $budget->ownerUserId,
+            'subject_user_id' => $budget->subjectUserId ?? BudgetService::SUBJECT_HOUSEHOLD,
             'is_active' => $budget->isActive ? '1' : '0',
         ], [], $budget->id));
     }

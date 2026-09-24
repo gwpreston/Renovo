@@ -11,7 +11,9 @@ use App\Domain\Money;
 use App\Domain\NoticePeriod;
 use App\Domain\SplitMode;
 use App\Domain\SubscriptionFilter;
+use App\Domain\SubscriptionStatus;
 use App\Domain\SubscriptionType;
+use App\Domain\Visibility;
 use App\Persistence\Criteria;
 use App\Security\Scope;
 use DateTimeImmutable;
@@ -76,6 +78,22 @@ final class SubscriptionRepository extends AbstractScopedRepository
             . ' AND split.' . $this->quote('user_id') . ' = :__participant)';
     }
 
+    /**
+     * A subscription marked "only me" is seen by its owner and nobody else.
+     *
+     * AND-ed onto every predicate by the base class — reads and writes, SHARED
+     * and ISOLATED — and after the split widening above, so a participation
+     * cannot reopen it. (A private row may not have a split in the first
+     * place; SubscriptionService and SplitService refuse the combination.)
+     */
+    protected function privacyPredicate(string $viewerParam, bool $qualified): string
+    {
+        $column = fn (string $name): string => $qualified ? $this->qualify($name) : $this->quote($name);
+
+        return '(' . $column('visibility') . " = '" . Visibility::Household->value . "'"
+            . ' OR ' . $column('owner_user_id') . ' = :' . $viewerParam . ')';
+    }
+
     protected function filterableColumns(): array
     {
         return [
@@ -98,6 +116,9 @@ final class SubscriptionRepository extends AbstractScopedRepository
             'is_active',
             'category_id',
             'created_at',
+            'visibility',
+            'cancelled_at',
+            'plan',
         ];
     }
 
@@ -201,7 +222,9 @@ final class SubscriptionRepository extends AbstractScopedRepository
      */
     public function findPaused(Scope $scope): array
     {
-        $criteria = Criteria::new()->equals('is_active', false);
+        // Paused, not merely inactive: a cancelled row is finished, and the
+        // strip's "a year if resumed" is not a thing it can be.
+        $criteria = Criteria::new()->equals('is_active', false)->equals('cancelled_at', null);
         $params = [];
         $sql = $this->selectWithJoins() . $this->scopedWhere($scope, $criteria, $params);
 
@@ -287,8 +310,13 @@ final class SubscriptionRepository extends AbstractScopedRepository
      */
     public function findTrialsToConvert(Scope $scope, DateTimeImmutable $today): array
     {
+        // `cancelled_at` as well as `is_active`, though the service keeps the
+        // two in step: a cancelled trial converting into a paid subscription is
+        // the one outcome cancelling exists to prevent, so it is refused here
+        // in its own words rather than by implication.
         $criteria = Criteria::new()
             ->equals('is_active', true)
+            ->equals('cancelled_at', null)
             ->equals('is_trial', true)
             ->where('trial_end_date', '<', $today->format('Y-m-d'))
             ->orderBy('trial_end_date', 'asc');
@@ -362,6 +390,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
     {
         $criteria = Criteria::new()
             ->equals('is_active', true)
+            ->equals('cancelled_at', null)
             ->equals('subscription_type', SubscriptionType::Recurring->value)
             ->where('next_payment_date', '<', $today->format('Y-m-d'));
 
@@ -383,7 +412,13 @@ final class SubscriptionRepository extends AbstractScopedRepository
             $data['updated_at'] = $now;
 
             $id = $this->insertScoped($scope, $data);
-            $this->syncTags($scope, $id, $tagIds);
+
+            // The row was inserted by this statement's transaction, with the
+            // household forced by insertScoped, so there is nothing for the
+            // write assertion to establish — and one case where asking would
+            // be wrong: a backup putting a private row back with the member it
+            // belongs to, which the restorer may create but not see.
+            $this->writeTags($id, $tagIds);
 
             return $id;
         });
@@ -517,6 +552,85 @@ final class SubscriptionRepository extends AbstractScopedRepository
     }
 
     /**
+     * Cancel or un-cancel, in one statement so the two columns cannot part.
+     *
+     * Both directions leave the row inactive: a cancel switches it off, and an
+     * undo returns it to Paused rather than Active, so that correcting a slip
+     * cannot quietly restart charges nobody is expecting.
+     */
+    public function setCancelled(Scope $scope, int $id, ?DateTimeImmutable $cancelledAt): void
+    {
+        $this->updateScoped($scope, $id, [
+            'cancelled_at' => $cancelledAt?->format('Y-m-d'),
+            'is_active' => false,
+            'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * How many subscriptions in this scope's household are private to
+     * somebody else — for the backup screen's "left out" statement.
+     *
+     * Like `instanceTotals()` it deliberately bypasses the read predicate, and
+     * is allowed to for the same reason: it returns a count and nothing about
+     * what is counted. Only the backup, which is an Owner/Admin's screen, asks.
+     */
+    public function countPrivateToOthers(Scope $scope): int
+    {
+        if (!$scope->hasHousehold()) {
+            return 0;
+        }
+
+        return (int) $this->db->fetchValue(
+            'SELECT COUNT(*) FROM ' . $this->quote('subscriptions')
+            . ' WHERE ' . $this->quote('household_id') . ' = :household'
+            . ' AND ' . $this->quote('visibility') . ' = :private'
+            . ' AND ' . $this->quote('owner_user_id') . ' <> :viewer',
+            ['household' => $scope->householdId, 'private' => Visibility::Payer->value, 'viewer' => $scope->userId],
+        );
+    }
+
+    /**
+     * The given ids less any that are cancelled, for the bulk resume.
+     *
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    public function withoutCancelled(Scope $scope, array $ids): array
+    {
+        return $this->idsMatching($scope, $ids, Criteria::new()->equals('cancelled_at', null));
+    }
+
+    /**
+     * The given ids less any that are private, for the bulk reassignments.
+     *
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    public function withoutPrivate(Scope $scope, array $ids): array
+    {
+        return $this->idsMatching($scope, $ids, Criteria::new()->equals('visibility', Visibility::Household->value));
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    private function idsMatching(Scope $scope, array $ids, Criteria $criteria): array
+    {
+        $ids = array_values(array_unique($ids));
+        if ($ids === []) {
+            return [];
+        }
+
+        $params = [];
+        $sql = 'SELECT ' . $this->qualify('id') . ' FROM ' . $this->quote('subscriptions')
+            . $this->writableWhere($scope, $criteria->in('id', $ids), $params);
+
+        return array_map(static fn (array $row): int => (int) $row['id'], $this->db->fetchAll($sql, $params));
+    }
+
+    /**
      * Change how a subscription's cost is divided.
      */
     public function setSplitMode(Scope $scope, int $id, SplitMode $mode): void
@@ -605,9 +719,17 @@ final class SubscriptionRepository extends AbstractScopedRepository
     {
         $criteria = Criteria::new();
 
-        if (!$filter->includeInactive) {
-            $criteria = $criteria->equals('is_active', true);
-        }
+        $criteria = match ($filter->status) {
+            SubscriptionStatus::Active => $criteria->equals('is_active', true)->equals('is_trial', false),
+            SubscriptionStatus::Trial => $criteria->equals('is_active', true)->equals('is_trial', true),
+            SubscriptionStatus::Paused => $criteria->equals('is_active', false)->equals('cancelled_at', null),
+            SubscriptionStatus::Cancelled => $criteria->where('cancelled_at', 'IS NOT NULL'),
+            null => match (true) {
+                !$filter->includeInactive => $criteria->equals('is_active', true),
+                !$filter->includeCancelled => $criteria->equals('cancelled_at', null),
+                default => $criteria,
+            },
+        };
         if ($filter->search !== '') {
             $criteria = $criteria->search(['name', 'notes'], $filter->search);
         }
@@ -684,6 +806,18 @@ final class SubscriptionRepository extends AbstractScopedRepository
     {
         $this->assertInScope($scope, $subscriptionId);
 
+        $this->writeTags($subscriptionId, $tagIds);
+    }
+
+    /**
+     * Replace a subscription's tag rows. Callers establish the right to first:
+     * `syncTags()` by asking the write predicate, `create()` by having just
+     * inserted the row.
+     *
+     * @param list<int> $tagIds
+     */
+    private function writeTags(int $subscriptionId, array $tagIds): void
+    {
         $this->db->execute(
             'DELETE FROM ' . $this->quote('subscription_tags')
             . ' WHERE ' . $this->quote('subscription_id') . ' = :id',
@@ -829,6 +963,10 @@ final class SubscriptionRepository extends AbstractScopedRepository
             paymentMethodIcon: $this->nullableString($row['payment_method_icon'] ?? null),
             paymentMethodLogoPath: $this->nullableString($row['payment_method_logo_path'] ?? null),
             paymentMethodColour: $this->nullableString($row['payment_method_colour'] ?? null),
+            visibility: Visibility::tryFromString($this->nullableString($row['visibility'] ?? null))
+                ?? Visibility::Household,
+            cancelledAt: $this->nullableDate($row['cancelled_at'] ?? null),
+            plan: $this->nullableString($row['plan'] ?? null),
         );
     }
 

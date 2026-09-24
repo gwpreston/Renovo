@@ -170,6 +170,38 @@ final class ImportTest extends DatabaseTestCase
         );
     }
 
+    public function testAPlanColumnIsMappedAndImported(): void
+    {
+        $csv = <<<CSV
+        Name,Price,Currency,Billing cycle,Next payment date,Plan
+        Streaming,17.99,GBP,Monthly,2026-12-01,Premium
+        Music,10.99,GBP,Monthly,2026-12-01,
+        CSV;
+
+        $id = $this->imports->stage(FakeUpload::of($csv, 'plans.csv'));
+        $mapping = $this->imports->suggestMapping(ImportPreset::AUTOMATIC, $this->imports->read($id)->headers);
+        self::assertArrayHasKey('plan', $mapping);
+
+        $this->imports->commit($this->scope, $this->user, $id, $mapping, 'GBP');
+
+        $plans = [];
+        foreach ($this->subscriptions->allForStats($this->scope, activeOnly: false) as $subscription) {
+            $plans[$subscription->name] = $subscription->plan;
+        }
+        self::assertSame(['Music' => null, 'Streaming' => 'Premium'], $this->sorted($plans));
+    }
+
+    /**
+     * @param array<string, string|null> $values
+     * @return array<string, string|null>
+     */
+    private function sorted(array $values): array
+    {
+        ksort($values);
+
+        return $values;
+    }
+
     /**
      * Export, import, compare. The strongest statement the importer can make.
      */

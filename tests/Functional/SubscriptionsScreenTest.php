@@ -258,7 +258,7 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
 
         // Two paused rows exist and the instance is SHARED, so the owner sees
         // both of them counted.
-        self::assertStringContainsString('Paused / inactive', $strip);
+        self::assertStringContainsString('Paused', $strip);
         self::assertStringContainsString('>2<', $strip);
     }
 

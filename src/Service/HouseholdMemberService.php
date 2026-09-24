@@ -362,6 +362,15 @@ final class HouseholdMemberService
     }
 
     /**
+     * How many of those are private to them, which a SHARED removal must ask
+     * about rather than hand over silently.
+     */
+    public function privateRowCount(Scope $scope, int $userId): int
+    {
+        return $this->memberData->countPrivateOwnedBy($scope, $userId);
+    }
+
+    /**
      * Take somebody out of the household.
      *
      * The account survives — this removes a membership, not a person — but
@@ -372,17 +381,28 @@ final class HouseholdMemberService
      * reassigned without ceremony, and in ISOLATED they were private, so
      * silently handing them to somebody else would disclose them.
      *
+     * Their "only me" subscriptions are private in either mode, so they get
+     * the ISOLATED treatment in SHARED as well: `$deletePrivate` decides them
+     * separately, and in ISOLATED `$deleteData` already covers them.
+     *
      * Their API tokens are deliberately left alone. A token's household id is
      * not what a request is scoped by — `ScopeFactory` re-derives the scope
      * from live memberships and ignores a preference the user no longer has —
      * so a token naming this household stops reaching it the moment the
      * membership row goes, and still works for a household they are in.
      *
-     * @param bool $deleteData Only honoured in ISOLATED mode.
+     * @param bool $deleteData    Only honoured in ISOLATED mode.
+     * @param bool $deletePrivate Delete their private subscriptions while the
+     *                            rest is reassigned.
      * @throws ValidationException
      */
-    public function remove(User $actor, Scope $scope, int $userId, bool $deleteData): void
-    {
+    public function remove(
+        User $actor,
+        Scope $scope,
+        int $userId,
+        bool $deleteData,
+        bool $deletePrivate = false,
+    ): void {
         $householdId = $this->assertAdministers($scope);
         $member = $this->requireMember($householdId, $userId);
 
@@ -399,7 +419,13 @@ final class HouseholdMemberService
 
         // One transaction, in the repository: the split rows, the owned rows
         // and the membership either all go or none of them do.
-        $orphanedFiles = $this->memberData->removeFromHousehold($scope, $member->id, $actor->id, $delete);
+        $orphanedFiles = $this->memberData->removeFromHousehold(
+            $scope,
+            $member->id,
+            $actor->id,
+            $delete,
+            $delete || $deletePrivate,
+        );
 
         // Only once the rows are certainly gone, because unlink does not roll
         // back. A file left behind is wasted disk; a file deleted for a
@@ -416,7 +442,11 @@ final class HouseholdMemberService
         $this->audit->record(
             AuditAction::MemberRemoved,
             $actor,
-            ['data' => $delete ? 'deleted' : 'reassigned', 'isolation' => $scope->isolationMode->value],
+            [
+                'data' => $delete ? 'deleted' : 'reassigned',
+                'private' => $delete || $deletePrivate ? 'deleted' : 'reassigned',
+                'isolation' => $scope->isolationMode->value,
+            ],
             $householdId,
             $member->id,
             $member->email,

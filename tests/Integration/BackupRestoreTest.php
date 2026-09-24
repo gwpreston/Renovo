@@ -602,6 +602,122 @@ final class BackupRestoreTest extends DatabaseTestCase
         self::assertSame([], $data['subscriptions']);
     }
 
+    public function testPlanVisibilityAndCancellationSurviveTheRoundTrip(): void
+    {
+        $base = [
+            'price' => '9.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+        ];
+        $this->subscriptions->create($this->source, ['name' => 'Streaming', 'plan' => 'Family'] + $base);
+        $this->subscriptions->create($this->source, ['name' => 'Mine', 'visibility' => 'payer'] + $base);
+        $gone = $this->subscriptions->create($this->source, ['name' => 'Gone'] + $base);
+        $this->subscriptions->cancel($this->source, $gone);
+
+        $summary = $this->backups->restore($this->target, $this->targetUser, $this->export());
+        self::assertSame(3, $summary['subscriptions']);
+        self::assertSame(0, $summary['skipped']);
+
+        $restored = [];
+        foreach ($this->subscriptions->allForStats($this->target, activeOnly: false) as $subscription) {
+            $restored[$subscription->name] = $subscription;
+        }
+
+        self::assertSame('Family', $restored['Streaming']->plan);
+        // The exporter's own private row, restored by somebody not in the
+        // target household's member list for it: it lands with the restorer
+        // and stays private.
+        self::assertSame(\App\Domain\Visibility::Payer, $restored['Mine']->visibility);
+        self::assertSame('2026-06-01', $restored['Gone']->cancelledAt?->format('Y-m-d'));
+        self::assertFalse($restored['Gone']->isActive);
+    }
+
+    public function testAnotherMembersPrivateSubscriptionIsLeftOutAndCounted(): void
+    {
+        $partner = $this->partnerScope();
+        $this->subscriptions->create($partner, [
+            'name' => 'Partner private',
+            'price' => '20.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'visibility' => 'payer',
+        ]);
+
+        self::assertSame(1, $this->backups->privateLeftOut($this->source));
+
+        $archive = $this->export();
+        self::assertSame([], $this->readArchiveJson($archive, 'data.json')['subscriptions']);
+        self::assertSame(1, $this->readArchiveJson($archive, 'manifest.json')['private_left_out']);
+    }
+
+    public function testAPrivateRowRestoredForAnotherMemberStaysTheirs(): void
+    {
+        // The partner exports their own household view, private row included.
+        $partner = $this->partnerScope();
+        $this->subscriptions->create($partner, [
+            'name' => 'Partner private',
+            'price' => '20.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'visibility' => 'payer',
+        ]);
+        $users = new UserRepository($this->db);
+        $archive = $this->backups->export($partner, $users->findById($this->partnerId), 'Test instance');
+        $this->temporaryFiles[] = $archive;
+
+        // The target's owner restores it. The partner is a member there, so
+        // the row goes back to them — and so out of the restorer's sight.
+        $summary = $this->backups->restore($this->target, $this->targetUser, $archive);
+        self::assertSame(1, $summary['subscriptions']);
+
+        self::assertSame([], $this->subscriptions->allForStats($this->target, activeOnly: false));
+        self::assertSame(1, $this->subscriptions->countPrivateToOthers($this->target));
+    }
+
+    public function testBudgetSubjectsSurviveTheRoundTrip(): void
+    {
+        $base = ['period' => 'monthly', 'amount' => '50.00', 'currency' => 'GBP'];
+        $this->budgets->create($this->source, [
+            'name' => 'Partner',
+            'subject_user_id' => (string) $this->partnerId,
+        ] + $base);
+        $this->budgets->create($this->source, [
+            'name' => 'Everyone',
+            'subject_user_id' => BudgetService::SUBJECT_HOUSEHOLD,
+        ] + $base);
+        $this->budgets->create($this->source, ['name' => 'Mine'] + $base);
+
+        $this->backups->restore($this->target, $this->targetUser, $this->export());
+
+        $restored = [];
+        foreach ($this->budgets->all($this->target, activeOnly: false) as $budget) {
+            $restored[$budget->name] = $budget;
+        }
+
+        self::assertSame($this->partnerId, $restored['Partner']->subjectUserId);
+        self::assertTrue($restored['Everyone']->isHousehold());
+        // The source owner is not in the target household, so their budget —
+        // like their rows — comes back as the restorer's own.
+        self::assertSame($this->targetUser->id, $restored['Mine']->subjectUserId);
+    }
+
+    private function partnerScope(): Scope
+    {
+        return Scope::forMember(
+            $this->partnerId,
+            false,
+            (int) $this->source->householdId,
+            Role::Editor,
+            IsolationMode::Shared,
+        );
+    }
+
     private function export(): string
     {
         $path = $this->backups->export($this->source, $this->sourceUser, 'Test instance');

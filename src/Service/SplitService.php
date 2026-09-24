@@ -175,6 +175,14 @@ final class SplitService
         }
 
         $mode = SplitMode::tryFromString($this->str($input, 'split_mode')) ?? SplitMode::None;
+
+        // A private subscription is paid by one person, and a split is always
+        // visible to everybody in it — the two cannot coexist. The reverse,
+        // making a split row private, is refused by SubscriptionService.
+        if ($mode->isSplit() && $subscription->isPrivate()) {
+            throw new ValidationException(['split_mode' => 'error.split.private']);
+        }
+
         $memberIds = $this->householdMemberIds($scope);
 
         [$participants, $errors] = $this->validateParticipants($input, $mode, $memberIds);

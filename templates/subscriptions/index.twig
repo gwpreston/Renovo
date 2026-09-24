@@ -61,6 +61,22 @@
                     </select>
                 </div>
 
+                {#
+                    Status. "All" means everything still in play — running and
+                    paused. A cancelled subscription is finished, and is found
+                    here under its own name rather than among them.
+                #}
+                <div class="filter-field">
+                    <label for="status">{{ t('field.status') }}</label>
+                    <select id="status" name="status">
+                        <option value="">{{ t('state.all') }}</option>
+                        {% for status in statuses %}
+                            <option value="{{ status.value }}"
+                                    {{ filter.status == status ? 'selected' : '' }}>{{ t(status.labelKey) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
                 <div class="filter-field">
                     <label for="owner">{{ t('field.member') }}</label>
                     <select id="owner" name="owner">

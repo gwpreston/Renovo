@@ -35,6 +35,7 @@ use App\Service\ForecastService;
 use App\Service\InstanceSettingsService;
 use App\Service\Notification\AlertScanner;
 use App\Service\Notification\DigestBuilder;
+use App\Service\Notification\PriceChangeScanner;
 use App\Service\Notification\NotificationDispatcher;
 use App\Service\Notification\NotificationRateLimiter;
 use App\Service\Notification\NotificationSettingsService;
@@ -218,6 +219,14 @@ abstract class NotificationTestCase extends DatabaseTestCase
                 $this->subscriptionService,
             ),
             $this->scanner,
+            new PriceChangeScanner(
+                $this->subscriptionService,
+                $priceHistory,
+                new MoneyFormatter(new LocaleContext('en_GB')),
+                TestTranslator::create(),
+                'https://renovo.example',
+            ),
+            $this->log,
             new DigestBuilder(TestTranslator::create()),
             $this->dispatcher,
             $this->notificationSettings,

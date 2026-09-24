@@ -53,19 +53,28 @@
             </select>
             {% if errors.category_id is defined %}<p class="field-error">{{ error_message(errors.category_id) }}</p>{% endif %}
 
-            {% if not scope.restrictsWritesToOwner and members|length > 1 %}
-                <label for="owner_user_id">{{ t('budgets_form.whose_budget') }}</label>
-                <select id="owner_user_id" name="owner_user_id">
+            {#
+                Whose spending: a member, or the whole household. Offered only
+                to somebody who may measure more than themselves — an Owner/Admin
+                or Editor in SHARED mode. Everybody else's budget measures them,
+                and the field is left out so an edit keeps what is there.
+            #}
+            {% if not scope.restrictsWritesToOwner %}
+                {% set subject = values.subject_user_id|default(values.owner_user_id|default(current_user.id)) %}
+                <label for="subject_user_id">{{ t('budgets_form.whose_spending') }}</label>
+                <select id="subject_user_id" name="subject_user_id">
+                    <option value="household" {{ subject == 'household' ? 'selected' : '' }}>
+                        {{ t('budgets.household') }}
+                    </option>
                     {% for member in members %}
-                        <option value="{{ member.id }}"
-                                {{ values.owner_user_id|default(current_user.id) == member.id ? 'selected' : '' }}>
+                        <option value="{{ member.id }}" {{ subject == member.id ? 'selected' : '' }}>
                             {{ member.display_name }}
                         </option>
                     {% endfor %}
                 </select>
-                <p class="hint">{{ t('budgets_form.owner_hint') }}</p>
-                {% if errors.owner_user_id is defined %}
-                    <p class="field-error">{{ error_message(errors.owner_user_id) }}</p>
+                <p class="hint">{{ t('budgets_form.subject_hint') }}</p>
+                {% if errors.subject_user_id is defined %}
+                    <p class="field-error">{{ error_message(errors.subject_user_id) }}</p>
                 {% endif %}
             {% endif %}
 

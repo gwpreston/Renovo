@@ -45,6 +45,16 @@
             </p>
             {% if errors.digest_day is defined %}<p class="field-error">{{ error_message(errors.digest_day) }}</p>{% endif %}
 
+            {# The hidden field carries "off"; a ticked box overrides it with "on". #}
+            <input type="hidden" name="price_change_alerts" value="0">
+            <label class="choice">
+                <input type="checkbox" name="price_change_alerts" value="1"
+                       aria-describedby="price_change_alerts_hint"
+                       {{ preferences.priceChangeAlerts ? 'checked' : '' }}>
+                <span>{{ t('notifications.price_change_toggle') }}</span>
+            </label>
+            <p class="hint" id="price_change_alerts_hint">{{ t('notifications.price_change_hint') }}</p>
+
             {% if channels is not empty %}
                 <h3>{{ t('notifications.where_each_alert_goes') }}</h3>
                 <p class="hint">

@@ -60,9 +60,16 @@
                                     <a href="/subscriptions/{{ subscription.id }}{{
                                         can_edit_row(scope, subscription) ? '/edit' : '/money'
                                     }}">{{ subscription.name }}</a>
-                                    {% if not subscription.isActive %}<span class="badge">{{ t('state.paused') }}</span>{% endif %}
-                                    {% if subscription.isTrial %}
+                                    {% if subscription.plan %}<span class="muted">{{ subscription.plan }}</span>{% endif %}
+                                    {# The status, derived in one place: Cancelled, Paused, Trial, or nothing for Active. #}
+                                    {% set status = subscription.status.value %}
+                                    {% if status == 'trial' %}
                                         <span class="badge badge-warn">{{ t('state.trial') }}</span>
+                                    {% elseif status != 'active' %}
+                                        <span class="badge" data-status="{{ status }}">{{ t(subscription.status.labelKey) }}</span>
+                                    {% endif %}
+                                    {% if subscription.isPrivate %}
+                                        <span class="badge" title="{{ t('subscriptions_form.only_me_note') }}">{{ t('visibility.payer') }}</span>
                                     {% endif %}
                                     {% if subscription.splitMode.isSplit %}
                                         <span class="badge"
@@ -133,12 +140,29 @@
                             <a class="button button-quiet"
                                href="/subscriptions/{{ subscription.id }}/money">{{ t('subscriptions_list.cost') }}</a>
                             {% if can(scope, 'subscription.update') and can_edit_row(scope, subscription) %}
-                                <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="inline">
-                                    {{ csrf_field() }}
-                                    <button type="submit" class="button button-quiet">
-                                        {{ subscription.isActive ? 'Pause' : 'Resume' }}
-                                    </button>
-                                </form>
+                                {% if subscription.isCancelled %}
+                                    {# Undoing a cancel lands on Paused, so it cannot restart charges unasked. #}
+                                    <form method="post" action="/subscriptions/{{ subscription.id }}/uncancel" class="inline">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-quiet">
+                                            {{ t('subscriptions_list.uncancel') }}
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <form method="post" action="/subscriptions/{{ subscription.id }}/toggle" class="inline">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-quiet">
+                                            {{ subscription.isActive ? t('subscriptions_list.pause') : t('subscriptions_list.resume') }}
+                                        </button>
+                                    </form>
+                                    <form method="post" action="/subscriptions/{{ subscription.id }}/cancel" class="inline"
+                                          onsubmit="return confirm('{{ t('confirm.cancel_subscription', {'name': subscription.name})|e('js') }}')">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-quiet">
+                                            {{ subscription.isTrial ? t('subscriptions_list.cancel_trial') : t('subscriptions_list.cancel') }}
+                                        </button>
+                                    </form>
+                                {% endif %}
                             {% endif %}
                             {% if can(scope, 'subscription.delete') and can_edit_row(scope, subscription) %}
                                 <form method="post" action="/subscriptions/{{ subscription.id }}/delete" class="inline"

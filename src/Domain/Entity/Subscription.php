@@ -9,7 +9,9 @@ use App\Domain\Money;
 use App\Domain\NoticePeriod;
 use App\Domain\Rounding;
 use App\Domain\SplitMode;
+use App\Domain\SubscriptionStatus;
 use App\Domain\SubscriptionType;
+use App\Domain\Visibility;
 use DateTimeImmutable;
 
 /**
@@ -75,7 +77,47 @@ final class Subscription
         public readonly ?string $paymentMethodIcon = null,
         public readonly ?string $paymentMethodLogoPath = null,
         public readonly ?string $paymentMethodColour = null,
+        /**
+         * Who may see it. `Payer` keeps it to its owner; the scoping layer is
+         * what enforces that, so a row that reached this entity is one the
+         * reader was allowed to see.
+         */
+        public readonly Visibility $visibility = Visibility::Household,
+        /**
+         * The day it was cancelled. Set only together with `isActive = false`
+         * — SubscriptionService holds the two in step — so a cancelled row is
+         * excluded from everything a paused one is.
+         */
+        public readonly ?DateTimeImmutable $cancelledAt = null,
+        /** The tier it is on — "Standard", "Family" — as the provider names it. */
+        public readonly ?string $plan = null,
     ) {
+    }
+
+    /**
+     * The state the interface names, derived here and nowhere else.
+     *
+     * The order is the precedence: a cancelled trial is Cancelled, a paused
+     * trial is Paused, and only a running row is a Trial or Active.
+     */
+    public function status(): SubscriptionStatus
+    {
+        return match (true) {
+            $this->cancelledAt !== null => SubscriptionStatus::Cancelled,
+            !$this->isActive => SubscriptionStatus::Paused,
+            $this->isTrial => SubscriptionStatus::Trial,
+            default => SubscriptionStatus::Active,
+        };
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->cancelledAt !== null;
+    }
+
+    public function isPrivate(): bool
+    {
+        return $this->visibility->isPrivate();
     }
 
     /**
