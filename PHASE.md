@@ -4,288 +4,182 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 20 — the data-model additions the new screens need
+# Phase 21 — the dashboard: Overview and Household
 
-The prototype assumes six things the application does not yet record or do. They
-were decided one by one (decisions 2, 5, 8, 9, 10 and 18) and are built here,
-**before any screen is rebuilt**, so Phases 21–28 display real behaviour rather
-than inventing it. Each addition goes through the existing service and repository
-layers, the central scoping layer, the API, backup/restore and the tests — the
-same edges Phase 17 moved for payment methods.
+The prototype has two dashboards, and both are kept: **Overview** (variant A —
+what the month and year cost, what is coming, where it goes) and **Household**
+(variant B — how this month is going, who pays what, and the year against its
+budget pace). One page, two views, a toggle between them. This phase replaces the
+Phase 10 card set with the prototype's, on the Phase 18 theme inside the Phase 19
+shell.
 
-No screen is redesigned in this phase. Where an addition needs a control to be
-usable at all (a field on the existing subscription form, a toggle in the existing
-notification preferences), the control is added to the **current** page in its
-current style; the redesigned versions arrive with each screen's own phase.
+Every tile binds to a figure a service produces, and the money rules hold on
+every one of them: minor units until ICU formats them, a combined total only when
+every currency converts, and the missing currency named when one does not.
 
 ## Depends on
 
-- **P1** — the scoping layer (`AbstractScopedRepository`, `Scope`), the
-  subscription model, `is_active`.
-- **P2** — budgets and `ForecastService`, splits and their read-only widening,
-  price history and `CatchUpService`.
-- **P3** — the alert dispatcher, `notification_log`, digests, per-user routing.
-- **P5** — the API, OpenAPI, `docs/api.md`, backup/restore, the importer.
-- **P13** — `PriceChangeSource`, used to tell a real rise from a trial conversion.
-- **The Contributor role** — already built; the permission rules below include it.
+- **Phase 20** — Paused/Cancelled derivation, the cancel action (for "Cancel
+  trial"), private-row scoping, household and member budgets.
+- **Phases 10–13** — `SpendChartService`, `CategoryBreakdownService`,
+  `ForecastService`, `SpendInsightService` (price-rise rule),
+  `DashboardLayoutService` and `dashboard_cards`.
+- **Phase 2** — the year-over-year reconstruction, from which past-month spend is
+  extracted (section C).
 
 ## In scope this phase (build ONLY these)
 
-### A. "Only payer" visibility (decision 2)
+### A. The view toggle and the greeting
 
-A subscription can be marked private to its payer. It is hidden from **everyone
-else in the household, in either isolation mode**, including Owner/Admins.
+- A segmented control, **Overview / Household**, at the top of the dashboard.
+  The choice is saved per account (`users.dashboard_view`) and the dashboard
+  opens on it next time. The existing "default landing view" preference is
+  unchanged — it chooses *whether* you land on the dashboard; this chooses
+  *which* dashboard.
+- Each view has its own card list, reorder and hide, keyed by view in
+  `dashboard_cards`, so hiding a card on Overview leaves Household alone.
+- Greeting: "Welcome back, {first name}" and "Here's where {household} stands on
+  {date}" (ICU date). **No time-of-day greeting**: dates are UTC (Phase 3's known
+  limitation) and "Good afternoon" at 7am would be wrong for anyone not in UTC.
 
-- **Column** `subscriptions.visibility` — string, `household` (default) or
-  `payer`. Existing rows become `household`.
-- **Scoping.** The read predicate gains
-  `(visibility = 'household' OR owner_user_id = :viewer)`, applied **after** the
-  split-participant widening so no widening can re-expose a private row. Because
-  it lives in the one scoping layer, every consumer inherits it: the list, search,
-  stats, forecast, budgets, calendar, iCal feed, insights, the API, bulk actions,
-  tags and price-history decoration.
-- **Totals.** A private row counts only in its payer's figures. Other members'
-  household totals, budgets, forecasts and charts leave it out — its cost is not
-  visible by subtraction.
-- **No splits.** A private subscription is paid by one person. Validation rejects
-  `visibility = payer` with any split, and rejects adding a split to a private
-  row. (A split must be visible to its participants — a standing rule in
-  CLAUDE.md — so the two cannot coexist.)
-- **Alerts** for a private row go to its payer only (they already follow scope).
-- **Member removal** (Phase 15): a departing member's private rows are always
-  handled by the reassign-or-delete prompt, in SHARED as well as ISOLATED mode,
-  because nobody else can see them to take them over silently.
-- **API**: `visibility` in the payload, OpenAPI and `docs/api.md`; an absent
-  value on PUT keeps the current setting (the Phase 17 precedent).
-- **Backup**: see the open decision below.
-- **Form**: a "Visible to: Household / Only me" control on the current form;
-  choosing "Only me" disables the split control.
+### B. Overview (variant A)
 
-### B. "Paused" is the name for inactive (decision 5)
+| Card | Binds to |
+| --- | --- |
+| **Monthly spend** KPI | recurring monthly total, per-currency rule; note "N% of {budget}" only when the viewer has a monthly overall budget, else no note |
+| **Yearly run-rate** KPI | yearly normalised total at today's prices ("at today's prices" is the honest caption; the forecast lives elsewhere) |
+| **Due next 7 days** KPI | count, and the amount per currency / combined |
+| **Active** KPI | active count, with "N trials · N paused" beneath |
+| **Monthly spend chart** | six months back (reconstructed, section C) and six ahead (forecast, hatched), a line at the monthly overall budget when one exists; the busiest month picked out |
+| **Where it goes** donut | `CategoryBreakdownService`, flat categories, monthly equivalent in base currency; degrades to per-currency figures, no donut, when a currency cannot convert |
+| **Coming up** | charges and trial conversions in the next 30 days from the forecast — date tile, name, owner initials, amount in its own currency and ≈ base; links to all subscriptions |
+| **Budgets** | up to four of the viewer's monthly budgets: charged so far against projected, note (left / over / past warning / "projected over if trials convert") |
+| **Free trials** | running trials: end date, days left, who started it, what it converts to (own currency, ≈ base); **Cancel trial** (Phase 20 cancel) drawn only where `mayWriteRow` allows; empty state "No trials running" |
+| **Price change** banner | the most imminent scheduled rise from the Phase 13 price-rise rule: old → new, monthly and yearly difference, link to price history; absent when there is none — never a hardcoded subscription |
 
-No schema change. A subscription with `is_active = false` and no
-`cancelled_at` is **Paused** everywhere the interface names a state: badges, the
-status filter, the stats strip. The existing pause/resume action is renamed to
-match. A paused row stays out of recurring totals, the forecast, reminders and
-the calendar, as inactive rows already do.
+The prototype's **"Keep it"** button on trial cards is not built: keeping a
+trial is what happens when you do nothing, so a button for it has nothing to do.
 
-### C. Cancelled (decision 18)
+### C. Past spend is reconstructed, and says so
 
-A cancelled subscription is finished, unlike a paused one that may resume.
+Renovo has no ledger. The prototype's "what left the account each month" is
+therefore **reconstructed** from start dates, cycles and price history — exactly
+how year-over-year already works. That logic is extracted from the Phase 2
+year-over-year code into one `SpendHistoryService`, so the dashboard, Analytics
+(Phase 23) and Budgets (Phase 24) share it and year-over-year keeps its figures.
 
-- **Column** `subscriptions.cancelled_at` — nullable date.
-- **Cancel** (`SubscriptionService::cancel()`): sets `cancelled_at` to today and
-  `is_active` to false in one transaction. On a trial it also stops the
-  conversion: `CatchUpService` skips cancelled rows, so a cancelled trial never
-  becomes a paid subscription. Available for any subscription; the redesigned
-  screens surface it on trials first ("Cancel trial").
-- **Undo**: clearing `cancelled_at` returns the row to Paused (not Active), so an
-  accidental cancel cannot silently restart charges.
-- **Status order**, derived in one place: Cancelled → Paused → Trial → Active.
-- Cancelled rows are excluded from totals, forecast, budgets, reminders,
-  calendar and feed; listed under a **Cancelled** filter; still deletable.
-- Permission: the same as editing the subscription (`mayWriteRow`); a Viewer
-  gets 403.
-- API field `cancelled_at` (read-only in the payload; cancelling and undoing are
-  `POST /api/v1/subscriptions/{id}/cancel` and `.../uncancel`), OpenAPI and
-  `docs/api.md`; backup/restore carries it.
+- The past series is captioned **"Reconstructed from start dates and price
+  history"**, and the card states how many subscriptions were left out for having
+  no start date — the same note year-over-year gives.
+- Cancelled rows count up to `cancelled_at`; paused rows are treated as
+  year-over-year already treats inactive rows (no `paused_at` exists).
+- The six-ahead half is `ForecastService`, so the chart's future matches the
+  Forecast page month for month.
 
-### D. Plan (decision 10)
+### D. Household (variant B)
 
-- **Column** `subscriptions.plan` — nullable string, 60 ("Standard", "Family").
-- On the form, list and detail; in the API, OpenAPI, `docs/api.md`,
-  backup/restore, and as an optional mapped column in the CSV/JSON importer (a
-  plain text field, so trivial there).
+| Card | Binds to |
+| --- | --- |
+| **{Month} so far** hero | "£X **already charged** of £Y due this month" — charges in this month whose date has passed, against all charges due in it; a charged / still-due bar with a marker at the monthly household budget if one exists. Wording is deliberately "charged", not "paid": nothing confirms a payment |
+| Hero figures | **Year to date** (reconstructed) with % against the same period last year; **Next 12 months** (forecast); **Trials converting** (+monthly cost from N trials) |
+| **Next 30 days** timeline | charges placed on a 30-day axis with ticks (Today, +7, +14, +21, +30), count and total |
+| **Who pays** | each member's monthly share after splits, subscription count and % of household spend, from the split service (custom shares included) |
+| **Spent this year vs budget pace** | cumulative reconstructed spend January to now against an even pace of the household's yearly budget; shown only when a household yearly (or monthly ×12) budget exists |
+| **By category** | proportion bars, same service as the donut |
 
-### E. Budgets for a named member, and for the whole household (decision 8)
+**Who pays under ISOLATED mode** shows only what the viewer can see: their own
+share (and nothing that would reveal another member's spend). The card retitles
+itself "Your share" there rather than showing a household it cannot see. Private
+rows (Phase 20) count only for their payer.
 
-Today a budget is owned by a member and measures **that member's share**. The
-prototype's "Whose spending" adds two things: an Owner/Admin setting a budget for
-someone else, and a budget over the whole household.
+### E. What happens to the Phase 10 cards
 
-- **Column** `budgets.subject_user_id` — nullable FK to `users`. Backfilled to
-  `owner_user_id`, so every existing budget keeps measuring exactly what it did.
-  `null` means **household**: the whole household's spend, not one share.
-- **Household budgets exist only in SHARED mode.** In ISOLATED mode nobody may
-  see the whole household's spend, so the option is not offered and the service
-  refuses it; an existing household budget on an instance switched to ISOLATED
-  is shown to its owner as unavailable rather than computed from a partial view.
-- **Who may set what**: Owner/Admin and Editor — any subject (Editor only in
-  SHARED for others, since in ISOLATED they cannot see others' rows);
-  Contributor — themselves only; Viewer — none (403).
-- **Visibility**: SHARED — household-wide, as now; ISOLATED — the owner and the
-  subject.
-- **Projection** still comes from `ForecastService`, now asked for the subject's
-  share or for the household; private rows follow section A (a household budget
-  counts a private row only for the payer viewing it — so a household budget is
-  computed from the scope of whoever views it, and the alert state machine
-  evaluates it from the **owner's** scope).
-- **Alerts** go to the owner and, when different, the subject — each by their
-  own routing preferences. The existing crossing/re-arm state is unchanged.
-- API, OpenAPI, `docs/api.md` and backup/restore carry `subject_user_id`
-  (matched by email on restore, like other member references).
-
-### F. "Price change" alert type (decision 9)
-
-A new alert, on the existing dispatcher, for "a price was recorded or scheduled".
-This deliberately supersedes Phase 16's "no new alert types" for this one case.
-
-- **Fires once per price-history row** that is a genuine change: a manual price
-  edit or a newly scheduled future price. **Not** for a subscription's first
-  price, a trial conversion (`PriceChangeSource::TrialConversion`) or a bulk
-  currency conversion (the amount changed, the price did not).
-- **Occurrence key** = the price-history row id, so a re-run is silent. Sent on
-  the next scheduler run after the row is written; a scheduled rise produces one
-  alert when it is scheduled, not another when it takes effect.
-- **Recipients**: users who can see the subscription (scope decides), with the
-  alert enabled.
-- **Preferences**: a "Price changes" row in the **existing** per-user routing and
-  a toggle, default **on**, routed like renewals. Digest users get a
-  "Price changes" section in their digest.
-- New `AlertType` case, catalogue keys, and message text naming old price, new
-  price, effective date and yearly effect — in the subscription's own currency.
+- Monthly spend, yearly spend, upcoming renewals, the chart and the usage widget
+  are **replaced** by the Overview cards above; their card keys map to the new
+  ones where the meaning survives (monthly, yearly, chart, budgets).
+- The **recent subscriptions table** with its filter chips stays available as an
+  optional Overview card, **hidden by default**.
+- **Saved layouts**: see the open decision below.
 
 ## Data-model changes
 
-Migrations, sequenced after the last existing one, each with an explicit
-`down()`, verified on PostgreSQL and MySQL:
+1. `add_dashboard_view_to_users` — `dashboard_view` string(10), nullable
+   (null = `overview`).
+2. `add_view_to_dashboard_cards` — `view` string(10) not null default
+   `overview`; unique key becomes `(user_id, view, card_key)`.
 
-1. `add_visibility_to_subscriptions` — `visibility` string(10), default
-   `household`, not null.
-2. `add_cancelled_at_to_subscriptions` — nullable date, indexed.
-3. `add_plan_to_subscriptions` — nullable string(60).
-4. `add_subject_user_id_to_budgets` — nullable FK to `users`
-   (`ON DELETE CASCADE`, matching how a departing member's own budgets already
-   go), indexed; data step backfills `subject_user_id = owner_user_id`.
+Both with explicit `down()`, verified on both engines.
 
-No new table. The price-change alert reuses `notification_log`.
+## Explicitly out of scope
 
-## Explicitly out of scope (leave clean seams, do NOT stub)
+- The Subscriptions, Analytics and Budgets pages (their own phases), though they
+  reuse `SpendHistoryService`.
+- A time-of-day greeting (needs per-user time zones).
+- An in-app notification inbox (decision 6).
 
-- A `paused_at` date (pausing stays a flag; past-spend reconstruction treats
-  paused rows as Phase 2's year-over-year already does).
-- Category groups (decision 4 — categories stay flat).
-- Any screen redesign — Phases 21–28.
-- "Spend removed by cancellations" as a figure (Phase 8's "Total Savings" seam)
-  — `cancelled_at` makes it computable later; not built now.
+## Decisions & assumptions (confirmed 2026-09-24)
 
-## Decisions & assumptions (confirm or correct before build)
-
-- **Backup and private rows — decided: (b).** A backup **excludes** other
-  members' private subscriptions and states how many were left out (export
-  screen and manifest). It keeps the backup's standing rule — an archive holds
-  what the exporter can see, as ISOLATED already does — and avoids the one
-  unscoped read that would have let an Owner open a private row.
-- Cancelling is available for **every** subscription, surfaced first on trials.
-- Undoing a cancel returns the row to **Paused**, not Active.
-- Household budgets are **SHARED-mode only**.
-- The price-change alert defaults **on**.
+- **Saved layouts — reset (a).** A migration of its own clears every saved
+  layout once, so everyone starts from the new defaults; its `down()` is a
+  documented no-op (a deletion cannot be undone). Noted in the release notes.
+- **The subscriptions table is reinstated** as an optional Overview card,
+  hidden by default, under its old key `recent`. (It was retired in 530eb3a; this
+  phase brings it back as an opt-in card rather than dropping the line.)
+- **Cancelled rows stop at `cancelled_at` everywhere**, year-over-year
+  included. The extraction lands first as a pure move with the old figures
+  pinned; the cutoff follows as its own change, and changes YoY only for rows
+  that carry a `cancelled_at`.
+- **Past and future split at today.** The reconstruction covers charges
+  *before* today; the forecast covers today onwards. The current month is one
+  bar in two parts — already charged, still due — and the Household hero reads
+  the same split, so no charge is counted twice.
+- **First name** is the display name up to its first space (there is no
+  first-name field).
+- The view toggle is a web preference (CSRF-protected POST); no API route.
+- "Keep it" on trials is not built.
+- "Already charged", not "paid".
+- Who pays becomes "Your share" in ISOLATED.
+- The budget line and pace appear only when a relevant budget exists — never an
+  invented limit.
+- Built on `phase-18-theme`, after Phases 18–20.
 
 ## Status
 
-- [x] Migrations 1–4 (and 5–6, below) apply and roll back on both engines
-- [x] Visibility: column, scoping predicate after widening, no-split rule,
-      alerts, removal prompt, form control
-- [x] Paused: status derivation and labels
-- [x] Cancelled: cancel/undo service + routes, catch-up skip, exclusions,
-      Cancelled filter
-- [x] Plan: column, form, list, importer mapping
-- [x] Budget subject: column + backfill, household (SHARED) and member
-      subjects, permissions, alert recipients
-- [x] Price-change alert: type, finder, idempotency, preferences row, digest
-      section
-- [x] API + OpenAPI + `docs/api.md` for visibility, cancelled_at (+ cancel /
-      uncancel), plan; coverage tests green (`subject_user_id` has no API —
-      there is no budgets endpoint)
-- [x] Backup/restore carries all four columns
-- [x] New strings in `translations/en.php`
-- [x] `composer check`, `i18n:check`, API coverage green on both engines
-
-## Built as approved, with these decisions
-
-- **Two more migrations.** `saveRoutes` deliberately never subscribes anybody
-  to a new alert type, so "default on, routed like renewals" needed both a
-  place for the toggle and routes to exist:
-  `add_price_change_alerts_to_notification_preferences` (boolean, default
-  true) and `copy_renewal_routes_to_price_change` (each renewal route gains a
-  price-change sibling; idempotent; `down()` deletes them). A preferences save
-  that does not name the toggle keeps it.
-- **Budgets: nobody measures another member in ISOLATED mode**, Owner/Admins
-  included — reads there are fenced by mode, not role, so the spec's reason for
-  excluding Editors applies to everybody. A budget set for somebody else before
-  a switch to ISOLATED shows its owner "unavailable", is visible to its subject
-  through a read-only widening on `BudgetRepository`, and is not evaluated for
-  alerts (its state row belongs to the owner, who cannot measure it).
-- **Budget alerts.** The crossing is evaluated once, in the owner's run and
-  scope; a subject who is not the owner is sent the recorded crossing in their
-  own run, keyed on its date. A subject whose run precedes the owner's hears on
-  the next run. A household budget's breach goes to its owner only.
-- **The owner of a budget is whoever set it.** The form's picker is now "Whose
-  spending" (`subject_user_id`: a member, `household`, or absent); an edit no
-  longer moves the owner, and a form without the picker keeps the subject.
-  The dashboard's usage card shows the budget whose *subject* is the viewer.
-- **"Only me" means the actor.** Allowed only when the owner is the person
-  saving it, the payer is unset or the owner, and the row is not split. A
-  restore may put a private row back with the member it belonged to.
-- **Privacy applies to writes too.** The clause is AND-ed onto the write
-  predicate as well as the read one, so bulk actions, pause, cancel and delete
-  cannot reach another member's private row. Price history and attachments
-  follow their subscription through a `NOT EXISTS` on the parent.
-- **The web list hides cancelled rows by default**; a new Status filter (All /
-  Active / Trial / Paused / Cancelled) finds them. The API keeps `inactive=1`
-  meaning paused *and* cancelled, gains a `status` parameter, and the resource
-  gains a read-only `status`. The strip's "Paused" figure excludes cancelled
-  rows, and the list's Pause/Resume labels now come from the catalogue.
-- **Cancel** is on every row (labelled "Cancel trial" on a trial), with a
-  confirm; a cancelled row offers "Undo cancel" instead of Pause/Resume.
-  Resume, a form or API save, a bulk resume and an import cannot reactivate a
-  cancelled row.
-- **Member removal.** In SHARED mode a departing member's private rows get
-  their own reassign-or-delete question; reassigned, they stay private (to the
-  new owner) and lose a payer. Budgets that measure the departing member are
-  deleted, whoever set them; budgets they set for others or the household move
-  to the admin like every other row.
-- **Price-change digests** include only changes recorded since the user's
-  previous *delivered* digest (from the ledger), so a change is never in two
-  digests and a digest that failed does not swallow what it carried; with no
-  delivered digest yet, a month back. Immediate users look back seven days and
-  the ledger makes each change once — which also means the first run after
-  upgrading announces manual and scheduled edits from the previous week.
-- **The "Visible to" control** is a `role="radiogroup"` rather than a nested
-  fieldset, which `SubscriptionFormLayoutTest` forbids; a `.group-label` class
-  styles its name as a label.
-- **Not done:** demo seed and dev-setup sample data do not yet use plans,
-  private rows or cancellations; a private row restored for another member
-  loses its attachments (the restorer cannot write to it).
+- [ ] Migrations 1–2
+- [ ] View toggle, saved per account; per-view card lists
+- [ ] `SpendHistoryService` extracted from year-over-year (YoY figures unchanged)
+- [ ] Overview: four KPIs, spend chart (reconstructed + forecast + budget line),
+      donut with degrade, coming up, budgets, free trials with Cancel trial,
+      price-change banner
+- [ ] Household: month-so-far hero, hero figures, 30-day timeline, who pays
+      (scoped), year vs budget pace, by category
+- [ ] Phase 10 cards mapped/retired; subscriptions table optional
+- [ ] Narrow layout: one column, charts legible at 390px
+- [ ] New strings in `translations/en.php`
+- [ ] `composer check`, `i18n:check` green on both engines
 
 ## Definition of done
 
-Migrations apply and roll back; a private subscription is invisible to every
-other member in both modes and absent from their totals; paused and cancelled are
-distinct, correctly derived and correctly excluded; a cancelled trial never
-converts; plan round-trips; budgets can measure a named member or (in SHARED) the
-household; a price change sends exactly one alert; the API and backup carry every
-new field; all gates green on both engines. Then update `PHASE.md` to the next
-phase.
+Both views render real figures only, in all palettes × themes, wide and narrow;
+the chart's future half equals the Forecast page and its past half equals
+`SpendHistoryService`; every money figure follows the per-currency rule including
+the withheld total; nothing on either view reveals a private row or, in ISOLATED,
+another member's spend; the toggle and per-view layouts persist; the gates pass
+on both engines. Then update `PHASE.md` to the next phase.
 
 ## Tests
 
-- **Visibility:** another member — Owner/Admin, Editor, Contributor, Viewer —
-  cannot list, find, search, total, forecast, calendar, feed or API-read a
-  private row, in SHARED and ISOLATED; the payer can. A private row cannot gain
-  a split and a split row cannot become private. Split widening does not expose a
-  private row (fails without the predicate ordering).
-- **Totals:** a household total viewed by a non-payer equals the total without
-  the private row.
-- **Cancelled:** cancelling a trial stops conversion on the next catch-up;
-  undo returns Paused; cancelled rows leave totals, forecast, budgets, reminders
-  and calendar; status derivation order holds; Viewer 403.
-- **Plan:** persists through form, API, import and backup.
-- **Budgets:** backfill leaves existing projections unchanged; a member budget
-  measures the subject's share; a household budget is refused in ISOLATED;
-  Contributor cannot set one for another member; alerts reach owner and subject.
-- **Price change:** exactly one alert per genuine change; none for first price,
-  trial conversion or currency conversion; re-run sends nothing; routing and the
-  toggle are honoured; digest aggregation includes it.
-- **Regression:** the Phase 2/3 suites (splits, catch-up, budget de-dup/re-arm,
-  idempotency) stay green.
+- Year-over-year figures are identical before and after the extraction.
+- The chart's forecast months equal `ForecastService::monthly()`; its past months
+  equal `SpendHistoryService` and carry the excluded count.
+- Per-currency: with an unconvertible currency the KPIs show subtotals and no
+  combined figure, and the chart and donut are withheld with the currency named.
+- "Already charged" counts only charges dated before today in the current month.
+- Who pays: ISOLATED shows only the viewer's own share; a private row is absent
+  for non-payers; custom split weights are honoured.
+- Cancel trial is drawn only where the viewer may write the row, and a forged
+  POST from one who may not is refused.
+- The price banner is absent with no scheduled rise and names the right one with
+  several.
+- The view choice persists; hiding a card in one view does not affect the other.
+- `AccessibilityTest` passes for both views; one primary action per screen.
