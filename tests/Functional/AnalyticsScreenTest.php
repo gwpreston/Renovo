@@ -19,6 +19,7 @@ use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Service\ForecastService;
 use App\Service\PriceHistoryService;
+use App\Service\SpendHistoryService;
 use App\Service\StatsService;
 use App\Support\MoneyFormatter;
 use App\Tests\Integration\DatabaseTestCase;
@@ -746,7 +747,7 @@ final class AnalyticsScreenTest extends DatabaseTestCase
         // itself: the point of the note is that the page reports what was
         // actually left out.
         $excluded = $this->container()
-            ->get(StatsService::class)
+            ->get(SpendHistoryService::class)
             ->yearOverYear($this->scopeFor($this->ownerId))['excluded_count'];
 
         self::assertGreaterThan(0, $excluded, 'the fixture should leave something out of the comparison');

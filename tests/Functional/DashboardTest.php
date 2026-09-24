@@ -19,6 +19,7 @@ use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Service\BudgetService;
 use App\Service\InstanceSettingsService;
+use App\Service\SpendHistoryService;
 use App\Service\StatsService;
 use App\Support\MoneyFormatter;
 use App\Tests\Integration\DatabaseTestCase;
@@ -37,7 +38,7 @@ use Symfony\Component\Mailer\MailerInterface;
  * The claim this phase makes is that every tile binds to a figure a service
  * already produces — so these assert the binding rather than the arithmetic,
  * which the forecast's and the budget's own tests already cover. The chart is
- * checked against the reconstruction `StatsService` walks, because "the
+ * checked against the reconstruction `SpendHistoryService` walks, because "the
  * dashboard and the Analytics page cannot disagree" is only true if it is the
  * same call.
  *
@@ -477,7 +478,7 @@ final class DashboardTest extends DatabaseTestCase
         $container = $this->app->getContainer();
         self::assertNotNull($container);
 
-        $months = $container->get(StatsService::class)->monthlyHistory(
+        $months = $container->get(SpendHistoryService::class)->monthly(
             $this->scopeFor($this->ownerId),
         );
 

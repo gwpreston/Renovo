@@ -38,6 +38,7 @@ final class AnalyticsScreenService
 {
     public function __construct(
         private readonly StatsService $stats,
+        private readonly SpendHistoryService $history,
         private readonly ForecastService $forecast,
         private readonly SpendChartService $spendChart,
         private readonly CategoryBreakdownService $breakdown,
@@ -113,12 +114,12 @@ final class AnalyticsScreenService
             // household answers both — over twelve calendar months here and a
             // rolling year there, which is why the totals are close rather
             // than equal.
-            'history' => $this->spendChart->fromHistory($this->stats->monthlyHistory($scope)),
+            'history' => $this->spendChart->fromHistory($this->history->monthly($scope)),
             'categories' => $breakdown + ['donut' => $this->donut($breakdown)],
             // The same breakdown and the same degrade, grouped by what each
             // subscription is paid with rather than what it is for.
             'payment_methods' => $byMethod + ['donut' => $this->donut($byMethod)],
-            'year_over_year' => $this->stats->yearOverYear($scope),
+            'year_over_year' => $this->history->yearOverYear($scope),
             'notable' => $this->notable($all),
             // After the catch-up, like everything else here: insights read
             // prices and trial states that are already up to date, so the card

@@ -55,6 +55,7 @@ final class DashboardService
 
     public function __construct(
         private readonly StatsService $stats,
+        private readonly SpendHistoryService $history,
         private readonly ForecastService $forecast,
         private readonly BudgetService $budgets,
         private readonly SubscriptionService $subscriptions,
@@ -89,11 +90,11 @@ final class DashboardService
             'stats' => $stats,
             'metrics' => $this->metrics($stats, $soon, $months),
             // The year behind, drawn by the same builder the Analytics page's
-            // trajectory uses and reconstructed by `StatsService` from the same
+            // trajectory uses and reconstructed by `SpendHistoryService` from the same
             // walk its year-over-year card reads — so the two price a given past
             // charge identically, even though their windows differ (twelve
             // calendar months here, a rolling year there).
-            'history' => $this->spendChart->fromHistory($this->stats->monthlyHistory($scope)),
+            'history' => $this->spendChart->fromHistory($this->history->monthly($scope)),
             'usage' => $this->usage($scope, $stats),
             // Who carries what, from the same service the household screen
             // reads, so the card and the page cannot put different figures

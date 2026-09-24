@@ -25,6 +25,7 @@ use App\Service\ExchangeRate\FrankfurterProvider;
 use App\Service\ExchangeRateService;
 use App\Service\InstanceSettingsService;
 use App\Service\PriceHistoryService;
+use App\Service\SpendHistoryService;
 use App\Service\SplitService;
 use App\Service\StatsService;
 use App\Service\SubscriptionService;
@@ -47,6 +48,7 @@ final class YearOverYearTest extends DatabaseTestCase
     private SubscriptionRepository $subscriptions;
     private PriceHistoryService $priceHistory;
     private StatsService $stats;
+    private SpendHistoryService $history;
 
     private int $alice;
     private int $household;
@@ -121,7 +123,15 @@ final class YearOverYearTest extends DatabaseTestCase
             $catchUp,
             $rates,
             $settings,
+            $clock,
+        );
+
+        $this->history = new SpendHistoryService(
+            $subscriptionService,
             $historyRepository,
+            $this->stats,
+            $rates,
+            $settings,
             $clock,
         );
     }
@@ -131,7 +141,7 @@ final class YearOverYearTest extends DatabaseTestCase
         // £10 a month since well before the window: twelve charges in each year.
         $this->createMonthly('Streaming', 1000, '2023-06-15');
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         self::assertSame(12000, $yoy['current']['amount_minor']);
         self::assertSame(12000, $yoy['previous']['amount_minor']);
@@ -165,7 +175,7 @@ final class YearOverYearTest extends DatabaseTestCase
             new DateTimeImmutable('2025-07-01'),
         );
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         self::assertSame(24000, $yoy['current']['amount_minor']);
         self::assertSame(12000, $yoy['previous']['amount_minor']);
@@ -179,7 +189,7 @@ final class YearOverYearTest extends DatabaseTestCase
         // June inclusive, so seven of them, and nothing in the earlier window.
         $this->createMonthly('New thing', 1000, '2025-12-15');
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         self::assertSame(7000, $yoy['current']['amount_minor']);
         self::assertSame(0, $yoy['previous']['amount_minor']);
@@ -202,7 +212,7 @@ final class YearOverYearTest extends DatabaseTestCase
             'is_active' => true,
         ], []);
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         self::assertSame(0, $yoy['current']['amount_minor']);
         self::assertSame(0, $yoy['previous']['amount_minor']);
@@ -217,7 +227,7 @@ final class YearOverYearTest extends DatabaseTestCase
         // cheap in hindsight.
         $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false);
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         self::assertSame(12000, $yoy['current']['amount_minor']);
         self::assertSame(12000, $yoy['previous']['amount_minor']);
@@ -237,7 +247,7 @@ final class YearOverYearTest extends DatabaseTestCase
             'is_active' => true,
         ], []);
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         self::assertSame(1500, $yoy['current']['amount_minor']);
         self::assertSame(1500, $yoy['previous']['amount_minor']);
@@ -248,7 +258,7 @@ final class YearOverYearTest extends DatabaseTestCase
         $this->createMonthly('Sterling', 1000, '2023-06-15');
         $this->createMonthly('Euro', 1200, '2023-06-15', currency: 'EUR');
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         // €12.00 at 1.20 is £10.00, so £20 a month, £240 a year.
         self::assertSame(24000, $yoy['current']['amount_minor']);
@@ -259,7 +269,7 @@ final class YearOverYearTest extends DatabaseTestCase
         $this->createMonthly('Sterling', 1000, '2023-06-15');
         $this->createMonthly('Exotic', 5000, '2023-06-15', currency: 'XOF');
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         self::assertNull($yoy['current']['amount_minor']);
         self::assertNull($yoy['change_minor']);
@@ -276,11 +286,78 @@ final class YearOverYearTest extends DatabaseTestCase
         // year and overstate the recent side of every comparison.
         $this->createMonthly('On the boundary', 1000, '2024-06-15');
 
-        $yoy = $this->stats->yearOverYear($this->scope());
+        $yoy = $this->history->yearOverYear($this->scope());
 
         // Twelve charges each, not twelve and thirteen.
         self::assertSame(12000, $yoy['current']['amount_minor']);
         self::assertSame(12000, $yoy['previous']['amount_minor']);
+    }
+
+    /**
+     * The whole comparison, pinned across a mixed household.
+     *
+     * Written when the reconstruction moved out of `StatsService` into
+     * `SpendHistoryService`, and run against both sides of that move: every
+     * field of the result — both windows, the change, the per-currency detail
+     * and the excluded count — came out identical. The cases above each pin one
+     * rule; this pins them all together, so a later change to any one of them
+     * shows up here as well.
+     */
+    public function testTheWholeComparisonIsPinnedAcrossAMixedHousehold(): void
+    {
+        $this->createMonthly('Steady', 1000, '2023-06-15');
+        $this->createMonthly('Euro', 1200, '2023-06-15', currency: 'EUR');
+        $this->createMonthly('Paused', 500, '2023-06-15', isActive: false);
+
+        $risen = $this->createMonthly('Risen', 2000, '2023-06-15');
+        $this->priceHistory->recordInitialPrice(
+            $this->scope(),
+            $risen,
+            Money::of(1000, 'GBP'),
+            new DateTimeImmutable('2023-06-15'),
+            $this->alice,
+        );
+        $this->priceHistory->recordCurrentPrice(
+            $this->scope(),
+            $risen,
+            Money::of(2000, 'GBP'),
+            \App\Domain\PriceChangeSource::Manual,
+            $this->alice,
+            null,
+            new DateTimeImmutable('2025-07-01'),
+        );
+
+        $this->subscriptions->create($this->scope(), [
+            'name' => 'Domain',
+            'price_minor' => 1500,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'yearly',
+            'next_payment_date' => '2027-03-10',
+            'start_date' => '2022-03-10',
+            'anchor_day' => 10,
+            'is_active' => true,
+        ], []);
+
+        $this->subscriptions->create($this->scope(), [
+            'name' => 'Undated',
+            'price_minor' => 900,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-07-01',
+            'is_active' => true,
+        ], []);
+
+        self::assertSame([
+            'current' => ['currency' => 'GBP', 'amount_minor' => 55500, 'unconvertible' => []],
+            'previous' => ['currency' => 'GBP', 'amount_minor' => 43500, 'unconvertible' => []],
+            'change_minor' => 12000,
+            'change_percent' => 28,
+            'current_by_currency' => ['EUR' => 14400, 'GBP' => 43500],
+            'previous_by_currency' => ['EUR' => 14400, 'GBP' => 31500],
+            'excluded_count' => 1,
+        ], $this->history->yearOverYear($this->scope()));
     }
 
     public function testPerPeriodFiguresAlwaysMultiplyUpToTheYearlyOne(): void

@@ -27,6 +27,7 @@ use App\Service\ExchangeRateService;
 use App\Service\InstanceSettingsService;
 use App\Service\PriceHistoryService;
 use App\Service\SpendChartService;
+use App\Service\SpendHistoryService;
 use App\Service\StatsService;
 use App\Service\SubscriptionService;
 use App\Service\TrialService;
@@ -60,6 +61,7 @@ final class SpendHistoryTest extends DatabaseTestCase
     private SubscriptionRepository $subscriptions;
     private PriceHistoryService $priceHistory;
     private StatsService $stats;
+    private SpendHistoryService $history;
     private SpendChartService $chart;
 
     private int $alice;
@@ -136,7 +138,15 @@ final class SpendHistoryTest extends DatabaseTestCase
             $catchUp,
             $rates,
             $settings,
+            $clock,
+        );
+
+        $this->history = new SpendHistoryService(
+            $subscriptionService,
             $historyRepository,
+            $this->stats,
+            $rates,
+            $settings,
             $clock,
         );
 
@@ -151,7 +161,7 @@ final class SpendHistoryTest extends DatabaseTestCase
 
     public function testTheWindowIsTwelveCalendarMonthsEndingWithThisOne(): void
     {
-        $months = $this->stats->monthlyHistory($this->scope());
+        $months = $this->history->monthly($this->scope());
 
         self::assertCount(12, $months);
         self::assertSame('2025-07', $months[0]['month']);
@@ -164,7 +174,7 @@ final class SpendHistoryTest extends DatabaseTestCase
         // charge has already been taken: twelve of them, one per bucket.
         $this->createMonthly('Streaming', 1000, '2023-06-15');
 
-        $months = $this->stats->monthlyHistory($this->scope());
+        $months = $this->history->monthly($this->scope());
 
         self::assertSame(
             array_fill(0, 12, 1000),
@@ -188,7 +198,7 @@ final class SpendHistoryTest extends DatabaseTestCase
             'is_active' => true,
         ], []);
 
-        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         self::assertSame(12000, $byMonth['2026-03']);
         self::assertSame(0, $byMonth['2026-02']);
@@ -219,7 +229,7 @@ final class SpendHistoryTest extends DatabaseTestCase
             new DateTimeImmutable('2026-01-01'),
         );
 
-        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         self::assertSame(1000, $byMonth['2025-12']);
         self::assertSame(2000, $byMonth['2026-01']);
@@ -231,7 +241,7 @@ final class SpendHistoryTest extends DatabaseTestCase
         // cancellation look cheaper in hindsight than they were.
         $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false);
 
-        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         self::assertSame(1000, $byMonth['2025-09']);
     }
@@ -256,7 +266,7 @@ final class SpendHistoryTest extends DatabaseTestCase
             array_fill(0, 12, 0),
             array_map(
                 static fn (array $month): ?int => $month['combined_minor'],
-                $this->stats->monthlyHistory($this->scope()),
+                $this->history->monthly($this->scope()),
             ),
         );
     }
@@ -266,7 +276,7 @@ final class SpendHistoryTest extends DatabaseTestCase
         $this->createMonthly('Sterling', 1000, '2023-06-15');
         $this->createMonthly('Exotic', 5000, '2023-06-15', currency: 'XOF');
 
-        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
+        $chart = $this->chart->fromHistory($this->history->monthly($this->scope()));
 
         self::assertFalse($chart['is_drawable']);
         self::assertSame(['XOF'], $chart['unconvertible']);
@@ -282,7 +292,7 @@ final class SpendHistoryTest extends DatabaseTestCase
     {
         $this->createMonthly('Streaming', 1000, '2023-06-15');
 
-        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
+        $chart = $this->chart->fromHistory($this->history->monthly($this->scope()));
 
         self::assertSame(11, $chart['partial_index']);
         self::assertFalse($chart['months'][0]['is_partial']);
@@ -313,7 +323,7 @@ final class SpendHistoryTest extends DatabaseTestCase
             'converts_to_price_minor' => 1500,
         ], []);
 
-        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
+        $chart = $this->chart->fromHistory($this->history->monthly($this->scope()));
 
         self::assertFalse($chart['has_trials']);
         foreach ($chart['months'] as $month) {
@@ -329,7 +339,7 @@ final class SpendHistoryTest extends DatabaseTestCase
      */
     public function testTheForecastStillTreatsItsOpeningMonthAsThePartOne(): void
     {
-        $chart = $this->chart->fromMonths($this->stats->monthlyHistory($this->scope()));
+        $chart = $this->chart->fromMonths($this->history->monthly($this->scope()));
 
         self::assertSame(0, $chart['partial_index']);
     }
@@ -338,7 +348,7 @@ final class SpendHistoryTest extends DatabaseTestCase
     {
         $this->createMonthly('Euro', 1200, '2023-06-15', currency: 'EUR');
 
-        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         // €12.00 at 1.20 is £10.00.
         self::assertSame(1000, $byMonth['2026-02']);
