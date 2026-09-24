@@ -1,6 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('members.remove_heading', { 'name': member.displayName }) }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.member_remove') }}{% endblock %}
 
 {% block content %}
     <section class="card">

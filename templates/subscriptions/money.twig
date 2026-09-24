@@ -5,6 +5,7 @@
 {% block title %}{{ subscription.name }} — {{ t('subscriptions_money.title') }} — {{ instance_name }}{% endblock %}
 
 {% block heading %}{{ subscription.name }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.money') }}{% endblock %}
 
 {% block page_actions %}
     {% if can(scope, 'subscription.update') and can_edit_row(scope, subscription) %}

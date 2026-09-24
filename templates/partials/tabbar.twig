@@ -1,0 +1,64 @@
+{#
+    The rail, below 768px: a bottom tab bar — Home, Subs, Add, Analytics,
+    More — and a sheet holding everything else.
+
+    `<details>` rather than a scripted drawer on purpose. It opens and closes
+    with no JavaScript at all, the browser handles the keyboard, and what is
+    inside it is the same list of links the rail draws — so a phone with the
+    bundle blocked still reaches every page the desktop does. The sheet leads
+    with the household label and the user card, which are the rail's too.
+
+    The summary carries the active marker when the page you are on is one of
+    the ones the sheet holds, so a narrow screen says where you are without
+    being opened.
+
+    Add sits in the middle, raised. Like the top bar's it wears the secondary
+    fill: on a phone the page's own action is on screen beside it, and that is
+    the one that takes the accent.
+
+    `nav`    the Navigation for this page
+    `shell`  the ShellContext, or null
+#}
+{% set can_add = can(scope, 'subscription.create') %}
+<nav class="tabbar" aria-label="{{ t('nav.primary') }}">
+    <ul class="tabbar-list">
+        {% for link in nav.tabs %}
+            <li>
+                <a class="tabbar-link{{ link.active ? ' is-active' : '' }}"
+                   href="{{ link.href }}"
+                   {{ link.active ? 'aria-current="page"' : '' }}>
+                    {{ icon(link.icon, 'nav-icon') }}
+                    <span class="tabbar-label">{{ t(link.tabLabelKey) }}</span>
+                </a>
+            </li>
+
+            {% if loop.index == 2 and can_add %}
+                <li>
+                    <a class="tabbar-add" href="/subscriptions/new" data-opens-dialog="quick-add">
+                        <span class="tabbar-add-button">{{ icon('add', 'nav-icon') }}</span>
+                        <span class="tabbar-label">{{ t('nav.tab_add') }}</span>
+                    </a>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        <li>
+            <details class="tabbar-more{{ nav.drawerHoldsActive ? ' is-active' : '' }}">
+                <summary class="tabbar-link">
+                    {{ icon('more', 'nav-icon') }}
+                    <span class="tabbar-label">{{ t('nav.more') }}</span>
+                </summary>
+
+                <div class="tabbar-drawer">
+                    {% if shell and shell.household %}
+                        {% include 'partials/household_label.twig' with {'household': shell.household} only %}
+                    {% endif %}
+
+                    {% include 'partials/user_card.twig' with {'account': nav.account, 'user': current_user} only %}
+
+                    {% include 'partials/nav_links.twig' with {'links': nav.drawer} only %}
+                </div>
+            </details>
+        </li>
+    </ul>
+</nav>

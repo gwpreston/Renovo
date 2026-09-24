@@ -39,6 +39,7 @@
         "forecast": "chart-line",
         "groups": "layers",
         "household": "users",
+        "home": "house",
         "info": "info",
         "key": "key-round",
         "light": "sun",

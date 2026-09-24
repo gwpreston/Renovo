@@ -1,6 +1,15 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.subscriptions') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.subscriptions') }}{% endblock %}
+
+{#
+    Cancel-by is this list read by one date, and has no rail row of its own:
+    the rail lights Subscriptions while you are on it, and this is the way there.
+#}
+{% block page_actions %}
+    <a class="button button-quiet" href="/cancellations">{{ icon('cancellations', 'nav-icon') }}{{ t('nav.cancellations') }}</a>
+{% endblock %}
 
 {% block content %}
     {#

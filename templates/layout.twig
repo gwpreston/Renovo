@@ -156,8 +156,14 @@
 #}
 {% if current_user %}
     {% set nav = navigation(scope, current_path) %}
+    {#
+        The shell's three reads — the household label, the Subscriptions
+        badge, the bell's dot — and the rates chip, assembled once for the
+        rail, the top bar and the tab bar to share. See ShellService.
+    #}
+    {% set shell = scope ? shell(scope) : null %}
 
-    {% include 'partials/sidebar.twig' %}
+    {% include 'partials/rail.twig' %}
 
     <header class="topbar">
         <div class="topbar-lead">
@@ -168,7 +174,20 @@
                 </svg>
             </a>
 
-            <h1 class="topbar-title">{% block heading %}{{ instance_name }}{% endblock %}</h1>
+            <div class="topbar-heading">
+                <h1 class="topbar-title">{% block heading %}{{ instance_name }}{% endblock %}</h1>
+
+                {#
+                    A short line under the title, catalogued and static. A
+                    subtitle that carries figures ("12 tracked · £182/mo")
+                    belongs to the page's own rebuild, where the per-currency
+                    rule can be kept; this phase gives each page words only.
+                    Hidden below 900px, where the title needs the room.
+                #}
+                {% if block('page_subtitle') is defined %}
+                    <p class="topbar-subtitle">{{ block('page_subtitle') }}</p>
+                {% endif %}
+            </div>
 
             {#
                 What this particular page offers: editing the thing being
@@ -179,7 +198,7 @@
             <div class="topbar-page-actions">{% block page_actions %}{% endblock %}</div>
         </div>
 
-        {% include 'partials/topbar_actions.twig' %}
+        {% include 'partials/topbar.twig' %}
     </header>
 {% elseif auth_chrome %}
     {#
@@ -247,7 +266,7 @@
 </footer>
 
 {% if current_user %}
-    {% include 'partials/mobile_nav.twig' %}
+    {% include 'partials/tabbar.twig' %}
     {% include 'partials/dialogs.twig' %}
 {% endif %}
 </body>

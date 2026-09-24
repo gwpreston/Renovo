@@ -1,5 +1,5 @@
 /**
- * Keyboard shortcuts and the quick-add dialog.
+ * Keyboard shortcuts, the quick-add dialog and the top bar's theme toggle.
  *
  * Framework-free, and nothing here is load-bearing: every shortcut is a link
  * or a form that also works by clicking it, so a browser with this file blocked
@@ -105,10 +105,30 @@
      * page's own is what somebody pressing `/` means, so the one inside <main>
      * wins and the bar's is the fallback everywhere else.
      */
+    /*
+     * The page's own filter first, then the top bar's — whichever is actually
+     * on screen. The top bar's is hidden below 1100px, and focusing a hidden
+     * field does nothing, so on a narrow page with no filter of its own `/`
+     * goes to the list's search instead of being swallowed.
+     */
     function focusSearch() {
-        var search = document.querySelector('main input[type="search"]')
-            || document.querySelector('input[type="search"]');
+        var candidates = document.querySelectorAll('main input[type="search"], input[type="search"]');
+        var search = null;
+
+        for (var i = 0; i < candidates.length; i += 1) {
+            if (candidates[i].getClientRects().length > 0) {
+                search = candidates[i];
+                break;
+            }
+        }
+
         if (!search) {
+            if (document.querySelector('.topbar-search')) {
+                window.location.href = '/subscriptions';
+
+                return true;
+            }
+
             return false;
         }
 
@@ -179,6 +199,67 @@
             if (element && element.open) {
                 element.close();
             }
+        }
+    });
+    /*
+     * The theme toggle. Without this file it is a plain form posting the
+     * opposite of the account's setting, and the server sends the reader back.
+     * With it, two things improve.
+     *
+     * An account on "system" is showing whatever the machine asks for, which
+     * the server could not know when it wrote the form, so the form is told
+     * the opposite of what is actually on screen before anybody presses it.
+     *
+     * And htmx posts it in place: the server answers with a `renovo:theme`
+     * event naming what it saved, and the root's attribute changes under the
+     * reader with nothing reloaded. The icon follows by itself — the
+     * stylesheet shows whichever matches the root.
+     */
+    var darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+    function showing() {
+        var theme = document.documentElement.dataset.theme;
+        if (theme === 'light' || theme === 'dark') {
+            return theme;
+        }
+
+        return darkQuery && darkQuery.matches ? 'dark' : 'light';
+    }
+
+    function readyToggles() {
+        var next = showing() === 'dark' ? 'light' : 'dark';
+        var forms = document.querySelectorAll('.theme-toggle');
+
+        for (var i = 0; i < forms.length; i += 1) {
+            var form = forms[i];
+            var label = next === 'dark' ? form.dataset.labelDark : form.dataset.labelLight;
+            var input = form.querySelector('input[name="theme"]');
+            var button = form.querySelector('button');
+            var text = form.querySelector('[data-theme-toggle-label]');
+
+            if (input) {
+                input.value = next;
+            }
+            if (button && label) {
+                button.title = label;
+            }
+            if (text && label) {
+                text.textContent = label;
+            }
+        }
+    }
+
+    readyToggles();
+
+    if (darkQuery && darkQuery.addEventListener) {
+        darkQuery.addEventListener('change', readyToggles);
+    }
+
+    document.body.addEventListener('renovo:theme', function (event) {
+        var theme = event.detail && event.detail.theme;
+        if (theme === 'light' || theme === 'dark' || theme === 'system') {
+            document.documentElement.dataset.theme = theme;
+            readyToggles();
         }
     });
 }());

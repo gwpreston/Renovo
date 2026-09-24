@@ -1,6 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ budget_id ? t('budgets_form.edit_title') : t('budgets.new_budget') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.budget_form') }}{% endblock %}
 
 {% block content %}
 

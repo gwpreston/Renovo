@@ -79,8 +79,12 @@ final class ThemeContrastTest extends TestCase
         // hover tint and on the active fill; the quieter inks only on the rail.
         'rail-ink' => ['rail', 'rail-tint:rail', 'rail-active:rail'],
         'rail-text' => ['rail', 'rail-tint:rail', 'rail-active:rail'],
-        'rail-muted' => ['rail'],
+        // The household label's second line sits on the label's tint.
+        'rail-muted' => ['rail', 'rail-tint:rail'],
         'rail-faint' => ['rail'],
+        // Accent-coloured text on the rail: the tagline under the brand, and
+        // the Subscriptions count on its active-fill pill.
+        'rail-accent' => ['rail', 'rail-active:rail'],
         'rail-bad' => ['rail'],
         'rail-info' => ['rail'],
     ];

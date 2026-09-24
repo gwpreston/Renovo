@@ -1,6 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.dashboard') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.dashboard') }}{% endblock %}
 
 {% block content %}
     {% if not scope.hasHousehold %}

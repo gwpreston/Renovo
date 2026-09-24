@@ -24,20 +24,26 @@ namespace App\Domain;
 final class NavItem
 {
     /**
+     * @param non-empty-string $id         A stable name for the item, for the
+     *                                     shell to hang things on (the badge).
      * @param non-empty-string $labelKey   Catalogue key for the visible label.
      * @param non-empty-string $href       Where the item goes.
      * @param non-empty-string $icon       A key of `assets/theme/icons.json`.
      * @param list<string> $matches        Paths for which this item is the active one.
      * @param Permission|null $permission  What a user must be allowed to do to see it.
      * @param bool $tab                    Whether it is one of the narrow screen's tabs.
+     * @param non-empty-string|null $tabLabelKey  A shorter label for a tab, where the
+     *                                     rail's would not fit ("Subs").
      */
     public function __construct(
+        public readonly string $id,
         public readonly string $labelKey,
         public readonly string $href,
         public readonly string $icon,
         public readonly array $matches = [],
         public readonly ?Permission $permission = null,
         public readonly bool $tab = false,
+        public readonly ?string $tabLabelKey = null,
     ) {
     }
 

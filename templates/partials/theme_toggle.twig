@@ -1,0 +1,37 @@
+{#
+    Light ↔ dark, saved to the account.
+
+    A form, so it works with no script: it posts the opposite of the account's
+    setting and the server sends the reader back to the page they were on.
+    With htmx the same post swaps the root's `data-theme` in place — see the
+    `renovo:theme` handler in app.js — and nothing reloads.
+
+    An account on "system" is the one case the server cannot settle, because
+    only the browser knows what the system is showing. The form says "dark"
+    for it, and the script corrects that to the opposite of whatever is
+    actually on screen before it is sent. Choosing "system" again is on the
+    profile page, which is where all three states are offered.
+
+    Both icons are in the markup and the stylesheet shows the one that
+    matches what the page is wearing, including under "system", so the icon is
+    right on first paint with no script.
+
+    `user`       the signed-in User
+    `return_to`  the path to come back to
+#}
+{% set theme = user.themePreference().value %}
+{% set next = theme == 'dark' ? 'light' : 'dark' %}
+{% set label = next == 'dark' ? t('shell.theme_to_dark') : t('shell.theme_to_light') %}
+<form class="theme-toggle" method="post" action="/profile/theme"
+      hx-post="/profile/theme" hx-swap="none"
+      data-label-light="{{ t('shell.theme_to_light') }}"
+      data-label-dark="{{ t('shell.theme_to_dark') }}">
+    {{ csrf_field() }}
+    <input type="hidden" name="theme" value="{{ next }}">
+    <input type="hidden" name="return" value="{{ return_to }}">
+    <button type="submit" class="icon-button" title="{{ label }}">
+        {{ icon('dark', 'icon-button-icon theme-toggle-dark') }}
+        {{ icon('light', 'icon-button-icon theme-toggle-light') }}
+        <span class="visually-hidden" data-theme-toggle-label>{{ label }}</span>
+    </button>
+</form>

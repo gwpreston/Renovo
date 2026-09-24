@@ -34,8 +34,9 @@ final class NavigationTest extends TestCase
     /**
      * Every path the shell can be rendered on, and the item it belongs to.
      *
-     * A null expectation means no item claims it: a page that is reached from
-     * somewhere rather than navigated to.
+     * The user card is an item here like any rail row — `nav.profile` — so
+     * "exactly one" counts it too. A null expectation means no item claims
+     * the path.
      *
      * @return array<string, array{0: string, 1: string|null}>
      */
@@ -47,28 +48,32 @@ final class NavigationTest extends TestCase
             'a new subscription' => ['/subscriptions/new', 'nav.subscriptions'],
             'editing one' => ['/subscriptions/12/edit', 'nav.subscriptions'],
             'its money' => ['/subscriptions/12/money', 'nav.subscriptions'],
+            // Cancel-by lost its row; the list it is linked from is lit.
+            'cancel-by, which is the list' => ['/cancellations', 'nav.subscriptions'],
             'statistics' => ['/stats', 'nav.analytics'],
             'the forecast, which is analytics too' => ['/forecast', 'nav.analytics'],
             'the calendar' => ['/calendar', 'nav.calendar'],
             'budgets' => ['/budgets', 'nav.budgets'],
             'a new budget' => ['/budgets/new', 'nav.budgets'],
-            'cancel-by' => ['/cancellations', 'nav.cancellations'],
-            'categories' => ['/categories', 'nav.categories'],
-            'the household' => ['/household', 'nav.household'],
+            'the member screen' => ['/settings/members', 'nav.members'],
+            'removing a member' => ['/settings/members/4/remove', 'nav.members'],
+            'the household overview' => ['/household', 'nav.members'],
             'settings' => ['/settings', 'nav.settings'],
-            'your own page' => ['/profile', 'nav.profile'],
-            // The three below all start with "/settings" and only one of them
-            // is Notifications. This is the collision the old hand-written
-            // navigation had to special-case in the template.
-            'alerts, which are not settings' => ['/settings/notifications', 'nav.notifications'],
-            'security is settings' => ['/settings/security', 'nav.settings'],
-            'api tokens are settings' => ['/settings/api-tokens', 'nav.settings'],
-            'backup is settings' => ['/settings/backup', 'nav.settings'],
-            // Import has no rail row of its own; Settings, which carries the
-            // button that leads there, is what stays lit while you use it.
+            // The pages that lost their rows light Settings, whose page links
+            // to each of them.
+            'categories are settings' => ['/categories', 'nav.settings'],
+            'payment methods are settings' => ['/payment-methods', 'nav.settings'],
             'import is settings' => ['/import', 'nav.settings'],
             'the import mapping step' => ['/import/map', 'nav.settings'],
-            'the audit log' => ['/audit', 'nav.audit'],
+            'the audit log is settings' => ['/audit', 'nav.settings'],
+            'api tokens are settings' => ['/settings/api-tokens', 'nav.settings'],
+            'backup is settings' => ['/settings/backup', 'nav.settings'],
+            'security is settings' => ['/settings/security', 'nav.settings'],
+            // Starts with "/settings" and is not Settings: per-person, and its
+            // own row.
+            'alerts, which are not settings' => ['/settings/notifications', 'nav.notifications'],
+            'your own page, which is the user card' => ['/profile', 'nav.profile'],
+            'your account details' => ['/profile/account', 'nav.profile'],
             // Deliberately claimed by nothing: a path that merely begins with
             // the same letters as a section is not part of it.
             'a path that only looks like the list' => ['/subscriptions-archive', null],
@@ -82,21 +87,34 @@ final class NavigationTest extends TestCase
     {
         $navigation = $this->navigation->forPath($this->owner(), $path);
 
-        $active = $this->activeLabels($navigation);
-
         self::assertSame(
             $expected === null ? [] : [$expected],
-            $active,
+            $this->activeLabels($navigation),
             sprintf('%s should be %s.', $path, $expected ?? 'claimed by no navigation item'),
         );
     }
 
     /**
+     * The rail is the prototype's: three screens you read, then the household
+     * tools, in that order.
+     */
+    public function testTheRailIsTheMainGroupThenTheHouseholdTools(): void
+    {
+        $navigation = $this->navigation->forPath($this->owner(), '/');
+
+        self::assertSame(
+            ['nav.dashboard', 'nav.subscriptions', 'nav.analytics'],
+            $this->labels($navigation->primary),
+        );
+        self::assertSame(
+            ['nav.budgets', 'nav.calendar', 'nav.members', 'nav.notifications', 'nav.settings'],
+            $this->labels($navigation->tools),
+        );
+        self::assertSame('/profile', $navigation->account->href);
+    }
+
+    /**
      * The root does not claim every page in the application.
-     *
-     * Every path begins with "/", so a prefix test written the obvious way
-     * lights the dashboard everywhere — and then lights the real item beside
-     * it, because both matched.
      */
     public function testTheDashboardClaimsOnlyTheDashboard(): void
     {
@@ -108,23 +126,48 @@ final class NavigationTest extends TestCase
     }
 
     /**
-     * Profile and Settings are two pages, and the rail lights one of them at a
-     * time. Standing on Settings must not light Profile as well.
+     * Members & roles goes to whichever people screen the reader may open.
+     *
+     * An Owner/Admin manages the people; an Editor or Contributor may only
+     * see the household's overview, which had a rail row of its own before
+     * and keeps its route through this item. A Viewer may open neither and is
+     * offered neither.
      */
-    public function testProfileIsItsOwnDestination(): void
+    public function testMembersPointsAtThePeopleScreenTheReaderMayOpen(): void
     {
-        $tools = $this->navigation->forPath($this->owner(), '/settings')->tools;
+        self::assertSame('/settings/members', $this->byLabel(
+            $this->navigation->forPath($this->owner(), '/')->tools,
+            'nav.members',
+        )?->href);
 
-        $profile = $this->byLabel($tools, 'nav.profile');
+        foreach ([Role::Editor, Role::Contributor] as $role) {
+            $scope = Scope::forMember(5, false, 1, $role, IsolationMode::Shared);
 
-        self::assertNotNull($profile, 'The profile link is gone.');
-        self::assertSame('/profile', $profile->href);
-        self::assertFalse($profile->active, 'Settings is the page; Profile is not.');
+            self::assertSame('/household', $this->byLabel(
+                $this->navigation->forPath($scope, '/')->tools,
+                'nav.members',
+            )?->href, $role->value);
 
-        $onProfile = $this->navigation->forPath($this->owner(), '/profile')->tools;
+            self::assertSame(['nav.members'], $this->activeLabels($this->navigation->forPath($scope, '/household')));
+        }
 
-        self::assertTrue($this->byLabel($onProfile, 'nav.profile')?->active);
-        self::assertFalse($this->byLabel($onProfile, 'nav.settings')?->active);
+        self::assertNull($this->byLabel($this->navigation->forPath($this->viewer(), '/')->tools, 'nav.members'));
+    }
+
+    /**
+     * Profile and Settings are two destinations, and one of them is lit at a
+     * time. Standing on Settings must not light the user card as well.
+     */
+    public function testTheUserCardIsItsOwnDestination(): void
+    {
+        $onSettings = $this->navigation->forPath($this->owner(), '/settings');
+
+        self::assertFalse($onSettings->account->active, 'Settings is the page; the profile is not.');
+
+        $onProfile = $this->navigation->forPath($this->owner(), '/profile');
+
+        self::assertTrue($onProfile->account->active);
+        self::assertFalse($this->byLabel($onProfile->tools, 'nav.settings')?->active);
     }
 
     /**
@@ -136,8 +179,9 @@ final class NavigationTest extends TestCase
         $labels = $this->allLabels($this->navigation->forPath($this->viewer(), '/'));
 
         self::assertContains('nav.subscriptions', $labels);
+        self::assertContains('nav.notifications', $labels);
         self::assertContains('nav.settings', $labels);
-        self::assertNotContains('nav.audit', $labels, 'A Viewer cannot read the audit log.');
+        self::assertNotContains('nav.members', $labels, 'A Viewer may open neither people screen.');
     }
 
     /**
@@ -151,46 +195,69 @@ final class NavigationTest extends TestCase
             '/settings',
         ));
 
-        self::assertSame(['nav.dashboard', 'nav.notifications', 'nav.audit', 'nav.settings', 'nav.profile'], $labels);
+        self::assertSame(['nav.dashboard', 'nav.notifications', 'nav.settings', 'nav.profile'], $labels);
     }
 
     /**
      * The narrow screen reaches everything the rail does.
      *
-     * The tab bar and the drawer are a split of the same list, so this is the
-     * assertion that a destination cannot be added to the rail and quietly not
-     * exist on a phone.
+     * The tab bar and the More sheet are a split of the same list — the sheet
+     * leading with the user card — so this is the assertion that a
+     * destination cannot be added to the rail and quietly not exist on a
+     * phone. Asserted for every role, since each sees a different list.
      */
     public function testTheNarrowLayoutReachesEveryDestinationTheRailDoes(): void
     {
-        $navigation = $this->navigation->forPath($this->owner(), '/');
+        $contributor = Scope::forMember(5, false, 1, Role::Contributor, IsolationMode::Isolated);
 
-        $rail = array_map(static fn (NavLink $link): string => $link->href, [
-            ...$navigation->primary,
-            ...$navigation->tools,
-        ]);
+        foreach ([$this->owner(), $this->viewer(), $contributor] as $scope) {
+            $navigation = $this->navigation->forPath($scope, '/');
 
-        $narrow = array_map(static fn (NavLink $link): string => $link->href, [
-            ...$navigation->tabs,
-            ...$navigation->drawer,
-        ]);
+            $rail = $this->hrefs([...$navigation->primary, ...$navigation->tools, $navigation->account]);
+            $narrow = $this->hrefs([...$navigation->tabs, ...$navigation->drawer, $navigation->account]);
 
-        sort($rail);
-        sort($narrow);
+            self::assertSame($rail, $narrow);
+        }
 
-        self::assertSame($rail, $narrow);
+        $owner = $this->navigation->forPath($this->owner(), '/');
+
+        self::assertSame(['/', '/subscriptions', '/stats'], array_map(
+            static fn (NavLink $link): string => $link->href,
+            $owner->tabs,
+        ), 'The tabs are Home, Subs and Analytics; Add and More sit beside them.');
+
+        self::assertSame(
+            ['nav.budgets', 'nav.calendar', 'nav.members', 'nav.notifications', 'nav.settings'],
+            $this->labels($owner->drawer),
+        );
     }
 
     /**
-     * The disclosure that hides half the destinations says when the page you
-     * are on is one of them, so a narrow screen is not silent about where it
+     * The tabs that would not fit their rail label carry a short one.
+     */
+    public function testTheTabsCarryTheirShortLabels(): void
+    {
+        self::assertSame(
+            ['nav.tab_home', 'nav.tab_subscriptions', 'nav.analytics'],
+            array_map(
+                static fn (NavLink $link): string => $link->tabLabelKey,
+                $this->navigation->forPath($this->owner(), '/')->tabs,
+            ),
+        );
+    }
+
+    /**
+     * The More sheet says when it holds the page you are on — including the
+     * user card at its top — so a narrow screen is not silent about where it
      * is until somebody opens it.
      */
     public function testTheDrawerSaysWhenItHoldsThePageYouAreOn(): void
     {
         self::assertTrue($this->navigation->forPath($this->owner(), '/settings')->drawerHoldsActive());
+        self::assertTrue($this->navigation->forPath($this->owner(), '/calendar')->drawerHoldsActive());
         self::assertTrue($this->navigation->forPath($this->owner(), '/profile')->drawerHoldsActive());
         self::assertFalse($this->navigation->forPath($this->owner(), '/')->drawerHoldsActive());
+        self::assertFalse($this->navigation->forPath($this->owner(), '/forecast')->drawerHoldsActive());
     }
 
     private function owner(): Scope
@@ -222,13 +289,10 @@ final class NavigationTest extends TestCase
      */
     private function activeLabels(Navigation $navigation): array
     {
-        return array_values(array_map(
-            static fn (NavLink $link): string => $link->labelKey,
-            array_filter(
-                [...$navigation->primary, ...$navigation->tools],
-                static fn (NavLink $link): bool => $link->active,
-            ),
-        ));
+        return $this->labels(array_values(array_filter(
+            [...$navigation->primary, ...$navigation->tools, $navigation->account],
+            static fn (NavLink $link): bool => $link->active,
+        )));
     }
 
     /**
@@ -236,9 +300,27 @@ final class NavigationTest extends TestCase
      */
     private function allLabels(Navigation $navigation): array
     {
-        return array_map(
-            static fn (NavLink $link): string => $link->labelKey,
-            [...$navigation->primary, ...$navigation->tools],
-        );
+        return $this->labels([...$navigation->primary, ...$navigation->tools, $navigation->account]);
+    }
+
+    /**
+     * @param list<NavLink> $links
+     * @return list<string>
+     */
+    private function labels(array $links): array
+    {
+        return array_map(static fn (NavLink $link): string => $link->labelKey, $links);
+    }
+
+    /**
+     * @param list<NavLink> $links
+     * @return list<string>
+     */
+    private function hrefs(array $links): array
+    {
+        $hrefs = array_map(static fn (NavLink $link): string => $link->href, $links);
+        sort($hrefs);
+
+        return $hrefs;
     }
 }

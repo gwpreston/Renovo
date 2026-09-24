@@ -77,13 +77,24 @@ final class ProfileController extends Controller
         $body = $this->body($request);
         $theme = is_scalar($body['theme'] ?? null) ? (string) $body['theme'] : null;
 
-        $this->preferences->updateTheme($this->user($request)->id, $theme);
+        $saved = $this->preferences->updateTheme($this->user($request)->id, $theme);
 
-        // Back where they were: the switch is in the navigation bar, so
-        // sending them to the profile page from an arbitrary page would be a
-        // navigation they did not ask for.
+        // The top bar's toggle, through htmx: nothing to navigate to, only
+        // the root's `data-theme` to change, which app.js does on this event.
+        if ($this->isHtmx($request)) {
+            return $response
+                ->withHeader('HX-Trigger', (string) json_encode(['renovo:theme' => ['theme' => $saved->value]]))
+                ->withStatus(204);
+        }
+
+        // Back where they were: the toggle is in the top bar, so sending them
+        // to the profile page from an arbitrary page would be a navigation
+        // they did not ask for. The form names the page it was on; a browser
+        // that strips the field falls back to the Referer, and either is
+        // reduced to a path on this host before it is followed.
+        $return = is_string($body['return'] ?? null) ? $this->localPath($body['return']) : null;
         $referer = $request->getHeaderLine('Referer');
-        $target = $referer !== '' ? $this->samePathAsUs($request, $referer) : '/profile';
+        $target = $return ?? ($referer !== '' ? $this->samePathAsUs($request, $referer) : '/profile');
 
         return $this->redirectAfterWrite($request, $response, $target);
     }
@@ -145,8 +156,28 @@ final class ProfileController extends Controller
             return '/profile';
         }
 
-        $path = $parts['path'] ?? '/';
+        return $this->localPath($parts['path'] ?? '/') ?? '/profile';
+    }
 
-        return str_starts_with($path, '/') ? $path : '/profile';
+    /**
+     * A path on this host, or null.
+     *
+     * One leading slash and not two: `//elsewhere.example/` is a URL on
+     * another host that happens to begin like a path, and so is `/\` to a
+     * browser that reads backslashes as slashes. Control characters are
+     * refused so that nothing can be smuggled into the Location header.
+     */
+    private function localPath(string $path): ?string
+    {
+        if (
+            !str_starts_with($path, '/')
+            || str_starts_with($path, '//')
+            || str_starts_with($path, '/\\')
+            || preg_match('/[\x00-\x1f\x7f]/', $path) === 1
+        ) {
+            return null;
+        }
+
+        return $path;
     }
 }

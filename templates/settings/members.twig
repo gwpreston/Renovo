@@ -2,6 +2,18 @@
 {% import 'partials/avatar.twig' as avatar %}
 
 {% block heading %}{{ t('members.title') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.members') }}{% endblock %}
+
+{#
+    The household's read-only overview — what each member's share comes to —
+    which the rail's Members & roles item points at for anyone who may not
+    manage the people. An Owner/Admin reaches it from here, and it links back.
+#}
+{% block page_actions %}
+    {% if can(scope, 'household.view') %}
+        <a class="button button-quiet" href="/household">{{ icon('household', 'nav-icon') }}{{ t('household.title') }}</a>
+    {% endif %}
+{% endblock %}
 
 {% block content %}
     {#

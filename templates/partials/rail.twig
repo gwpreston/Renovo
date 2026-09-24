@@ -1,0 +1,72 @@
+{#
+    The rail, top to bottom as the prototype draws it: the brand, the household
+    you are in, where you can go, a way to add a subscription, and who you are.
+
+    Fixed at 240px on anything wide enough for it and replaced by the tab bar
+    in `tabbar.twig` below 768px. Both draw the same lists, so the narrow
+    screen loses the layout and none of the reach.
+
+    `nav`    the Navigation for this page
+    `shell`  the ShellContext (the household label and the badge), or null
+
+    What is not here: the design's Upgrade Plan card. Renovo is self-hosted and
+    there is no plan to upgrade to.
+#}
+<aside class="sidebar">
+    {#
+        The mark sits in a tile on the dark rails — white, so the gradient
+        reads — and bare on the light ones. The tile's colour and padding are
+        palette tokens (`--logo-tile`, `--logo-pad`), so which rail gets one is
+        decided by the palette rather than by this template.
+    #}
+    <a class="sidebar-brand" href="/">
+        <span class="logo-tile">
+            <svg class="brand-mark" viewBox="0 0 460 427" aria-hidden="true" focusable="false">
+                <use href="#renovo-mark"></use>
+            </svg>
+        </span>
+        <span class="sidebar-brand-text">
+            <span class="sidebar-brand-name">{{ instance_name }}</span>
+            <span class="sidebar-tagline">{{ t('shell.tagline') }}</span>
+        </span>
+    </a>
+
+    {% if shell and shell.household %}
+        {% include 'partials/household_label.twig' with {'household': shell.household} only %}
+    {% endif %}
+
+    <div class="sidebar-nav">
+        <nav aria-label="{{ t('nav.primary') }}">
+            {% include 'partials/nav_links.twig' with {
+                'links': nav.primary,
+                'badges': shell and shell.subscriptionCount is not null
+                    ? {'subscriptions': shell.subscriptionCount}
+                    : {}
+            } only %}
+        </nav>
+
+        {% if nav.tools is not empty %}
+            <nav aria-labelledby="rail-tools-heading">
+                <p class="sidebar-group-heading" id="rail-tools-heading">{{ t('nav.household_tools') }}</p>
+                {% include 'partials/nav_links.twig' with {'links': nav.tools} only %}
+            </nav>
+        {% endif %}
+    </div>
+
+    <div class="sidebar-foot">
+        {#
+            Secondary on purpose. The top bar's "Add new" is the same action on
+            every screen, and the one accent-filled button a screen has belongs
+            to what that screen is about — so this wears the rail's own quiet
+            fill. It is a link to the real form before it is a dialog.
+        #}
+        {% if can(scope, 'subscription.create') %}
+            <a class="sidebar-add" href="/subscriptions/new" data-opens-dialog="quick-add">
+                {{ icon('add-circle', 'nav-icon') }}
+                <span>{{ t('subscriptions.add_subscription') }}</span>
+            </a>
+        {% endif %}
+
+        {% include 'partials/user_card.twig' with {'account': nav.account, 'user': current_user} only %}
+    </div>
+</aside>

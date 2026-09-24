@@ -158,11 +158,11 @@ main.container {
 /* --------------------------------------------------------------- the shell */
 
 /*
- * Every signed-in page sits in the same frame: a fixed rail down the left, a
- * bar across the top of what is left, and — below 768px — a bar along the
- * bottom instead of the rail. `has-shell` is on the body, set by the same
- * condition that draws the frame, so the room made for it and the thing it is
- * made for cannot disagree.
+ * Every signed-in page sits in the same frame, rebuilt in Phase 19 to the
+ * prototype: a fixed rail down the left, a 64px bar across the top of what is
+ * left, and — below 768px — a tab bar along the bottom instead of the rail.
+ * `has-shell` is on the body, set by the same condition that draws the frame,
+ * so the room made for it and the thing it is made for cannot disagree.
  *
  * The rail is taken out of the flow rather than being a grid column because
  * the content column is the one that scrolls: a 240px rail alongside a long
@@ -170,6 +170,7 @@ main.container {
  */
 :root {
     --rail-width: 240px;
+    --topbar-height: 4rem;
     --tabbar-height: 4.25rem;
 }
 
@@ -182,20 +183,26 @@ main.container {
     top: 0;
     z-index: 20;
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75rem 1rem;
-    padding: 0.75rem 1rem;
-    background: var(--bg);
+    gap: 0.75rem;
+    min-height: var(--topbar-height);
+    padding: 0.5rem 1rem;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
 }
 
 .topbar-lead {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
     gap: 0.5rem 0.75rem;
+    min-width: 0;
+}
+
+.topbar-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
     min-width: 0;
 }
 
@@ -204,6 +211,28 @@ main.container {
     font-size: var(--size-title);
     font-weight: var(--weight-bold);
     letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The short line beside the title: a pill, as the prototype draws it. */
+.topbar-subtitle {
+    display: none;
+    margin: 0;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: var(--size-caption);
+    font-weight: var(--weight-medium);
+    white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+    .topbar-subtitle {
+        display: block;
+    }
 }
 
 .topbar-page-actions:empty {
@@ -213,57 +242,168 @@ main.container {
 .topbar-actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem 0.75rem;
-    flex-wrap: wrap;
+    gap: 0.5rem;
+    flex-shrink: 0;
     margin-left: auto;
 }
 
 /*
- * The search the bar carries on every page. It submits to the subscriptions
+ * A square control carrying only an icon: the theme toggle, the bell, the
+ * user card's sign-out. Its name is visually hidden text inside it, so it is
+ * announced by what it does and not by what it looks like.
+ */
+.icon-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.icon-button:hover {
+    background: var(--surface-2);
+}
+
+.icon-button-icon {
+    display: block;
+    width: 1.0625rem;
+    height: 1.0625rem;
+}
+
+/*
+ * The theme toggle carries both icons and shows the one for where a press
+ * would take you — the moon on a light page, the sun on a dark one — from the
+ * same attribute and media query the palette itself is chosen by, so it is
+ * right on first paint under "system" too.
+ */
+.theme-toggle {
+    display: inline-flex;
+}
+
+.theme-toggle-light {
+    display: none;
+}
+
+:root[data-theme='dark'] .theme-toggle-dark {
+    display: none;
+}
+
+:root[data-theme='dark'] .theme-toggle-light {
+    display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root[data-theme='system'] .theme-toggle-dark {
+        display: none;
+    }
+
+    :root[data-theme='system'] .theme-toggle-light {
+        display: block;
+    }
+}
+
+/* The bell's dot: decoration over a link whose text already says it. */
+.bell-dot {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.4375rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--bad);
+    box-shadow: 0 0 0 2px var(--surface);
+}
+
+/*
+ * The search the bar carries on wide screens. It submits to the subscriptions
  * list, which is the collection there is anything to search; the icon is
  * decoration sitting in the field's own padding.
  */
 .topbar-search {
     position: relative;
-    display: flex;
+    display: none;
     align-items: center;
 }
 
 /*
- * Specific enough to win: the shared field rule below sets a padding of its
- * own, and this one has to clear the icon sitting inside the field.
+ * Specific enough to win: the shared field rule sets a padding of its own,
+ * and this one has to clear the icon sitting inside the field.
  */
 .topbar-search input[type='search'] {
-    padding-left: 2.25rem;
-    width: 12rem;
-    max-width: 40vw;
+    width: 15rem;
+    padding: 0.5rem 0.75rem 0.5rem 2.125rem;
+    font-size: var(--size-caption);
+    background: var(--surface-2);
 }
 
 .topbar-search-icon {
     position: absolute;
     left: 0.7rem;
-    width: 1rem;
-    height: 1rem;
+    width: 0.9375rem;
+    height: 0.9375rem;
     color: var(--faint);
     pointer-events: none;
 }
 
+/* "GBP · rates 23 Sep", in the figures face. */
+.rates-chip {
+    display: none;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.4375rem 0.625rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    color: var(--muted);
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+a.rates-chip:hover {
+    color: var(--text);
+    background: var(--surface-2);
+}
+
+.rates-chip.is-warning {
+    border-color: transparent;
+    background: var(--warn-bg);
+    color: var(--warn);
+}
+
+.rates-chip-icon {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+}
+
+.rates-chip-flag {
+    font-family: var(--font-text);
+    font-weight: var(--weight-bold);
+}
+
+@media (min-width: 1100px) {
+    .topbar-search,
+    .rates-chip {
+        display: inline-flex;
+    }
+}
+
 /* Its colour is with the other buttons; this is only its layout. */
 .topbar-add {
-    display: inline-flex;
+    display: none;
     align-items: center;
-    gap: 0.4rem;
-}
-
-.topbar-account {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.topbar-name {
-    color: var(--muted);
-    font-size: var(--size-label);
+    gap: 0.375rem;
+    padding: 0.5625rem 0.75rem;
+    font-size: var(--size-caption);
 }
 
 /* ------------------------------------------------------------- the brand */
@@ -286,8 +426,8 @@ main.container {
 .sidebar-brand {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    padding: 0.25rem;
+    gap: 0.75rem;
+    padding: 1.25rem 1.25rem 0.25rem;
     text-decoration: none;
     color: var(--rail-ink);
 }
@@ -308,11 +448,26 @@ main.container {
     height: 1.75rem;
 }
 
+.sidebar-brand-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
 .sidebar-brand-name {
-    font-weight: var(--weight-heavy);
-    font-size: var(--size-heading);
-    letter-spacing: -0.01em;
+    font-weight: var(--weight-bold);
+    font-size: 1.25rem;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
     overflow-wrap: anywhere;
+}
+
+.sidebar-tagline {
+    color: var(--rail-accent);
+    font-size: 0.625rem;
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
 }
 
 .topbar-brand {
@@ -321,7 +476,114 @@ main.container {
 }
 
 .topbar-brand .brand-mark {
-    height: 1.75rem;
+    height: 1.625rem;
+}
+
+/* ---------------------------------------------------- the household label */
+
+/*
+ * A label and not a control, so it has no hover, no chevron and no cursor:
+ * there is nothing to switch to. These are its colours on a page surface —
+ * the More sheet; the rail's are in the rail's section below.
+ */
+.household-label {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+}
+
+.household-label-icon {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    color: var(--accent-text);
+}
+
+.household-label-text {
+    min-width: 0;
+}
+
+.household-label-name,
+.household-label-meta {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.household-label-name {
+    font-size: var(--size-caption);
+    font-weight: var(--weight-bold);
+}
+
+.household-label-meta {
+    font-size: 0.6875rem;
+    color: var(--muted);
+}
+
+/* ------------------------------------------------------------ the user card */
+
+.user-card {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/*
+ * The card is the way to your profile, and a navigation item like any other:
+ * it takes the same "you are here" treatment when you are on it.
+ */
+.user-card-link {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.375rem;
+    border-left: 3px solid transparent;
+    border-radius: var(--radius-control);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.user-card-link:hover {
+    background-color: var(--surface-2);
+}
+
+.user-card-link.is-active {
+    background-color: var(--accent-soft);
+    border-left-color: var(--accent);
+}
+
+.user-card-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.user-card-name,
+.user-card-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-card-name {
+    font-size: var(--size-caption);
+    font-weight: var(--weight-bold);
+}
+
+.user-card-email {
+    font-size: 0.6875rem;
+    color: var(--muted);
+}
+
+.user-card-signout {
+    display: inline-flex;
 }
 
 /* -------------------------------------------------------------- navigation */
@@ -337,14 +599,14 @@ main.container {
 
 /*
  * A navigation item. These are the colours it wears on a page surface — the
- * narrow screen's drawer; the rail's own, on the palette's rail colour, are
- * in the rail's section below.
+ * narrow screen's More sheet; the rail's own, on the palette's rail colour,
+ * are in the rail's section below.
  */
 .nav-link {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
+    padding: 0.625rem 0.75rem;
     border-left: 3px solid transparent;
     border-radius: var(--radius-control);
     text-decoration: none;
@@ -374,13 +636,24 @@ main.container {
 
 /* The icon beside a navigation label, drawn by `icon()` from the sprite. */
 .nav-icon {
-    width: 1.125rem;
-    height: 1.125rem;
+    width: 1.25rem;
+    height: 1.25rem;
     flex-shrink: 0;
 }
 
 .nav-label {
+    flex: 1 1 auto;
     overflow-wrap: anywhere;
+}
+
+/* The Subscriptions count. */
+.nav-badge {
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
 }
 
 /* ------------------------------------------------- the rail, when it fits */
@@ -397,20 +670,49 @@ main.container {
         width: var(--rail-width);
         display: flex;
         flex-direction: column;
-        gap: 1.25rem;
-        padding: 1rem 0.75rem;
-        overflow-y: auto;
         background: var(--rail);
         color: var(--rail-text);
         border-right: 1px solid var(--rail-border);
     }
 
     /*
-     * The rail's items, on the rail's own colours. The palette decides
-     * whether the rail is dark (navy, midnight, forest) or light (paper,
-     * ocean), so every colour here is a `--rail-*` token and none of them
-     * assumes which.
+     * Everything on the rail wears the rail's own colours. The palette
+     * decides whether the rail is dark (navy, midnight, forest) or light
+     * (paper, ocean), so every colour here is a `--rail-*` token and none of
+     * them assumes which.
      */
+    .sidebar .household-label {
+        margin: 0.875rem 0.75rem 0.25rem;
+        background: var(--rail-tint);
+        border-color: var(--rail-line);
+        color: var(--rail-ink);
+    }
+
+    .sidebar .household-label-icon {
+        color: var(--rail-accent);
+    }
+
+    .sidebar .household-label-meta {
+        color: var(--rail-muted);
+    }
+
+    /* The one part of the rail that scrolls, if a short window needs it to. */
+    .sidebar-nav {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding: 0.625rem 0.75rem;
+    }
+
+    .sidebar-group-heading {
+        margin: 0;
+        padding: 1.125rem 0.75rem 0.375rem;
+        color: var(--rail-faint);
+        font-size: 0.625rem;
+        font-weight: var(--weight-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
     .sidebar .nav-link {
         color: var(--rail-text);
     }
@@ -430,33 +732,102 @@ main.container {
         color: var(--rail-accent);
     }
 
+    .sidebar .nav-badge {
+        background: var(--rail-active);
+        color: var(--rail-accent);
+    }
+
+    .sidebar-foot {
+        padding: 0.75rem;
+    }
+
+    /*
+     * The rail's add button: secondary, in the rail's quiet fill with its
+     * ink, because the one accent fill a screen has belongs to that screen.
+     */
+    .sidebar-add {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.6875rem 1rem;
+        border: 1px solid var(--rail-line);
+        border-radius: var(--radius-card);
+        background: var(--rail-tint);
+        color: var(--rail-ink);
+        font-size: var(--size-body);
+        font-weight: var(--weight-bold);
+        text-decoration: none;
+    }
+
+    .sidebar-add:hover {
+        background: var(--rail-active);
+    }
+
+    .sidebar-add .nav-icon {
+        width: 1rem;
+        height: 1rem;
+        color: var(--rail-accent);
+    }
+
+    .sidebar .user-card {
+        margin-top: 1rem;
+        padding-top: 0.875rem;
+        border-top: 1px solid var(--rail-line);
+    }
+
+    .sidebar .user-card-link {
+        color: var(--rail-ink);
+    }
+
+    .sidebar .user-card-link:hover {
+        background-color: var(--rail-tint);
+    }
+
+    .sidebar .user-card-link.is-active {
+        background-color: var(--rail-active);
+        border-left-color: var(--accent);
+    }
+
+    .sidebar .user-card-email {
+        color: var(--rail-muted);
+    }
+
+    .sidebar .icon-button {
+        background: transparent;
+        border-color: var(--rail-line);
+        color: var(--rail-muted);
+    }
+
+    .sidebar .icon-button:hover {
+        background: var(--rail-tint);
+        color: var(--rail-ink);
+    }
+
     /* The page's ring would be the wrong colour on a dark rail. */
     .sidebar :focus-visible {
         outline-color: var(--rail-accent);
     }
 
-    .sidebar-tools {
-        padding-top: 0.75rem;
-        border-top: 1px solid var(--rail-line);
-    }
-
-    /* The tools group sits at the bottom of the rail, whatever is above it. */
-    .sidebar-tools {
-        margin-top: auto;
+    .topbar {
+        padding: 0 clamp(0.875rem, 2.5vw, 1.5rem);
     }
 
     .topbar-brand {
         display: none;
+    }
+
+    .topbar-add {
+        display: inline-flex;
     }
 }
 
 /* ------------------------------------------- the rail, when it does not fit */
 
 /*
- * Below 768px the rail becomes a bar along the bottom: the four most-used
- * destinations, and a disclosure holding the rest. It is a <details>, so it
- * opens with no JavaScript at all — the narrow layout loses the rail and none
- * of the reach.
+ * Below 768px the rail becomes a bar along the bottom: Home, Subs, a raised
+ * Add, Analytics and More. More is a <details>, so it opens with no
+ * JavaScript at all — the narrow layout loses the rail and none of the reach.
  */
 .tabbar {
     position: fixed;
@@ -480,7 +851,8 @@ main.container {
     min-width: 0;
 }
 
-.tabbar-link {
+.tabbar-link,
+.tabbar-add {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -511,6 +883,27 @@ main.container {
     box-shadow: inset 0 3px 0 var(--accent);
 }
 
+/*
+ * The raised add button. The ink fill, not the accent: on a phone the page's
+ * own action is on screen beside it, and that is the one the accent is for.
+ */
+.tabbar-add-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    margin-top: -1.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--ink-btn);
+    color: var(--ink-btn-text);
+    box-shadow: 0 0 0 3px var(--surface), var(--shadow);
+}
+
+.tabbar-add:hover .tabbar-add-button {
+    background: var(--ink-btn-hover);
+}
+
 .tabbar-more > summary {
     list-style: none;
 }
@@ -520,18 +913,28 @@ main.container {
 }
 
 /*
- * The drawer opens upwards from the bar, which is where it is anchored, and is
+ * The sheet opens upwards from the bar, which is where it is anchored, and is
  * capped so a long list scrolls rather than running off the top of the screen.
+ * It leads with who and where you are — the rail's household label and user
+ * card — then the destinations the tabs do not hold.
  */
 .tabbar-drawer {
     position: absolute;
     inset: auto 0 100% 0;
-    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 70vh;
     overflow-y: auto;
-    padding: 0.5rem;
+    padding: 0.75rem;
     background: var(--surface);
     border-top: 1px solid var(--border);
     box-shadow: var(--shadow);
+}
+
+.tabbar-drawer .user-card {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
 }
 
 @media (min-width: 768px) {
@@ -543,20 +946,6 @@ main.container {
 @media (max-width: 767px) {
     body.has-shell {
         padding-bottom: calc(var(--tabbar-height) + 1rem);
-    }
-
-    .topbar-search input[type='search'] {
-        width: 8rem;
-    }
-
-    /* The label would wrap the bar onto a third line; the icon says enough. */
-    .topbar-add-label {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
     }
 }
 
@@ -1857,25 +2246,6 @@ kbd {
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
-}
-
-/*
- * The top bar's own name, now a link to the account page. It keeps the muted
- * treatment it had as plain text — it is an identity, not a call to action —
- * and gains the underline only on hover.
- */
-.topbar-identity {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: inherit;
-    text-decoration: none;
-}
-
-.topbar-identity:hover .topbar-name,
-.topbar-identity:focus-visible .topbar-name {
-    color: var(--text);
-    text-decoration: underline;
 }
 
 /*

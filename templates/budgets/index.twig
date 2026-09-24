@@ -1,6 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.budgets') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.budgets') }}{% endblock %}
 
 {% block page_actions %}
     {% if can(scope, 'budget.manage') %}

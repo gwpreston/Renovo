@@ -432,7 +432,11 @@ final class PersonalisationTest extends DatabaseTestCase
         $settings = (string) $this->request('GET', '/settings')->getBody();
 
         self::assertStringNotContainsString('name="landing_view"', $settings, 'A preference is still on Settings.');
-        self::assertStringNotContainsString('name="theme"', $settings);
+        // The page's own content, not the shell: the top bar's light/dark
+        // toggle posts a `theme` on every page, Settings included.
+        $start = (int) strpos($settings, '<main');
+        $content = substr($settings, $start, (int) strpos($settings, '</main>') - $start);
+        self::assertStringNotContainsString('name="theme"', $content);
         self::assertStringContainsString('action="/settings/household"', $settings, 'Settings kept its own.');
     }
 

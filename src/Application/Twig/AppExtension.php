@@ -24,6 +24,7 @@ use App\Security\CsrfTokenManager;
 use App\Security\PermissionService;
 use App\Security\Scope;
 use App\Service\NavigationService;
+use App\Service\ShellService;
 use App\Service\ValidationError;
 use App\Support\AssetVersion;
 use App\Support\BuildManifest;
@@ -65,6 +66,7 @@ final class AppExtension extends AbstractExtension
         private readonly AssetVersion $assets,
         private readonly BuildManifest $build,
         private readonly NavigationService $navigation,
+        private readonly ShellService $shell,
         private readonly DateFormatter $dates,
         private readonly NumberFormat $numbers,
         private readonly IconSprite $icons,
@@ -87,6 +89,7 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('can', $this->can(...)),
             new TwigFunction('can_edit_row', $this->canEditRow(...)),
             new TwigFunction('navigation', $this->navigationFor(...)),
+            new TwigFunction('shell', $this->shell->forScope(...)),
             new TwigFunction('cycle_label', $this->cycleLabel(...)),
             new TwigFunction('type_label', $this->typeLabel(...)),
             new TwigFunction('role_label', $this->roleLabel(...)),

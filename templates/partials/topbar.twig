@@ -1,0 +1,54 @@
+{#
+    The top bar's right-hand side: search, the rates chip, the theme toggle,
+    the bell and quick-add. Every one of them works with the bundle blocked.
+
+    `shell`  the ShellContext, or null for an account with no household
+
+    Search is a GET form to the subscriptions list, using the list's own `q`,
+    so it is a search with no script at all. `/` focuses it — or the page's own
+    filter where there is one, which is the finer instrument; see app.js.
+
+    Quick-add is an anchor, not a button, and that is deliberate: with the
+    script it opens the dialog that loads the real subscription form, and
+    without it the same click goes to the same form as a page. It wears the
+    secondary fill, not the accent — see the buttons in components.css.
+#}
+<div class="topbar-actions">
+    {% if can(scope, 'subscription.view') %}
+        <form class="topbar-search" method="get" action="/subscriptions" role="search">
+            {{ icon('search', 'topbar-search-icon') }}
+            <input type="search" name="q" aria-label="{{ t('shell.search') }}"
+                   placeholder="{{ t('shell.search') }}">
+        </form>
+    {% endif %}
+
+    {% if shell %}
+        {% include 'partials/rates_chip.twig' with {'chip': shell.rates} only %}
+    {% endif %}
+
+    {% include 'partials/theme_toggle.twig' with {'user': current_user, 'return_to': current_path} only %}
+
+    {#
+        A link, not an inbox (decision 6): the calendar is the screen that
+        already shows renewals, trials and deadlines together. The dot is
+        decoration; what it means is said in the link's own text.
+    #}
+    {% if shell and can(scope, 'subscription.view') %}
+        <a class="icon-button topbar-bell" href="/calendar" title="{{ t('shell.bell') }}">
+            {{ icon('bell', 'icon-button-icon') }}
+            <span class="visually-hidden">{{ t('shell.bell') }}</span>
+            {% if shell.somethingDueSoon %}
+                <span class="bell-dot" aria-hidden="true"></span>
+                <span class="visually-hidden">{{ t('shell.bell_due_soon') }}</span>
+            {% endif %}
+        </a>
+    {% endif %}
+
+    {% if can(scope, 'subscription.create') %}
+        <a class="button topbar-add" href="/subscriptions/new"
+           data-opens-dialog="quick-add">
+            {{ icon('add', 'nav-icon') }}
+            <span class="topbar-add-label">{{ t('shell.add_new') }}</span>
+        </a>
+    {% endif %}
+</div>

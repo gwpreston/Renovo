@@ -32,13 +32,16 @@ final class NavigationService
     }
 
     /**
-     * The rail's main group: the application's own screens.
+     * The rail's main group: the three screens you read.
      *
-     * The order is the order the design gives, with the destinations the design
-     * table has no row for kept rather than dropped — a redesign that quietly
-     * removed the only link to budgets would be a regression dressed as a
-     * layout. Four of them carry `tab: true` and are what a phone gets along
-     * the bottom; the rest are one tap further away behind "More".
+     * Phase 9's rail had thirteen rows; the prototype has eight. Nothing lost
+     * its route in the difference — each destination that no longer has a row
+     * of its own is claimed by one that does, so the rail still says where you
+     * are on it and there is still a way there. The claims are the `matches`
+     * lists below, and the destination table in PHASE.md (section B) is the map they follow.
+     *
+     * The three of them carry `tab: true` and are what a phone gets along the
+     * bottom, either side of the add button; the rest are behind "More".
      *
      * @return list<NavItem>
      */
@@ -46,24 +49,30 @@ final class NavigationService
     {
         return [
             new NavItem(
+                id: 'dashboard',
                 labelKey: 'nav.dashboard',
                 href: '/',
                 icon: 'dashboard',
                 matches: ['/'],
                 tab: true,
+                tabLabelKey: 'nav.tab_home',
             ),
+            // Cancel-by is the list read by one date, and the list links to
+            // it; it lights the list rather than needing a row of its own.
             new NavItem(
+                id: 'subscriptions',
                 labelKey: 'nav.subscriptions',
                 href: '/subscriptions',
                 icon: 'subscriptions',
-                matches: ['/subscriptions'],
+                matches: ['/subscriptions', '/cancellations'],
                 permission: Permission::ViewSubscriptions,
                 tab: true,
+                tabLabelKey: 'nav.tab_subscriptions',
             ),
-            // The design calls this Analytics and points it at the statistics
-            // screen; the forecast is the same question asked forwards, so it
-            // lights the same item rather than needing a rail entry of its own.
+            // The forecast is the statistics' question asked forwards, so it
+            // lights the same item; the statistics page links to it.
             new NavItem(
+                id: 'analytics',
                 labelKey: 'nav.analytics',
                 href: '/stats',
                 icon: 'analytics',
@@ -71,15 +80,28 @@ final class NavigationService
                 permission: Permission::ViewSubscriptions,
                 tab: true,
             ),
+        ];
+    }
+
+    /**
+     * The rail's "Household tools" group: the things around the list.
+     *
+     * Notifications sits beside Settings although it lives under it, because
+     * it is per person (decision 13) and visited repeatedly. Its path is
+     * longer than Settings', which is what makes it win the active item — see
+     * `NavItem::claim()`. Members & roles wins over Settings the same way.
+     *
+     * Settings claims the screens that lost their rows — categories, payment
+     * methods, import, the audit log — because its page carries the links to
+     * them until the Settings rebuild gives them tabs.
+     *
+     * @return list<NavItem>
+     */
+    private function toolItems(?Scope $scope): array
+    {
+        return array_values(array_filter([
             new NavItem(
-                labelKey: 'nav.calendar',
-                href: '/calendar',
-                icon: 'calendar',
-                matches: ['/calendar'],
-                permission: Permission::ViewSubscriptions,
-                tab: true,
-            ),
-            new NavItem(
+                id: 'budgets',
                 labelKey: 'nav.budgets',
                 href: '/budgets',
                 icon: 'budget',
@@ -87,91 +109,77 @@ final class NavigationService
                 permission: Permission::ViewSubscriptions,
             ),
             new NavItem(
-                labelKey: 'nav.cancellations',
-                href: '/cancellations',
-                icon: 'cancellations',
-                matches: ['/cancellations'],
+                id: 'calendar',
+                labelKey: 'nav.calendar',
+                href: '/calendar',
+                icon: 'calendar',
+                matches: ['/calendar'],
                 permission: Permission::ViewSubscriptions,
             ),
+            $this->membersItem($scope),
             new NavItem(
-                labelKey: 'nav.categories',
-                href: '/categories',
-                icon: 'categories',
-                matches: ['/categories'],
-                permission: Permission::ViewSubscriptions,
-            ),
-            new NavItem(
-                labelKey: 'nav.payment_methods',
-                href: '/payment-methods',
-                icon: 'payment-methods',
-                matches: ['/payment-methods'],
-                permission: Permission::ViewSubscriptions,
-            ),
-            // The people, rather than the subscriptions. It asks for a
-            // permission of its own because it is the one screen that shows
-            // what somebody *else* spends, and that is not part of being
-            // allowed to read the household's list.
-            new NavItem(
-                labelKey: 'nav.household',
-                href: '/household',
-                icon: 'household',
-                matches: ['/household'],
-                permission: Permission::ViewHousehold,
-            ),
-        ];
-    }
-
-    /**
-     * The rail's bottom group: the things you configure rather than read.
-     *
-     * Notifications is above Settings although it lives under it, because the
-     * design gives it a row of its own and because it is the one a person
-     * visits repeatedly. Its path is longer than Settings', which is what makes
-     * it win the active item — see `NavItem::claim()`.
-     *
-     * Import has no row. It is reached from Settings, which is where its
-     * button lives, and Settings is what the rail marks while you are on it.
-     *
-     * @return list<NavItem>
-     */
-    private function toolItems(): array
-    {
-        return [
-            new NavItem(
+                id: 'notifications',
                 labelKey: 'nav.notifications',
                 href: '/settings/notifications',
                 icon: 'notifications',
                 matches: ['/settings/notifications'],
             ),
             new NavItem(
-                labelKey: 'nav.audit',
-                href: '/audit',
-                icon: 'audit',
-                matches: ['/audit'],
-                permission: Permission::ViewAuditLog,
-            ),
-            // Settings claims the import screens as well as its own. Importing
-            // is something you do once and from where you were sent — the
-            // Settings page carries the button — so a rail row of its own was
-            // a permanent fixture for an occasional errand. It still has to be
-            // claimed by *something*, or the import page is the one screen in
-            // the application whose rail marks nothing as where you are.
-            new NavItem(
+                id: 'settings',
                 labelKey: 'nav.settings',
                 href: '/settings',
                 icon: 'settings',
-                matches: ['/settings', '/import'],
+                matches: ['/settings', '/import', '/categories', '/tags', '/payment-methods', '/audit'],
             ),
-            // Profile is a page of its own: what one account sets for itself,
-            // as against Settings, where a household or an instance decides
-            // something on everybody's behalf.
-            new NavItem(
-                labelKey: 'nav.profile',
-                href: '/profile',
-                icon: 'profile',
-                matches: ['/profile'],
-            ),
-        ];
+        ]));
+    }
+
+    /**
+     * Members & roles, pointed at whichever of the two people screens this
+     * reader may open — or nothing, if neither.
+     *
+     * An Owner/Admin gets the member screen, where the people are managed. An
+     * Editor or Contributor may not manage anybody but may see the household's
+     * read-only overview, which was a rail row of its own before this phase;
+     * the same item takes them there, so the overview keeps its route. Both
+     * paths light the one item wherever you arrived from.
+     */
+    private function membersItem(?Scope $scope): ?NavItem
+    {
+        $href = match (true) {
+            $this->allows($scope, Permission::ManageHousehold) => '/settings/members',
+            $this->allows($scope, Permission::ViewHousehold) => '/household',
+            default => null,
+        };
+
+        if ($href === null) {
+            return null;
+        }
+
+        return new NavItem(
+            id: 'members',
+            labelKey: 'nav.members',
+            href: $href,
+            icon: 'household',
+            matches: ['/settings/members', '/household'],
+        );
+    }
+
+    /**
+     * The user card: what one account sets for itself, as against Settings,
+     * where a household or an instance decides something on everybody's
+     * behalf. It is drawn as a card rather than a row, but it is claimed like
+     * any row, so standing on your profile lights it and nothing else.
+     */
+    private function accountItem(): NavItem
+    {
+        return new NavItem(
+            id: 'profile',
+            labelKey: 'nav.profile',
+            href: '/profile',
+            icon: 'profile',
+            matches: ['/profile'],
+        );
     }
 
     /**
@@ -181,15 +189,18 @@ final class NavigationService
     public function forPath(?Scope $scope, string $path): Navigation
     {
         $primary = $this->visible($this->primaryItems(), $scope);
-        $tools = $this->visible($this->toolItems(), $scope);
+        $tools = $this->visible($this->toolItems($scope), $scope);
+        $account = $this->accountItem();
 
-        $active = $this->activeItem([...$primary, ...$tools], $path);
+        $active = $this->activeItem([...$primary, ...$tools, $account], $path);
 
         $link = fn (NavItem $item): NavLink => new NavLink(
+            $item->id,
             $item->labelKey,
             $item->href,
             $item->icon,
             $item === $active,
+            $item->tabLabelKey ?? $item->labelKey,
         );
 
         $tabs = array_values(array_filter($primary, static fn (NavItem $item): bool => $item->tab));
@@ -201,6 +212,7 @@ final class NavigationService
         return new Navigation(
             array_map($link, $primary),
             array_map($link, $tools),
+            $link($account),
             array_map($link, $tabs),
             array_map($link, $drawer),
         );
@@ -223,8 +235,13 @@ final class NavigationService
                 return true;
             }
 
-            return $scope !== null && $this->permissions->allows($scope, $item->permission);
+            return $this->allows($scope, $item->permission);
         }));
+    }
+
+    private function allows(?Scope $scope, Permission $permission): bool
+    {
+        return $scope !== null && $this->permissions->allows($scope, $permission);
     }
 
     /**

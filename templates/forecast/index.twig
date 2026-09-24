@@ -3,6 +3,7 @@
 {% block title %}{{ t('nav.forecast') }} — {{ instance_name }}{% endblock %}
 
 {% block heading %}{{ t('forecast.next_12_months') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.forecast') }}{% endblock %}
 
 {% block page_actions %}
     <a class="button button-quiet" href="/forecast{{ mine_only ? '' : '?mine=1' }}">

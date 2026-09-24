@@ -1,0 +1,27 @@
+{#
+    The base currency and when its rates were last fetched: "GBP · rates 23 Sep".
+
+    Read from what the rate cache records — rendering this never fetches. A
+    stale or missing set of rates wears the warning pair and says so in words,
+    so the state is never colour alone.
+
+    For whoever may change the rate provider it links to that setting; for
+    anyone else it is a status, since the settings it would lead to are not
+    theirs to open.
+
+    `chip`  a RatesChip
+#}
+{% set warning = chip.state.isWarning() %}
+{% set tag = chip.linksToSettings ? 'a' : 'span' %}
+<{{ tag }} class="rates-chip num{{ warning ? ' is-warning' : '' }}"
+    {%- if chip.linksToSettings %} href="/settings#exchange-rates"{% endif %}>
+    {%- if warning -%}{{ icon('warn', 'rates-chip-icon') }}{%- endif -%}
+    {%- if chip.refreshedAt -%}
+        {{ t('shell.rates_on', {'currency': chip.currency, 'date': chip.refreshedAt|local_date('d MMM')}) }}
+    {%- else -%}
+        {{ t('shell.rates_unavailable', {'currency': chip.currency}) }}
+    {%- endif -%}
+    {%- if chip.state.value == 'stale' -%}
+        <span class="visually-hidden"> {{ t('shell.rates_stale') }}</span><span class="rates-chip-flag" aria-hidden="true">{{ t('shell.rates_stale') }}</span>
+    {%- endif -%}
+</{{ tag }}>

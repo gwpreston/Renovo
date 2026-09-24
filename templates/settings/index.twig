@@ -1,8 +1,35 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.settings') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.settings') }}{% endblock %}
 
 {% block content %}
+
+    {#
+        The pages that lost their rail rows when the rail was rebuilt to the
+        prototype, gathered here until the Settings rebuild gives them tabs.
+        Settings is what the rail lights while you are on any of them, so this
+        row is how they are reached and the rail is how you know where you are.
+        Each is offered to whoever may open it, and to nobody else.
+    #}
+    <nav class="settings-links" aria-label="{{ t('settings.more_pages') }}">
+        <ul class="settings-links-list">
+            {% if can(scope, 'subscription.view') %}
+                <li><a href="/categories">{{ icon('categories', 'nav-icon') }}{{ t('nav.categories') }}</a></li>
+                <li><a href="/payment-methods">{{ icon('payment-methods', 'nav-icon') }}{{ t('nav.payment_methods') }}</a></li>
+            {% endif %}
+            {% if can(scope, 'data.import') %}
+                <li><a href="/import">{{ icon('upload', 'nav-icon') }}{{ t('nav.import') }}</a></li>
+            {% endif %}
+            {% if can(scope, 'backup.manage') %}
+                <li><a href="/settings/backup">{{ icon('download', 'nav-icon') }}{{ t('backup.title') }}</a></li>
+            {% endif %}
+            {% if can(scope, 'audit.view') %}
+                <li><a href="/audit">{{ icon('audit', 'nav-icon') }}{{ t('audit.title') }}</a></li>
+            {% endif %}
+            <li><a href="/settings/api-tokens">{{ icon('key', 'nav-icon') }}{{ t('tokens.title') }}</a></li>
+        </ul>
+    </nav>
 
     {% if can(scope, 'data.import') or can(scope, 'backup.manage') %}
         <section class="card">
@@ -90,7 +117,7 @@
                 </select>
 
                 <fieldset class="stack">
-                    <legend>{{ t('settings.exchange_rates') }}</legend>
+                    <legend id="exchange-rates">{{ t('settings.exchange_rates') }}</legend>
                     <p class="hint">{{ t('settings.rates_note') }}</p>
 
                     {% for provider in rate_providers %}
