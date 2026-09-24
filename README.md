@@ -1,7 +1,8 @@
 # Renovo
 
 A self-hosted tracker for subscriptions and recurring bills. Multi-user,
-permission-scoped, with multi-currency totals, budgets, a twelve-month forecast,
+permission-scoped, with an Overview and a Household dashboard, multi-currency
+totals, budgets, a twelve-month forecast,
 price history, free-trial tracking, shared-cost splitting, upcoming-renewal
 windows, notice periods, a versioned JSON API, CSV/JSON import, whole-household
 backups, a calendar feed and a calendar view, attached invoices, saved views,
@@ -96,7 +97,8 @@ Built in phases:
   dashboard somebody has arranged keeps its arrangement and finds them
   appended. It adds no figure the application did not already produce — and it
   no longer repeats the subscriptions list, which is the Subscriptions page's
-  own subject.
+  own subject. *Phase 21 replaced this card set with the prototype's two
+  dashboards; see below.*
 
 - **Phase 11 — my subscriptions — complete.** The subscriptions screen in the
   design's arrangement: a stats strip across the top, the list itself, the two
@@ -266,8 +268,9 @@ language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-See `PHASE.md` for what was in scope for the last phase and `SPEC.md` for the
-conventions every phase followed.
+The current phase is **Phase 21 — the dashboard: Overview and Household**.
+`PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
+archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
 ---
 
@@ -1839,9 +1842,9 @@ password for each, once:
 
 The second account is what makes the demonstration a household rather than a
 list. A **Contributor** reads everything and changes only their own part of it,
-so signing in as Rowan is the only way to see that role; the per-member
-breakdown on the dashboard and the Household screen need somebody to compare
-against before they draw anything at all; and the four budgets between them
+so signing in as Rowan is the only way to see that role; Who pays on the
+Household dashboard and the Household screen need somebody to compare against
+before they draw anything at all; and the four budgets between them
 land comfortable, near their limit and over it, which is every state the budget
 card has.
 
