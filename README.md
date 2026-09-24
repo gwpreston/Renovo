@@ -108,7 +108,8 @@ Built in phases:
   alongside. The list is the same list, so saved views, density, scope and
   permissions are unchanged by the restyle; the figures are the ones the
   Statistics page and the cancel-by view already produce. It adds no data and no
-  new query path. See [My subscriptions](#my-subscriptions).
+  new query path. *Phase 22 rearranged this screen to the prototype and moved
+  trials and the category widget to the dashboard; see below.*
 
 - **Phase 12 — analytics and insights — complete.** The Statistics page
   restyled to the design's layout: a KPI row, the twelve-month spending
