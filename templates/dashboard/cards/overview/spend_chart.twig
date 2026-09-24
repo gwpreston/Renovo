@@ -48,6 +48,9 @@
                     {% for bar in chart.bars %}
                         <div class="spend-bar is-{{ bar.kind }}{{ bar.is_busiest ? ' is-busiest' : '' }}"
                              title="{{ bar.long_label }} · {{ bar.total_display }}">
+                            {% if bar.is_busiest %}
+                                <b class="spend-bar-peak num">{{ bar.total_display }}</b>
+                            {% endif %}
                             {% if bar.due_minor > 0 %}
                                 <span class="spend-bar-due" style="height: {{ bar.due_height }}"></span>
                             {% endif %}

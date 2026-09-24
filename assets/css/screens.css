@@ -1515,9 +1515,11 @@ tr.is-passed > td {
 
 .spend-bar > span {
     display: block;
+    flex-shrink: 0;
 }
 
-.spend-bar > span:first-child {
+/* The topmost part of a bar is rounded — still due when there is some. */
+.spend-bar > span:first-of-type {
     border-radius: 5px 5px 0 0;
 }
 
@@ -1533,9 +1535,19 @@ tr.is-passed > td {
     opacity: 0.85;
 }
 
-/* The busiest month is picked out by weight, not by a second colour. */
-.spend-bar.is-busiest > span:first-child {
-    box-shadow: 0 -3px 0 var(--accent);
+/*
+ * The busiest month carries its total above it, as the line charts label
+ * their peak: a figure, not a second colour, so it reads on the hatch as well
+ * as on the solid bars.
+ */
+.spend-bar-peak {
+    margin-bottom: 0.25rem;
+    overflow: visible;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--text);
+    text-align: center;
+    white-space: nowrap;
 }
 
 .spend-bars-labels {
@@ -1562,6 +1574,12 @@ tr.is-passed > td {
 @media (max-width: 479px) {
     .spend-bars-labels span:nth-child(even):not(.is-current) {
         visibility: hidden;
+    }
+
+    /* The shown labels may spill into the hidden neighbour's column. */
+    .spend-bars-labels span {
+        overflow: visible;
+        white-space: nowrap;
     }
 
     .spend-bars-plot,

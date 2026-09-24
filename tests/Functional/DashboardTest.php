@@ -311,6 +311,26 @@ final class DashboardTest extends DatabaseTestCase
         self::assertStringContainsString('£22.02 left this month', $card);
     }
 
+    /**
+     * Another member's personal budget measures their spending, not the
+     * viewer's, so it is not on the viewer's card — though in SHARED mode the
+     * viewer can read it on the budget screen.
+     */
+    public function testTheBudgetsCardLeavesOutOtherMembersOwnBudgets(): void
+    {
+        $this->budget($this->editorId, 'Editors own', '10.00', 'monthly', (string) $this->editorId);
+        $this->budget($this->ownerId, 'House', '200.00', 'monthly', BudgetService::SUBJECT_HOUSEHOLD);
+
+        $names = array_map(
+            static fn (array $row): string => $row['budget']->name,
+            $this->overview($this->ownerId)['budgets'],
+        );
+
+        self::assertSame(['House'], $names);
+        $card = $this->section($this->body($this->get('/', $this->ownerId)), 'budgets-card');
+        self::assertStringNotContainsString('Editors own', $card);
+    }
+
     public function testABudgetOverOnlyIfTheTrialsConvertSaysSo(): void
     {
         // £14.99 committed, £27.98 with the trial: under £20 only without it.

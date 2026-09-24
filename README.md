@@ -249,6 +249,17 @@ Built in phases:
   subscriptions and says how many. See
   [Paused, cancelled, and only me](#paused-cancelled-and-only-me),
   [Budgets](#budgets) and [Notifications](#notifications).
+- **Phase 21 — the dashboard: Overview and Household — complete.** The
+  prototype's two dashboards on one page, with a toggle between them that is
+  remembered on the account and a card layout of their own for each.
+  **Overview** shows what the month and the year cost, what is coming, and where
+  the money goes. **Household** shows how this month is going, who pays what,
+  and how the year compares with its budget pace. Past spend is reconstructed
+  from start dates and price history, and says so. The reconstruction now lives
+  in one service, which year-over-year shares, and it stops counting a
+  cancelled subscription at its cancellation date. **Upgrading resets every
+  saved dashboard layout once** (see [Upgrading](#upgrading)). Three
+  migrations. See [The dashboard](#the-dashboard).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
@@ -447,6 +458,15 @@ Every migration ships a working `down()`. PostgreSQL has transactional DDL, so a
 failed migration rolls back completely; MySQL does not, so migrations are kept
 small and the applied version is tracked in `phinxlog` — `phinx status` will
 show a partially applied set.
+
+One exception, and it is deliberate. **Upgrading to Phase 21 clears every saved
+dashboard layout once** (`20261101000003_reset_saved_dashboard_layouts`),
+because the card set was replaced wholesale. A kept layout would have put the
+new cards behind the positions of cards that no longer exist. Everyone starts
+from the new default arrangement and can rearrange it from their profile.
+Nothing else is touched. The migration's `down()` does nothing, because a
+deletion cannot be undone. The backup you took first is the only way back to
+the old arrangements.
 
 ---
 
@@ -1019,6 +1039,41 @@ screens at both settings and compares the HTML to keep it that way. The
 property is easy to lose the first time somebody tidies a compact list by
 dropping a column, and losing it would turn a visual preference into a
 different page.
+
+## The dashboard
+
+One page with two views and a toggle between them. The choice is remembered on
+your account, and each view has its own card order and hiding.
+
+- **Overview**: monthly spend (with "N% of budget" when the household has a
+  monthly overall budget), the yearly run-rate at today's prices, what is due
+  in the next seven days, and the active count with trials and paused beneath.
+  Below that: a thirteen-bar chart of six months behind, this month split into
+  already charged and still due, and six forecast months; where the money goes;
+  the next 30 days of charges; this month's budgets; running trials, with
+  Cancel trial for whoever may change the row; and the next scheduled price
+  rise. The subscriptions table is an optional card.
+- **Household**: this month so far, as already charged of everything due; year
+  to date against the same stretch last year; the next twelve months; what the
+  running trials will add; the next 30 days on a timeline; who pays what after
+  splits; spending by category; and the year's spend against an even pace of
+  the household budget.
+
+Every figure comes from a service the rest of the application already uses. The
+chart's forecast months are the Forecast page's months, and its past months
+come from the same reconstruction year-over-year uses. Renovo keeps no ledger,
+so past spend is **reconstructed** from start dates, billing cycles and price
+history. The cards say so, and say how many subscriptions were left out for
+having no start date. "Already charged" means the charge's date has passed.
+Nothing confirms that it was paid.
+
+Money follows the usual rule: a combined total only when every currency
+converts, otherwise per-currency figures with the missing rate named. The
+budget line, the month's marker and the pace card use the household's own
+budget, never a member's, because they sit against household-wide totals. With
+no such budget they are left out; in ISOLATED mode there is never one. Under
+ISOLATED, Who pays shows only your own share. There is no time-of-day greeting,
+because dates are UTC.
 
 ## My subscriptions
 
@@ -1687,8 +1742,11 @@ else does.
 - **Open on** — the page you land on when you open Renovo. The dashboard,
   the subscriptions list, the calendar, budgets, the forecast or the statistics.
 - **Dashboard cards** — reorder them by number and untick the ones you do not
-  want. A card added by a later version appears in its default place rather
-  than silently going missing.
+  want, separately for the Overview and the Household dashboard. A card added by
+  a later version appears in its default place rather than silently going
+  missing. The subscriptions table is listed but off until you tick it.
+  Which of the two dashboards you open on is remembered from the toggle at the
+  top of the dashboard itself.
 
 ### Saved views
 

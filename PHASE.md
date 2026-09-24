@@ -121,7 +121,7 @@ Both with explicit `down()`, verified on both engines.
 
 - **Saved layouts — reset (a).** A migration of its own clears every saved
   layout once, so everyone starts from the new defaults; its `down()` is a
-  documented no-op (a deletion cannot be undone). Noted in the release notes.
+  documented no-op (a deletion cannot be undone). Noted in README's Upgrading section.
 - **The subscriptions table is reinstated** as an optional Overview card,
   hidden by default, under its old key `recent`. (It was retired in 530eb3a; this
   phase brings it back as an opt-in card rather than dropping the line.)
@@ -173,8 +173,8 @@ Both with explicit `down()`, verified on both engines.
 - [x] Household: month-so-far hero, hero figures, 30-day timeline, who pays
       (scoped), year vs budget pace, by category
 - [x] Phase 10 cards mapped/retired; subscriptions table optional
-- [ ] Narrow layout: one column, charts legible at 390px (CSS in place; not yet
-      checked in a browser at 390px)
+- [x] Narrow layout: one column, charts legible at 390px (checked in a browser,
+      both views, light and dark)
 - [x] New strings in `translations/en.php`
 - [x] `composer check`, `i18n:check` green on both engines
 

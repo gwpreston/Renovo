@@ -60,8 +60,11 @@ final class BudgetMonthService
     /**
      * The viewer's monthly budgets, read against this month.
      *
-     * Only budgets this scope can measure honestly are included — the budget
-     * screen explains the others. The overall ones lead, the household's before
+     * The viewer's own budgets and the household's — never one another member
+     * set for themselves, which in SHARED mode the viewer can see on the
+     * budget screen but which measures somebody else's spending. Only budgets
+     * this scope can measure honestly are included; the budget screen
+     * explains the others. The overall ones lead, the household's before
      * a member's, then the per-category ones, each group oldest first so the
      * order holds still between visits.
      *
@@ -72,6 +75,7 @@ final class BudgetMonthService
         $monthly = array_values(array_filter(
             $this->budgets->all($scope),
             fn (Budget $budget): bool => $budget->period === BudgetPeriod::Monthly
+                && ($budget->isHousehold() || $budget->subjectUserId === $scope->userId)
                 && $this->budgets->isMeasurableBy($scope, $budget),
         ));
 

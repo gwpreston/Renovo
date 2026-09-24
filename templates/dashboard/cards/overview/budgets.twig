@@ -26,7 +26,10 @@
                 {% set state = row.is_over ? 'is-over' : (row.over_if_trials_convert or row.is_warning ? 'is-warning' : '') %}
                 <li class="budget-row {{ state }}">
                     <p class="budget-row-head">
-                        <strong>{{ row.budget.name }}</strong>
+                        <span>
+                            <strong>{{ row.budget.name }}</strong>
+                            <span class="hint">· {{ row.budget.isHousehold ? t('dashboard.budget_household') : t('dashboard.budget_yours') }}</span>
+                        </span>
                         {% if row.charged is not null and row.projected is not null %}
                             <span class="num muted">{{ row.charged.amountMinor|money(row.charged.currency) }} / {{ row.limit.amountMinor|money(row.limit.currency) }}</span>
                         {% endif %}
