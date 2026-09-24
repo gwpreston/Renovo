@@ -17,29 +17,10 @@
  * what a segment of an incomplete total would mean.
  */
 
-import { drawInCard, payloadFor, token } from './charts.js';
+import { drawInCard, payloadFor, themeColours } from './charts.js';
 
 /** Where the payload and the canvas describe each other. */
 const CANVAS = 'canvas[data-chart="donut"]';
-
-/**
- * The categorical palette, in order.
- *
- * Six named series and one for the tail, defined per theme in `tokens.css`, so
- * a segment follows light and dark like everything else. The fallbacks are the
- * light palette's values: they matter only if the stylesheet has not arrived,
- * in which case the chart has bigger problems than its hues.
- */
-const SERIES = [
-    ['--series-1', '#097a70'],
-    ['--series-2', '#1069bb'],
-    ['--series-3', '#7a4fbd'],
-    ['--series-4', '#b4430f'],
-    ['--series-5', '#8a6d1f'],
-    ['--series-6', '#0d6b8f'],
-];
-
-const TAIL = ['--series-other', '#6b7280'];
 
 function labelFor(slice, otherLabel, unassignedLabel) {
     if (slice.is_other) {
@@ -57,20 +38,19 @@ function configFor(data, otherLabel, unassignedLabel) {
        "everything else" reads as everything else rather than as a seventh
        category. A segment that arrives with a colour of its own — a payment
        method somebody chose one for — keeps it; the rest take the palette. */
+    const palette = themeColours();
     const colours = data.slices.map((slice, index) => {
         if (!slice.is_other && typeof slice.colour === 'string' && slice.colour !== '') {
             return slice.colour;
         }
 
-        const [name, fallback] = slice.is_other ? TAIL : SERIES[index % SERIES.length];
-
-        return token(name, fallback);
+        return slice.is_other ? palette.other : palette.series[index % palette.series.length];
     });
 
-    const text = token('--text-muted', '#5b6472');
+    const text = palette.muted;
     /* The ring is cut out of the card, not painted on it, so the gaps between
        segments have to be the card's own surface. */
-    const surface = token('--surface', '#ffffff');
+    const surface = palette.surface;
 
     return {
         type: 'doughnut',

@@ -87,8 +87,8 @@
                                     <button type="submit" class="button button-quiet">{{ t('action.rename') }}</button>
                                 </form>
                             </td>
-                            <td>{{ passkey.createdAt|local_date('d MMM y') }}</td>
-                            <td>{{ passkey.lastUsedAt ? passkey.lastUsedAt|local_date('d MMM y HH:mm') : 'Never' }}</td>
+                            <td class="num">{{ passkey.createdAt|local_date('d MMM y') }}</td>
+                            <td class="num">{{ passkey.lastUsedAt ? passkey.lastUsedAt|local_date('d MMM y HH:mm') : 'Never' }}</td>
                             <td class="muted">{{ passkey.transportSummary }}</td>
                             <td>
                                 <form method="post" action="/settings/security/passkeys/{{ passkey.id }}/delete"
@@ -158,8 +158,8 @@
                             {% if item.isCurrent %}<span class="badge">{{ t('security.this_device') }}</span>{% endif %}
                         </td>
                         <td class="muted">{{ item.ipAddress|default('Unknown') }}</td>
-                        <td>{{ item.createdAt ? item.createdAt|local_date('d MMM y HH:mm') : '—' }}</td>
-                        <td>{{ item.lastActivity|local_date('d MMM y HH:mm') }}</td>
+                        <td class="num">{{ item.createdAt ? item.createdAt|local_date('d MMM y HH:mm') : '—' }}</td>
+                        <td class="num">{{ item.lastActivity|local_date('d MMM y HH:mm') }}</td>
                         <td>
                             {% if not item.isCurrent %}
                                 <form method="post" action="/settings/security/sessions/revoke" class="inline">

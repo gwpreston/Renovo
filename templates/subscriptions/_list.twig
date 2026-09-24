@@ -62,7 +62,7 @@
                                     }}">{{ subscription.name }}</a>
                                     {% if not subscription.isActive %}<span class="badge">{{ t('state.paused') }}</span>{% endif %}
                                     {% if subscription.isTrial %}
-                                        <span class="badge badge-warning">{{ t('state.trial') }}</span>
+                                        <span class="badge badge-warn">{{ t('state.trial') }}</span>
                                     {% endif %}
                                     {% if subscription.splitMode.isSplit %}
                                         <span class="badge"
@@ -107,7 +107,7 @@
                         <td>
                             {# For a trial this is the conversion, not the stale payment date. #}
                             {% if subscription.nextChargeDate %}
-                                {{ subscription.nextChargeDate|local_date('d MMM y') }}
+                                <span class="num">{{ subscription.nextChargeDate|local_date('d MMM y') }}</span>
                                 {% if subscription.isTrial %}
                                     <div class="hint">{{ t('state.trial_converts') }}</div>
                                 {% endif %}
@@ -121,8 +121,8 @@
                                 —
                             {% endif %}
                         </td>
-                        <td class="numeric">{{ subscription.price.amountMinor|money(subscription.price.currency) }}</td>
-                        <td class="numeric">
+                        <td class="numeric num">{{ subscription.price.amountMinor|money(subscription.price.currency) }}</td>
+                        <td class="numeric num">
                             {% if subscription.monthlyMinor is not null %}
                                 {{ subscription.monthlyMinor|money(subscription.price.currency) }}
                             {% else %}

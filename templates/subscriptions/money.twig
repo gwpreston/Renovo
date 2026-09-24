@@ -56,10 +56,10 @@
                             <div class="timeline-date">
                                 {{ entry.change.effectiveFrom|local_date('d MMM y') }}
                                 {% if entry.is_scheduled %}
-                                    <span class="badge badge-warning">{{ t('subscriptions_money.scheduled') }}</span>
+                                    <span class="badge badge-warn">{{ t('subscriptions_money.scheduled') }}</span>
                                 {% endif %}
                             </div>
-                            <div class="timeline-amount">
+                            <div class="timeline-amount num">
                                 {{ entry.change.price.amountMinor|money(entry.change.price.currency) }}
                                 {% if entry.difference_minor is not null and entry.difference_minor != 0 %}
                                     <span class="{{ entry.difference_minor > 0 ? 'is-increase' : 'is-decrease' }}">
@@ -124,8 +124,8 @@
                         {% for share in shares %}
                             <tr>
                                 <td>{{ share.user_name ?? '—' }}</td>
-                                <td class="numeric">{{ share.share_units }}</td>
-                                <td class="numeric">{{ share.amount.amountMinor|money(share.amount.currency) }}</td>
+                                <td class="numeric num">{{ share.share_units }}</td>
+                                <td class="numeric num">{{ share.amount.amountMinor|money(share.amount.currency) }}</td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -244,9 +244,9 @@
                                     {{ attachment.originalFilename }}
                                 </a>
                             </td>
-                            <td>{{ attachment.periodDate ? attachment.periodDate|local_date('MMM y') : '—' }}</td>
+                            <td class="num">{{ attachment.periodDate ? attachment.periodDate|local_date('MMM y') : '—' }}</td>
                             <td class="muted">{{ attachment.humanSize() }}</td>
-                            <td class="muted">{{ attachment.createdAt|local_date('d MMM y') }}</td>
+                            <td class="muted num">{{ attachment.createdAt|local_date('d MMM y') }}</td>
                             <td>
                                 {% if can(scope, 'attachment.manage') and can_edit_row(scope, subscription) %}
                                     <form method="post"

@@ -17,7 +17,7 @@
                 <tr>
                     <td>{{ row.name }}</td>
                     <td>{{ row.count }}</td>
-                    <td class="numeric">{{ row.monthly_minor|money(row.currency) }}</td>
+                    <td class="numeric num">{{ row.monthly_minor|money(row.currency) }}</td>
                 </tr>
             {% endfor %}
             </tbody>

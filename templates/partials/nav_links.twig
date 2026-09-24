@@ -12,10 +12,8 @@
     because the drawer's list sits inside the bottom bar's own and nesting one
     navigation landmark in another tells a screen reader there are two.
 
-    The icon is an empty span the bundle fills in: see `assets/js/icons.js`. It
-    carries `aria-hidden`, because what says where the link goes is the text
-    beside it — which is also why a browser with the script blocked loses
-    nothing but the picture.
+    The icon is server-rendered from the sprite (see `icon()`), and hidden from
+    assistive technology: what says where the link goes is the text beside it.
 #}
 <ul class="nav-list">
     {% for link in links %}
@@ -23,7 +21,7 @@
             <a class="nav-link{{ link.active ? ' is-active' : '' }}"
                href="{{ link.href }}"
                {{ link.active ? 'aria-current="page"' : '' }}>
-                <span class="nav-icon" data-icon="{{ link.icon }}" aria-hidden="true"></span>
+                {{ icon(link.icon, 'nav-icon') }}
                 <span class="nav-label">{{ t(link.labelKey) }}</span>
             </a>
         </li>

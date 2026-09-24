@@ -1,129 +1,45 @@
 /**
- * The icon set.
+ * Icons, for the few places a script builds markup of its own.
  *
- * Lucide ships a thousand icons as individual modules, so the ones named here
- * are the only ones bundled — importing the package's index instead would put
- * every icon in the bundle to use a couple of dozen of them.
+ * Everything the server renders gets its icons from the Twig `icon()`
+ * function, which points a `<use>` at the sprite the build produced from
+ * `assets/theme/icons.json`. A script that draws a badge after the page has
+ * loaded — the payment-method preview — does the same thing here, against the
+ * same sprite, so there is one set of drawings and no copy of Lucide in the
+ * bundle.
  *
- * Adding an icon is adding a line to this map. There is no lazy path and does
- * not need one: each icon is a few hundred bytes of path data.
- *
- * The names are what a thing is in this application, not what Lucide calls the
- * drawing. `subscriptions` is the navigation's second item; which glyph that
- * happens to be is this file's business and nowhere else's.
+ * The sprite's URL is content-hashed, so the layout hands it over on the root
+ * element as `data-icon-sprite` rather than this file guessing it.
  */
 
-import {
-    ArrowLeftRight,
-    Banknote,
-    BellRing,
-    CalendarDays,
-    CalendarX2,
-    ChartLine,
-    ChartNoAxesColumn,
-    CircleAlert,
-    CircleUserRound,
-    CreditCard,
-    Ellipsis,
-    Gift,
-    Landmark,
-    LayoutDashboard,
-    Plus,
-    Repeat,
-    ScrollText,
-    Search,
-    Settings,
-    Smartphone,
-    Tag,
-    Users,
-    Wallet,
-    WalletCards,
-    createElement,
-} from 'lucide';
-
-const ICONS = {
-    add: Plus,
-    alert: CircleAlert,
-    analytics: ChartNoAxesColumn,
-    audit: ScrollText,
-    budget: Wallet,
-    calendar: CalendarDays,
-    cancellations: CalendarX2,
-    categories: Tag,
-    dashboard: LayoutDashboard,
-    forecast: ChartLine,
-    household: Users,
-    more: Ellipsis,
-    notifications: BellRing,
-    'payment-methods': WalletCards,
-    /* The generic pictures a payment method can carry. Deliberately not
-       anybody's logo: PayPal is a wallet here and the App Store a phone, and
-       a household that wants the real mark uploads it. The list of keys is
-       mirrored in `App\Domain\DefaultPaymentMethods::ICONS`. */
-    'payment-bank': Landmark,
-    'payment-card': CreditCard,
-    'payment-cash': Banknote,
-    'payment-gift': Gift,
-    'payment-phone': Smartphone,
-    'payment-repeat': Repeat,
-    'payment-transfer': ArrowLeftRight,
-    'payment-wallet': Wallet,
-    profile: CircleUserRound,
-    search: Search,
-    settings: Settings,
-    subscriptions: CreditCard,
-};
+const SVG = 'http://www.w3.org/2000/svg';
 
 /**
- * An icon as an `<svg>` element, or null if there is no icon by that name.
+ * An icon as an `<svg>` element, or null when the page carries no sprite.
  *
  * An element rather than a string of markup, so a caller cannot put it on a
- * page with `innerHTML` and cannot be tempted to interpolate anything into it.
- * Icons are decoration, so the element is hidden from assistive technology —
- * whatever the icon sits beside carries the meaning.
+ * page with `innerHTML`. Icons are decoration, so the element is hidden from
+ * assistive technology — whatever the icon sits beside carries the meaning.
  *
- * @param {string} name A key of the map above.
+ * @param {string} name A key of `assets/theme/icons.json`.
+ * @param {string} [className] A class for the `<svg>`, which is what sizes it.
  * @returns {SVGElement|null}
  */
-export function icon(name) {
-    const definition = ICONS[name];
+export function icon(name, className = 'icon') {
+    const sprite = document.documentElement.dataset.iconSprite;
 
-    if (definition === undefined) {
+    if (!sprite) {
         return null;
     }
 
-    const element = createElement(definition);
-    element.setAttribute('aria-hidden', 'true');
-    element.setAttribute('focusable', 'false');
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('class', className);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
 
-    return element;
-}
+    const use = document.createElementNS(SVG, 'use');
+    use.setAttribute('href', `${sprite}#${name}`);
+    svg.append(use);
 
-/** The names `icon()` will answer to. */
-export function iconNames() {
-    return Object.keys(ICONS);
-}
-
-/**
- * Fill every `<span data-icon="…">` under `root` with its drawing.
- *
- * The shell's navigation marks its icon slots in the HTML and lets this put
- * the pictures in, rather than the server inlining path data it would have to
- * keep in step with this map by hand. Nothing depends on it running: each slot
- * sits beside the label that says where the link goes, the stylesheet reserves
- * the space either way, and a browser with the bundle blocked gets navigation
- * with no pictures rather than navigation that has moved.
- *
- * Idempotent, so it can be called again after htmx has swapped in new markup.
- *
- * @param {ParentNode} [root] Where to look; the whole document by default.
- */
-export function hydrateIcons(root = document) {
-    root.querySelectorAll('[data-icon]:empty').forEach((slot) => {
-        const drawing = icon(slot.dataset.icon);
-
-        if (drawing !== null) {
-            slot.append(drawing);
-        }
-    });
+    return svg;
 }

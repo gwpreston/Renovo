@@ -34,18 +34,18 @@
         <div class="columns">
             <div>
                 <h3 class="stat-label">{{ t('stats.last_12_months') }}</h3>
-                <p class="stat-value">{{ yoy.current.amount_minor|money(yoy.current.currency) }}</p>
+                <p class="stat-value num">{{ yoy.current.amount_minor|money(yoy.current.currency) }}</p>
             </div>
             <div>
                 <h3 class="stat-label">{{ t('stats.the_12_before_that') }}</h3>
-                <p class="stat-value">{{ yoy.previous.amount_minor|money(yoy.previous.currency) }}</p>
+                <p class="stat-value num">{{ yoy.previous.amount_minor|money(yoy.previous.currency) }}</p>
             </div>
             <div>
                 <h3 class="stat-label">{{ t('field.change') }}</h3>
-                <p class="stat-value {{ yoy.change_minor > 0 ? 'is-increase' : 'is-decrease' }}">
+                <p class="stat-value num {{ yoy.change_minor > 0 ? 'is-increase' : 'is-decrease' }}">
                     {{ yoy.change_minor|money(yoy.current.currency, true) }}
                     {% if yoy.change_percent is not null %}
-                        <span class="stat-unit">({{ yoy.change_percent|percent(true) }})</span>
+                        <span class="stat-unit num">({{ yoy.change_percent|percent(true) }})</span>
                     {% endif %}
                 </p>
             </div>
@@ -80,9 +80,9 @@
                         and nothing else, so nobody is shown a price they
                         have never been charged.
                     #}
-                    <p class="stat-value">
+                    <p class="stat-value num">
                         {{ row.monthly_minor|money(row.subscription.price.currency) }}
-                        <span class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
+                        <span class="stat-unit num">{{ t('dashboard.per_month_unit') }}</span>
                     </p>
                 </li>
             {% endfor %}

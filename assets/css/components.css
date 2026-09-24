@@ -6,7 +6,8 @@
  * price timeline, the budget meters — are in `screens.css`.
  *
  * No rule here writes a colour literal. Everything resolves to a token from
- * `tokens.css`, which is what lets the same markup carry both themes.
+ * `assets/theme/tokens.json`, which is what lets the same markup carry every
+ * palette in light and dark.
  */
 
 /* ------------------------------------------------------------------ layout */
@@ -118,12 +119,9 @@ main.container {
 /* ------------------------------------------------------------------ cards */
 
 /*
- * The surface everything sits on: a 16px radius and a single hairline border.
- *
- * On the dark theme the border is a 8%-white inner line rather than a drop
- * shadow, because a shadow cast onto a near-black page is invisible. What
- * separates a card from the page there is the light catching its top edge,
- * which is what the `::before` highlight below imitates.
+ * The surface everything sits on: a 12px radius, a single hairline border and
+ * a soft shadow. On the dark theme `--shadow` is `none` — a shadow cast onto a
+ * navy-slate page is invisible — and the border alone lifts the card.
  */
 .card {
     position: relative;
@@ -147,30 +145,14 @@ main.container {
 }
 
 /*
- * The featured card, and the only place the logo gradient is allowed to wash
- * across a surface. PHASE.md reserves it for one card per screen: used on
- * every card it would stop meaning "look here".
+ * The featured card: one per screen, or it stops meaning "look here". It used
+ * to be washed in the logo's gradient; the gradient now belongs to the mark
+ * alone, so the card is edged in the palette's accent instead, with a band
+ * of it along the top that says the same thing in any palette.
  */
 .card-featured {
-    border-color: transparent;
-    background:
-        linear-gradient(var(--surface), var(--surface)) padding-box,
-        var(--gradient-brand) border-box;
-    border: 1px solid transparent;
-}
-
-.card-featured::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: var(--gradient-brand);
-    opacity: 0.08;
-    pointer-events: none;
-}
-
-.card-featured > * {
-    position: relative;
+    border-color: var(--accent);
+    border-top-width: 3px;
 }
 
 /* --------------------------------------------------------------- the shell */
@@ -205,7 +187,7 @@ main.container {
     justify-content: space-between;
     gap: 0.75rem 1rem;
     padding: 0.75rem 1rem;
-    background: var(--surface-raised);
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
 }
 
@@ -219,8 +201,8 @@ main.container {
 
 .topbar-title {
     margin: 0;
-    font-size: 1.375rem;
-    font-weight: var(--weight-semibold);
+    font-size: var(--size-title);
+    font-weight: var(--weight-bold);
     letter-spacing: -0.01em;
 }
 
@@ -260,16 +242,10 @@ main.container {
 .topbar-search-icon {
     position: absolute;
     left: 0.7rem;
-    display: inline-flex;
     width: 1rem;
     height: 1rem;
-    color: var(--text-muted);
+    color: var(--faint);
     pointer-events: none;
-}
-
-.topbar-search-icon svg {
-    width: 100%;
-    height: 100%;
 }
 
 /* Its colour is with the other buttons; this is only its layout. */
@@ -286,7 +262,7 @@ main.container {
 }
 
 .topbar-name {
-    color: var(--text-muted);
+    color: var(--muted);
     font-size: var(--size-label);
 }
 
@@ -294,8 +270,8 @@ main.container {
 
 /*
  * The mark, from `partials/brand_sprite.twig`. It is the supplied logo traced
- * to one outline and filled with the brand gradient, so it recolours with the
- * theme instead of carrying the wordmark's navy onto a near-black page.
+ * to one outline and filled with the brand gradient — the one place the
+ * gradient appears — so it carries no wordmark navy onto a dark rail.
  *
  * The aspect ratio is the mark's own; giving it a height and letting the width
  * follow keeps it from being squashed by whatever it sits in.
@@ -313,12 +289,28 @@ main.container {
     gap: 0.625rem;
     padding: 0.25rem;
     text-decoration: none;
-    color: var(--text);
+    color: var(--rail-ink);
+}
+
+/*
+ * The tile the mark sits in on a dark rail. On the light rails the palette
+ * sets it transparent with no padding, which leaves the mark bare.
+ */
+.logo-tile {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: var(--logo-pad);
+    background: var(--logo-tile);
+    border-radius: var(--radius-control);
+}
+
+.logo-tile .brand-mark {
+    height: 1.75rem;
 }
 
 .sidebar-brand-name {
-    font-weight: var(--weight-bold);
-    font-size: 1.0625rem;
+    font-weight: var(--weight-heavy);
+    font-size: var(--size-heading);
     letter-spacing: -0.01em;
     overflow-wrap: anywhere;
 }
@@ -343,51 +335,48 @@ main.container {
     gap: 0.125rem;
 }
 
+/*
+ * A navigation item. These are the colours it wears on a page surface — the
+ * narrow screen's drawer; the rail's own, on the palette's rail colour, are
+ * in the rail's section below.
+ */
 .nav-link {
     display: flex;
     align-items: center;
     gap: 0.75rem;
     padding: 0.5rem 0.75rem;
+    border-left: 3px solid transparent;
     border-radius: var(--radius-control);
     text-decoration: none;
-    color: var(--text-muted);
+    color: var(--muted);
     font-size: var(--size-body);
+    font-weight: var(--weight-medium);
 }
 
 .nav-link:hover {
     color: var(--text);
-    background-color: var(--surface-hover);
+    background-color: var(--surface-2);
 }
 
 /*
- * One treatment for "you are here", used everywhere navigation appears: a bar
- * in the brand gradient along the leading edge. Not a fill as well — two
- * markers for one state is how a nav ends up with an item that looks active on
- * one screen width and merely hovered on another.
+ * One treatment for "you are here", used everywhere navigation appears: a
+ * fill, and a 3px bar in the accent along the leading edge. The bar is what
+ * survives greyscale and forced colours; the fill is what makes it findable at
+ * a glance. Decided on the server from the route, so it is right in the HTML
+ * that arrives.
  */
 .nav-link.is-active {
     color: var(--text);
-    font-weight: var(--weight-medium);
-    background: var(--gradient-brand) left center / 3px 100% no-repeat;
+    font-weight: var(--weight-semibold);
+    background-color: var(--accent-soft);
+    border-left-color: var(--accent);
 }
 
-/*
- * The box an icon lands in, sized before it arrives. The bundle fills these
- * after the page has painted (see `assets/js/icons.js`), and a box that had no
- * size until then would shift every label in the rail sideways when it did.
- */
+/* The icon beside a navigation label, drawn by `icon()` from the sprite. */
 .nav-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.125rem;
+    height: 1.125rem;
     flex-shrink: 0;
-}
-
-.nav-icon svg {
-    width: 100%;
-    height: 100%;
 }
 
 .nav-label {
@@ -411,8 +400,44 @@ main.container {
         gap: 1.25rem;
         padding: 1rem 0.75rem;
         overflow-y: auto;
-        background: var(--surface-raised);
-        border-right: 1px solid var(--border);
+        background: var(--rail);
+        color: var(--rail-text);
+        border-right: 1px solid var(--rail-border);
+    }
+
+    /*
+     * The rail's items, on the rail's own colours. The palette decides
+     * whether the rail is dark (navy, midnight, forest) or light (paper,
+     * ocean), so every colour here is a `--rail-*` token and none of them
+     * assumes which.
+     */
+    .sidebar .nav-link {
+        color: var(--rail-text);
+    }
+
+    .sidebar .nav-link:hover {
+        color: var(--rail-ink);
+        background-color: var(--rail-tint);
+    }
+
+    .sidebar .nav-link.is-active {
+        color: var(--rail-ink);
+        background-color: var(--rail-active);
+        border-left-color: var(--accent);
+    }
+
+    .sidebar .nav-link.is-active .nav-icon {
+        color: var(--rail-accent);
+    }
+
+    /* The page's ring would be the wrong colour on a dark rail. */
+    .sidebar :focus-visible {
+        outline-color: var(--rail-accent);
+    }
+
+    .sidebar-tools {
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--rail-line);
     }
 
     /* The tools group sits at the bottom of the rail, whatever is above it. */
@@ -437,7 +462,7 @@ main.container {
     position: fixed;
     inset: auto 0 0 0;
     z-index: 30;
-    background: var(--surface-raised);
+    background: var(--surface);
     border-top: 1px solid var(--border);
     padding-bottom: env(safe-area-inset-bottom, 0);
 }
@@ -464,8 +489,8 @@ main.container {
     padding: 0.6rem 0.25rem;
     min-height: var(--tabbar-height);
     text-decoration: none;
-    color: var(--text-muted);
-    font-size: 0.6875rem;
+    color: var(--muted);
+    font-size: var(--size-caption);
     text-align: center;
     cursor: pointer;
 }
@@ -482,8 +507,8 @@ main.container {
 .tabbar-link.is-active,
 .tabbar-more.is-active > .tabbar-link {
     color: var(--text);
-    font-weight: var(--weight-medium);
-    background: var(--gradient-brand) top center / 100% 3px no-repeat;
+    font-weight: var(--weight-semibold);
+    box-shadow: inset 0 3px 0 var(--accent);
 }
 
 .tabbar-more > summary {
@@ -504,7 +529,7 @@ main.container {
     max-height: 60vh;
     overflow-y: auto;
     padding: 0.5rem;
-    background: var(--surface-raised);
+    background: var(--surface);
     border-top: 1px solid var(--border);
     box-shadow: var(--shadow);
 }
@@ -536,7 +561,7 @@ main.container {
 }
 
 .footer {
-    color: var(--text-muted);
+    color: var(--muted);
     font-size: var(--size-label);
     padding-bottom: 2rem;
     display: flex;
@@ -624,50 +649,63 @@ body.no-shell .footer {
 }
 
 /*
- * The theme switch: light, dark, and the machine's own preference.
+ * The segmented control: a few mutually exclusive options, all visible, one
+ * chosen. The sign-in screen's theme switch is one (light, dark, and the
+ * machine's own preference — three states, because "follow the system" is
+ * the default and a two-state toggle cannot express it).
  *
- * Three states rather than two, because "follow the system" is the default
- * and a two-state toggle cannot express it — a reader who has never touched
- * this should be able to get back to it. A segmented control rather than a
- * `<select>` because all three fit, and the one in use should be visible
- * without opening anything.
- *
- * The selected option is marked by `aria-pressed`, so what the eye reads from
- * the fill is the same thing a screen reader is told, with no second source
- * of truth to fall out of step.
+ * The chosen option is marked by `aria-pressed` on a button, or by a checked
+ * radio inside a label, so what the eye reads from the fill is the same thing
+ * a screen reader is told, with no second source of truth to fall out of step.
  */
-.theme-switch {
+.segmented {
     display: inline-flex;
+    flex-wrap: wrap;
     gap: 0.125rem;
     padding: 0.1875rem;
-    background: var(--surface-sunken);
+    background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-control);
 }
 
-.theme-switch-option {
+.segmented-option {
     padding: 0.3rem 0.75rem;
     font: inherit;
     font-size: var(--size-label);
     font-weight: var(--weight-medium);
-    color: var(--text-muted);
+    color: var(--muted);
     background: transparent;
     /* Transparent rather than absent: the selected option takes a visible one
        and the row must not shift by a pixel when the selection moves. */
     border: 1px solid transparent;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-small);
     cursor: pointer;
+    position: relative;
 }
 
-.theme-switch-option:hover {
+.segmented-option:hover {
     color: var(--text);
 }
 
-.theme-switch-option[aria-pressed='true'] {
+.segmented-option[aria-pressed='true'],
+.segmented-option:has(input:checked) {
     color: var(--text);
+    font-weight: var(--weight-semibold);
     background: var(--surface);
     border-color: var(--border);
     box-shadow: var(--shadow);
+}
+
+/* A radio inside an option is the state; the option is what is seen. */
+.segmented-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.segmented-option:has(input:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
 }
 
 /*
@@ -704,24 +742,24 @@ body.no-shell .footer {
     }
 }
 
+/* The eyebrow over a figure: caption-sized, uppercase, quiet. */
 .stat-label {
-    font-size: var(--size-label);
-    color: var(--text-muted);
+    font-size: var(--size-caption);
+    color: var(--faint);
     margin: 0 0 0.35rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    font-weight: var(--weight-medium);
+    font-weight: var(--weight-semibold);
 }
 
 /*
- * The KPI. Large, heavy and tight — the one number on the card that is meant
- * to be read from across the room, and the reason the type scale starts at
- * 2.5rem rather than growing out of the body size.
+ * The KPI: the one number on the card that is meant to be read first. Its
+ * face comes from `.num`, which the template puts beside this class.
  */
 .stat-value {
     font-size: var(--size-kpi);
     font-weight: var(--weight-bold);
-    line-height: 1.1;
+    line-height: 1.15;
     letter-spacing: -0.02em;
     margin: 0 0 0.25rem;
 }
@@ -729,7 +767,7 @@ body.no-shell .footer {
 .stat-unit {
     font-size: var(--size-body);
     font-weight: var(--weight-normal);
-    color: var(--text-muted);
+    color: var(--muted);
     letter-spacing: 0;
 }
 
@@ -738,12 +776,12 @@ body.no-shell .footer {
 }
 
 .muted {
-    color: var(--text-muted);
+    color: var(--muted);
 }
 
 .hint,
 .field-hint {
-    color: var(--text-muted);
+    color: var(--muted);
     font-size: var(--size-label);
     margin: 0;
 }
@@ -784,10 +822,10 @@ body.no-shell .footer {
 }
 
 .table th {
-    font-size: var(--size-label);
+    font-size: var(--size-caption);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--text-muted);
+    color: var(--muted);
     font-weight: var(--weight-semibold);
 }
 
@@ -805,7 +843,7 @@ body.no-shell .footer {
 }
 
 .table tbody tr:hover td {
-    background: var(--surface-hover);
+    background: var(--surface-2);
 }
 
 .table .numeric {
@@ -866,32 +904,48 @@ body.no-shell .footer {
 
 /* ------------------------------------------------------- badges and chips */
 
+/*
+ * A status, as a pill with its word in it — never colour alone. The four
+ * semantic kinds each carry one meaning: ok is on track or active, warn is
+ * renewing soon, past a warning threshold or paused, bad is over budget or an
+ * error, info is a trial. A tint behind coloured text rather than a solid
+ * fill, because that is the pair the contrast test holds to AA in every
+ * palette and theme.
+ */
 .badge {
     display: inline-block;
-    font-size: 0.6875rem;
-    font-weight: var(--weight-medium);
-    padding: 0.1rem 0.45rem;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    line-height: 1.4;
+    padding: 0.1rem 0.5rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
-    color: var(--text-muted);
+    color: var(--muted);
     margin-left: 0.25rem;
+    white-space: nowrap;
 }
 
-/*
- * Urgency, in the warm hue PHASE.md reserves for it: renewing soon, a
- * cancel-by deadline, a budget projected over. A tint behind coloured text
- * rather than a solid fill, because no single ink reads on the amber across
- * both themes.
- */
-.badge-warning {
-    background: var(--warning-bg);
-    color: var(--warning);
+.badge-ok {
+    background: var(--ok-bg);
+    color: var(--ok);
     border-color: transparent;
 }
 
-.badge-danger {
-    background: var(--error-bg);
-    color: var(--error-text);
+.badge-warn {
+    background: var(--warn-bg);
+    color: var(--warn);
+    border-color: transparent;
+}
+
+.badge-bad {
+    background: var(--bad-bg);
+    color: var(--bad);
+    border-color: transparent;
+}
+
+.badge-info {
+    background: var(--info-bg);
+    color: var(--info);
     border-color: transparent;
 }
 
@@ -903,7 +957,7 @@ body.no-shell .footer {
     padding: 0.2rem 0.55rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);
-    background: var(--surface-sunken);
+    background: var(--surface-2);
 }
 
 .chip input {
@@ -911,7 +965,49 @@ body.no-shell .footer {
 }
 
 .chip-static {
-    color: var(--text-muted);
+    color: var(--muted);
+}
+
+/*
+ * The filter chip: a pill that narrows a list, on or off. The state is a
+ * checkbox (or radio) inside the label, so it posts with the filter form and
+ * works with no script; the chip is what is seen.
+ */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.75rem;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    position: relative;
+}
+
+.filter-chip:hover {
+    color: var(--text);
+}
+
+.filter-chip:has(input:checked),
+.filter-chip[aria-pressed='true'] {
+    color: var(--accent-ink);
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.filter-chip input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.filter-chip:has(input:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
 }
 
 /*
@@ -925,7 +1021,7 @@ body.no-shell .footer {
     align-items: center;
     gap: 0.35rem;
     font-size: var(--size-label);
-    color: var(--text-muted);
+    color: var(--muted);
     max-width: 100%;
 }
 
@@ -937,11 +1033,6 @@ body.no-shell .footer {
     flex: 0 0 auto;
     border-radius: var(--radius-small);
     object-fit: contain;
-}
-
-.payment-badge-icon svg {
-    width: 100%;
-    height: 100%;
 }
 
 .payment-badge-name {
@@ -1003,7 +1094,7 @@ body.no-shell .footer {
     left: 0;
     right: 0;
 
-    background: var(--surface-raised);
+    background: var(--surface);
     border: 1px solid var(--border-control);
     border-radius: var(--radius-control);
     box-shadow: var(--shadow);
@@ -1025,7 +1116,7 @@ body.no-shell .footer {
  */
 .tag-suggestion.is-active,
 .tag-suggestion:hover {
-    background: var(--surface-hover);
+    background: var(--surface-2);
     font-weight: var(--weight-medium);
 }
 
@@ -1083,7 +1174,7 @@ textarea {
     font: inherit;
     font-size: var(--size-body);
     color: var(--text);
-    background: var(--surface-sunken);
+    background: var(--surface);
     /*
      * The control border is a heavier token than the hairline that separates
      * cards. The edge of an input is a user-interface component boundary, and
@@ -1095,9 +1186,29 @@ textarea {
     border-radius: var(--radius-control);
 }
 
+/*
+ * Focus: the control's own edge takes the ring colour as well as the global
+ * outline, so a field that is being typed into is unmistakable.
+ */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    border-color: var(--focus-ring);
+    outline-offset: 1px;
+}
+
+/*
+ * The error state. `aria-invalid` is what a screen reader announces, so it is
+ * also what draws the red edge — one source for both — and the message beside
+ * the field (`.field-error`) says what is wrong in words.
+ */
+[aria-invalid='true'] {
+    border-color: var(--bad);
+}
+
 input::placeholder,
 textarea::placeholder {
-    color: var(--text-muted);
+    color: var(--faint);
     opacity: 1;
 }
 
@@ -1140,7 +1251,57 @@ input[type='checkbox'],
 input[type='radio'] {
     appearance: auto;
     width: auto;
-    accent-color: var(--accent);
+    accent-color: var(--accent-text);
+}
+
+/*
+ * The toggle: a checkbox drawn as a switch. It is still the checkbox — the
+ * same element, keyboard behaviour and form value, with `role="switch"` in the
+ * markup to say on/off rather than ticked/unticked — so it needs no script and
+ * cannot disagree with what is posted. The track takes the accent when on,
+ * and the knob moves: position says the state as well as colour does.
+ */
+input[type='checkbox'].toggle {
+    appearance: none;
+    position: relative;
+    flex: 0 0 auto;
+    width: 2.25rem;
+    height: 1.25rem;
+    margin: 0;
+    background: var(--surface-3);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+input[type='checkbox'].toggle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0.125rem;
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    box-shadow: 0 1px 2px var(--backdrop);
+    transform: translateY(-50%);
+    transition: transform 0.15s ease;
+}
+
+input[type='checkbox'].toggle:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+input[type='checkbox'].toggle:checked::before {
+    transform: translate(1rem, -50%);
+}
+
+@media (forced-colors: active) {
+    input[type='checkbox'].toggle::before {
+        background: CanvasText;
+    }
 }
 
 fieldset {
@@ -1271,7 +1432,7 @@ legend {
 }
 
 .field-error {
-    color: var(--danger);
+    color: var(--bad);
     font-size: var(--size-label);
     margin: 0;
 }
@@ -1312,7 +1473,7 @@ legend {
 }
 
 .field-suffix {
-    color: var(--text-muted);
+    color: var(--muted);
 }
 
 .filters {
@@ -1352,92 +1513,94 @@ legend {
 
 /* ---------------------------------------------------------------- buttons */
 
+/*
+ * Four buttons, each with one job.
+ *
+ *   - primary: the accent fill with the accent's ink. One per screen — the
+ *     action the screen is about — or it stops meaning anything.
+ *   - secondary: the ink fill (navy on a light page, near-white on a dark
+ *     one). A notable action that is not the screen's main one — adding a
+ *     subscription from the top bar, running a backup.
+ *   - quiet: a surface tint. Everything else, and what a bare `.button` is.
+ *   - danger: the bad colour on its tint. Deleting, removing, revoking.
+ */
 .button {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
     padding: 0.55rem 1rem;
     font: inherit;
     font-size: var(--size-body);
-    font-weight: var(--weight-medium);
-    border: 1px solid var(--border-control);
-    border-radius: var(--radius-control);
-    background: var(--surface);
+    font-weight: var(--weight-semibold);
+    line-height: 1.25;
+    border: 1px solid transparent;
+    border-radius: var(--radius-button);
+    background: var(--surface-2);
     color: var(--text);
     text-decoration: none;
     cursor: pointer;
 }
 
 .button:hover {
-    background: var(--surface-hover);
-    border-color: var(--accent);
-}
-
-/*
- * The one primary action per screen, filled with a flat colour.
- *
- * `--accent` is the action colour the rest of the interface already uses for a
- * link and a focus ring, and `--accent-text` is the ink defined to sit on it,
- * so the button follows the theme rather than restating it: a dark teal
- * carrying white on a light page, the brighter teal carrying near-black on a
- * dark one. The logo's gradient stays where nothing sits on top of it.
- */
-.button-primary {
-    background: var(--accent);
-    border-color: transparent;
-    color: var(--accent-text);
-}
-
-.button-primary:hover {
-    background: var(--accent);
-    filter: brightness(1.08);
-    border-color: transparent;
-}
-
-/*
- * Quick-add: outlined in the accent, and deliberately not filled with it.
- *
- * It is the one control that is on every single screen, which is exactly why
- * it does not take the fill. "The one primary action per screen" cannot mean
- * anything if a global shortcut is filled on all of them — the screen's own
- * action would be arguing with the top bar for the same signal, and a reader
- * scanning for "the thing to press here" would find two.
- *
- * So it keeps the accent in its edge and its ink: still the strongest thing in
- * the bar, never the strongest thing on the page, and still clearly not the
- * quiet sign-out beside it. A screen with no action of its own — the
- * dashboard, the calendar — then has nothing filled at all, which is honest.
- *
- * Two class names rather than one, because `.button` is written below this
- * point in the file and a single-class rule would lose to it on order alone.
- */
-.button.topbar-add {
-    color: var(--accent);
-    border-color: var(--accent);
-}
-
-.button.topbar-add:hover {
-    color: var(--accent);
-    border-color: var(--accent);
+    background: var(--surface-3);
 }
 
 .button-quiet {
-    background: transparent;
+    background: var(--surface-2);
+}
+
+/*
+ * `--accent-ink` on `--accent`, always: the accent is a bright fill and white
+ * on the default emerald is 2.0:1. Each palette defines the ink that reads on
+ * its own accent, and the contrast test holds every pair to AA.
+ */
+.button-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+
+.button-primary:hover {
+    background: var(--accent-hover);
+}
+
+/*
+ * Quick-add wears the secondary fill, not the accent. It is on every screen,
+ * so filling it with the accent would leave nothing for the action a
+ * particular screen is about; the ink fill keeps it the strongest thing in
+ * the bar and never the strongest thing on the page.
+ *
+ * Two class names, because `topbar-add` is a layout hook as well and the
+ * test that finds it matches the markup exactly.
+ */
+.button-secondary,
+.button.topbar-add {
+    background: var(--ink-btn);
+    color: var(--ink-btn-text);
+}
+
+.button-secondary:hover,
+.button.topbar-add:hover {
+    background: var(--ink-btn-hover);
 }
 
 .button-danger {
-    color: var(--danger);
-    border-color: transparent;
-    background: transparent;
+    color: var(--bad);
+    background: var(--bad-bg);
 }
 
 .button-danger:hover {
-    background: var(--error-bg);
-    border-color: transparent;
+    background: var(--bad-bg);
+    border-color: var(--bad);
 }
 
+/* An icon-only control. It carries a catalogued `aria-label` in the markup. */
 .button-icon {
+    display: inline-flex;
+    align-items: center;
     background: none;
     border: 0;
-    color: var(--text-muted);
+    color: var(--muted);
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
@@ -1445,7 +1608,7 @@ legend {
 }
 
 .button-icon:hover {
-    color: var(--danger);
+    color: var(--bad);
 }
 
 /* A button that reads as a link — the shortcut help in the footer. */
@@ -1453,10 +1616,25 @@ legend {
     background: none;
     border: 0;
     padding: 0;
-    color: var(--text-muted);
+    color: var(--muted);
     font: inherit;
     text-decoration: underline;
     cursor: pointer;
+}
+
+/* The generic one-em icon `icon()` draws when no other class sizes it. */
+.icon {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    vertical-align: -0.125em;
+}
+
+.button .nav-icon,
+.button .icon {
+    width: 1rem;
+    height: 1rem;
 }
 
 /* ----------------------------------------------------------------- alerts */
@@ -1470,23 +1648,29 @@ legend {
     gap: 0.5rem;
 }
 
+/*
+ * A message about what just happened, or about the page as a whole. The same
+ * semantic pairs as the badges, so a success reads as ok and a failure as bad
+ * in every palette.
+ */
 .flash,
 .alert {
     padding: 0.7rem 0.9rem;
-    border-radius: var(--radius-control);
+    border-radius: var(--radius-button);
     border: 1px solid transparent;
     font-size: var(--size-body);
+    font-weight: var(--weight-medium);
 }
 
 .flash-success {
-    background: var(--success-bg);
-    color: var(--success-text);
+    background: var(--ok-bg);
+    color: var(--ok);
 }
 
 .flash-error,
 .alert-error {
-    background: var(--error-bg);
-    color: var(--error-text);
+    background: var(--bad-bg);
+    color: var(--bad);
 }
 
 .alert p {
@@ -1495,13 +1679,13 @@ legend {
 
 /* A heads-up rather than a problem: the warm hue, as a leading rule. */
 .callout {
-    border-left: 4px solid var(--warning);
+    border-left: 4px solid var(--warn);
 }
 
 .trace {
     overflow-x: auto;
     font-size: 0.75rem;
-    background: var(--surface-sunken);
+    background: var(--surface-2);
     padding: 0.75rem;
     border-radius: var(--radius-control);
 }
@@ -1521,9 +1705,9 @@ legend {
     overflow-x: auto;
     margin: 0.5rem 0;
     padding: 0.75rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-figures);
     font-size: 0.8125rem;
-    background: var(--surface-sunken);
+    background: var(--surface-2);
     border-radius: var(--radius-control);
 }
 
@@ -1534,7 +1718,7 @@ legend {
     max-height: calc(100vh - 4rem);
     overflow: auto;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-modal);
     background: var(--surface);
     color: var(--text);
     padding: 1.25rem;
@@ -1578,7 +1762,7 @@ legend {
 
 .shortcut-list dd {
     margin: 0;
-    color: var(--text-muted);
+    color: var(--muted);
 }
 
 kbd {
@@ -1588,7 +1772,7 @@ kbd {
     border-bottom-width: 2px;
     border-radius: 5px;
     padding: 0.05rem 0.35rem;
-    background: var(--surface-sunken);
+    background: var(--surface-2);
 }
 
 /* ------------------------------------------------------------- pagination */
@@ -1652,9 +1836,9 @@ kbd {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--surface-sunken);
+    background: var(--surface-2);
     border: 1px solid var(--border);
-    color: var(--text-muted);
+    color: var(--muted);
     font-size: calc(var(--avatar-size) * 0.4);
     font-weight: var(--weight-medium);
     line-height: 1;

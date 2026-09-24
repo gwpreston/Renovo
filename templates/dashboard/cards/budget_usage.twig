@@ -22,14 +22,14 @@
         <p class="stat-label">{{ row.budget.name }}</p>
 
         {% if row.projected is null %}
-            <p class="stat-value">{{ t('common.none_symbol') }}</p>
+            <p class="stat-value num">{{ t('common.none_symbol') }}</p>
             <p class="field-error">
                 {{ t('budgets.unconvertible', {'currencies': row.unconvertible|join(', ')}) }}
             </p>
         {% else %}
-            <p class="stat-value">
+            <p class="stat-value num">
                 {{ row.projected.amountMinor|money(row.projected.currency) }}
-                <span class="stat-unit">
+                <span class="stat-unit num">
                     {{ t('budgets.of_limit', {'limit': row.limit.amountMinor|money(row.limit.currency)}) }}
                 </span>
             </p>

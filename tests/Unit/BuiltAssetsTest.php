@@ -12,8 +12,9 @@ use PHPUnit\Framework\TestCase;
  *
  * BuildManifestTest checks the reader against a manifest written by hand; this
  * checks the real output of `npm run build` — that the entries the layout asks
- * for are there, that the vendored font resolves to a local file that exists,
- * and that Chart.js is a chunk of its own rather than weight on every page.
+ * for are there, that the vendored fonts resolve to local files that exist,
+ * that the icon sprite is built and indexed, and that Chart.js is a chunk of
+ * its own rather than weight on every page.
  *
  * Skipped when there is no build, so `vendor/bin/phpunit` still runs on a
  * checkout where `npm install` has not been. CI runs the build first, in both
@@ -66,16 +67,22 @@ final class BuiltAssetsTest extends TestCase
     }
 
     /**
-     * The whole point of vendoring the font: every @font-face in the compiled
+     * The whole point of vendoring the fonts: every @font-face in the compiled
      * stylesheet points at a file this instance serves. A CDN URL here would
      * be a page that renders in fallback type on a network with no route out —
      * and it would have arrived through a dependency, not through a template.
      */
-    public function testTheVendoredFontIsServedFromThisInstance(): void
+    public function testTheVendoredFontsAreServedFromThisInstance(): void
     {
         $css = (string) file_get_contents($this->pathFor($this->build->url('app.css')));
 
-        self::assertStringContainsString('@font-face', $css, 'The Inter import emits no @font-face rules.');
+        foreach (['Plus Jakarta Sans Variable', 'JetBrains Mono Variable'] as $family) {
+            self::assertMatchesRegularExpression(
+                '~@font-face\{[^}]*font-family:\s*["\']?' . preg_quote($family, '~') . '~',
+                $css,
+                sprintf('No @font-face rule for %s.', $family),
+            );
+        }
 
         preg_match_all('~src:\s*url\(([^)]+)\)~i', $css, $matches);
         self::assertNotEmpty($matches[1], 'No @font-face src found in the compiled stylesheet.');
@@ -89,15 +96,51 @@ final class BuiltAssetsTest extends TestCase
     }
 
     /** Shipping the .woff2 without the licence beside it would not honour it. */
-    public function testTheFontLicenceIsVendoredAlongsideIt(): void
+    public function testEachFontsLicenceIsVendoredAlongsideIt(): void
     {
-        $licence = $this->buildPath . '/inter-OFL.txt';
+        foreach (['plus-jakarta-sans-OFL.txt', 'jetbrains-mono-OFL.txt'] as $file) {
+            $licence = $this->buildPath . '/' . $file;
 
-        self::assertFileExists($licence);
-        self::assertStringContainsString(
-            'SIL OPEN FONT LICENSE',
-            strtoupper((string) file_get_contents($licence)),
-        );
+            self::assertFileExists($licence);
+            self::assertStringContainsString(
+                'SIL OPEN FONT LICENSE',
+                strtoupper((string) file_get_contents($licence)),
+            );
+        }
+    }
+
+    /**
+     * The manifest records every file the build produced, the fonts and the
+     * sprite among them — the manifest is what an operator checks to see what
+     * a page can load, and the sprite is loaded by every signed-in page.
+     */
+    public function testTheManifestListsTheFontsAndTheSprite(): void
+    {
+        $manifest = (string) file_get_contents($this->buildPath . '/manifest.json');
+
+        self::assertStringContainsString('plus-jakarta-sans', $manifest);
+        self::assertStringContainsString('jetbrains-mono', $manifest);
+        self::assertStringContainsString('"assets/theme/sprite.svg"', $manifest);
+    }
+
+    /**
+     * The sprite exists under its hashed name, is indexed beside it, and holds
+     * a symbol for every name the index promises — so `icon()` saying "yes,
+     * that one exists" is a statement about the file the browser will fetch.
+     */
+    public function testTheIconSpriteHoldsEveryIndexedIcon(): void
+    {
+        $index = json_decode((string) file_get_contents($this->buildPath . '/icons.json'), true);
+        self::assertIsArray($index);
+        self::assertIsString($index['sprite'] ?? null);
+        self::assertIsArray($index['names'] ?? null);
+
+        $sprite = (string) file_get_contents($this->buildPath . '/' . $index['sprite']);
+        self::assertStringNotContainsString('http://', str_replace('http://www.w3.org/2000/svg', '', $sprite));
+
+        foreach ($index['names'] as $name) {
+            self::assertStringContainsString(sprintf('<symbol id="%s"', $name), $sprite);
+        }
     }
 
     /**

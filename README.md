@@ -205,6 +205,18 @@ Built in phases:
   cannot clear it — and backups carry the list, its logos and every
   assignment, matched by name on the way back in.
 
+- **Phase 18 — the Renovo theme — complete.** The visual language from the
+  Claude Design prototype as the foundation later screens build on: colours
+  authored once in `assets/theme/tokens.json` and generated into five palettes
+  (navy & emerald by default, light & emerald, midnight & teal, light & ocean
+  blue, forest & mint), each in light, dark and "system"; Plus Jakarta Sans for
+  text and JetBrains Mono for every figure; a server-rendered Lucide sprite;
+  and one vocabulary of cards, buttons, controls, badges and tables. Each
+  member picks their own palette under Profile → Appearance — a Viewer
+  included — and it is rendered into the page before first paint. Every
+  palette × theme is held to WCAG AA by a test that reads the same JSON the
+  build does. No screen was rebuilt. See [The design system](#the-design-system).
+
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
@@ -653,7 +665,9 @@ npm run watch      # rebuild on change
 | `assets/css/*.css`    | `public/build/app-<hash>.css`    | `{{ bundle('app.css') }}`    |
 | `assets/js/app.js`    | `public/build/app-<hash>.js`     | `{{ bundle('app.js') }}`     |
 | Chart.js              | `public/build/chart-<hash>.js`   | fetched on first chart only  |
-| Inter (Fontsource)    | `public/build/inter-*.woff2`     | `@font-face` in the built CSS |
+| Plus Jakarta Sans, JetBrains Mono (Fontsource) | `public/build/<family>-*.woff2` | `@font-face` in the built CSS |
+| `assets/theme/tokens.json` | part of `app-<hash>.css`    | the palettes, generated at build start |
+| `assets/theme/icons.json`  | `public/build/sprite-<hash>.svg` + `icons.json` | `{{ icon('name') }}` |
 
 Every filename contains a hash of the file's own contents, and
 `public/build/manifest.json` maps a logical name to the current one. A template
@@ -700,32 +714,39 @@ immediately, but one you *delete* lingers in the compiled stylesheet until the
 watcher restarts. A one-shot `npm run build` is always exact, which is what
 production and CI use.
 
-### The webfont
+### The webfonts
 
-Inter comes from **Fontsource** — Google Fonts' families repackaged for
-self-hosting and installed from npm. The build copies the `.woff2` files into
-the web root and rewrites the `@font-face` rules to point at them, so "use a
-Google font" and "load nothing from Google" are both true at once. The SIL Open
-Font License is copied out of the package alongside it, as
-`public/build/inter-OFL.txt`.
+Plus Jakarta Sans (text) and JetBrains Mono (figures) come from **Fontsource**
+— Google Fonts' families repackaged for self-hosting and installed from npm.
+The build copies the `.woff2` files into the web root and rewrites the
+`@font-face` rules to point at them, so "use a Google font" and "load nothing
+from Google" are both true at once. Each family's SIL Open Font License is
+copied out of its package alongside, as `public/build/plus-jakarta-sans-OFL.txt`
+and `public/build/jetbrains-mono-OFL.txt`. See [Typography](#typography).
 
-Phase 8 applies it. The deciding reason for Inter specifically is narrow: its
-subset carries the `tnum` OpenType feature, so a column of currency lines up
-digit under digit. See [The design system](#the-design-system).
+### The icons
+
+`assets/theme/icons.json` maps what a thing is called here (`budget`,
+`payment-card`) to the Lucide drawing that shows it. The build reads only those
+drawings out of the npm package and writes one SVG sprite, plus an index PHP
+reads. A template draws one with `{{ icon('budget', 'nav-icon') }}`, which
+prints an `<svg aria-hidden="true"><use href="/build/sprite-….svg#budget">` — so
+icons are server-rendered and work with JavaScript off. An unknown name throws
+outside production and is logged and omitted in it.
 
 ### The JavaScript
 
 The bundle is deliberately small. Keyboard shortcuts, the quick-add dialog and
 passkey registration stay in `public/assets/`, hand-written and served
 directly, along with htmx — none of them needed bundling, so none of them were
-moved. What the bundle provides is the two things that did:
+moved. What the bundle provides is what did:
 
 ```js
 // Chart.js, in a chunk of its own: fetched the first time this is called, and
 // never by a page that does not call it.
 await window.Renovo.chart(canvas, { type: 'line', data: … });
 
-// Lucide icons, tree-shaken down to the handful listed in assets/js/icons.js.
+// An icon from the same sprite the server uses, for markup a script builds.
 element.append(window.Renovo.icon('calendar'));
 ```
 
@@ -751,132 +772,101 @@ temporarily. If a URL is an identifier rather than an address (`xmlns` on an
 
 ## The design system
 
-The colour, type and spacing every screen is built from. Phase 7 decided how
-assets are compiled and served; this is what they express.
+The colour, type and shape every screen is built from — since Phase 18, the
+visual language of the Claude Design prototype. Phase 7 decided how assets are
+compiled and served; this is what they express.
 
-### One stylesheet, one definition of each token
+### Colours are data
 
-`assets/css/` compiles to the single stylesheet each page links:
+Every colour is written once, in `assets/theme/tokens.json`: a base set (the
+surfaces, text, the four status pairs, chart series) in light and dark, and
+five palettes that each set the rail and the accent in light and dark. At the
+start of every build `assets/theme/build-tokens.js` resolves each
+palette × theme — base light, base dark, palette light, palette dark, later
+wins — and writes the result to `assets/css/generated/theme.css` (generated,
+gitignored). `tests/Unit/ThemeContrastTest.php` resolves the same file the
+same way, so what ships and what is checked cannot drift apart.
 
-| File             | Holds                                                        |
-|------------------|--------------------------------------------------------------|
-| `tokens.css`     | every colour, radius and type size, and both theme sets       |
-| `base.css`       | element defaults, re-established after Preflight              |
-| `components.css` | the shell, cards, tables, forms, buttons, badges, dialogs     |
-| `screens.css`    | the calendar, budget meters, price timeline, density          |
+| File                        | Holds                                               |
+|-----------------------------|-----------------------------------------------------|
+| `assets/theme/tokens.json`  | every colour, per palette and theme                 |
+| `assets/css/tokens.css`     | shape, the type scale, and the bridge to Tailwind   |
+| `assets/css/base.css`       | element defaults, `.num`, the focus ring            |
+| `assets/css/components.css` | the shell, cards, buttons, controls, badges, tables |
+| `assets/css/screens.css`    | the calendar, meters, charts, the palette picker    |
 
-Nothing downstream writes a colour literal. Tokens are declared twice: once as
-semantic custom properties (`--surface`, `--text`, `--accent`), and once in an
-`@theme inline` block that hands the same properties to Tailwind. That is what
-makes `bg-surface` in a template and `.card { background: var(--surface) }` in
-a stylesheet the same colour by construction rather than by agreement.
+No stylesheet and no chart writes a colour literal. Tailwind's `@theme inline`
+maps its keys onto the custom properties (`--color-surface: var(--surface)`),
+so switching palette or theme is an attribute change on `<html>`, never a
+recompilation.
 
-The `inline` keyword matters: without it Tailwind resolves a theme value at
-build time and bakes it into the utility, freezing every utility to whichever
-theme compiled first. Note also that every `@theme` key is spelled differently
-from the property it points at — a key assigned its own name compiles to
-`--x: var(--x)`, which is circular and resolves to nothing.
+### Palettes, themes, and no flash
 
-### The brand, and why there are two gradients
+The server renders the account's choice into the root element:
 
-The logo is a **teal-green → blue** gradient mark, kept in the repository at
-`assets/brand/renovo-logo.png`. `--brand-from` (`#0daa9c`) and `--brand-to`
-(`#1069bb`) are the only place those stops are written down, so re-sampling the
-logo is a two-line edit. They are the mark's real colours: Phase 9 projected
-every pixel of it onto the 135° axis the gradient runs along and averaged the
-first and last twentieth.
-
-They are used where nothing sits on top of them — the brand mark, the active
-nav item, a featured card's wash. **A filled button is a flat colour, not a
-gradient**: `--accent`, the same action colour a link and a focus ring use,
-with `--accent-text` as its ink. Both are assigned per theme, so the button
-follows light and dark like everything else, and the ink has one contrast ratio
-to clear rather than a range of them. White text on the real mark would be
-2.9:1 at the teal stop, which is why a button was never painted with the logo's
-own colours.
-
-Brand and urgency are deliberately **different hues**. Teal-green is "this is
-the action"; amber→orange is "money is about to move" — renewing soon, a
-cancel-by deadline, a budget projected over; a muted red is a genuine problem.
-A single-accent palette cannot say two of those at once.
-
-### One filled button per screen
-
-The accent fill means "this is the thing to do here", so a screen carries at
-most one of it. Two of them says it twice, which is the same as not saying it:
-a reader scanning for the action finds a pair and has to read both.
-
-That is why the top bar's **quick-add is outlined rather than filled**. It is
-the one control on every single screen, and a global shortcut that is filled
-everywhere leaves no accent for the action a particular screen is about. It
-keeps the accent in its edge and its ink — still the strongest thing in the
-bar, never the strongest thing on the page. A screen with nothing to do on it —
-the dashboard, the calendar — then has no filled button at all, which is
-honest.
-
-`ShellTest` counts the accent on every rendered screen and
-`TemplateConventionsTest` counts it in every template, including the screens
-that are not rendered in a test. `.card-featured`, the brand wash, is counted
-the same way: one card per screen.
-
-### Dark is a theme, not the application
-
-Three states, not two. An account picks system, light or dark under
-Settings → Appearance, and an explicit choice beats the browser:
-
-```css
-:root { /* light */ }
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) { /* dark */ }
-}
-:root[data-theme='dark'] { /* dark */ }
+```html
+<html data-theme="system|light|dark" data-palette="navy|paper|midnight|ocean|forest">
 ```
 
-The `:not([data-theme='light'])` guard is the whole trick. Without it, someone
-who chose light on a machine set to dark gets repainted dark — breaking the
-setting for exactly the person who bothered to change it. This is also why the
-token layer uses no `dark:` variants: Tailwind's default `dark:` understands
-only the media query, so it would disagree with the setting in that same case.
+The generated stylesheet has a block for every combination, including
+"system" through a media query guarded by `:not([data-theme='light'])` — so an
+explicit "light" on a machine set to dark stays light. The right colours are on
+first paint with JavaScript off. Signed-out pages wear navy; their theme still
+follows the sign-in screen's switch.
+
+The palette is per account, saved from Profile → Appearance to its own
+CSRF-protected endpoint. The value is checked against the `App\Domain\Palette`
+allowlist and an unknown one is refused with nothing written. Null means navy,
+decided in `Palette::fromNullable()` and nowhere else.
+
+### The accent rule
+
+A filled accent surface carries `--accent-ink`; accent-coloured text is always
+`--accent-text`. White on the default emerald is 2.0:1, so it never appears.
+The logo's gradient (`--brand-from` → `--brand-to`) is the mark's alone — no
+interface element wears it.
+
+One **primary** button per screen (accent fill). Notable actions that are not
+the screen's main one — quick-add in the top bar — take the **secondary** ink
+fill. Everything else is **quiet**; destructive actions are **danger**.
+`ShellTest` and `TemplateConventionsTest` count the accent per screen.
+
+Status colours mean one thing each: **ok** on track, **warn** renewing soon or
+past a threshold, **bad** over budget or an error, **info** a trial. A badge
+always carries its word.
 
 ### Typography
 
-Inter, self-hosted, with **tabular figures on every number**. That is the
-deciding reason for the family: proportional digits are different widths, so a
-column of amounts shifts as its values change. Switched on with
-`font-variant-numeric: tabular-nums` rather than `font-feature-settings: "tnum"`,
-which would switch off the other features in the font, and left off for running
-prose.
+**Plus Jakarta Sans** for text; **JetBrains Mono** with tabular digits for
+every figure — amounts, counts, KPIs, dates in tables, chart labels. A figure
+gets that face only through the `.num` class, so a later screen cannot forget
+it. Running prose keeps the text face.
 
-| Role            | Size / weight             |
-|-----------------|---------------------------|
-| KPI value       | 2.5rem, 700, tabular      |
-| Section heading | 1.25rem, 600              |
-| Body / table    | 0.9375rem, 400–500        |
-| Label / caption | 0.8125rem, 500, muted     |
+| Role              | Size / weight               |
+|-------------------|-----------------------------|
+| KPI value         | 22px, 700, mono             |
+| Page title        | 18px, 700                   |
+| Section heading   | 16px, 700                   |
+| Body / table      | 14px (13px dense), 400–500  |
+| Label             | 12px, 600                   |
+| Caption / eyebrow | 11px, 600                   |
 
 ### Contrast is tested, not eyeballed
 
-`tests/Unit/DesignTokensTest.php` reads the compiled stylesheet and asserts
-every text token clears WCAG AA (4.5:1) on the surface it is used against, in
-both themes, and that control borders clear 3:1. The palette decides whether
-the application is readable, so a token nudged darker to "look better" fails
-the build rather than shipping.
-
-The matrix is the point, not the threshold. Checking each ink against `--surface`
-alone proves the card and nothing else, and the places contrast quietly fails
-are the ones nobody pictures while choosing a colour: the quiet text in the
-footer, which sits on the page rather than on a card; the same text in a hovered
-row, which is a lighter surface than the one it was chosen against; and ordinary
-text in a row tinted for urgency, where the background was picked to carry the
-warning colour and then has to carry a subscription's name as well. Every pair
-in the test is one a rule actually produces.
+`ThemeContrastTest` asserts, for every palette × theme, that text clears 4.5:1
+on every ground a rule puts it on — the page, a card, a hovered row, each
+status tint, the accent's wash, the rail and its hover and active fills — and
+that the focus ring, field edges and chart series clear 3:1. Translucent
+colours are composited onto what they sit on before they are measured. Where
+the prototype failed, the value was adjusted in the JSON keeping its hue;
+thresholds are never loosened. `DesignTokensTest` checks the compiled
+stylesheet carries every palette and applies the faces.
 
 ### A note for operators
 
-Changing how Renovo looks now needs `npm install && npm run build` rather than
-an editor and a reload — the cost of having one compilation own both the
-utilities and the rules. Most of what you would want to change is a handful of
-custom properties at the top of `assets/css/tokens.css`.
+Changing how Renovo looks needs `npm install && npm run build` rather than an
+editor and a reload. Colours are in `assets/theme/tokens.json`; run the tests
+after changing one.
 
 ## The application shell
 

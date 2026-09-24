@@ -67,12 +67,12 @@
                 <div>
                     <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
                     {% if subscription.isTrial %}
-                        <span class="badge badge-warning">{{ t('state.trial') }}</span>
+                        <span class="badge badge-warn">{{ t('state.trial') }}</span>
                     {% endif %}
                     <div class="hint">
                         <strong>{{ row.date|local_date('d MMM y') }}</strong> ·
                         {% if row.is_passed %}
-                            <span class="badge badge-danger">{{ t('cancellations.deadline_passed') }}</span>
+                            <span class="badge badge-bad">{{ t('cancellations.deadline_passed') }}</span>
                             {{ t('cancellations.passed_days', {'days': row.days * -1}) }}
                         {% elseif row.days == 0 %}
                             {{ t('state.today') }}

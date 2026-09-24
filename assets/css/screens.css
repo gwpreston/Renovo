@@ -41,7 +41,7 @@
 .renewal-date,
 .renewal-days,
 .renewal-amount {
-    color: var(--text-muted);
+    color: var(--muted);
     white-space: nowrap;
 }
 
@@ -55,7 +55,7 @@
  * anyone who cannot tell the two apart.
  */
 .renewal-days.is-due-soon {
-    color: var(--danger);
+    color: var(--bad);
     font-weight: 600;
 }
 
@@ -238,7 +238,7 @@
     padding: 0;
     list-style: none;
     font-size: var(--size-label);
-    color: var(--text-muted);
+    color: var(--muted);
 }
 
 .chart-card.is-drawn .chart-legend {
@@ -264,13 +264,14 @@
     border-top-style: solid;
 }
 
+/* The same series tokens the chart draws its two lines in. */
 .chart-key-total {
-    border-top-color: var(--warning);
+    border-top-color: var(--s4);
 }
 
 .chart-key-committed {
     border-top-style: dashed;
-    border-top-color: var(--accent);
+    border-top-color: var(--s2);
 }
 
 .chart-key-gap {
@@ -289,7 +290,7 @@
 
 .chart-figures .is-peak th,
 .chart-figures .is-peak td {
-    color: var(--warning);
+    color: var(--warn);
 }
 
 /* Where the money goes, as a share of the combined monthly total. */
@@ -314,7 +315,7 @@
 }
 
 .distribution-amount {
-    color: var(--text-muted);
+    color: var(--muted);
     white-space: nowrap;
 }
 
@@ -348,11 +349,11 @@
  * action" and "this needs attention" without the two competing.
  */
 .budget.is-warning {
-    border-left: 4px solid var(--warning);
+    border-left: 4px solid var(--warn);
 }
 
 .budget.is-over {
-    border-left: 4px solid var(--danger);
+    border-left: 4px solid var(--bad);
 }
 
 /*
@@ -363,7 +364,7 @@
 .meter {
     height: 0.6rem;
     border-radius: var(--radius-pill);
-    background: var(--surface-sunken);
+    background: var(--surface-2);
     border: 1px solid var(--border);
     overflow: hidden;
     margin: 0.5rem 0;
@@ -377,17 +378,17 @@
 .meter-fill {
     display: block;
     height: 100%;
-    background: var(--gradient-brand);
+    background: var(--accent);
 }
 
 .budget.is-warning .meter-fill,
 .meter.is-warning .meter-fill {
-    background: var(--warning);
+    background: var(--warn);
 }
 
 .budget.is-over .meter-fill,
 .meter.is-over .meter-fill {
-    background: var(--danger);
+    background: var(--bad);
 }
 
 /* --------------------------------------------------------------- forecast */
@@ -409,16 +410,16 @@
 /* -------------------------------------------------------------- cancel-by */
 
 tr.is-urgent > td {
-    background: var(--warning-bg);
+    background: var(--warn-bg);
 }
 
 tr.is-passed > td {
-    background: var(--error-bg);
+    background: var(--bad-bg);
 }
 
 /* A failed sign-in should be findable by eye in a long log. */
 .row-warning td:first-child {
-    border-left: 3px solid var(--warning);
+    border-left: 3px solid var(--warn);
     padding-left: 0.5rem;
 }
 
@@ -440,12 +441,12 @@ tr.is-passed > td {
 
 .timeline li.is-scheduled {
     border-left-style: dashed;
-    border-left-color: var(--warning);
+    border-left-color: var(--warn);
 }
 
 .timeline-date {
     font-size: var(--size-label);
-    color: var(--text-muted);
+    color: var(--muted);
     display: flex;
     gap: 0.5rem;
     align-items: center;
@@ -460,11 +461,11 @@ tr.is-passed > td {
 
 /* A price going up is bad news in a bills application; going down is good. */
 .is-increase {
-    color: var(--increase);
+    color: var(--bad);
 }
 
 .is-decrease {
-    color: var(--decrease);
+    color: var(--ok);
 }
 
 /* ------------------------------------------------- security and the audit log */
@@ -686,7 +687,7 @@ tr.is-passed > td {
  * survives greyscale and colour blindness.
  */
 .calendar-deadline {
-    border-left: 3px solid var(--warning);
+    border-left: 3px solid var(--warn);
     padding-left: 0.5rem;
 }
 
@@ -717,7 +718,7 @@ tr.is-passed > td {
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--text-muted);
+    color: var(--muted);
     font-weight: var(--weight-semibold);
     padding: 0.35rem 0.25rem;
     text-align: left;
@@ -736,23 +737,23 @@ tr.is-passed > td {
 }
 
 .calendar-day.is-empty {
-    background: var(--surface-sunken);
+    background: var(--surface-2);
     border-color: transparent;
 }
 
 .calendar-day.is-today {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--accent-text);
     outline-offset: -2px;
 }
 
 .calendar-date {
     font-size: var(--size-label);
-    color: var(--text-muted);
+    color: var(--muted);
     display: block;
 }
 
 .calendar-day.is-today .calendar-date {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: var(--weight-semibold);
 }
 
@@ -769,12 +770,12 @@ tr.is-passed > td {
     line-height: 1.3;
     padding: 0.2rem 0.3rem;
     border-radius: var(--radius-small);
-    background: var(--surface-sunken);
+    background: var(--surface-2);
     border-left: 3px solid var(--accent);
 }
 
 .calendar-event.is-trial {
-    border-left-color: var(--warning);
+    border-left-color: var(--warn);
 }
 
 .calendar-event a {
@@ -789,7 +790,7 @@ tr.is-passed > td {
 }
 
 .calendar-amount {
-    color: var(--text-muted);
+    color: var(--muted);
 }
 
 /*
@@ -924,12 +925,12 @@ tr.is-passed > td {
  * card, where a background wash would read as a second card.
  */
 .deadline.is-urgent {
-    border-left: 3px solid var(--warning);
+    border-left: 3px solid var(--warn);
     padding-left: 0.5rem;
 }
 
 .deadline.is-passed {
-    border-left: 3px solid var(--error-text);
+    border-left: 3px solid var(--bad);
     padding-left: 0.5rem;
 }
 
@@ -1067,21 +1068,20 @@ tr.is-passed > td {
 .donut-centre-value {
     display: block;
     font-size: var(--size-heading);
-    font-weight: var(--weight-semibold);
-    font-variant-numeric: tabular-nums;
+    font-weight: var(--weight-bold);
     line-height: 1.2;
 }
 
 .donut-centre-label {
     display: block;
     font-size: var(--size-label);
-    color: var(--text-muted);
+    color: var(--muted);
 }
 
 /*
  * The spend-insight card.
  *
- * The one card on this screen that wears the brand gradient, which is what
+ * The one card on this screen edged in the accent, which is what
  * `.card-featured` is for and why it has waited until now to be used: the rule
  * is one featured card per screen, and a card that tells the member to go and
  * do something is the one that earns it here.
@@ -1116,7 +1116,7 @@ tr.is-passed > td {
 
 .insight-more > summary {
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--muted);
     font-size: var(--size-label);
 }
 
@@ -1271,7 +1271,7 @@ tr.is-passed > td {
 }
 
 .capability-mark {
-    color: var(--success-text);
+    color: var(--ok);
     text-align: center;
     line-height: 1;
 }
@@ -1284,7 +1284,7 @@ tr.is-passed > td {
  */
 .capability.is-absent,
 .capability.is-absent .capability-mark {
-    color: var(--text-muted);
+    color: var(--muted);
     opacity: 0.65;
 }
 
@@ -1341,4 +1341,100 @@ tr.is-passed > td {
     .calendar-day.is-today {
         outline: 2px solid currentColor;
     }
+}
+
+/* --------------------------------------------------------- palette picker */
+
+/*
+ * Profile → Appearance: five palettes as cards, each drawn in its own rail and
+ * accent. `data-swatch` on the option scopes that palette's two colours to it
+ * (the generated theme stylesheet defines `--swatch-rail`, `--swatch-accent`
+ * and `--swatch-border` per key), so the page can show all five while it
+ * wears one.
+ *
+ * The radio is the state and stays a real radio: visually hidden, keyboard-
+ * reachable, posted as-is. The card around it shows which is chosen with the
+ * accent edge *and* the heavier name, so the choice does not rest on colour.
+ */
+.palette-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.palette-picker {
+    border: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.palette-picker > legend {
+    padding: 0;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+}
+
+.palette-options {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+}
+
+.palette-option {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-button);
+    background: var(--surface);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+}
+
+.palette-option:hover {
+    border-color: var(--border-control);
+}
+
+.palette-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.palette-option:has(input:checked) {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 1px var(--accent-text);
+    font-weight: var(--weight-bold);
+}
+
+.palette-option:has(input:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/* The rail, as a strip, with the accent as a dot on it. */
+.palette-swatch {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 2.25rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--swatch-border);
+    border-radius: var(--radius-control);
+    background: var(--swatch-rail);
+}
+
+.palette-swatch-accent {
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: var(--radius-pill);
+    background: var(--swatch-accent);
+}
+
+.palette-name {
+    font-size: var(--size-label);
 }

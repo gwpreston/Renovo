@@ -78,6 +78,7 @@ use App\Service\PasswordResetService;
 use App\Service\RateLimiter;
 use App\Support\AssetVersion;
 use App\Support\BuildManifest;
+use App\Support\IconSprite;
 use App\Support\ExternalAssetScanner;
 use App\Support\Clock;
 use App\Support\MoneyFormatter;
@@ -449,6 +450,16 @@ return static function (ContainerBuilder $builder, array $settings): void {
         // vendored htmx that it does not.
         BuildManifest::class => static fn (ContainerInterface $c): BuildManifest => new BuildManifest(
             $c->get('settings')['paths']['build_manifest'],
+        ),
+
+        // The sprite the same build emits. Strict outside production, so an
+        // icon name nobody added to `assets/theme/icons.json` fails the page
+        // that uses it in development and in the tests, where someone will
+        // see it, rather than drawing nothing in front of a user.
+        IconSprite::class => static fn (ContainerInterface $c): IconSprite => new IconSprite(
+            $c->get('settings')['paths']['build'] . '/icons.json',
+            $c->get('settings')['app']['env'] !== 'production',
+            $c->get(LoggerInterface::class),
         ),
 
         ExternalAssetScanner::class => static fn (ContainerInterface $c): ExternalAssetScanner

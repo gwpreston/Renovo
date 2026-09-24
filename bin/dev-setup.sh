@@ -434,8 +434,8 @@ fi
 step "Building front-end assets"
 # ---------------------------------------------------------------------------
 # The `assets` container started with the rest of the stack: it installs the JS
-# dependencies, compiles Tailwind, bundles the JavaScript, vendors the Inter
-# webfont, and then watches for changes. Every page needs the manifest that
+# dependencies, compiles Tailwind, bundles the JavaScript, vendors the
+# webfonts, and then watches for changes. Every page needs the manifest that
 # build writes — the layout asks it for the stylesheet's hashed name — so wait
 # for it rather than letting the next step report a 500.
 #

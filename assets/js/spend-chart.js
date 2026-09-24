@@ -29,12 +29,13 @@
  * do something about. When no trial converts in the horizon the two lines would
  * coincide, so the server says `has_trials: false` and only one is drawn.
  *
- * Both lines are read from `--accent` and `--warning`, so the chart follows the
- * theme rather than restating it, and the two are told apart by dash as well as
+ * Both lines are read from the series tokens — `--s2`, the palette's accent
+ * family, and `--s4`, amber — so the chart follows the palette rather than
+ * restating it, and the two are told apart by dash as well as
  * by hue for a reader who cannot rely on the second.
  */
 
-import { drawInCard, payloadFor, token } from './charts.js';
+import { drawInCard, payloadFor, themeColours, token } from './charts.js';
 
 /** Where the payload and the canvas describe each other. */
 const CANVAS = 'canvas[data-chart="spend"]';
@@ -103,8 +104,8 @@ function peakLabelFor(index, displays, colour) {
             const above = point.y - chartArea.top > 24;
 
             ctx.save();
-            /* A resolved family, not `var(--font-stack)`: a canvas font string
-               is parsed without a cascade to resolve a custom property
+            /* A resolved family, not `var(--font-figures)`: a canvas font
+               string is parsed without a cascade to resolve a custom property
                against, and an unparseable one is dropped silently. */
             ctx.font = `600 12px ${fontFamily()}`;
             ctx.fillStyle = colour;
@@ -116,11 +117,9 @@ function peakLabelFor(index, displays, colour) {
     };
 }
 
-/** The page's own family, resolved, for the one string drawn onto the canvas. */
+/** The figures face, read from its token, for the one string drawn onto the canvas. */
 function fontFamily() {
-    const family = getComputedStyle(document.documentElement).fontFamily;
-
-    return family === '' ? 'system-ui, sans-serif' : family;
+    return token('--font-figures', 'ui-monospace, monospace');
 }
 
 function configFor(data) {
@@ -129,19 +128,20 @@ function configFor(data) {
     const committed = data.months.map((month) => month.committed_minor);
     const tickLabels = new Map(data.ticks.map((tick) => [tick.value, tick.label]));
 
-    const total = token('--accent', '#086f66');
-    /* Amber is this application's "money is about to move", and a trial about
-       to convert is exactly that — so the upper line and the band it encloses
-       are amber, and the spend already committed is the calm accent. */
-    const trial = token('--warning', '#a83f0e');
-    const grid = token('--border', 'rgba(16, 24, 40, 0.12)');
-    const text = token('--text-muted', '#5b6472');
-    const surface = token('--surface', '#ffffff');
+    const colours = themeColours();
+    const total = colours.series[1];
+    /* A trial about to convert is money about to move — so the upper line and
+       the band it encloses are the amber series, and the spend already
+       committed is the calm accent series. */
+    const trial = colours.series[3];
+    const grid = colours.border;
+    const text = colours.muted;
+    const surface = colours.surface;
     /* The wash between the two lines, as its own token rather than the upper
        line's colour thinned here: the amount of it that reads as the same wash
        is not the same on a light surface as on a dark one, and that is a
        decision for the palette to make. */
-    const band = token('--chart-band', 'rgba(168, 63, 14, 0.16)');
+    const band = colours.band;
 
     const partialIndex = data.partial_index ?? -1;
     /* The segment touching the part month is drawn dashed, whichever side of it
@@ -279,7 +279,7 @@ function configFor(data) {
         },
         plugins: [
             crosshairFor(grid),
-            peakLabelFor(data.peak_index, displays, token('--text', '#101828')),
+            peakLabelFor(data.peak_index, displays, colours.text),
         ],
     };
 }

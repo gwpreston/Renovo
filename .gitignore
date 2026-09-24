@@ -57,6 +57,10 @@ docker-compose.override.yml
 # ---------------------------------------------------------------------------
 /public/build/
 
+# The theme stylesheet, generated from assets/theme/tokens.json at the start of
+# every build. The JSON is the source; this is its output.
+/assets/css/generated/
+
 # ---------------------------------------------------------------------------
 # Tooling caches
 # ---------------------------------------------------------------------------

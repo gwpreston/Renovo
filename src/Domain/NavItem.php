@@ -26,7 +26,7 @@ final class NavItem
     /**
      * @param non-empty-string $labelKey   Catalogue key for the visible label.
      * @param non-empty-string $href       Where the item goes.
-     * @param non-empty-string $icon       A key of the map in `assets/js/icons.js`.
+     * @param non-empty-string $icon       A key of `assets/theme/icons.json`.
      * @param list<string> $matches        Paths for which this item is the active one.
      * @param Permission|null $permission  What a user must be allowed to do to see it.
      * @param bool $tab                    Whether it is one of the narrow screen's tabs.

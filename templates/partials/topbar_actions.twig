@@ -21,7 +21,7 @@
 <div class="topbar-actions">
     {% if can(scope, 'subscription.view') %}
         <form class="topbar-search" method="get" action="/subscriptions" role="search">
-            <span class="topbar-search-icon" data-icon="search" aria-hidden="true"></span>
+            {{ icon('search', 'topbar-search-icon') }}
             <input type="search" name="q" aria-label="{{ t('nav.search') }}"
                    placeholder="{{ t('nav.search') }}">
         </form>
@@ -30,7 +30,7 @@
     {% if can(scope, 'subscription.create') %}
         <a class="button topbar-add" href="/subscriptions/new"
            data-opens-dialog="quick-add">
-            <span class="nav-icon" data-icon="add" aria-hidden="true"></span>
+            {{ icon('add', 'nav-icon') }}
             <span class="topbar-add-label">{{ t('subscriptions.add_subscription') }}</span>
         </a>
     {% endif %}

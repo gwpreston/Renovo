@@ -20,14 +20,14 @@
                     <span class="renewal-name">
                         {{ logo.mark(row.subscription, 20) }}{{ row.subscription.name }}
                     </span>
-                    <span class="renewal-days {{ row.is_urgent ? 'is-due-soon' : '' }}">
+                    <span class="renewal-days num {{ row.is_urgent ? 'is-due-soon' : '' }}">
                         {% if row.days == 0 %}
                             {{ t('state.today') }}
                         {% else %}
                             {{ t('dashboard.days_away', {'days': row.days}) }}
                         {% endif %}
                     </span>
-                    <span class="renewal-amount">
+                    <span class="renewal-amount num">
                         {{ row.subscription.price.amountMinor|money(row.subscription.price.currency) }}
                     </span>
                 </li>

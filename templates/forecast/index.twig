@@ -42,18 +42,18 @@
                                                 event.subscription.name }}</a>
                                             <span class="muted">{{ event.date|local_date('d MMM') }}</span>
                                             {% if event.reason == 'trial_conversion' %}
-                                                <span class="badge badge-warning">{{ t('state.trial_converts') }}</span>
+                                                <span class="badge badge-warn">{{ t('state.trial_converts') }}</span>
                                             {% elseif event.reason == 'one_off' %}
                                                 <span class="badge">{{ t('type.one_off') }}</span>
                                             {% endif %}
-                                            <span class="renewal-amount">{{
+                                            <span class="renewal-amount num">{{
                                                 event.amount.amountMinor|money(event.amount.currency) }}</span>
                                         </li>
                                     {% endfor %}
                                 </ul>
                             {% endif %}
                         </td>
-                        <td class="numeric">
+                        <td class="numeric num">
                             {% if month.combined_minor is not null %}
                                 {{ month.combined_minor|money(base_currency) }}
                                 {% if peak_minor > 0 and month.combined_minor > 0 %}

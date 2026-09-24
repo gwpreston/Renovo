@@ -23,7 +23,7 @@
 
     <article class="card stat metric">
         <h2 class="stat-label">{{ t('dashboard.renewing_soon') }}</h2>
-        <p class="stat-value">{{ metrics.renewals.count }}</p>
+        <p class="stat-value num">{{ metrics.renewals.count }}</p>
         <p class="muted">{{ t('dashboard.renewing_soon_note', {'days': metrics.renewals.days}) }}</p>
         {% if metrics.renewals.total is not empty %}
             <p class="muted">
@@ -42,7 +42,7 @@
     #}
     <article class="card stat metric">
         <h2 class="stat-label">{{ t('dashboard.active_subscriptions') }}</h2>
-        <p class="stat-value">{{ metrics.portfolio.active_count }}</p>
+        <p class="stat-value num">{{ metrics.portfolio.active_count }}</p>
         {% if metrics.portfolio.next %}
             {% set next = metrics.portfolio.next %}
             <p class="muted">{{ t('dashboard.next_charge', {

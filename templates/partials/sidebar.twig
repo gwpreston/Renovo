@@ -11,10 +11,18 @@
     made of real destinations.
 #}
 <aside class="sidebar">
+    {#
+        The mark sits in a tile on the dark rails — white, so the gradient
+        reads — and bare on the light ones. The tile's colour and padding are
+        palette tokens (`--logo-tile`, `--logo-pad`), so which rail gets one is
+        decided by the palette rather than by this template.
+    #}
     <a class="sidebar-brand" href="/">
-        <svg class="brand-mark" viewBox="0 0 460 427" aria-hidden="true" focusable="false">
-            <use href="#renovo-mark"></use>
-        </svg>
+        <span class="logo-tile">
+            <svg class="brand-mark" viewBox="0 0 460 427" aria-hidden="true" focusable="false">
+                <use href="#renovo-mark"></use>
+            </svg>
+        </span>
         <span class="sidebar-brand-name">{{ instance_name }}</span>
     </a>
 

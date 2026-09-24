@@ -6,6 +6,7 @@ namespace App\Domain\Entity;
 
 use App\Domain\Density;
 use App\Domain\LandingView;
+use App\Domain\Palette;
 use App\Domain\Theme;
 use App\Domain\WeekStart;
 use App\Support\Initials;
@@ -48,6 +49,8 @@ final class User
         /** An address requested but not yet proved. `email` is still the login. */
         public readonly ?string $pendingEmail = null,
         public readonly ?string $avatarPath = null,
+        /** Null means the default palette; see `palettePreference()`. */
+        public readonly ?string $palette = null,
     ) {
     }
 
@@ -84,6 +87,11 @@ final class User
     public function themePreference(): Theme
     {
         return Theme::fromString($this->theme);
+    }
+
+    public function palettePreference(): Palette
+    {
+        return Palette::fromNullable($this->palette);
     }
 
     public function densityPreference(): Density

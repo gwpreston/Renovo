@@ -37,6 +37,11 @@ no plans to upgrade to; a card advertising one would be dishonest furniture. The
 space it occupied goes to nothing, or to the theme/quick-add controls that do
 belong there.
 
+> **Superseded by Phase 18.** The active item is the rail's `--rail-active`
+> fill plus a 3px `--accent` left border (not amber), still derived from the
+> route server-side. The rail's colours come from the member's palette, and
+> navigation icons are server-rendered from the build's sprite with `icon()`.
+
 The active item takes the amber accent — a solid fill or a left border, one
 treatment chosen and used consistently — and it is derived from the current route
 server-side, so the highlight is right on first paint rather than corrected by

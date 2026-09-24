@@ -48,6 +48,12 @@ on, not the tool.
 
 ## The font is vendored, not linked
 
+> **Superseded by Phase 18.** The vendoring pattern stands; the fonts changed.
+> The build now vendors **Plus Jakarta Sans** (text) and **JetBrains Mono**
+> (figures) through `@fontsource-variable/plus-jakarta-sans` and
+> `@fontsource-variable/jetbrains-mono`, with both SIL OFL licences copied into
+> `public/build/` beside them. Inter is no longer installed.
+
 Inter is brought in through **Fontsource** (`@fontsource-variable/inter`) — Google
 Fonts' families repackaged for self-hosting and installed from npm, not fetched
 from `fonts.googleapis.com`. The build copies the `.woff2` files into the output

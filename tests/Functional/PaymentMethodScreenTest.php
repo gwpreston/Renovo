@@ -103,7 +103,8 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
 
         $page = $this->body($this->request('GET', '/payment-methods'));
         self::assertStringNotContainsString('action="/payment-methods/defaults"', $page);
-        self::assertStringContainsString('data-icon="payment-bank"', $page);
+        // The generic icon, drawn by the server from the sprite.
+        self::assertMatchesRegularExpression('~<use href="/build/sprite-[^"]+\.svg#payment-bank">~', $page);
     }
 
     public function testAMemberAddsAMethodWithALogoThenRenamesAndRemovesIt(): void
@@ -218,7 +219,7 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
         $edit = $this->body($this->request('GET', '/subscriptions/' . $id . '/edit'));
         $edit = (string) preg_replace('/\s+/', ' ', $edit);
         self::assertMatchesRegularExpression('#<option value="' . $card . '"[^>]*selected[^>]*>Joint card#', $edit);
-        self::assertStringContainsString('data-icon="payment-card"', $edit);
+        self::assertMatchesRegularExpression('~<use href="/build/sprite-[^"]+\.svg#payment-card">~', $edit);
     }
 
     /**

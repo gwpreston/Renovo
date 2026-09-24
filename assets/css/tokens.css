@@ -1,404 +1,149 @@
 /*
- * The design tokens.
+ * The design tokens that are not colours, and the bridge to Tailwind.
  *
- * Every colour, radius and type size the interface uses is named here once.
- * Nothing downstream writes a literal colour: a rule in `components.css` and a
- * Tailwind utility in a template both resolve to the same custom property, so
- * they cannot disagree about what "brand" or "card" means.
- *
- * Two layers, in this order:
- *
- *   1. Semantic custom properties, reassigned per theme. These are what carry
- *      light and dark.
- *   2. `@theme inline`, which hands the same properties to Tailwind so
- *      `bg-surface` and `.card { background: var(--surface) }` are the same
- *      colour by construction.
- *
- * The `inline` keyword on the theme block is what makes a runtime-swapped
- * palette work. Without it Tailwind resolves a theme value at build time and
- * bakes it into the utility, which would freeze every utility to whichever
- * theme was compiled first. With it, `bg-surface` compiles to
- * `background-color: var(--surface)` and follows the cascade like everything
- * else.
+ * Colours live in `assets/theme/tokens.json`. The build turns that file into
+ * `generated/theme.css` — every palette in light, in dark, and in "system" —
+ * and the contrast test reads the same JSON, so no colour is written down
+ * here or anywhere else in the stylesheets. What is left for this file is
+ * what does not change with the palette: the logo's own gradient, shape, and
+ * type.
  */
 
 /* ------------------------------------------------------------------ brand */
 
 /*
- * The logo's two gradient stops, sampled from the mark, and the single place
- * they are written down. Every gradient in the application composes from these
- * two names, so re-sampling the logo is a two-line edit rather than a search
- * for hex codes.
+ * The logo's two gradient stops, sampled from the mark in Phase 9: every pixel
+ * of `assets/brand/renovo-logo.png` projected onto the 135° axis the gradient
+ * runs along, and the first and last twentieth averaged. The mark's own
+ * `<linearGradient>` in `partials/brand_sprite.twig` reads them.
  *
- * Phase 8 wrote down its own stated values because the logo was not in the
- * repository. Phase 9 received it, and these are the real ones: every pixel of
- * the mark was projected onto the 135° axis the gradient runs along, and the
- * first and last twentieth averaged. They are what `renovo-logo.png` in
- * `assets/brand/` actually paints, not an approximation of it.
- *
- * These are theme-independent: the brand is the brand on a light page and a
- * dark one.
+ * The gradient is the mark's and nothing else's. Interface elements — the
+ * primary button, the active navigation item, a featured card — take the
+ * palette's flat `--accent`, which is what lets five palettes exist at all: a
+ * gradient on the controls would be the one colour no palette could change.
  */
 :root {
     --brand-from: #0daa9c;
     --brand-to: #1069bb;
-    --gradient-brand: linear-gradient(135deg, var(--brand-from), var(--brand-to));
 
     /*
-     * A filled button is a solid colour, not a gradient.
-     *
-     * It used to be the gradient above, darkened until white could sit on it.
-     * A flat fill is the simpler thing and the more legible one: the ink meets
-     * one contrast ratio rather than a range of them, a row of buttons cannot
-     * disagree about where its gradient starts, and the brand still reads on
-     * the page from the mark, the active rail item and the featured card's
-     * wash — the places nothing sits on top of.
-     *
-     * The colour is `--accent`, the action colour already defined per theme,
-     * with `--accent-text` as its ink. Both are assigned in the palettes below,
-     * so a filled button follows light and dark like everything else.
+     * The forecast hatch: accent stripes on the palette's pale (or, in dark,
+     * deep) tint of it. Composed here rather than in the JSON because it is a
+     * pattern, not a colour — it is never read by a canvas, and CSS resolves
+     * both references against whichever palette is on the root.
      */
-}
-
-/* ------------------------------------------------------- the light palette */
-
-/*
- * Light is the default assignment, which is what an account set to "system"
- * gets on a browser that asks for light, and what `data-theme="light"` gets
- * unconditionally.
- *
- * "Dark first" in PHASE.md means dark is the better-tuned of the two and the
- * one the screenshots show. It does not mean light is dropped: an account can
- * choose it under Settings → Appearance, and that choice wins over the
- * browser's.
- */
-:root {
-    color-scheme: light;
-
-    /*
-     * Surfaces.
-     *
-     * The page is a definite grey, not a hint of one. It used to be `#f4f5f7`,
-     * which put a white card on a 1.09:1 background — a 2% separation that the
-     * shadow could not rescue, so the whole screen read as one undifferentiated
-     * white sheet and the cards stopped looking like cards. `#e8eaee` roughly
-     * doubles that to 1.20:1, which is enough for a card to lift without the
-     * page turning into a second colour competing with the content.
-     *
-     * Hover and sunken must stay *darker* than the page, or a recessed surface
-     * sits lighter than what it is recessed into and the depth reads backwards.
-     * They moved with `--bg` for exactly that reason.
-     */
-    --bg: #e8eaee;
-    --surface: #ffffff;
-    --surface-raised: #ffffff;
-    --surface-hover: #dde0e6;
-    --surface-sunken: #dde0e6;
-
-    /*
-     * Two borders, because they do two jobs. The hairline separates things
-     * that are already visibly distinct and may be faint; the control border
-     * is the visible edge of an input or a button, which WCAG holds to 3:1
-     * against what it sits on the way it holds text to 4.5:1.
-     */
-    --border: rgba(16, 24, 40, 0.12);
-    /*
-     * 3.36:1 on the page and 4.05:1 on a card. It was `#7d8794`, which landed
-     * at 3.02:1 once the page darkened — over the line by a rounding error,
-     * which is not over the line.
-     */
-    --border-control: #767f8c;
-
-    /* text */
-    --text: #14161c;
-    --text-muted: #5b6472;
-
-    /*
-     * The action colour, for links, focus rings, the active nav item and a
-     * meter fill. It is the brand's teal darkened until it clears 4.5:1 on
-     * *both* surfaces it is read on — 5.02:1 on the page, 6.04:1 on a card —
-     * and carries white at 6.04:1 when it is a filled button. The mark's own
-     * #0daa9c is 2.9:1 on white, readable on the dark surface it was sampled
-     * against and not on this one.
-     *
-     * It was #097a70, which held 5.21:1 on a card but only 4.33:1 once the page
-     * darkened — and a link in a card's margin is read against the page.
-     */
-    --accent: #086f66;
-    --accent-text: #ffffff;
-
-    /*
-     * Urgency: renewing soon, a cancel-by deadline, a budget projected over.
-     *
-     * Darkened from #b4430f when the page did. It is read on four surfaces —
-     * the card, the page, its own tint and the hover/sunken grey — and the
-     * hover grey is the strict one: the old value held 4.23:1 there once that
-     * surface darkened, which `DesignTokensTest` fails on. This clears 4.5:1 on
-     * all four.
-     */
-    --warning: #a83f0e;
-    --warning-bg: #fff1e8;
-
-    /*
-     * The wash the spend chart fills between its two lines with — what
-     * converting trials will add to a month. `--warning` at low opacity, but
-     * written out per theme rather than mixed at use: a canvas fill reads
-     * this through `getComputedStyle`, which hands back a custom property
-     * unresolved, so anything with a `var()` or a `color-mix()` inside it
-     * would reach the canvas as a string it cannot parse. It also wants more
-     * weight on a dark surface than on a light one to read as the same wash.
-     */
-    --chart-band: rgba(168, 63, 14, 0.16);
-
-    /* a genuine problem, distinct from the heads-up above */
-    --danger: #b3261e;
-    --error-bg: #fdecea;
-    --error-text: #b3261e;
-
-    --success-bg: #e6f4ea;
-    --success-text: #14683f;
-
-    /* a price moved: up is bad news in a bills app, down is good */
-    --increase: #b3261e;
-    --decrease: #14683f;
-
-    /*
-     * The categorical palette: the colours a segment or a series is told apart
-     * by, rather than a colour that means something.
-     *
-     * Every other hue in this file carries a meaning — amber is money about to
-     * move, red is a problem, the accent is the thing to press. These carry
-     * none, which is the point: a donut's third segment is not more urgent than
-     * its second. They are ordered by hue rather than by importance so that
-     * adjacent segments are distinguishable, and the tail is deliberately
-     * outside the sequence so "everything else" reads as everything else and
-     * not as a seventh category.
-     *
-     * Each clears 3:1 against the surface it is drawn on, which is what WCAG
-     * asks of a graphical object a reader has to tell from its background.
-     */
-    --series-1: #097a70;
-    --series-2: #1069bb;
-    --series-3: #7a4fbd;
-    --series-4: #b4430f;
-    --series-5: #8a6d1f;
-    --series-6: #0d6b8f;
-    --series-other: #6b7280;
-
-    --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
-    --backdrop: rgba(16, 24, 40, 0.45);
-}
-
-/* -------------------------------------------------------- the dark palette */
-
-/*
- * Written once and applied twice, because the theme has three states and only
- * two of them are a media query's business.
- *
- * The `:not([data-theme='light'])` guard is the whole trick: an account that
- * has explicitly chosen light, on a machine set to dark, must get light. Left
- * out, the media query would repaint it dark and the setting would look
- * broken on exactly the machines whose owners bothered to change it.
- */
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) {
-        color-scheme: dark;
-
-        --bg: #0b0b0e;
-        --surface: #1a1a20;
-        --surface-raised: #121215;
-        --surface-hover: #202028;
-        --surface-sunken: #121215;
-
-        --border: rgba(255, 255, 255, 0.08);
-        --border-control: #666674;
-
-        --text: #ffffff;
-        --text-muted: #9e9eab;
-
-        --accent: #0daa9c;
-        --accent-text: #05130f;
-
-        --warning: #ff784e;
-        --warning-bg: #3a1f10;
-
-        /* Heavier than the light theme's: the same wash on a darker surface. */
-        --chart-band: rgba(255, 120, 78, 0.26);
-
-        --danger: #ff6b63;
-        --error-bg: #3a1614;
-        --error-text: #ff8a82;
-
-        --success-bg: #0f2e1d;
-        --success-text: #57d18c;
-
-        --increase: #ff8a82;
-        --decrease: #57d18c;
-
-        /* The categorical palette again, lifted for a near-black page: the
-           light values are too dark to tell apart on it. */
-        --series-1: #2ec9b8;
-        --series-2: #5aa9f0;
-        --series-3: #b99bf5;
-        --series-4: #ff9d6e;
-        --series-5: #d9bd57;
-        --series-6: #5cc2e8;
-        --series-other: #9095a3;
-
-        /*
-         * No drop shadow. On a near-black page a shadow is invisible; what
-         * separates a card from the page here is its own faint top-edge
-         * highlight, applied in `components.css`.
-         */
-        --shadow: none;
-        --backdrop: rgba(0, 0, 0, 0.6);
-    }
-}
-
-:root[data-theme='dark'] {
-    color-scheme: dark;
-
-    --bg: #0b0b0e;
-    --surface: #1a1a20;
-    --surface-raised: #121215;
-    --surface-hover: #202028;
-    --surface-sunken: #121215;
-
-    --border: rgba(255, 255, 255, 0.08);
-    --border-control: #666674;
-
-    --text: #ffffff;
-    --text-muted: #9e9eab;
-
-    --accent: #0daa9c;
-    --accent-text: #05130f;
-
-    --warning: #ff784e;
-    --warning-bg: #3a1f10;
-
-    /* Heavier than the light theme's: the same wash on a darker surface. */
-    --chart-band: rgba(255, 120, 78, 0.26);
-
-    --danger: #ff6b63;
-    --error-bg: #3a1614;
-    --error-text: #ff8a82;
-
-    --success-bg: #0f2e1d;
-    --success-text: #57d18c;
-
-    --increase: #ff8a82;
-    --decrease: #57d18c;
-
-    /* The categorical palette again, lifted for a near-black page: the light
-       values are too dark to tell apart on it. */
-    --series-1: #2ec9b8;
-    --series-2: #5aa9f0;
-    --series-3: #b99bf5;
-    --series-4: #ff9d6e;
-    --series-5: #d9bd57;
-    --series-6: #5cc2e8;
-    --series-other: #9095a3;
-
-    --shadow: none;
-    --backdrop: rgba(0, 0, 0, 0.6);
+    --hatch: repeating-linear-gradient(135deg, var(--accent) 0 3px, var(--hatch-2) 3px 7px);
 }
 
 /* ---------------------------------------------------- shape and type scale */
 
 :root {
     /*
-     * 16px on a card, smaller on the things that sit inside one. A single
-     * radius everywhere makes a chip look like a card that failed to grow.
+     * 12px on a card, 14px on a modal, less on the things that sit inside one.
+     * A single radius everywhere makes a chip look like a card that failed to
+     * grow.
+     *
+     * Rule-only, and not handed to Tailwind below except for the card and the
+     * field: an 8px corner inside a card is a decision for the rule that draws
+     * it rather than something a template should reach for.
      */
-    --radius: 16px;
-    --radius-control: 10px;
-    /*
-     * Rule-only, and deliberately not handed to Tailwind below. Their names
-     * sit in Tailwind's `--radius-*` namespace, so exposing them would create
-     * `rounded-small` and `rounded-pill`; `rounded-full` already covers the
-     * pill, and an 8px corner inside a card is a decision for the rule that
-     * draws it rather than something a template should reach for.
-     */
-    --radius-small: 8px;
+    --radius: 12px;
+    --radius-modal: 14px;
+    --radius-button: 10px;
+    --radius-control: 8px;
+    --radius-small: 6px;
     --radius-pill: 999px;
 
     /*
-     * Inter, vendored by the build. The stack behind it is what renders for
-     * the moment before the webfont arrives, and on the rare instance whose
-     * operator has stripped the font files out.
+     * Plus Jakarta Sans for words and JetBrains Mono for figures, both
+     * vendored by the build. The stack behind each is what renders for the
+     * moment before the webfont arrives.
      *
-     * Named `--font-stack` rather than `--font-sans` on purpose: `--font-sans`
-     * is Tailwind's own theme key, and a theme key assigned its own name — a
-     * `--font-sans: var(--font-sans)` — is a circular reference that CSS
-     * resolves to nothing at all. Every raw token here is named differently
-     * from the Tailwind key that exposes it, which is what keeps the two from
-     * colliding in `:root`.
+     * Named `--font-text` and `--font-figures` rather than `--font-sans` and
+     * `--font-mono` on purpose: those are Tailwind's own theme keys, and a
+     * theme key assigned its own name — a `--font-sans: var(--font-sans)` — is
+     * a circular reference that CSS resolves to nothing at all. Every raw
+     * token here is named differently from the Tailwind key that exposes it.
      */
-    --font-stack: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto,
+    --font-text: 'Plus Jakarta Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto,
         Helvetica, Arial, sans-serif;
+    --font-figures: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas,
+        monospace;
 
     /*
-     * A small fixed scale rather than ad-hoc sizes, so a heading added in a
-     * hurry lands on one of four sizes that already exist.
+     * A fixed scale, so a heading added in a hurry lands on a size that
+     * already exists. Eleven pixels is the floor: the prototype went down to
+     * eight, which is decoration rather than text.
      */
-    --size-kpi: 2.5rem;
-    --size-heading: 1.25rem;
-    --size-body: 0.9375rem;
-    --size-label: 0.8125rem;
+    --size-kpi: 1.375rem;
+    --size-title: 1.125rem;
+    --size-heading: 1rem;
+    --size-body: 0.875rem;
+    --size-dense: 0.8125rem;
+    --size-label: 0.75rem;
+    --size-caption: 0.6875rem;
 
     --weight-normal: 400;
     --weight-medium: 500;
     --weight-semibold: 600;
     --weight-bold: 700;
+    --weight-heavy: 800;
 }
 
 /* ------------------------------------------------------ handed to Tailwind */
 
 /*
- * The same tokens, in Tailwind's namespaces, so a utility class is available
- * for every one of them. `--color-surface` here is what makes `bg-surface`,
- * `text-surface` and `border-surface` exist.
+ * The same tokens, in Tailwind's namespaces, so a utility class exists for
+ * each of them: `--color-surface` here is what makes `bg-surface` work.
  *
- * Only the tokens a template might reasonably want as a utility are listed.
- * A name that exists here but nowhere in `templates/` costs nothing — Tailwind
- * emits a utility only where it finds the class used.
+ * `inline` is what makes a runtime-swapped palette work. Without it Tailwind
+ * resolves a theme value at build time and bakes it into the utility, freezing
+ * every utility to whichever palette was compiled first; with it, `bg-surface`
+ * compiles to `background-color: var(--surface)` and follows the attribute on
+ * the root like everything else. Switching palette or theme is an attribute
+ * change, never a recompilation.
  *
  * Every key below is spelled differently from the property it points at. A key
  * that referenced its own name would compile to `--x: var(--x)` in `:root`,
- * which is circular and therefore invalid — the utility and the rule would
- * both silently fall back to nothing.
+ * which is circular and therefore invalid.
  */
 @theme inline {
     --color-bg: var(--bg);
     --color-surface: var(--surface);
-    --color-surface-raised: var(--surface-raised);
-    --color-surface-hover: var(--surface-hover);
-    --color-surface-sunken: var(--surface-sunken);
+    --color-surface-2: var(--surface-2);
+    --color-surface-3: var(--surface-3);
 
     --color-line: var(--border);
     --color-line-control: var(--border-control);
 
     --color-ink: var(--text);
-    --color-ink-muted: var(--text-muted);
+    --color-ink-muted: var(--muted);
+    --color-ink-faint: var(--faint);
 
-    --color-brand: var(--accent);
-    --color-brand-from: var(--brand-from);
-    --color-brand-to: var(--brand-to);
-    --color-brand-ink: var(--accent-text);
+    --color-accent: var(--accent);
+    --color-accent-ink: var(--accent-ink);
+    --color-accent-soft: var(--accent-soft);
+    --color-accent-text: var(--accent-text);
 
-    --color-urgent: var(--warning);
-    --color-urgent-bg: var(--warning-bg);
-    --color-danger: var(--danger);
-    --color-increase: var(--increase);
-    --color-decrease: var(--decrease);
+    --color-ok: var(--ok);
+    --color-ok-bg: var(--ok-bg);
+    --color-warn: var(--warn);
+    --color-warn-bg: var(--warn-bg);
+    --color-bad: var(--bad);
+    --color-bad-bg: var(--bad-bg);
+    --color-info: var(--info);
+    --color-info-bg: var(--info-bg);
 
-    --font-sans: var(--font-stack);
+    --font-sans: var(--font-text);
+    --font-mono: var(--font-figures);
 
     --radius-card: var(--radius);
     --radius-field: var(--radius-control);
 
     --text-kpi: var(--size-kpi);
+    --text-title: var(--size-title);
     --text-heading: var(--size-heading);
     --text-body: var(--size-body);
     --text-label: var(--size-label);
+    --text-caption: var(--size-caption);
 }

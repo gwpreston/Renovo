@@ -300,6 +300,7 @@ return static function (App $app): void {
         // everything that is needs somebody's authority.
         $group->get('/profile', [ProfileController::class, 'index'])->setName('profile');
         $group->post('/profile/theme', [ProfileController::class, 'updateTheme']);
+        $group->post('/profile/palette', [ProfileController::class, 'updatePalette']);
         $group->post('/profile/preferences', [ProfileController::class, 'updatePreferences']);
 
         // Phase 15: account self-service. No permission on any of them, by the

@@ -74,11 +74,11 @@
                                 apology in a table cell.
                             #}
                             {% if row.monthly.totals is empty %}
-                                <td class="numeric muted">{{ t('common.none_symbol') }}</td>
-                                <td class="numeric muted">{{ t('common.none_symbol') }}</td>
+                                <td class="numeric muted num">{{ t('common.none_symbol') }}</td>
+                                <td class="numeric muted num">{{ t('common.none_symbol') }}</td>
                             {% else %}
-                                <td class="numeric member-figure">{{ figure.spend(row.monthly, '') }}</td>
-                                <td class="numeric member-figure">{{ figure.spend(row.yearly, '') }}</td>
+                                <td class="numeric member-figure num">{{ figure.spend(row.monthly, '') }}</td>
+                                <td class="numeric member-figure num">{{ figure.spend(row.yearly, '') }}</td>
                             {% endif %}
                         {% endif %}
                     </tr>

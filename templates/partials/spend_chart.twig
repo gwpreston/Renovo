@@ -90,14 +90,14 @@
                                 <span class="badge">{{ t('dashboard.part_month') }}</span>
                             {% endif %}
                         </th>
-                        <td class="numeric">
+                        <td class="numeric num">
                             {{ month.display }}
                             {% if loop.index0 == chart.peak_index %}
-                                <span class="badge badge-warning">{{ t('dashboard.peak_month') }}</span>
+                                <span class="badge badge-warn">{{ t('dashboard.peak_month') }}</span>
                             {% endif %}
                         </td>
                         {% if chart.has_trials %}
-                            <td class="numeric">{{ month.committed_display }}</td>
+                            <td class="numeric num">{{ month.committed_display }}</td>
                         {% endif %}
                     </tr>
                 {% endfor %}

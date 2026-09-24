@@ -13,6 +13,12 @@ against the complete set, is what catches the seams between them.
 
 ## Interaction states
 
+> **Superseded by Phase 18** for colour. The one primary action per screen is
+> an `--accent` fill with `--accent-ink` text, not the amber gradient; active
+> nav items take `--rail-active` plus an accent left border; rows lift to
+> `--surface-2`. Amber is `--warn` only. The rule itself — one primary per
+> screen, nothing competing with it — stands.
+
 The states the design specifies, applied consistently across every screen built
 in this sequence: nav items take the amber accent when active; table rows lift to
 the hover surface (`#202028`); the one primary action per screen carries the amber

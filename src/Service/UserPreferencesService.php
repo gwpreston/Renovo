@@ -6,14 +6,15 @@ namespace App\Service;
 
 use App\Domain\Density;
 use App\Domain\LandingView;
+use App\Domain\Palette;
 use App\Domain\Theme;
 use App\Domain\WeekStart;
 use App\I18n\Locales;
 use App\Repository\UserRepository;
 
 /**
- * A user's own display preferences: theme, language, week start, list density
- * and where they land.
+ * A user's own display preferences: theme, palette, language, week start, list
+ * density and where they land.
  *
  * Every value is validated here rather than in the controller, which is the
  * difference between a preference and an arbitrary string in a column: each
@@ -41,6 +42,29 @@ final class UserPreferencesService
         $resolved = Theme::fromString($theme);
 
         $this->users->updatePreferences($userId, ['theme' => $resolved->value]);
+
+        return $resolved;
+    }
+
+    /**
+     * The palette, on its own form.
+     *
+     * The one preference that is *rejected* rather than coerced. Every other
+     * preference here quietly becomes its default when the value is not one it
+     * knows; this one ends up in an attribute on every page's root element, so
+     * an unknown value is a tampered form, and the answer to a tampered form
+     * is an error and no write — not a silent reset of a choice the member
+     * really did make.
+     */
+    public function updatePalette(int $userId, ?string $palette): Palette
+    {
+        $resolved = Palette::tryFrom($palette ?? '');
+
+        if ($resolved === null) {
+            throw ValidationException::field('palette', 'error.palette.unknown');
+        }
+
+        $this->users->updatePreferences($userId, ['palette' => $resolved->value]);
 
         return $resolved;
     }

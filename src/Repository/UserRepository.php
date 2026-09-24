@@ -107,7 +107,7 @@ final class UserRepository extends AbstractRepository
      */
     public function updatePreferences(int $userId, array $preferences): void
     {
-        $allowed = ['theme', 'locale', 'week_start', 'density', 'landing_view'];
+        $allowed = ['theme', 'palette', 'locale', 'week_start', 'density', 'landing_view'];
 
         $assignments = [];
         $values = [];
@@ -343,6 +343,9 @@ final class UserRepository extends AbstractRepository
                 : null,
             avatarPath: isset($row['avatar_path']) && $row['avatar_path'] !== ''
                 ? (string) $row['avatar_path']
+                : null,
+            palette: isset($row['palette']) && $row['palette'] !== ''
+                ? (string) $row['palette']
                 : null,
         );
     }

@@ -121,7 +121,7 @@
                 empty box.
             #}
             <p class="donut-centre" aria-hidden="true">
-                <span class="donut-centre-value">{{ donut.total_display }}</span>
+                <span class="donut-centre-value num">{{ donut.total_display }}</span>
                 <span class="donut-centre-label">{{ t('dashboard.per_month_unit') }}</span>
             </p>
         </div>
@@ -149,16 +149,16 @@
                         <th scope="row">
                             {{ slice.is_other ? tail_name : (slice.is_unassigned ? unassigned_label : slice.name) }}
                         </th>
-                        <td class="numeric">{{ slice.display }}</td>
-                        <td class="numeric">{{ slice.percent|percent }}</td>
+                        <td class="numeric num">{{ slice.display }}</td>
+                        <td class="numeric num">{{ slice.percent|percent }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
                 <tfoot>
                 <tr>
                     <th scope="row">{{ t('field.total') }}</th>
-                    <td class="numeric">{{ donut.total_display }}</td>
-                    <td class="numeric">{{ 100|percent }}</td>
+                    <td class="numeric num">{{ donut.total_display }}</td>
+                    <td class="numeric num">{{ 100|percent }}</td>
                 </tr>
                 </tfoot>
             </table>

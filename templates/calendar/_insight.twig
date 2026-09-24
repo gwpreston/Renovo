@@ -30,7 +30,7 @@
     {% if calendar.count > 0 %}
         <p class="calendar-insight-total">
             {% for currency, amount in calendar.totals %}
-                <span class="stat-value">{{ amount|money(currency) }}</span>{{ not loop.last ? ' ' : '' }}
+                <span class="stat-value num">{{ amount|money(currency) }}</span>{{ not loop.last ? ' ' : '' }}
             {% endfor %}
         </p>
         <p class="muted">{{ t('calendar.due_this_month', {'count': calendar.count}) }}</p>
@@ -49,8 +49,8 @@
                             {{ trial.subscription.name }}
                         </a>
                     </span>
-                    <span class="renewal-date">{{ trial.date|local_date('d MMM') }}</span>
-                    <span class="renewal-amount">
+                    <span class="renewal-date num">{{ trial.date|local_date('d MMM') }}</span>
+                    <span class="renewal-amount num">
                         {{ trial.amount.amountMinor|money(trial.amount.currency) }}
                     </span>
                 </li>
@@ -83,12 +83,12 @@
                             {{ deadline.subscription.name }}
                         </a>
                     </span>
-                    <span class="renewal-date">
-                        <span class="badge badge-warning">
+                    <span class="renewal-date num">
+                        <span class="badge badge-warn">
                             {{ t('calendar.cancel_by', {'date': deadline.date|local_date('d MMM')}) }}
                         </span>
                     </span>
-                    <span class="renewal-amount">
+                    <span class="renewal-amount num">
                         {{ deadline.amount.amountMinor|money(deadline.amount.currency) }}
                     </span>
                 </li>

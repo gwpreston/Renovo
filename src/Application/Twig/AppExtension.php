@@ -28,6 +28,7 @@ use App\Service\ValidationError;
 use App\Support\AssetVersion;
 use App\Support\BuildManifest;
 use App\Support\DateFormatter;
+use App\Support\IconSprite;
 use App\Support\MoneyFormatter;
 use App\Support\NumberFormat;
 use DateTimeImmutable;
@@ -66,6 +67,7 @@ final class AppExtension extends AbstractExtension
         private readonly NavigationService $navigation,
         private readonly DateFormatter $dates,
         private readonly NumberFormat $numbers,
+        private readonly IconSprite $icons,
     ) {
     }
 
@@ -75,6 +77,8 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('t', $this->translate(...)),
             new TwigFunction('asset', $this->assets->url(...)),
             new TwigFunction('bundle', $this->build->url(...)),
+            new TwigFunction('icon', $this->icons->render(...), ['is_safe' => ['html']]),
+            new TwigFunction('icon_sprite', $this->icons->url(...)),
             new TwigFunction('locale_tag', fn (): string => $this->locale->tag()),
             new TwigFunction('js_translations', $this->jsTranslations(...)),
             new TwigFunction('error_message', $this->errorMessage(...)),

@@ -83,11 +83,11 @@
                                                 <a href="/subscriptions/{{ event.subscription.id }}/money">
                                                     {{ event.subscription.name }}
                                                 </a>
-                                                <span class="calendar-amount">
+                                                <span class="calendar-amount num">
                                                     {{ event.amount.amountMinor|money(event.amount.currency) }}
                                                 </span>
                                                 {% if event.reason == 'trial_conversion' %}
-                                                    <span class="badge badge-warning">
+                                                    <span class="badge badge-warn">
                                                         {{ t('state.trial_converts') }}
                                                     </span>
                                                 {% endif %}

@@ -25,7 +25,7 @@
             {% for row in progress %}
                 {% set budget = row.budget %}
                 <article class="card budget {{ row.is_over ? 'is-over' : (row.is_warning ? 'is-warning' : '') }}">
-                    <header class="budget-header">
+                    <header class="budget-header num">
                         <h2>{{ budget.name }}</h2>
                         {% if can(scope, 'budget.manage') %}
                             <a class="button button-quiet" href="/budgets/{{ budget.id }}/edit">{{ t('action.edit') }}</a>
@@ -39,14 +39,14 @@
                     </p>
 
                     {% if row.projected is null %}
-                        <p class="stat-value">—</p>
+                        <p class="stat-value num">—</p>
                         <p class="field-error">
                             {{ t('budgets.unconvertible', {'currencies': row.unconvertible|join(', ')}) }}
                         </p>
                     {% else %}
-                        <p class="stat-value">
+                        <p class="stat-value num">
                             {{ row.projected.amountMinor|money(row.projected.currency) }}
-                            <span class="stat-unit">
+                            <span class="stat-unit num">
                                 {{ t('budgets.of_limit', {'limit': row.limit.amountMinor|money(row.limit.currency)}) }}
                             </span>
                         </p>

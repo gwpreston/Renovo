@@ -150,6 +150,49 @@
         #}
         <section class="card">
             <h2>{{ t('settings.appearance') }}</h2>
+
+            {#
+                The palette, on a form of its own beside the preferences below.
+
+                Its own form because it is the one preference that is refused
+                rather than coerced when the value is not one it knows — see
+                `UserPreferencesService::updatePalette` — and a refusal should
+                not also throw away the theme, language and dashboard layout
+                somebody changed in the same submission.
+
+                Each option is drawn in its own colours: `data-swatch` scopes
+                the palette's rail and accent to the card, so the five can be
+                compared while the page wears one of them. The name is the
+                label; the colours are decoration beside it.
+            #}
+            <form method="post" action="/profile/palette" class="palette-form">
+                {{ csrf_field() }}
+
+                <fieldset class="palette-picker">
+                    <legend>{{ t('settings.palette') }}</legend>
+                    <p class="hint">{{ t('settings.palette_hint') }}</p>
+
+                    <div class="palette-options">
+                        {% for palette in palettes %}
+                            <label class="palette-option" data-swatch="{{ palette.value }}">
+                                <input type="radio" name="palette" value="{{ palette.value }}"
+                                       {{ current_user.palettePreference() == palette ? 'checked' : '' }}>
+                                <span class="palette-swatch" aria-hidden="true">
+                                    <span class="palette-swatch-accent"></span>
+                                </span>
+                                <span class="palette-name">{{ t(palette.labelKey()) }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </fieldset>
+
+                <div class="form-actions">
+                    <button type="submit" class="button">{{ t('settings.palette_save') }}</button>
+                </div>
+            </form>
+
+            <hr class="divider">
+
             <form method="post" action="/profile/preferences" class="stack">
                 {{ csrf_field() }}
 

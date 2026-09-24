@@ -214,7 +214,7 @@
                     <tbody>
                     {% for entry in recent %}
                         <tr>
-                            <td>{{ entry.created_at|local_date('d MMM y, HH:mm') }}</td>
+                            <td class="num">{{ entry.created_at|local_date('d MMM y, HH:mm') }}</td>
                             <td>{{ alert_type_label(entry.alert_type) }}</td>
                             <td>{{ entry.channel_label }}</td>
                             <td>

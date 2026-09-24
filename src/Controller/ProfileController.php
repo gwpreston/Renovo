@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Domain\Density;
 use App\Domain\LandingView;
+use App\Domain\Palette;
 use App\Domain\Theme;
 use App\Domain\WeekStart;
 use App\I18n\Locales;
@@ -14,6 +15,7 @@ use App\Security\SessionInterface;
 use App\Service\AvatarStorage;
 use App\Service\DashboardLayoutService;
 use App\Service\UserPreferencesService;
+use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
@@ -56,6 +58,7 @@ final class ProfileController extends Controller
     {
         return $this->render($request, $response, 'profile/index.twig', [
             'themes' => Theme::cases(),
+            'palettes' => Palette::cases(),
             'densities' => Density::cases(),
             'week_starts' => WeekStart::cases(),
             'landing_views' => LandingView::cases(),
@@ -83,6 +86,26 @@ final class ProfileController extends Controller
         $target = $referer !== '' ? $this->samePathAsUs($request, $referer) : '/profile';
 
         return $this->redirectAfterWrite($request, $response, $target);
+    }
+
+    /**
+     * The palette picker. Self-service like the rest of this page: it changes
+     * how one account's pages look and nothing anybody else sees, so it needs
+     * no permission beyond being signed in — a Viewer chooses their own.
+     */
+    public function updatePalette(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body = $this->body($request);
+        $palette = is_scalar($body['palette'] ?? null) ? (string) $body['palette'] : null;
+
+        try {
+            $this->preferences->updatePalette($this->user($request)->id, $palette);
+            $this->flash('success', 'flash.palette_saved');
+        } catch (ValidationException $exception) {
+            $this->flashErrors($exception);
+        }
+
+        return $this->redirectAfterWrite($request, $response, '/profile');
     }
 
     public function updatePreferences(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

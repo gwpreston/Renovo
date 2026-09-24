@@ -71,7 +71,7 @@
                     {% for label, amount in per_period %}
                         <div class="stat">
                             <h3 class="stat-label">{{ t('period.per_' ~ label) }}</h3>
-                            <p class="stat-value">
+                            <p class="stat-value num">
                                 {{ amount is not null ? amount|money(combined_yearly.currency) : '—' }}
                             </p>
                         </div>
@@ -129,12 +129,12 @@
                                 <td>
                                     <a href="/subscriptions/{{ subscription.id }}/money">{{ subscription.name }}</a>
                                     {% if signal.is_low_use %}
-                                        <span class="badge badge-warning">{{ t('stats.rarely_used') }}</span>
+                                        <span class="badge badge-warn">{{ t('stats.rarely_used') }}</span>
                                     {% endif %}
                                 </td>
-                                <td class="numeric">{{
+                                <td class="numeric num">{{
                                     subscription.monthlyMinor|money(subscription.price.currency) }}</td>
-                                <td class="numeric">
+                                <td class="numeric num">
                                     {{ subscription.usageCount }}
                                     {% if signal.uses_per_month is not null %}
                                         <div class="hint">{{ t('stats.uses_per_month', {
@@ -142,7 +142,7 @@
                                         }) }}</div>
                                     {% endif %}
                                 </td>
-                                <td class="numeric">
+                                <td class="numeric num">
                                     {% if signal.cost_per_use_minor is not null %}
                                         {{ signal.cost_per_use_minor|money(subscription.price.currency) }}
                                     {% else %}

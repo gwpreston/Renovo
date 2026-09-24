@@ -7,12 +7,12 @@
  * hand-written, served directly and untouched by this build. htmx is vendored
  * the same way. None of them needed bundling and so none of them were moved.
  *
- * What this file provides is the two things that do: a chart library too large
- * to load on every page, and an icon set that has to be tree-shaken to be worth
- * having. It exposes both on `window.Renovo`, and — since Phase 9 gave the
- * shell a navigation made of icons — fills in the icon slots the server marked
- * up. Phase 10 added the first page that draws a chart: the dashboard's
- * twelve-month spend, from a payload the server rendered beside the canvas.
+ * What this file provides is what does: a chart library too large to load on
+ * every page, exposed on `window.Renovo` with a helper for building an icon
+ * from the sprite. (Icons used to be filled in here after the page painted;
+ * since Phase 18 the server renders them, so the navigation has its pictures
+ * with the script blocked.) Phase 10 added the first page that draws a chart:
+ * the dashboard's twelve-month spend, from a payload the server rendered beside the canvas.
  * Phase 12 added the second kind and the first page carrying two — the
  * analytics screen's spending trajectory beside its category donut — which is
  * why the drawing below is a list rather than a call.
@@ -23,9 +23,9 @@
  *     element.append(window.Renovo.icon('calendar'));
  */
 
-import { renderChart } from './charts.js';
+import { onThemeChange, renderChart } from './charts.js';
 import { drawCategoryDonuts } from './category-donut.js';
-import { hydrateIcons, icon, iconNames } from './icons.js';
+import { icon } from './icons.js';
 import { enhancePaymentMethodFields } from './payment-method-field.js';
 import { drawSpendCharts } from './spend-chart.js';
 import { enhanceTagFields } from './tag-field.js';
@@ -38,8 +38,6 @@ import { enhanceTagFields } from './tag-field.js';
 window.Renovo = {
     chart: renderChart,
     icon,
-    iconNames,
-    hydrateIcons,
 };
 
 /**
@@ -54,16 +52,13 @@ function drawCharts(root = document) {
 }
 
 /*
- * The shell's icons, drawn once the document is there to draw them into.
+ * The enhancements, run once the document is there to enhance.
  *
  * This is a module, so it is deferred and the markup already exists by the
  * time it runs; the readyState test is for the case where it does not, which
- * is a module fetched from cache faster than the parser. Running again after
- * an htmx swap covers a fragment that arrived with icon slots of its own —
- * `hydrateIcons` only fills empty ones, so doing it twice costs nothing.
+ * is a module fetched from cache faster than the parser.
  */
 function hydrate() {
-    hydrateIcons(document);
     enhanceTagFields(document);
     enhancePaymentMethodFields(document);
     drawCharts();
@@ -78,7 +73,6 @@ if (document.readyState === 'loading') {
 document.addEventListener('htmx:afterSwap', (event) => {
     const root = event.target instanceof Element ? event.target : document;
 
-    hydrateIcons(root);
     // The quick-add dialog loads the subscription form through htmx, so the
     // tag field arrives after this module first ran.
     enhanceTagFields(root);
@@ -86,15 +80,12 @@ document.addEventListener('htmx:afterSwap', (event) => {
 });
 
 /*
- * Redraw when the system flips between light and dark.
+ * Redraw when the palette or the theme changes.
  *
  * A chart's colours are read from the design tokens at the moment it is drawn,
- * so one drawn in light mode keeps light-mode ink until something asks for it
- * again. An account that has chosen a theme explicitly is unaffected: its
- * tokens do not move.
+ * so one drawn in one palette keeps that palette's ink until something asks for
+ * it again. Two things can move the tokens under a drawn chart: the system
+ * flipping between light and dark (for an account set to "system"), and the
+ * root's `data-theme` or `data-palette` changing.
  */
-if (typeof window.matchMedia === 'function') {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        drawCharts();
-    });
-}
+onThemeChange(() => drawCharts());

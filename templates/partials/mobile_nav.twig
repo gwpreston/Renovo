@@ -17,7 +17,7 @@
                 <a class="tabbar-link{{ link.active ? ' is-active' : '' }}"
                    href="{{ link.href }}"
                    {{ link.active ? 'aria-current="page"' : '' }}>
-                    <span class="nav-icon" data-icon="{{ link.icon }}" aria-hidden="true"></span>
+                    {{ icon(link.icon, 'nav-icon') }}
                     <span class="tabbar-label">{{ t(link.labelKey) }}</span>
                 </a>
             </li>
@@ -26,7 +26,7 @@
         <li>
             <details class="tabbar-more{{ nav.drawerHoldsActive ? ' is-active' : '' }}">
                 <summary class="tabbar-link">
-                    <span class="nav-icon" data-icon="more" aria-hidden="true"></span>
+                    {{ icon('more', 'nav-icon') }}
                     <span class="tabbar-label">{{ t('nav.more') }}</span>
                 </summary>
 

@@ -11,10 +11,10 @@
                         {{ logo.mark(trial, 20) }}
                         <a href="/subscriptions/{{ trial.id }}/money">{{ trial.name }}</a>
                     </span>
-                    <span class="renewal-date">
+                    <span class="renewal-date num">
                         {{ t('dashboard.converts_on', {'date': trial.trialEndDate|local_date('d MMM')}) }}
                     </span>
-                    <span class="renewal-amount">
+                    <span class="renewal-amount num">
                         {{ trial.priceAfterConversion.amountMinor|money(
                             trial.priceAfterConversion.currency) }}
                     </span>

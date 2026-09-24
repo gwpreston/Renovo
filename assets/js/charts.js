@@ -40,6 +40,10 @@ export async function renderChart(canvas, config) {
 
     charts.get(canvas)?.destroy();
 
+    // Every label a chart draws is a figure or sits beside one, so the axes,
+    // tooltips and legend take the figures face like the tables beside them.
+    Chart.defaults.font.family = token('--font-figures', 'ui-monospace, monospace');
+
     const chart = new Chart(canvas, config);
     charts.set(canvas, chart);
 
@@ -83,7 +87,7 @@ export async function drawInCard(canvas, config) {
 
 /**
  * Read a design token, so a chart is drawn in the same colours as everything
- * around it and follows the theme rather than restating it.
+ * around it and follows the palette rather than restating it.
  *
  * @param {string} name The custom property, including its leading dashes.
  * @param {string} fallback What to use when the stylesheet has not loaded.
@@ -93,6 +97,64 @@ export function token(name, fallback) {
     const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
     return value === '' ? fallback : value;
+}
+
+/**
+ * Every colour a chart is allowed to use, read from the tokens as they are
+ * right now.
+ *
+ * This is the one place a chart gets a colour. The six series are
+ * categorical — they tell one thing from another and mean nothing — and are
+ * written out as literal values by the token build, so a canvas can use them
+ * directly. The fallbacks are the default palette's light values and only
+ * matter if the stylesheet has not loaded, in which case the page has bigger
+ * problems than its chart.
+ *
+ * Read afresh on every draw rather than cached, because the palette under a
+ * drawn chart can change (see `onThemeChange`).
+ *
+ * @returns {{ series: string[], other: string, accent: string, border: string,
+ *             muted: string, text: string, surface: string, band: string }}
+ */
+export function themeColours() {
+    return {
+        series: [
+            token('--s1', '#0A2540'),
+            token('--s2', '#047857'),
+            token('--s3', '#3B82F6'),
+            token('--s4', '#D97706'),
+            token('--s5', '#8B5CF6'),
+            token('--s6', '#475569'),
+        ],
+        other: token('--s-other', '#8792A2'),
+        accent: token('--accent', '#00D084'),
+        border: token('--border', '#E2E8F0'),
+        muted: token('--muted', '#4A5568'),
+        text: token('--text', '#0A2540'),
+        surface: token('--surface', '#FFFFFF'),
+        band: token('--chart-band', 'rgba(180, 83, 9, 0.14)'),
+    };
+}
+
+/**
+ * Call `redraw` whenever the tokens under a drawn chart may have moved.
+ *
+ * Two things move them: the root's `data-theme` or `data-palette` changing,
+ * and — for an account set to "system" — the machine flipping between light
+ * and dark. An account that has chosen a theme explicitly is unaffected by the
+ * second; the callback runs anyway, and redraws in the same colours.
+ *
+ * @param {() => void} redraw
+ */
+export function onThemeChange(redraw) {
+    new MutationObserver(redraw).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme', 'data-palette'],
+    });
+
+    if (typeof window.matchMedia === 'function') {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
+    }
 }
 
 /**

@@ -265,12 +265,12 @@ final class DashboardTest extends DatabaseTestCase
         // is StatsService::UPCOMING_URGENT_DAYS, and this is the assertion that
         // pins it: moving it breaks one of these two lines.
         self::assertMatchesRegularExpression(
-            '/renewal-days is-due-soon"[^>]*>\s*3 days/',
+            '/renewal-days num is-due-soon"[^>]*>\s*3 days/',
             $card,
             'a charge three days away is not marked as due soon',
         );
         self::assertMatchesRegularExpression(
-            '/renewal-days "[^>]*>\s*9 days/',
+            '/renewal-days num "[^>]*>\s*9 days/',
             $card,
             'a charge nine days away is marked as due soon when it should not be',
         );
@@ -557,7 +557,7 @@ final class DashboardTest extends DatabaseTestCase
      */
     private function renewalsCount(string $html): ?int
     {
-        $pattern = '/Renewing soon<\/h2>\s*<p class="stat-value">(\d+)<\/p>/';
+        $pattern = '/Renewing soon<\/h2>\s*<p class="stat-value num">(\d+)<\/p>/';
 
         return preg_match($pattern, $html, $matches) === 1 ? (int) $matches[1] : null;
     }

@@ -118,6 +118,7 @@ return [
         'You cannot change your own role. Ask another Owner to change it for you.',
     'error.member.not_yourself' => 'You cannot do that to your own account.',
     'error.member.role_invalid' => 'Choose a role from the list.',
+    'error.palette.unknown' => 'Choose one of the palettes shown.',
     'flash.avatar_missing' => 'There was no picture to remove.',
     'flash.avatar_removed' => 'Your picture has been removed.',
     'flash.avatar_saved' => 'Your picture has been saved.',
@@ -253,6 +254,16 @@ return [
     'settings.density' => 'List density',
     'settings.landing_view' => 'Open on',
     'settings.landing_view_hint' => 'The page you see when you open Renovo.',
+
+    'settings.palette' => 'Colour palette',
+    'settings.palette_hint' => 'The colours of the sidebar and of the buttons and highlights. Only you see your choice.',
+    'settings.palette_save' => 'Use this palette',
+
+    'palette.navy' => 'Navy & emerald',
+    'palette.paper' => 'Light & emerald',
+    'palette.midnight' => 'Midnight & teal',
+    'palette.ocean' => 'Light & ocean blue',
+    'palette.forest' => 'Forest & mint',
 
     'theme.system' => 'Match my system',
     // The same choice on the sign-in screen's switch, where the three options
@@ -474,6 +485,7 @@ return [
     'flash.password_changed' => 'Your password has been changed. Sign in with it now.',
     'flash.two_factor_expired' => 'That sign-in attempt expired. Start again.',
     'flash.preferences_saved' => 'Your preferences have been saved.',
+    'flash.palette_saved' => 'Your palette has been saved.',
 
     'flash.subscription_added' => 'Subscription added.',
     'flash.subscription_saved' => 'Subscription saved.',

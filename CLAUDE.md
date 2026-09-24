@@ -17,7 +17,9 @@ below before adding anything.
 - **Twig** templates; **htmx** for filter/sort/pagination without full reloads.
   Responsive, mobile-first CSS. No SPA framework.
 - **Vite** builds the front-end assets: **Tailwind CSS 4**, a small JS bundle
-  (Chart.js lazily, a handful of Lucide icons) and the **Inter** webfont
+  (Chart.js lazily), an SVG sprite of the Lucide icons the app names, the
+  theme stylesheet generated from `assets/theme/tokens.json`, and the
+  **Plus Jakarta Sans** (text) and **JetBrains Mono** (figures) webfonts
   vendored through Fontsource. Sources in `assets/`, output in `public/build/`
   with a manifest a Twig helper reads. Node is a *build* dependency only — the
   running application never uses it.
@@ -179,8 +181,13 @@ reference and locale completeness. Don't merge red CI.
   it. Never add a `<script>` or `<link>` pointing at a CDN — not even
   temporarily. A large library goes behind a dynamic `import()` so it becomes a
   chunk of its own rather than weight on every page; see `assets/js/charts.js`.
-- **New icon:** add it to the map in `assets/js/icons.js`. Importing Lucide's
-  index instead would put a thousand icons in the bundle to use one.
+- **New icon:** add it to the map in `assets/theme/icons.json` and draw it with
+  `icon('name')` in Twig. Only the icons listed are built into the sprite.
+- **New colour:** add it to `assets/theme/tokens.json` (base, or every
+  palette), never as a literal in a stylesheet or a chart; add the pairs it is
+  drawn in to `tests/Unit/ThemeContrastTest.php`. Filled accent surfaces carry
+  `--accent-ink`; accent-coloured text is `--accent-text`. A figure (amount,
+  count, date in a table) takes the `.num` class.
 - **New feature touching data:** it must respect roles + isolation via the
   scoping layer, and be covered by tests, including a permission test.
 
