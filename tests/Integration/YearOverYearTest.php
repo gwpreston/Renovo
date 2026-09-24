@@ -220,17 +220,38 @@ final class YearOverYearTest extends DatabaseTestCase
         self::assertSame(1, $yoy['excluded_count']);
     }
 
-    public function testACancelledSubscriptionStillCountsForTheYearsItRan(): void
+    public function testAPausedSubscriptionStillCountsForTheYearsItRan(): void
     {
         // It is inactive now, but the money was spent. Excluding it would make
         // a year in which somebody cancelled several things look artificially
         // cheap in hindsight.
-        $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false);
+        $this->createMonthly('Paused', 1000, '2023-06-15', isActive: false);
 
         $yoy = $this->history->yearOverYear($this->scope());
 
         self::assertSame(12000, $yoy['current']['amount_minor']);
         self::assertSame(12000, $yoy['previous']['amount_minor']);
+    }
+
+    public function testACancelledSubscriptionStopsCountingWhenItWasCancelled(): void
+    {
+        // Cancelled on 20 December: charges on the 15th of July through
+        // December are in the current window, and nothing after.
+        $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false, cancelledAt: '2025-12-20');
+
+        $yoy = $this->history->yearOverYear($this->scope());
+
+        self::assertSame(6000, $yoy['current']['amount_minor']);
+        self::assertSame(12000, $yoy['previous']['amount_minor']);
+    }
+
+    public function testAChargeOnTheDayOfCancellationStillCounts(): void
+    {
+        $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false, cancelledAt: '2025-12-15');
+
+        $yoy = $this->history->yearOverYear($this->scope());
+
+        self::assertSame(6000, $yoy['current']['amount_minor']);
     }
 
     public function testAYearlySubscriptionContributesOneChargeToEachYear(): void
@@ -386,6 +407,7 @@ final class YearOverYearTest extends DatabaseTestCase
         string $startDate,
         string $currency = 'GBP',
         bool $isActive = true,
+        ?string $cancelledAt = null,
     ): int {
         return $this->subscriptions->create($this->scope(), [
             'name' => $name,
@@ -397,6 +419,7 @@ final class YearOverYearTest extends DatabaseTestCase
             'start_date' => $startDate,
             'anchor_day' => (int) (new DateTimeImmutable($startDate))->format('j'),
             'is_active' => $isActive,
+            'cancelled_at' => $cancelledAt,
         ], []);
     }
 

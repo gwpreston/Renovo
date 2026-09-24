@@ -29,6 +29,9 @@ use DateTimeImmutable;
  * could not be placed for having no start date, so each screen can say how
  * many it left out rather than quietly showing less.
  *
+ * A cancelled subscription counts up to its `cancelled_at` and not after it; a
+ * paused one, which records no date it stopped, is counted as it always was.
+ *
  * @phpstan-import-type Combined from StatsService
  * @phpstan-import-type MonthTotals from ForecastService
  * @phpstan-type HistoricCharge array{
@@ -281,7 +284,8 @@ final class SpendHistoryService
     }
 
     /**
-     * Reconstruct the charges a subscription took in `($from, $to]`.
+     * Reconstruct the charges a subscription took in `($from, $to]`, stopping
+     * at its cancellation date when it has one.
      *
      * The lower bound is exclusive so that two adjacent twelve-month windows
      * partition the charges rather than sharing the one on the boundary.
@@ -304,6 +308,17 @@ final class SpendHistoryService
         $start = $subscription->startDate;
         if ($start === null) {
             return [];
+        }
+
+        // A cancelled subscription stopped charging when it was cancelled. A
+        // charge falling on that day itself still counts: "up to" the day is
+        // the reading that never drops a charge somebody may well have paid.
+        // Paused rows have no such date and are walked through to the end of
+        // the window — there is no evidence of when they stopped, which is the
+        // same judgement a missing start date gets, made in the other
+        // direction because here the row demonstrably existed.
+        if ($subscription->cancelledAt !== null && $subscription->cancelledAt < $to) {
+            $to = $subscription->cancelledAt;
         }
 
         if (!$subscription->type->countsTowardsRecurringTotals()) {

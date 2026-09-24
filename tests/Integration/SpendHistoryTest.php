@@ -235,15 +235,27 @@ final class SpendHistoryTest extends DatabaseTestCase
         self::assertSame(2000, $byMonth['2026-01']);
     }
 
-    public function testACancelledSubscriptionStillCountsForTheMonthsItRan(): void
+    public function testAPausedSubscriptionStillCountsForTheMonthsItRan(): void
     {
         // The money was spent. Dropping it would make the months before a
         // cancellation look cheaper in hindsight than they were.
-        $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false);
+        $this->createMonthly('Paused', 1000, '2023-06-15', isActive: false);
 
         $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         self::assertSame(1000, $byMonth['2025-09']);
+    }
+
+    public function testACancelledSubscriptionStopsInTheMonthItWasCancelled(): void
+    {
+        // Cancelled on 10 February, before that month's charge on the 15th.
+        $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false, cancelledAt: '2026-02-10');
+
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
+
+        self::assertSame(1000, $byMonth['2026-01']);
+        self::assertSame(0, $byMonth['2026-02']);
+        self::assertSame(0, $byMonth['2026-05']);
     }
 
     public function testASubscriptionWithNoStartDateContributesNothing(): void
@@ -378,6 +390,7 @@ final class SpendHistoryTest extends DatabaseTestCase
         string $startDate,
         string $currency = 'GBP',
         bool $isActive = true,
+        ?string $cancelledAt = null,
     ): int {
         return $this->subscriptions->create($this->scope(), [
             'name' => $name,
@@ -389,6 +402,7 @@ final class SpendHistoryTest extends DatabaseTestCase
             'start_date' => $startDate,
             'anchor_day' => (int) (new DateTimeImmutable($startDate))->format('j'),
             'is_active' => $isActive,
+            'cancelled_at' => $cancelledAt,
         ], []);
     }
 
