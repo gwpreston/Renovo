@@ -145,6 +145,10 @@ return static function (App $app): void {
     $app->group('', function (RouteCollectorProxy $group) use ($requires): void {
         $group->get('/', [DashboardController::class, 'index'])->setName('dashboard');
 
+        // Which dashboard the account opens on. A personal preference, like the
+        // theme and palette under /profile, so it needs no permission.
+        $group->post('/dashboard/view', [DashboardController::class, 'updateView']);
+
         // Inside the authenticated group, unlike the login routes: signing out
         // is something a signed-in user does, and the audit entry needs to know
         // who did it.

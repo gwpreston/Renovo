@@ -57,6 +57,7 @@ final class SpendHistoryService
     public function __construct(
         private readonly SubscriptionService $subscriptions,
         private readonly PriceHistoryRepository $priceHistory,
+        private readonly SplitService $splits,
         private readonly StatsService $stats,
         private readonly ExchangeRateService $rates,
         private readonly InstanceSettingsService $settings,
@@ -71,12 +72,23 @@ final class SpendHistoryService
      * The lower bound is exclusive so that two adjacent windows partition the
      * charges rather than sharing the one on their boundary.
      *
+     * With `$forUserId`, only that member's part of each charge is counted —
+     * what a member budget measures — by the rule the forecast applies to a
+     * charge still to come. Past charges take today's split, because splits
+     * keep no history; a member who joined an arrangement last month is
+     * counted as though they had always been in it.
+     *
      * @return array{charges: list<HistoricCharge>, excluded_count: int}
      */
-    public function charges(Scope $scope, DateTimeImmutable $from, DateTimeImmutable $to): array
-    {
+    public function charges(
+        Scope $scope,
+        DateTimeImmutable $from,
+        DateTimeImmutable $to,
+        ?int $forUserId = null,
+    ): array {
         $charges = [];
         $excluded = 0;
+        $splits = $forUserId === null ? [] : $this->splits->allInScope($scope);
 
         foreach ($this->subscriptions->allForStats($scope, false) as $subscription) {
             if ($subscription->startDate === null) {
@@ -84,11 +96,22 @@ final class SpendHistoryService
                 continue;
             }
 
+            $participants = $splits[$subscription->id] ?? [];
+            if ($forUserId !== null && !$this->splits->bears($subscription, $participants, $forUserId)) {
+                continue;
+            }
+
             foreach ($this->historicCharges($scope, $subscription, $from, $to) as $charge) {
                 $charges[] = [
                     'subscription' => $subscription,
                     'date' => $charge['date'],
-                    'amount' => $charge['amount'],
+                    'amount' => $forUserId === null
+                        ? $charge['amount']
+                        : $this->splits->chargeShare($charge['amount'], $subscription, $participants, $forUserId),
+                    // `historic` rather than `renewal`: this is a charge the
+                    // reconstruction believes took place, not one the forecast
+                    // is predicting, and labelling it as the latter would make
+                    // the two indistinguishable to anything that reads it.
                     'reason' => 'historic',
                 ];
             }
@@ -123,9 +146,12 @@ final class SpendHistoryService
      * Two properties of the window are worth stating because the chart depends
      * on them. The lower bound is the day before the oldest bucket opens, and
      * is exclusive, so a charge on the first of that month lands inside it
-     * rather than being dropped. The upper bound is today, not the end of this
-     * month, which is what makes the closing bucket a part month — the chart
-     * draws it as one rather than as a collapse in spending.
+     * rather than being dropped. The upper bound is today unless the caller
+     * names an earlier day, not the end of this month, which is what makes the
+     * closing bucket a part month — the chart draws it as one rather than as a
+     * collapse in spending. The buckets are always counted back from today, so
+     * ending the window at yesterday on the first of a month leaves this
+     * month's bucket empty rather than shifting the whole window back.
      *
      * Every month is converted at today's rates, as the comparison card
      * already does. There is no history of rates to price a charge at the rate
@@ -134,7 +160,20 @@ final class SpendHistoryService
      *
      * @return list<MonthTotals>
      */
-    public function monthly(Scope $scope, int $months = self::MONTHS): array
+    public function monthly(Scope $scope, int $months = self::MONTHS, ?DateTimeImmutable $through = null): array
+    {
+        return $this->history($scope, $months, $through)['months'];
+    }
+
+    /**
+     * The months, and how many subscriptions they could not include.
+     *
+     * `monthly()` for a card that also states what it left out — the count a
+     * reconstructed figure owes its reader.
+     *
+     * @return array{months: list<MonthTotals>, excluded_count: int}
+     */
+    public function history(Scope $scope, int $months = self::MONTHS, ?DateTimeImmutable $through = null): array
     {
         $today = $this->clock->today();
         $baseCurrency = $this->settings->baseCurrency();
@@ -155,32 +194,18 @@ final class SpendHistoryService
             $cursor = $cursor->modify('+1 month');
         }
 
-        $from = $windowStart->modify('-1 day');
+        $walk = $this->charges($scope, $windowStart->modify('-1 day'), $through ?? $today);
 
-        foreach ($this->subscriptions->allForStats($scope, false) as $subscription) {
-            foreach ($this->historicCharges($scope, $subscription, $from, $today) as $charge) {
-                $key = $charge['date']->format('Y-m');
-                if (!isset($buckets[$key])) {
-                    continue;
-                }
-
-                $currency = $charge['amount']->currency;
-                $buckets[$key]['by_currency'][$currency] =
-                    ($buckets[$key]['by_currency'][$currency] ?? 0) + $charge['amount']->amountMinor;
-
-                // Shaped like a forecast charge because the payload builder
-                // takes forecast charges. `reason` is `historic` rather than
-                // `renewal`: this is a charge the reconstruction believes took
-                // place, not one the forecast is predicting, and labelling it
-                // as the latter would make the two indistinguishable to
-                // anything that ever reads the field.
-                $buckets[$key]['events'][] = [
-                    'subscription' => $subscription,
-                    'date' => $charge['date'],
-                    'amount' => $charge['amount'],
-                    'reason' => 'historic',
-                ];
+        foreach ($walk['charges'] as $charge) {
+            $key = $charge['date']->format('Y-m');
+            if (!isset($buckets[$key])) {
+                continue;
             }
+
+            $currency = $charge['amount']->currency;
+            $buckets[$key]['by_currency'][$currency] =
+                ($buckets[$key]['by_currency'][$currency] ?? 0) + $charge['amount']->amountMinor;
+            $buckets[$key]['events'][] = $charge;
         }
 
         foreach ($buckets as $key => $bucket) {
@@ -194,7 +219,7 @@ final class SpendHistoryService
             $buckets[$key] = $bucket;
         }
 
-        return array_values($buckets);
+        return ['months' => array_values($buckets), 'excluded_count' => $walk['excluded_count']];
     }
 
     /**

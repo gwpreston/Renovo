@@ -16,6 +16,7 @@ use App\Repository\HouseholdRepository;
 use App\Repository\InstanceSettingsRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\PriceHistoryRepository;
+use App\Repository\SplitRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
@@ -28,6 +29,7 @@ use App\Service\InstanceSettingsService;
 use App\Service\PriceHistoryService;
 use App\Service\SpendChartService;
 use App\Service\SpendHistoryService;
+use App\Service\SplitService;
 use App\Service\StatsService;
 use App\Service\SubscriptionService;
 use App\Service\TrialService;
@@ -144,6 +146,7 @@ final class SpendHistoryTest extends DatabaseTestCase
         $this->history = new SpendHistoryService(
             $subscriptionService,
             $historyRepository,
+            new SplitService(new SplitRepository($this->db), $this->subscriptions, $memberships, $this->db),
             $this->stats,
             $rates,
             $settings,

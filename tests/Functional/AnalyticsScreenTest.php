@@ -191,27 +191,25 @@ final class AnalyticsScreenTest extends DatabaseTestCase
     }
 
     /**
-     * The year behind is the dashboard's history card, not a second answer to
-     * the same question — the same assertion the trajectory gets, for the same
-     * reason. Both screens build it from one reconstruction, so a payload that
-     * differed would mean two walks of the household had been allowed to
-     * disagree about a month that has already happened.
+     * The year behind is the shared reconstruction, not a second answer to the
+     * same question. `SpendHistoryService` is what the dashboard's past bars
+     * and year-over-year are read from too, so a payload that differed would
+     * mean two walks of the household had been allowed to disagree about a
+     * month that has already happened.
      */
-    public function testTheHistoryIsTheSameChartTheDashboardDraws(): void
+    public function testTheHistoryIsTheSharedReconstruction(): void
     {
         $analytics = $this->payload(
             $this->body($this->get('/stats', $this->ownerId)),
             'analytics-history-data',
         );
-        $dashboard = $this->payload(
-            $this->body($this->get('/', $this->ownerId)),
-            'dashboard-history-data',
-        );
+        $months = $this->container()->get(SpendHistoryService::class)->monthly($this->scopeFor($this->ownerId));
 
         self::assertCount(12, $analytics['months'] ?? []);
-        self::assertSame($dashboard['months'], $analytics['months']);
-        self::assertSame($dashboard['partial_index'], $analytics['partial_index']);
-        self::assertSame($dashboard['ticks'], $analytics['ticks']);
+        foreach ($months as $index => $month) {
+            self::assertSame($month['month'], $analytics['months'][$index]['key']);
+            self::assertSame($month['combined_minor'], $analytics['months'][$index]['minor']);
+        }
     }
 
     /**

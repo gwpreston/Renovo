@@ -25,11 +25,15 @@
     `column_label`       the table's first column heading
     `unassigned_label`   the name of a row whose name is empty — the
                          subscriptions with no payment method
+    `note`               optional: a line under the heading
 #}
 <section class="card chart-card donut-card" id="{{ card_id }}"
          aria-labelledby="{{ card_id }}-heading">
     <header class="card-header">
         <h2 id="{{ card_id }}-heading">{{ heading }}</h2>
+        {% if note is defined and note %}
+            <p class="muted">{{ note }}</p>
+        {% endif %}
     </header>
 
     {% if breakdown.groups is empty %}

@@ -1,0 +1,82 @@
+{#
+    "{Month} so far": what has already been charged this month, of everything
+    due in it, with the year's three headline figures beside it.
+
+    **Already charged, not paid.** Nothing in Renovo confirms a payment went
+    through; these are the charges whose dates have passed. The bar is drawn
+    only when every currency converts, and carries a marker at the household's
+    monthly budget when there is one.
+#}
+{% import 'partials/spend.twig' as metric %}
+
+<section class="card month-hero" aria-labelledby="month-hero-heading">
+    <div class="month-hero-main">
+        <h2 id="month-hero-heading" class="stat-label month-hero-label">
+            {{ t('dashboard.month_so_far', {'month': month.month|local_date('MMMM')}) }}
+        </h2>
+
+        {% if month.bar %}
+            <p class="month-hero-figure">
+                <span class="month-hero-amount num">{{ month.charged.combined.amount_minor|money(month.charged.combined.currency) }}</span>
+                <span>{{ t('dashboard.charged_of_due', {
+                    'total': month.total.combined.amount_minor|money(month.total.combined.currency),
+                }) }}</span>
+            </p>
+
+            <div class="month-bar" role="img"
+                 aria-label="{{ t('dashboard.month_bar_label', {
+                     'charged': month.charged.combined.amount_minor|money(month.charged.combined.currency),
+                     'due': month.due.combined.amount_minor|money(month.due.combined.currency),
+                 }) }}">
+                <span class="month-bar-due" style="width: {{ month.bar.total_width }}"></span>
+                <span class="month-bar-charged" style="width: {{ month.bar.charged_width }}"></span>
+                {% if month.bar.budget_position %}
+                    <span class="month-bar-budget" style="left: {{ month.bar.budget_position }}"></span>
+                {% endif %}
+            </div>
+
+            <ul class="plain month-legend">
+                <li><span class="chart-key month-key-charged"></span>{{ t('dashboard.already_charged') }} <span class="num">{{ month.charged.combined.amount_minor|money(month.charged.combined.currency) }}</span></li>
+                <li><span class="chart-key month-key-due"></span>{{ t('dashboard.still_due') }} <span class="num">{{ month.due.combined.amount_minor|money(month.due.combined.currency) }}</span></li>
+                {% if month.budget %}
+                    <li><span class="chart-key month-key-budget"></span>{{ t('dashboard.series_budget', {'budget': month.budget.amountMinor|money(month.budget.currency)}) }}</li>
+                {% endif %}
+            </ul>
+        {% else %}
+            {# A currency with no rate: the figures per currency, and no bar. #}
+            <div class="month-hero-lines">
+                <p class="stat-label">{{ t('dashboard.already_charged') }}</p>
+                {{ metric.spend(month.charged, '') }}
+                <p class="stat-label">{{ t('dashboard.due_this_month') }}</p>
+                {{ metric.spend(month.total, '') }}
+            </div>
+        {% endif %}
+    </div>
+
+    <dl class="month-hero-stats">
+        <div>
+            <dt>{{ t('dashboard.year_to_date') }}</dt>
+            <dd class="num">{% include 'dashboard/_headline.twig' with {'figures': hero.year_to_date} only %}</dd>
+            {% if hero.year_to_date.change_percent is not null %}
+                <dd class="month-hero-note">{{ t('dashboard.vs_last_year', {'percent': hero.year_to_date.change_percent}) }}</dd>
+            {% endif %}
+        </div>
+        <div>
+            <dt>{{ t('dashboard.next_12_months') }}</dt>
+            <dd class="num">{% include 'dashboard/_headline.twig' with {'figures': hero.year_ahead} only %}</dd>
+            <dd class="month-hero-note">{{ t('dashboard.forecast') }}</dd>
+        </div>
+        <div>
+            <dt>{{ t('dashboard.trials_converting') }}</dt>
+            <dd class="num">{% include 'dashboard/_headline.twig' with {'figures': hero.trials, 'signed': true} only %}</dd>
+            <dd class="month-hero-note">{{ t('dashboard.monthly_from_trials', {'count': hero.trials.count}) }}</dd>
+        </div>
+    </dl>
+
+    <p class="month-hero-foot">
+        {{ t('dashboard.reconstructed_note') }}
+        {% if hero.year_to_date.excluded_count > 0 %}
+            {{ t('dashboard.excluded_note', {'count': hero.year_to_date.excluded_count}) }}
+        {% endif %}
+    </p>
+</section>

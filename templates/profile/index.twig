@@ -261,32 +261,44 @@
                     <p class="hint">{{ t('settings.landing_view_hint') }}</p>
                 </div>
 
-                <fieldset class="stack">
-                    <legend>{{ t('settings.dashboard_cards') }}</legend>
-                    <p class="hint">{{ t('settings.dashboard_cards_hint') }}</p>
+                {#
+                    One fieldset per dashboard view: each has its own cards,
+                    order and hiding, so the same card key can be arranged
+                    differently on each. The fields are keyed by view, and a
+                    view whose positions are not submitted is left as it was.
+                #}
+                {% for layout in dashboard_layouts %}
+                    {% set view = layout.view.value %}
+                    <fieldset class="stack">
+                        <legend>{{ t('settings.dashboard_cards_for', {'view': t(layout.view.labelKey())}) }}</legend>
+                        {% if loop.first %}
+                            <p class="hint">{{ t('settings.dashboard_cards_hint') }}</p>
+                        {% endif %}
 
-                    <ul class="card-layout">
-                        {% for entry in dashboard_layout %}
-                            <li class="card-layout-row">
-                                <label for="card-position-{{ entry.card.value }}" class="card-layout-name">
-                                    {{ t(entry.card.labelKey()) }}
-                                </label>
-                                <input type="number" min="1" max="{{ dashboard_layout|length }}"
-                                       id="card-position-{{ entry.card.value }}"
-                                       name="card_position[{{ entry.card.value }}]"
-                                       value="{{ loop.index }}"
-                                       aria-label="{{ t('settings.card_position', {
-                                           'card': t(entry.card.labelKey()),
-                                       }) }}">
-                                <label class="choice">
-                                    <input type="checkbox" name="card_visible[{{ entry.card.value }}]" value="1"
-                                           {{ entry.visible ? 'checked' : '' }}>
-                                    <span>{{ t('settings.card_visible') }}</span>
-                                </label>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                </fieldset>
+                        <ul class="card-layout">
+                            {% for entry in layout.cards %}
+                                <li class="card-layout-row">
+                                    <label for="card-position-{{ view }}-{{ entry.card.value }}" class="card-layout-name">
+                                        {{ t(entry.card.labelKey()) }}
+                                    </label>
+                                    <input type="number" min="1" max="{{ layout.cards|length }}"
+                                           id="card-position-{{ view }}-{{ entry.card.value }}"
+                                           name="card_position[{{ view }}][{{ entry.card.value }}]"
+                                           value="{{ loop.index }}"
+                                           aria-label="{{ t('settings.card_position', {
+                                               'card': t(entry.card.labelKey()),
+                                           }) }}">
+                                    <label class="choice">
+                                        <input type="checkbox"
+                                               name="card_visible[{{ view }}][{{ entry.card.value }}]" value="1"
+                                               {{ entry.visible ? 'checked' : '' }}>
+                                        <span>{{ t('settings.card_visible') }}</span>
+                                    </label>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </fieldset>
+                {% endfor %}
 
                 <button type="submit" class="button">{{ t('action.save') }}</button>
             </form>

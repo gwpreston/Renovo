@@ -110,6 +110,8 @@ final class AccessibilityTest extends DatabaseTestCase
     {
         return [
             ['/'],
+            // The Household dashboard: the same URL, chosen on the account.
+            ['household:/'],
             ['/subscriptions'],
             ['/subscriptions/new'],
             ['/subscriptions/{id}/edit'],
@@ -235,6 +237,11 @@ final class AccessibilityTest extends DatabaseTestCase
     private function get(string $path): string
     {
         $path = str_replace('{id}', (string) $this->subscriptionId, $path);
+
+        if (str_starts_with($path, 'household:')) {
+            (new UserRepository($this->db))->updatePreferences($this->userId, ['dashboard_view' => 'household']);
+            $path = substr($path, strlen('household:'));
+        }
 
         $response = $this->app->handle(
             (new ServerRequestFactory())->createServerRequest(

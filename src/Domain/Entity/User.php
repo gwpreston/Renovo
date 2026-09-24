@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Entity;
 
+use App\Domain\DashboardView;
 use App\Domain\Density;
 use App\Domain\LandingView;
 use App\Domain\Palette;
@@ -51,6 +52,8 @@ final class User
         public readonly ?string $avatarPath = null,
         /** Null means the default palette; see `palettePreference()`. */
         public readonly ?string $palette = null,
+        /** Null means Overview; see `dashboardViewPreference()`. */
+        public readonly ?string $dashboardView = null,
     ) {
     }
 
@@ -84,6 +87,19 @@ final class User
         return Initials::of($this->displayName);
     }
 
+    /**
+     * What a greeting calls this person: the display name up to its first
+     * space. There is no separate first-name field, and a display name with
+     * no space — a nickname, a single name — is used whole.
+     */
+    public function firstName(): string
+    {
+        $name = trim($this->displayName);
+        $space = strpos($name, ' ');
+
+        return $space === false ? $name : substr($name, 0, $space);
+    }
+
     public function themePreference(): Theme
     {
         return Theme::fromString($this->theme);
@@ -107,5 +123,10 @@ final class User
     public function landingViewPreference(): LandingView
     {
         return LandingView::fromString($this->landingView);
+    }
+
+    public function dashboardViewPreference(): DashboardView
+    {
+        return DashboardView::fromString($this->dashboardView);
     }
 }

@@ -502,24 +502,59 @@ final class HouseholdScreenTest extends DatabaseTestCase
     }
 
     /**
-     * The dashboard card is a comparison, and it is drawn only when there is
-     * one to make.
+     * The Household dashboard's Who pays, from the same figures as this screen.
+     *
+     * Ada carries £17.50 of the £29.00 the household spends a month and Bram
+     * £11.50, so the card puts 60% and 40% against them — shares of the
+     * members' shares added together. A Viewer is not shown on the dashboard
+     * what they are refused on this screen; the rows are never built.
      */
-    public function testTheDashboardCardComparesMembersOnlyWhenItHonestlyCan(): void
+    public function testTheDashboardsWhoPaysDividesTheHouseholdByItsMembers(): void
     {
-        self::assertStringContainsString('Who pays for what', $this->get('/'));
+        $this->openHouseholdView($this->ownerId);
+        $card = $this->whoPaysCard($this->get('/'));
 
-        // A Viewer is not shown on the dashboard what they are refused on its
-        // own screen. The rows are never built, so there is nothing for the
-        // template to forget to hide.
+        self::assertStringContainsString('Who pays what', $card);
+        self::assertStringContainsString('60% of household spend', $card);
+        self::assertStringContainsString('40% of household spend', $card);
+
+        $this->openHouseholdView($this->viewerId);
         $this->signIn($this->viewerId);
-        self::assertStringNotContainsString('Who pays for what', $this->get('/'));
+        self::assertSame('', $this->whoPaysCard($this->get('/')), 'A Viewer is shown no member figures.');
+    }
 
-        // And in ISOLATED mode there is one member with figures — the reader —
-        // which is not a comparison.
+    /**
+     * In ISOLATED mode the card is the reader's own share and nothing else: no
+     * other member's name, and no percentage of a household total the reader
+     * cannot see.
+     */
+    public function testUnderIsolationWhoPaysIsYourShareAlone(): void
+    {
         $this->container->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
-        $this->signIn($this->ownerId);
-        self::assertStringNotContainsString('Who pays for what', $this->get('/'));
+        $this->openHouseholdView($this->ownerId);
+
+        $card = $this->whoPaysCard($this->get('/'));
+
+        self::assertStringContainsString('Your share', $card);
+        self::assertStringContainsString('Ada', $card);
+        self::assertStringNotContainsString('Bram', $card);
+        self::assertStringNotContainsString('of household spend', $card);
+    }
+
+    private function openHouseholdView(int $userId): void
+    {
+        (new UserRepository($this->db))->updatePreferences($userId, ['dashboard_view' => 'household']);
+    }
+
+    /** The Who pays card's markup, or '' when it was not drawn. */
+    private function whoPaysCard(string $html): string
+    {
+        $start = strpos($html, 'class="card who-pays-card"');
+        if ($start === false) {
+            return '';
+        }
+
+        return substr($html, $start, (int) strpos($html, '</section>', $start) - $start);
     }
 
     private function adasOwnRow(): int

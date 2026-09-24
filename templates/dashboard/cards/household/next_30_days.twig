@@ -1,0 +1,53 @@
+{#
+    The next thirty days as a line: each charge at its distance from today,
+    ticked at today, a week, two, three and thirty days, with the count and
+    total above and the charges listed beneath.
+
+    The markers are a picture of the list below them, so they are hidden from
+    assistive technology and the list says everything they do.
+#}
+{% import 'partials/logo.twig' as logo %}
+
+<section class="card timeline-card" aria-labelledby="timeline-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="timeline-heading">{{ t('dashboard.next_days', {'days': timeline.days}) }}</h2>
+            <p class="muted">
+                {{ t('dashboard.charges_count', {'count': timeline.count}) }}
+                {% if timeline.totals is not empty %}
+                    · {% include 'dashboard/_headline.twig' with {'figures': timeline} only %}
+                {% endif %}
+            </p>
+        </div>
+    </header>
+
+    {% if timeline.markers is empty %}
+        <p class="muted empty">{{ t('dashboard.nothing_coming_up', {'days': timeline.days}) }}</p>
+    {% else %}
+        <div class="timeline" aria-hidden="true">
+            <div class="timeline-line"></div>
+            {% for tick in timeline.ticks %}
+                <span class="timeline-tick" style="left: {{ tick.position }}">
+                    {{ tick.days == 0 ? t('dashboard.today') : t('dashboard.plus_days', {'days': tick.days}) }}
+                </span>
+            {% endfor %}
+            {% for marker in timeline.markers %}
+                <span class="timeline-marker lane-{{ marker.lane }}{{ marker.reason == 'trial_conversion' ? ' is-trial' : '' }}"
+                      style="left: {{ marker.position }}"
+                      title="{{ marker.subscription.name }} · {{ marker.date|local_date('d MMM') }} · {{ marker.amount.amountMinor|money(marker.amount.currency) }}">
+                    {{ marker.subscription.name|initials }}
+                </span>
+            {% endfor %}
+        </div>
+
+        <ul class="plain timeline-list">
+            {% for marker in timeline.markers %}
+                <li class="timeline-item">
+                    <span class="timeline-date num">{{ marker.date|local_date('d MMM') }}</span>
+                    <span class="timeline-name">{{ marker.subscription.name }}</span>
+                    <span class="num">{{ marker.amount.amountMinor|money(marker.amount.currency) }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>

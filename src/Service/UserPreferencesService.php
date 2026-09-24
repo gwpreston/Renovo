@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\DashboardView;
 use App\Domain\Density;
 use App\Domain\LandingView;
 use App\Domain\Palette;
@@ -42,6 +43,22 @@ final class UserPreferencesService
         $resolved = Theme::fromString($theme);
 
         $this->users->updatePreferences($userId, ['theme' => $resolved->value]);
+
+        return $resolved;
+    }
+
+    /**
+     * Which dashboard the account opens on, from the toggle at its top.
+     *
+     * Coerced rather than rejected, like the theme: the stored value only ever
+     * chooses between two pages the member may already see, so an unknown one
+     * is harmlessly Overview.
+     */
+    public function updateDashboardView(int $userId, ?string $view): DashboardView
+    {
+        $resolved = DashboardView::fromString($view);
+
+        $this->users->updatePreferences($userId, ['dashboard_view' => $resolved->value]);
 
         return $resolved;
     }

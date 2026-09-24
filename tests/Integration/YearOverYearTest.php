@@ -129,6 +129,7 @@ final class YearOverYearTest extends DatabaseTestCase
         $this->history = new SpendHistoryService(
             $subscriptionService,
             $historyRepository,
+            new SplitService(new SplitRepository($this->db), $this->subscriptions, $memberships, $this->db),
             $this->stats,
             $rates,
             $settings,

@@ -888,49 +888,92 @@ return [
     'confirm.revoke_token' => 'Revoke this token? Anything using it stops working straight away.',
 
     // dashboard
+    'dashboard.active' => 'Active',
     'dashboard.active_subscriptions' => 'Active subscriptions',
-    'dashboard.by_category' => 'By category',
+    'dashboard.all_subscriptions' => 'All subscriptions',
+    'dashboard.already_charged' => 'Already charged',
+    'dashboard.approx' => '≈ {amount}',
+    'dashboard.at_todays_prices' => 'at today’s prices',
+    'dashboard.budget_left' => '{amount} left this month',
+    'dashboard.budget_meter' => '{charged}% charged so far, {projected}% projected by the end of the month',
+    'dashboard.budget_over_if_trials' => 'Projected over if the running trials convert',
+    'dashboard.budget_pace' => 'Spent this year vs budget pace',
+    'dashboard.budget_pace_note' => 'Cumulative, January to now, {year}',
+    'dashboard.budget_past_warning' => 'Past the {threshold}% warning',
+    'dashboard.budget_projected_over' => 'Projected {amount} over',
+    'dashboard.budgets_this_month' => 'Budgets · {month}',
+    'dashboard.busiest_month' => 'Busiest',
+    'dashboard.cancel_trial' => 'Cancel trial',
+    'dashboard.cancel_trial_named' => 'Cancel the {name} trial',
+    'dashboard.charged_of_due' => 'already charged of {total} due this month',
+    'dashboard.charges_count' => '{count, plural, =0 {No charges} one {# charge} other {# charges}}',
     'dashboard.chart_unconvertible' =>
         'The twelve-month chart is not drawn, because no exchange rate is available for {currencies} and '
         . 'a month missing one of its currencies would be drawn as a cheap month rather than an unknown '
         . 'one. The forecast shows those months per currency.',
-    'dashboard.combined_in' => 'Combined · {currency}',
-    'dashboard.coming_soon' => 'Coming soon',
-    'dashboard.coming_soon_note' => 'Next payments in the following {days} days',
-    'dashboard.days_away' =>
-        '{days, plural, one {# day} other {# days}}',
-    'dashboard.combined_note' =>
-        '{amount} per year, converted at the latest cached rates. The per-currency figures above are the '
-        . 'amounts actually charged.',
+    'dashboard.coming_up' => 'Coming up',
+    'dashboard.coming_up_note' => 'Charges and trial conversions in the next {days} days',
+    'dashboard.converts_to' => 'Converts to',
     'dashboard.converts_on' => 'converts {date}',
     'dashboard.due_in_total' => 'due in total',
+    'dashboard.due_next_days' => 'Due next {days} days',
+    'dashboard.due_this_month' => 'Due this month',
+    'dashboard.excluded_note' =>
+        '{count, plural, one {# subscription has} other {# subscriptions have}} no start date and '
+        . '{count, plural, one {is} other {are}} left out.',
+    'dashboard.filter_rows' => 'Which subscriptions to list',
+    'dashboard.forecast' => 'Forecast',
+    'dashboard.free_trials' => 'Free trials',
+    'dashboard.greeting' => 'Welcome back, {name}',
     'dashboard.metrics' => 'Spending at a glance',
-    'dashboard.member_shares' => 'Who pays for what',
-    'dashboard.member_shares_note' =>
-        'Each member\'s share of the household\'s recurring bill. Split subscriptions count '
-        . 'towards each of their participants at their own portion.',
+    'dashboard.month_bar_label' => '{charged} already charged, {due} still due',
+    'dashboard.month_so_far' => '{month} so far',
+    'dashboard.monthly_equivalent' => 'Monthly equivalent',
+    'dashboard.monthly_from_trials' =>
+        '{count, plural, =0 {No trials running} one {a month from # trial} other {a month from # trials}}',
     'dashboard.monthly_spend' => 'Monthly spend',
-    'dashboard.next_charge' => 'Next: {name}, {date} · {amount}',
+    'dashboard.next_12_months' => 'Next 12 months',
+    'dashboard.next_days' => 'Next {days} days',
     'dashboard.no_budget' => 'No budget set for you yet, so there is nothing to measure this against.',
     'dashboard.no_household' => 'No household',
     'dashboard.no_household_note' =>
         'You are not a member of a household yet, so there is nothing to show. Instance administration '
         . 'does not by itself grant access to anybody\'s subscriptions.',
+    'dashboard.no_trials' => 'No trials running.',
+    'dashboard.nothing_coming_up' => 'Nothing due in the next {days} days.',
     'dashboard.nothing_due' => 'Nothing due.',
     'dashboard.nothing_renewing' => 'Nothing renewing in the near window.',
+    'dashboard.of_household_spend' => '{percent}% of household spend',
     'dashboard.other_categories' => '{count, plural, one {# other category} other {# other categories}}',
+    'dashboard.pace_budget_to_date' => 'budget to date',
+    'dashboard.pace_of_monthly' => 'An even pace of twelve times the {budget} monthly household budget.',
+    'dashboard.pace_of_yearly' => 'An even pace of the {budget} yearly household budget.',
+    'dashboard.pace_over' => '{amount} over pace',
+    'dashboard.pace_spent' => 'spent',
+    'dashboard.pace_unconvertible' =>
+        'No exchange rate for {currencies}, so this year’s spend cannot be added up in one currency.',
+    'dashboard.pace_under' => '{amount} under pace',
     'dashboard.peak_month' => 'Busiest month',
     'dashboard.one_off_in' => 'One-off & lifetime · {currency}',
     'dashboard.one_off_note' => '{count, plural, one {# entry} other {# entries}}, not included in monthly totals',
     'dashboard.per_month_unit' => '/ month',
     'dashboard.per_year_unit' => '/ year',
-    'dashboard.per_year_and_count' =>
-        '{amount} per year · {count, plural, one {# subscription} other {# subscriptions}}',
-    'dashboard.recurring' => 'Recurring',
+    'dashboard.percent_of_budget' => '{percent}% of {budget} budget',
+    'dashboard.plus_days' => '+{days}',
+    'dashboard.price_change' => 'Price change',
+    'dashboard.price_rise_difference' =>
+        '{monthly} a month, {yearly} a year. Already included in the forecast.',
+    'dashboard.price_rises' => '{name} rises from {from} to {to} on {date}',
+    'dashboard.recent' => 'Subscriptions',
+    'dashboard.reconstructed_note' => 'Reconstructed from start dates and price history.',
     'dashboard.recurring_empty' => 'No active recurring subscriptions yet.',
-    'dashboard.recurring_in' => 'Recurring · {currency}',
     'dashboard.renewing_soon' => 'Renewing soon',
     'dashboard.renewing_soon_note' => 'in the next {days} days',
+    'dashboard.see_all' => 'See all',
+    'dashboard.see_price_history' => 'See price history',
+    'dashboard.series_actual' => 'Actual',
+    'dashboard.series_budget' => 'Budget {budget}',
+    'dashboard.series_forecast' => 'Forecast',
     'dashboard.share_of_spend' => '{name}: {percent}% of monthly spend',
     'dashboard.part_month' => 'Part month',
     'dashboard.part_month_note' =>
@@ -939,10 +982,6 @@ return [
     'dashboard.history_part_month_note' =>
         'This month counts only the charges taken so far, so it is short by whatever is still to come '
         . 'before the month is out.',
-    'dashboard.history_unconvertible' =>
-        'The chart of the last twelve months is not drawn, because no exchange rate is available for '
-        . '{currencies} and a month missing one of its currencies would be drawn as a cheap month rather '
-        . 'than an unknown one. Analytics shows the per-currency figures instead.',
     'dashboard.series_committed' => 'Excluding trial conversions',
     'dashboard.series_trial_gap' => 'What trials will add',
     'dashboard.series_with_trials' => 'Including trial conversions',
@@ -951,6 +990,12 @@ return [
     // draws, which the Analytics trajectory renders and which asks for them by
     // name. Renaming them would be renaming the partial's vocabulary to record
     // where it was first used.
+    'dashboard.spend_bars_alt' =>
+        'Spend per month in {currency}: six months reconstructed, this month charged so far and still due, '
+        . 'and six months forecast.',
+    'dashboard.spend_bars_unconvertible' =>
+        'The monthly spend chart is not drawn: no exchange rate is available for {currencies}, and a month '
+        . 'missing one of its currencies would look like a cheap month rather than an unknown one.',
     'dashboard.spend_chart_alt' =>
         'Line chart of spend per month for the next twelve months, in {currency}: one line including trial '
         . 'conversions and one excluding them. The same figures are in the table that follows.',
@@ -960,7 +1005,7 @@ return [
     'dashboard.spend_chart_alt_single' =>
         'Line chart of spend per month for the next twelve months, in {currency}. The same figures are in '
         . 'the table that follows.',
-    'dashboard.spend_history' => 'Spend, last 12 months',
+    'dashboard.spend_chart_note' => 'What was charged each month, and the forecast for the next six',
     'dashboard.spend_history_alt' =>
         'Line chart of spend per month over the last twelve months, in {currency}. The same figures are '
         . 'in the table that follows.',
@@ -968,18 +1013,35 @@ return [
     // ledger of payments taken, so these months were rebuilt from start dates,
     // billing cycles and price history. A reader comparing them with a bank
     // statement should know that before they do it.
-    'dashboard.spend_history_note' =>
-        'Reconstructed monthly spend in {currency}, from start dates and recorded price history',
-    'dashboard.trials_ending_soon' => 'Trials ending soon',
-    'dashboard.trials_note' => 'Free today. About to stop being.',
+    'dashboard.stands_on' => 'Here’s where {household} stands on {date}.',
+    'dashboard.still_due' => 'Still due',
+    'dashboard.this_month' => 'This month',
+    'dashboard.today' => 'Today',
+    'dashboard.trial_converts' => 'Trial converts',
+    'dashboard.trial_ends' => 'Ends {date} · {days, plural, one {# day} other {# days}} left',
+    'dashboard.trial_ends_today' => 'Ends today',
+    'dashboard.trial_started_by' => 'started by {name}',
+    'dashboard.trials_and_paused' =>
+        '{trials, plural, one {# trial} other {# trials}} · {paused} paused',
+    'dashboard.trials_converting' => 'Trials converting',
     'dashboard.trials_total_note' => 'about to start being charged',
-    'dashboard.usage' => 'Budget and where it goes',
+    'dashboard.view_active' => 'Active',
+    'dashboard.view_all' => 'All',
+    'dashboard.view_choice' => 'Which dashboard',
+    'dashboard.view_expiring' => 'Renewing soon',
+    'dashboard.vs_last_year' => '{percent, number, ::sign-always}% against the same period last year',
     'dashboard.where_it_goes' => 'Where it goes',
+    'dashboard.where_it_goes_note' => 'Monthly equivalent by category, in {currency}',
+    'dashboard.who_pays' => 'Who pays what',
+    'dashboard.who_pays_note' => 'Monthly share after splits',
+    'dashboard.year_to_date' => 'Year to date',
+    'dashboard.yearly_run_rate' => 'Yearly run-rate',
     'dashboard.yearly_spend' => 'Yearly spend',
     'dashboard.unconvertible' =>
         'Totals are shown per currency. They cannot be combined because no exchange rate is available '
         . 'for {currencies} — a total leaving that out would be a wrong number rather than an approximate '
         . 'one.',
+    'dashboard.your_share' => 'Your share',
 
     // error
     'error.back_to_the_dashboard' => 'Back to the dashboard',
@@ -1334,6 +1396,7 @@ return [
     'settings.card_position' => 'Position of the {card} card',
     'settings.card_visible' => 'Show',
     'settings.dashboard_cards' => 'Dashboard cards',
+    'settings.dashboard_cards_for' => '{view} dashboard cards',
     'settings.dashboard_cards_hint' =>
         'Lower numbers come first. Clear the box to hide a card without losing where you had put it.',
     'settings.data_intro' =>
@@ -1833,13 +1896,23 @@ return [
     'channel_field.webhook.url' => 'Endpoint URL',
 
     // dashboard_card
-    'dashboard_card.budget_usage' => 'Budget and where it goes',
+    'dashboard_card.budget_pace' => 'Spent this year vs budget pace',
+    'dashboard_card.budgets' => 'Budgets this month',
     'dashboard_card.by_category' => 'By category',
-    'dashboard_card.member_shares' => 'Who pays for what',
-    'dashboard_card.spend_history' => 'Spend, last 12 months',
+    'dashboard_card.coming_up' => 'Coming up',
+    'dashboard_card.free_trials' => 'Free trials',
+    'dashboard_card.month_so_far' => 'This month so far',
+    'dashboard_card.next_30_days' => 'Next 30 days',
+    'dashboard_card.price_change' => 'Next price change',
+    'dashboard_card.recent' => 'Subscriptions table',
+    'dashboard_card.spend_chart' => 'Monthly spend chart',
     'dashboard_card.totals' => 'Spending at a glance',
-    'dashboard_card.trials' => 'Trials ending soon',
-    'dashboard_card.upcoming' => 'Coming soon',
+    'dashboard_card.where_it_goes' => 'Where it goes',
+    'dashboard_card.who_pays' => 'Who pays what',
+
+    // dashboard_view
+    'dashboard_view.household' => 'Household',
+    'dashboard_view.overview' => 'Overview',
 
     // digest_mode
     'digest_mode.immediate' => 'As they happen',

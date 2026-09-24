@@ -5,122 +5,137 @@ declare(strict_types=1);
 namespace App\Domain;
 
 /**
- * The blocks the dashboard is made of.
+ * The blocks the two dashboards are made of.
  *
- * Each case is a template under `templates/dashboard/cards/`, included by name.
- * Adding a card is adding a case and a file; the page itself walks whatever
- * list it is handed and knows nothing about what is in them.
+ * Each case belongs to one view and is a template under
+ * `templates/dashboard/cards/{view}/`, included by name. Adding a card is
+ * adding a case and a file; the page walks whatever list it is handed and
+ * knows nothing about what is in them.
  *
- * The order of the cases is the default layout, and it is an argued one: the
- * metric row, then the year behind beside the budget it is measured against,
- * then the trials about to add to it, then the two lists.
+ * The order of a view's cases is its default layout. **Overview** reads like
+ * the prototype's variant A: the four figures, then the months behind and
+ * ahead beside where the money goes, then what is coming with the budgets, the
+ * trials and the next price rise stacked beside it. **Household** is variant
+ * B: how this month is going, the next thirty days, who carries what beside
+ * where it goes, and the year against its budget.
  *
- * The year *ahead* used to lead that arrangement, and the dashboard drew both
- * charts. It draws one now. The forecast is the Analytics page's own subject —
- * its trajectory is the same payload from the same builder — and a landing
- * screen carrying two twelve-month charts was asking a reader to tell them
- * apart before either had said anything. What already happened is the one a
- * dashboard is for; what is projected is a page you go to.
- *
- * Trials is a full-width callout again with the chart it was paired with gone.
- * It led the screen once, on the argument that what is about to start costing
- * money comes before what already does, and was narrowed to sit beside the
- * year behind. There is no second chart to sit beside now, and a 2-of-6 tile
- * alone on a row is a hole rather than an arrangement.
- *
- * That ordering is what a *new* account gets. An account that has
- * already arranged its dashboard keeps its arrangement and finds the new tiles
- * appended, which is DashboardLayoutService's business and deliberately not
- * changed here: moving somebody's saved layout around to match a redesign
- * would be a worse surprise than three new tiles at the bottom.
+ * Phase 21 replaced the Phase 10 set wholesale, and a migration cleared every
+ * saved layout once so nobody's arrangement points at cards that have gone.
+ * The keys whose meaning survived kept their names — `totals` is still the
+ * figures row, `by_category` still the category split, `recent` the
+ * subscriptions table — and the rest are new.
  *
  * The case *values* are stored in `dashboard_cards.card_key`, so they are a
- * data format. Renaming one would orphan every row that holds it.
- *
- * Removing one is survivable where renaming is not, because the layout is read
- * back as raw strings and merged against these cases: a row holding a key no
- * case answers to is simply passed over. That is how the per-period tile left
- * — the same four figures are the Analytics page's own subject, so the
- * dashboard was saying them twice — without a migration to chase the rows that
- * still name it. The subscriptions table left the same way and for the same
- * reason: the list, its filters and its status badges are the Subscriptions
- * page's own subject, and eight rows of it on the landing screen were a second,
- * shorter answer to a question already answered in full elsewhere.
+ * data format. Renaming one would orphan every row that holds it. Removing one
+ * is survivable: the layout is read back as raw strings and merged against
+ * these cases, so a row naming a key no case answers to is passed over.
  */
 enum DashboardCard: string
 {
+    // Overview
     case Totals = 'totals';
-    case SpendHistory = 'spend_history';
-    case BudgetUsage = 'budget_usage';
-    case Trials = 'trials';
-    case Upcoming = 'upcoming';
+    case SpendChart = 'spend_chart';
+    case WhereItGoes = 'where_it_goes';
+    case ComingUp = 'coming_up';
+    case Budgets = 'budgets';
+    case FreeTrials = 'free_trials';
+    case PriceChange = 'price_change';
+    case Recent = 'recent';
+
+    // Household
+    case MonthSoFar = 'month_so_far';
+    case NextThirtyDays = 'next_30_days';
+    case WhoPays = 'who_pays';
     case ByCategory = 'by_category';
-    case MemberShares = 'member_shares';
+    case BudgetPace = 'budget_pace';
 
     public function labelKey(): string
     {
         return 'dashboard_card.' . $this->value;
     }
 
+    public function view(): DashboardView
+    {
+        return match ($this) {
+            self::MonthSoFar,
+            self::NextThirtyDays,
+            self::WhoPays,
+            self::ByCategory,
+            self::BudgetPace => DashboardView::Household,
+            default => DashboardView::Overview,
+        };
+    }
+
+    /**
+     * The template this card is drawn by, relative to `templates/`.
+     */
+    public function template(): string
+    {
+        return 'dashboard/cards/' . $this->view()->value . '/' . $this->value . '.twig';
+    }
+
     /**
      * How many of the grid's six columns this card asks for.
      *
-     * The dashboard is a six-column grid that collapses to one on a narrow
-     * screen, and this is what makes the design's split rows — a wide chart
-     * beside a narrow usage widget, then the renewals list beside the category
-     * table — a property of the cards rather than of a fixed layout. Every
-     * other card takes the full width, so a rearranged dashboard stays a
-     * legible stack.
+     * The grid collapses to one column on a narrow screen, so these describe
+     * the wide arrangement only. The chart takes two thirds beside the donut's
+     * third, as Coming up does beside the narrow cards stacked next to it.
+     * Who pays and By category share a Household row by halves.
      *
-     * Six rather than three because two of these rows divide differently: the
-     * chart takes two thirds and the usage widget one, while Coming soon and
-     * By category take half each. Three columns can express the first split
-     * and has no half to give the second.
+     * Budget pace is full width rather than paired, because it is the card
+     * most often absent — it exists only where a household budget does — and
+     * an absent card of its own width leaves an empty row of no height where
+     * an absent narrow one would leave a hole beside its partner.
      *
-     * A span is the card's own property, not the row's, so two halves make a
-     * row only where they land next to each other. An account that has
-     * rearranged its dashboard and put something between them gets two
-     * half-width cards on separate rows, which is the honest rendering of the
-     * order it chose.
-     *
-     * The chart takes two thirds rather than the whole width: twelve points
-     * drawn across six columns is a picture with nothing beside it, and the
-     * budget it is measured against is the natural thing to read next to the
-     * spending it measures.
-     *
-     * A card that renders nothing leaves the rest of its row empty rather than
-     * closing it up, because auto-placement is not dense. Trials is the card
-     * most often absent — most households have no trial running — which is the
-     * other half of why it is full width: an absent card of its own width
-     * leaves an empty row of no height, where an absent narrow one leaves a
-     * visible hole beside whatever it was paired with.
-     *
-     * Member shares is full width for the reason Trials is. The two halves
-     * above it already pair with each other, so a third half-width card would
-     * sit beside a hole — and it is the card most often absent, because a
-     * household of one and an ISOLATED instance both give it nothing to
-     * compare.
-     *
-     * Auto-placement is left alone rather than made dense: a dense grid would
-     * reflow tiles past one another to fill holes, and a card order the user
-     * chose is not something to silently improve on.
+     * A span is the card's own property, not the row's, so a rearranged
+     * dashboard keeps each card's width and lets the order decide the rows.
      */
     public function columnSpan(): int
     {
         return match ($this) {
-            self::SpendHistory => 4,
-            self::BudgetUsage => 2,
-            self::Upcoming, self::ByCategory => 3,
+            self::SpendChart, self::ComingUp => 4,
+            self::WhereItGoes, self::Budgets, self::FreeTrials, self::PriceChange => 2,
+            self::WhoPays, self::ByCategory => 3,
             default => 6,
         };
     }
 
     /**
+     * How many grid rows this card spans.
+     *
+     * Coming up is a long list, and the prototype stacks three narrow cards
+     * beside it — the budgets, the trials and the price banner. Spanning three
+     * rows is what lets auto-placement put those three into the column next to
+     * it, one under another, rather than below it. Everything else is one row.
+     */
+    public function rowSpan(): int
+    {
+        return $this === self::ComingUp ? 3 : 1;
+    }
+
+    /**
+     * Whether a card is shown to an account that has not said otherwise.
+     *
+     * The subscriptions table is the Subscriptions page's own subject, so on
+     * the dashboard it is an opt-in: listed in the layout form, off until
+     * somebody turns it on.
+     */
+    public function visibleByDefault(): bool
+    {
+        return $this !== self::Recent;
+    }
+
+    /**
+     * One view's cards, in their default order.
+     *
      * @return list<self>
      */
-    public static function defaultOrder(): array
+    public static function defaultOrder(DashboardView $view): array
     {
-        return self::cases();
+        return array_values(array_filter(
+            self::cases(),
+            static fn (self $card): bool => $card->view() === $view,
+        ));
     }
 
     public static function tryFromString(?string $value): ?self

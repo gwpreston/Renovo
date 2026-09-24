@@ -1,0 +1,22 @@
+{#
+    Where the money goes: the recurring spend by category, as the monthly
+    equivalent in the base currency.
+
+    The Analytics page's donut, from the same breakdown and the same partial.
+    When a currency has no rate there is no single whole to draw, so the card
+    degrades to per-currency figures and names the currency that could not be
+    converted.
+#}
+{% include 'stats/_breakdown.twig' with {
+    breakdown: where_it_goes,
+    card_id: 'dashboard-where-it-goes',
+    data_id: 'dashboard-donut-data',
+    heading: t('dashboard.where_it_goes'),
+    note: t('dashboard.where_it_goes_note', {'currency': base_currency}),
+    empty_text: t('subscriptions.categories_empty'),
+    alt_key: 'stats.donut_alt',
+    per_currency_key: 'stats.donut_per_currency',
+    other_key: 'dashboard.other_categories',
+    column_label: t('field.category'),
+    unassigned_label: '',
+} only %}

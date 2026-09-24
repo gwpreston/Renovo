@@ -40,7 +40,7 @@ use App\Security\Scope;
  * total a minor unit or two away from the household's own figure: £10 a year
  * split three ways is 83p a month for the household and 28p each on three
  * cards. Every individual figure is right to the minor unit; their sum is not
- * re-derived from the household's. This is what `ForecastService::proportion()`
+ * re-derived from the household's. This is what `SplitService::chargeShare()`
  * already does with a projected charge, and making it exact would mean
  * allocating against the normalised figure — a change to the split machinery
  * rather than to this screen.
@@ -129,6 +129,62 @@ final class HouseholdOverviewService
         }
 
         return $overview;
+    }
+
+    /**
+     * The dashboard's Who pays: each member's monthly share, and the part of
+     * the household's spend it is.
+     *
+     * In SHARED mode, every member whose figures are shown, with their share
+     * as a percentage of the members' shares added together — which is the
+     * household's spend, divided by who carries it. The percentages are
+     * withheld, not estimated, when any member's monthly figure cannot be
+     * totalled in one currency.
+     *
+     * **In ISOLATED mode only the viewer's own share**, and no percentage: the
+     * viewer cannot see the household's total, so a share *of* it would be
+     * invented, and listing the other members with blank figures would still
+     * say who has how many subscriptions. The card retitles itself "Your
+     * share" on `own_share_only`.
+     *
+     * Private rows are already absent from any viewer who is not their payer,
+     * because the scoped query never returned them; they count for the payer,
+     * in the payer's own view.
+     *
+     * @return array{rows: list<MemberOverview>, percents: array<int, int|null>, own_share_only: bool}
+     */
+    public function whoPays(Scope $scope): array
+    {
+        $members = $this->members($scope);
+        $ownOnly = $scope->restrictsReadsToOwner();
+
+        $rows = array_values(array_filter(
+            $members,
+            static fn (array $row): bool => $ownOnly ? $row['is_self'] : !$row['figures_withheld'],
+        ));
+
+        $percents = [];
+        if (!$ownOnly) {
+            $total = 0;
+            $complete = true;
+            foreach ($rows as $row) {
+                $amount = $row['monthly']['combined']['amount_minor'];
+                if ($amount === null) {
+                    $complete = false;
+                    break;
+                }
+                $total += $amount;
+            }
+
+            foreach ($rows as $row) {
+                $amount = $row['monthly']['combined']['amount_minor'];
+                $percents[$row['member']->userId] = $complete && $total > 0 && $amount !== null
+                    ? Rounding::multiplyDivide($amount, 100, $total)
+                    : null;
+            }
+        }
+
+        return ['rows' => $rows, 'percents' => $percents, 'own_share_only' => $ownOnly];
     }
 
     /**

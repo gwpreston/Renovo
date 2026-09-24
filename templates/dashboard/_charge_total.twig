@@ -1,0 +1,26 @@
+{#
+    A set of charges' total, by the per-currency rule: the combined figure when
+    every currency converts, the subtotals always, and the missing currency
+    named when one does not.
+
+    `figures`  {totals: [{currency, amount_minor}], combined: {currency, amount_minor, unconvertible}}
+#}
+{% if figures.totals|length == 1 %}
+    <p class="kpi-note num">{{ figures.totals[0].amount_minor|money(figures.totals[0].currency) }}</p>
+{% elseif figures.combined.amount_minor is not null %}
+    <p class="kpi-note num">
+        {{ figures.combined.amount_minor|money(figures.combined.currency) }}
+        <span class="muted">·
+            {% for total in figures.totals %}
+                {{ total.amount_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
+            {% endfor %}
+        </span>
+    </p>
+{% elseif figures.totals is not empty %}
+    <p class="kpi-note num">
+        {% for total in figures.totals %}
+            {{ total.amount_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
+        {% endfor %}
+    </p>
+    <p class="hint">{{ t('dashboard.unconvertible', {'currencies': figures.combined.unconvertible|join(', ')}) }}</p>
+{% endif %}

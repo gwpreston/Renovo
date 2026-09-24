@@ -325,7 +325,23 @@ final class SubscriptionController extends Controller
 
         $this->flash('success', $cancel ? 'flash.subscription_cancelled' : 'flash.subscription_uncancelled');
 
-        return $this->redirectAfterWrite($request, $response, '/subscriptions');
+        return $this->redirectAfterWrite($request, $response, $this->cancellationReturn($request));
+    }
+
+    /**
+     * Where a cancel sends the member back to.
+     *
+     * The dashboard's Cancel trial uses this same action, and should leave the
+     * member on the dashboard. Only the paths that carry the control are
+     * honoured — a named allowlist rather than any local path, so the field
+     * can never become a redirect to somewhere unexpected.
+     */
+    private function cancellationReturn(ServerRequestInterface $request): string
+    {
+        $body = $this->body($request);
+        $target = is_scalar($body['return_to'] ?? null) ? (string) $body['return_to'] : '';
+
+        return $target === '/' ? '/' : '/subscriptions';
     }
 
     private function uploadedLogo(ServerRequestInterface $request): ?UploadedFileInterface

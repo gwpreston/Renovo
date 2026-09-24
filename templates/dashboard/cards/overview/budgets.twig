@@ -1,0 +1,62 @@
+{#
+    Budgets this month: up to four of the viewer's monthly budgets, each read
+    against the calendar month — charged so far, and projected to the month's
+    end — so the two bars share one scale.
+
+    The note says the one thing worth saying: how much is left, how far over
+    it will go, that it is past its warning, or that it will go over only if
+    the running trials convert, which is the warning a member can still act on.
+#}
+<section class="card budgets-card" aria-labelledby="budgets-card-heading">
+    <header class="card-header">
+        <h2 id="budgets-card-heading" class="stat-label">{{ t('dashboard.budgets_this_month', {'month': today|local_date('MMMM')}) }}</h2>
+        <span class="card-icon">{{ icon('budget') }}</span>
+    </header>
+
+    {% if budgets is empty %}
+        <p class="muted empty">
+            {{ t('dashboard.no_budget') }}
+            {% if can(scope, 'budget.manage') %}
+                <a href="/budgets/new">{{ t('budgets.set_one_up') }}</a>
+            {% endif %}
+        </p>
+    {% else %}
+        <ul class="plain budget-rows">
+            {% for row in budgets %}
+                {% set state = row.is_over ? 'is-over' : (row.over_if_trials_convert or row.is_warning ? 'is-warning' : '') %}
+                <li class="budget-row {{ state }}">
+                    <p class="budget-row-head">
+                        <strong>{{ row.budget.name }}</strong>
+                        {% if row.charged is not null and row.projected is not null %}
+                            <span class="num muted">{{ row.charged.amountMinor|money(row.charged.currency) }} / {{ row.limit.amountMinor|money(row.limit.currency) }}</span>
+                        {% endif %}
+                    </p>
+
+                    {% if row.unconvertible is not empty %}
+                        <p class="field-error">{{ t('budgets.unconvertible', {'currencies': row.unconvertible|join(', ')}) }}</p>
+                    {% else %}
+                        <div class="budget-track" role="img"
+                             aria-label="{{ t('dashboard.budget_meter', {
+                                 'charged': row.charged_percent,
+                                 'projected': row.projected_percent,
+                             }) }}">
+                            <span class="budget-track-projected" style="width: {{ min(row.projected_percent ?? 0, 100) }}%"></span>
+                            <span class="budget-track-charged" style="width: {{ min(row.charged_percent ?? 0, 100) }}%"></span>
+                        </div>
+                        <p class="budget-row-note">
+                            {% if row.is_over %}
+                                {{ t('dashboard.budget_projected_over', {'amount': (row.remaining.amountMinor * -1)|money(row.remaining.currency)}) }}
+                            {% elseif row.over_if_trials_convert %}
+                                {{ t('dashboard.budget_over_if_trials') }}
+                            {% elseif row.is_warning %}
+                                {{ t('dashboard.budget_past_warning', {'threshold': row.budget.warnThresholdPercent}) }}
+                            {% else %}
+                                {{ t('dashboard.budget_left', {'amount': row.remaining.amountMinor|money(row.remaining.currency)}) }}
+                            {% endif %}
+                        </p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>

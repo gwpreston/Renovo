@@ -1,0 +1,55 @@
+{#
+    Spent this year against budget pace: the reconstructed spend since
+    January, added up month by month, against an even pace of the household's
+    yearly budget (or twelve times its monthly one).
+
+    Drawn only when there is a household budget to pace against — never an
+    invented limit — and not at all when a month cannot be totalled in one
+    currency, because every running total after it would be wrong.
+#}
+{% if pace %}
+    <section class="card pace-card" aria-labelledby="pace-heading">
+        <header class="card-header">
+            <div>
+                <h2 id="pace-heading">{{ t('dashboard.budget_pace') }}</h2>
+                <p class="muted">{{ t('dashboard.budget_pace_note', {'year': today|local_date('y')}) }}</p>
+            </div>
+        </header>
+
+        {% if not pace.is_drawable %}
+            <p class="muted empty">{{ t('dashboard.pace_unconvertible', {'currencies': pace.unconvertible|join(', ')}) }}</p>
+        {% else %}
+            <div class="pace-chart" aria-hidden="true">
+                <svg viewBox="0 0 {{ pace.width }} {{ pace.height }}" preserveAspectRatio="none" focusable="false">
+                    <path class="pace-area" d="{{ pace.area }}"></path>
+                    <path class="pace-budget" d="{{ pace.pace_line }}"></path>
+                    <path class="pace-spent" d="{{ pace.line }}"></path>
+                </svg>
+            </div>
+            <div class="pace-labels" aria-hidden="true">
+                {% for month in pace.months %}
+                    <span>{{ month|local_date('MMM') }}</span>
+                {% endfor %}
+            </div>
+
+            <p class="pace-figures">
+                <span><strong class="num">{{ pace.spent.amountMinor|money(pace.spent.currency) }}</strong> {{ t('dashboard.pace_spent') }}</span>
+                <span><strong class="num">{{ pace.pace.amountMinor|money(pace.pace.currency) }}</strong> {{ t('dashboard.pace_budget_to_date') }}</span>
+                <span class="{{ pace.is_over_pace ? 'is-over' : 'is-under' }}">
+                    {{ pace.is_over_pace
+                        ? t('dashboard.pace_over', {'amount': pace.difference.amountMinor|money(pace.difference.currency)})
+                        : t('dashboard.pace_under', {'amount': pace.difference.amountMinor|money(pace.difference.currency)}) }}
+                </span>
+            </p>
+            <p class="hint">
+                {{ t(pace.is_yearly_budget ? 'dashboard.pace_of_yearly' : 'dashboard.pace_of_monthly', {
+                    'budget': pace.source_budget.amountMinor|money(pace.source_budget.currency),
+                }) }}
+                {{ t('dashboard.reconstructed_note') }}
+                {% if pace.excluded_count > 0 %}
+                    {{ t('dashboard.excluded_note', {'count': pace.excluded_count}) }}
+                {% endif %}
+            </p>
+        {% endif %}
+    </section>
+{% endif %}

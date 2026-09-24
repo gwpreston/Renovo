@@ -7,7 +7,6 @@ namespace App\Service;
 use App\Domain\Entity\PriceChange;
 use App\Domain\Entity\Subscription;
 use App\Domain\Money;
-use App\Domain\Rounding;
 use App\Repository\PriceHistoryRepository;
 use App\Security\Scope;
 use App\Support\Clock;
@@ -137,10 +136,11 @@ final class ForecastService
                     // The share is a proportion of the current price, applied
                     // to the price that will actually be charged, so a member
                     // paying a third still pays a third after an increase.
-                    $charge['amount'] = $this->proportion(
+                    $charge['amount'] = $this->splits->chargeShare(
                         $charge['amount'],
-                        $subscription->price,
-                        $this->splits->shareFor($subscription, $participants, $forUserId),
+                        $subscription,
+                        $participants,
+                        $forUserId,
                     );
                 }
 
@@ -155,6 +155,30 @@ final class ForecastService
         );
 
         return $charges;
+    }
+
+    /**
+     * Every charge expected from today to `$days` days ahead, inclusive, in
+     * date order.
+     *
+     * The same walk as `charges()`, cut to a window measured in days rather
+     * than months — the dashboard's Due next 7 days, Coming up and Next 30
+     * days all read it, so a trial converting on Friday is in all three.
+     *
+     * @return list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}>
+     */
+    public function chargesWithin(Scope $scope, int $days): array
+    {
+        $end = $this->clock->today()->modify(sprintf('+%d days', $days));
+
+        // Whole months enough to cover the window; the shortest month is 28
+        // days, so this is never one short.
+        $months = intdiv(max(0, $days), 28) + 1;
+
+        return array_values(array_filter(
+            $this->charges($scope, $months),
+            static fn (array $charge): bool => $charge['date'] <= $end,
+        ));
     }
 
     /**
@@ -310,30 +334,6 @@ final class ForecastService
         }
 
         return $price;
-    }
-
-    /**
-     * Scale a future charge by the proportion a member bears today.
-     *
-     * Expressed as a ratio rather than as a stored amount so that an increase
-     * is divided the same way the original was. If the current price is zero —
-     * a trial — the member bears the whole of their converted charge, since
-     * there is no ratio to take.
-     */
-    private function proportion(Money $charge, Money $currentPrice, Money $currentShare): Money
-    {
-        if ($currentPrice->isZero()) {
-            return $charge;
-        }
-
-        return Money::of(
-            Rounding::multiplyDivide(
-                $charge->amountMinor,
-                $currentShare->amountMinor,
-                $currentPrice->amountMinor,
-            ),
-            $charge->currency,
-        );
     }
 
     /**

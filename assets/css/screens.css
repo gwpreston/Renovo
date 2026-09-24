@@ -1288,6 +1288,810 @@ tr.is-passed > td {
     opacity: 0.65;
 }
 
+/* ------------------------------------------------ dashboard: the two views */
+
+/*
+ * The greeting and the Overview / Household toggle share a row that wraps
+ * on a narrow screen, the toggle dropping under the greeting.
+ */
+.dashboard-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.dashboard-greeting {
+    margin: 0;
+    font-size: var(--size-heading);
+    font-weight: var(--weight-bold);
+}
+
+.dashboard-date {
+    margin: 0.125rem 0 0;
+    font-size: var(--size-label);
+}
+
+/* Coming up spans three rows so the narrow cards stack in the column beside it. */
+.bento-rows-3 {
+    grid-row: span 3;
+}
+
+@media (max-width: 767px) {
+    .bento-rows-3 {
+        grid-row: auto;
+    }
+}
+
+/* The KPI tiles: eyebrow and icon on one line, the figure, then a note. */
+.kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0;
+}
+
+.kpi-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.kpi-head .stat-label {
+    margin: 0;
+}
+
+.kpi-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-small);
+}
+
+.kpi-icon svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.kpi-icon-info {
+    background: var(--info-bg);
+    color: var(--info);
+}
+
+.kpi-icon-ok {
+    background: var(--ok-bg);
+    color: var(--ok);
+}
+
+.kpi-icon-warn {
+    background: var(--warn-bg);
+    color: var(--warn);
+}
+
+.kpi-icon-neutral {
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.kpi-note {
+    margin: 0;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+}
+
+.kpi-note.is-under {
+    color: var(--accent-text);
+}
+
+.kpi-note.is-over {
+    color: var(--bad);
+}
+
+.card-icon {
+    display: inline-flex;
+    color: var(--faint);
+}
+
+.card-icon svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ------------------------------------------ dashboard: the monthly spend bars */
+
+.spend-bars-card .chart-legend {
+    display: flex;
+    margin: 0;
+}
+
+.chart-key-actual,
+.chart-key-forecast {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-top: 0;
+    border-radius: 3px;
+}
+
+.chart-key-actual {
+    background: var(--s1);
+}
+
+.chart-key-forecast {
+    background: var(--hatch);
+}
+
+.chart-key-budget {
+    border-top: 2px dashed var(--bad);
+}
+
+.spend-bars {
+    display: flex;
+    gap: 0.625rem;
+}
+
+.spend-bars-axis {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 13.75rem;
+    font-size: var(--size-caption);
+    color: var(--faint);
+    text-align: right;
+}
+
+.spend-bars-body {
+    flex: 1;
+    min-width: 0;
+}
+
+/*
+ * The plot: a baseline, a rule at the top and one at half height — the three
+ * values the axis names — and the bars standing on the baseline.
+ */
+.spend-bars-plot {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.375rem;
+    height: 13.75rem;
+    border-bottom: 1px solid var(--border);
+    background:
+        linear-gradient(var(--border), var(--border)) 0 0 / 100% 1px no-repeat,
+        linear-gradient(var(--border), var(--border)) 0 50% / 100% 1px no-repeat;
+}
+
+.spend-bars-budget {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 2px dashed var(--bad);
+    pointer-events: none;
+}
+
+/*
+ * One month. Its parts are stacked from the baseline up — already charged,
+ * then still due — so this month reads as one bar with its charged part
+ * beneath the part still to come.
+ */
+.spend-bar {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.spend-bar > span {
+    display: block;
+}
+
+.spend-bar > span:first-child {
+    border-radius: 5px 5px 0 0;
+}
+
+.spend-bar-charged {
+    background: var(--s1);
+}
+
+.spend-bar-due {
+    background: var(--hatch);
+}
+
+.spend-bar.is-past .spend-bar-charged {
+    opacity: 0.85;
+}
+
+/* The busiest month is picked out by weight, not by a second colour. */
+.spend-bar.is-busiest > span:first-child {
+    box-shadow: 0 -3px 0 var(--accent);
+}
+
+.spend-bars-labels {
+    display: flex;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+}
+
+.spend-bars-labels span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.spend-bars-labels .is-current {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+}
+
+/* Thirteen labels do not fit a phone: every other one, this month always. */
+@media (max-width: 479px) {
+    .spend-bars-labels span:nth-child(even):not(.is-current) {
+        visibility: hidden;
+    }
+
+    .spend-bars-plot,
+    .spend-bars-labels {
+        gap: 0.1875rem;
+    }
+}
+
+/* --------------------------------------------- dashboard: lists of charges */
+
+.charge-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.charge-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6875rem 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.date-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 2.75rem;
+}
+
+.date-tile-month {
+    font-size: var(--size-caption);
+    font-weight: var(--weight-bold);
+    color: var(--faint);
+    text-transform: uppercase;
+}
+
+.date-tile-day {
+    font-size: var(--size-title);
+    font-weight: var(--weight-bold);
+    line-height: 1.1;
+}
+
+.charge-name {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.charge-name a {
+    overflow: hidden;
+    font-weight: var(--weight-bold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.charge-owner {
+    flex-shrink: 0;
+}
+
+.charge-amount {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 4.5rem;
+    font-weight: var(--weight-bold);
+}
+
+@media (max-width: 479px) {
+    .charge-row .logo,
+    .charge-owner {
+        display: none;
+    }
+}
+
+/* ----------------------------------------------- dashboard: narrow cards */
+
+.budget-rows,
+.trial-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+.budget-row-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.375rem;
+    font-size: var(--size-label);
+}
+
+/*
+ * Two widths on one track: the projected month as a wash, what has already
+ * been charged solid over it — the same scale, so the gap between them is
+ * what is still to come.
+ */
+.budget-track {
+    position: relative;
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+}
+
+.budget-track > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-pill);
+}
+
+.budget-track-projected {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.budget-track-charged {
+    background: var(--accent);
+}
+
+.budget-row.is-warning .budget-track-charged {
+    background: var(--warn);
+}
+
+.budget-row.is-warning .budget-track-projected {
+    background: var(--warn-bg);
+    box-shadow: inset 0 0 0 1px var(--warn);
+}
+
+.budget-row.is-over .budget-track-charged {
+    background: var(--bad);
+}
+
+.budget-row.is-over .budget-track-projected {
+    background: var(--bad-bg);
+    box-shadow: inset 0 0 0 1px var(--bad);
+}
+
+.budget-row-note {
+    margin: 0.3rem 0 0;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    color: var(--accent-text);
+}
+
+.budget-row.is-warning .budget-row-note {
+    color: var(--warn);
+}
+
+.budget-row.is-over .budget-row-note {
+    color: var(--bad);
+}
+
+.trial-row {
+    padding: 0.625rem 0.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+}
+
+.trial-row p {
+    margin: 0 0 0.25rem;
+}
+
+.trial-row form {
+    margin-top: 0.5rem;
+}
+
+.price-banner {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.price-banner-label {
+    margin: 0;
+    color: var(--warn);
+}
+
+.price-banner-title {
+    margin: 0.25rem 0;
+    font-weight: var(--weight-bold);
+}
+
+/* The subscriptions table's chips, restored with the table. */
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.chip-action {
+    text-decoration: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.chip-action:hover {
+    color: var(--text);
+}
+
+.chip-action.is-active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+}
+
+/* --------------------------------------------- dashboard: household view */
+
+/*
+ * The month hero sits on the rail's colour, as the prototype's does: the one
+ * dark band on the Household view, so the month's position is what is read
+ * first. Every colour on it is a rail token, which each palette sets.
+ */
+.month-hero {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem 2.5rem;
+    padding: 1.5rem;
+    background: var(--rail);
+    color: var(--rail-ink);
+    border-color: var(--rail-border);
+}
+
+.month-hero-main {
+    flex: 2 1 22rem;
+    min-width: 0;
+}
+
+.month-hero-label,
+.month-hero .stat-label {
+    color: var(--rail-muted);
+}
+
+.month-hero-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.625rem;
+    margin: 0.5rem 0 0;
+    color: var(--rail-text);
+}
+
+.month-hero-amount {
+    font-size: 2.5rem;
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.03em;
+    color: var(--rail-ink);
+}
+
+.month-bar {
+    position: relative;
+    height: 0.75rem;
+    margin-top: 1.125rem;
+    border-radius: var(--radius-pill);
+    background: var(--rail-tint);
+}
+
+.month-bar > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-pill);
+}
+
+.month-bar-due {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.month-bar-charged {
+    background: var(--accent);
+}
+
+.month-bar > .month-bar-budget {
+    top: -0.3125rem;
+    bottom: -0.3125rem;
+    width: 0;
+    border-left: 2px solid var(--rail-ink);
+    border-radius: 0;
+}
+
+.month-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1.125rem;
+    margin-top: 0.625rem;
+    font-size: var(--size-label);
+    color: var(--rail-text);
+}
+
+.month-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.month-key-charged,
+.month-key-due {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-top: 0;
+    border-radius: 3px;
+}
+
+.month-key-charged {
+    background: var(--accent);
+}
+
+.month-key-due {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.month-key-budget {
+    width: 2px;
+    height: 0.75rem;
+    border-top: 0;
+    background: var(--rail-ink);
+}
+
+.month-hero-stats {
+    display: grid;
+    flex: 1 1 16rem;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    align-content: center;
+    gap: 1rem;
+    margin: 0;
+}
+
+.month-hero-stats > div {
+    padding-left: 0.875rem;
+    border-left: 1px solid var(--rail-line);
+}
+
+.month-hero-stats dt {
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--rail-muted);
+}
+
+.month-hero-stats dd {
+    margin: 0.25rem 0 0;
+    font-size: 1.25rem;
+    font-weight: var(--weight-bold);
+}
+
+.month-hero-stats .month-hero-note {
+    margin-top: 0.125rem;
+    font-family: var(--font-text);
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--rail-text);
+}
+
+.month-hero-foot {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--size-caption);
+    color: var(--rail-muted);
+}
+
+.month-hero-lines .stat-value {
+    color: var(--rail-ink);
+}
+
+/* The thirty-day line: ticks beneath, a marker per charge above it. */
+.timeline {
+    position: relative;
+    height: 5.5rem;
+    margin: 0 0.75rem 0.5rem;
+}
+
+.timeline-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3.5rem;
+    height: 2px;
+    background: var(--border);
+}
+
+.timeline-tick {
+    position: absolute;
+    top: 4rem;
+    transform: translateX(-50%);
+    font-size: var(--size-caption);
+    color: var(--faint);
+    white-space: nowrap;
+}
+
+.timeline-marker {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    transform: translateX(-50%);
+    border: 2px solid var(--surface);
+    border-radius: var(--radius-small);
+    background: var(--s1);
+    color: var(--surface);
+    font-size: var(--size-caption);
+    font-weight: var(--weight-heavy);
+}
+
+.timeline-marker.is-trial {
+    background: var(--warn);
+}
+
+.timeline-marker.lane-0 {
+    top: 2rem;
+}
+
+.timeline-marker.lane-1 {
+    top: 0.75rem;
+}
+
+.timeline-marker.lane-2 {
+    top: -0.5rem;
+}
+
+.timeline-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    gap: 0.5rem;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    font-size: var(--size-label);
+    font-weight: var(--weight-bold);
+}
+
+.timeline-date {
+    flex-shrink: 0;
+    width: 3.25rem;
+    color: var(--muted);
+}
+
+.timeline-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.who-pays-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.who-pays-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.who-pays-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.who-pays-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.3rem;
+}
+
+.who-pays-figure {
+    font-weight: var(--weight-semibold);
+}
+
+.who-pays-body .hint {
+    margin: 0.3rem 0 0;
+}
+
+/* The pace chart: an SVG stretched to its box, its strokes kept to width. */
+.pace-chart {
+    height: 12.5rem;
+}
+
+.pace-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.pace-area {
+    fill: var(--accent);
+    fill-opacity: 0.12;
+}
+
+.pace-spent,
+.pace-budget {
+    fill: none;
+    vector-effect: non-scaling-stroke;
+}
+
+.pace-spent {
+    stroke: var(--accent-text);
+    stroke-width: 3;
+}
+
+.pace-budget {
+    stroke: var(--bad);
+    stroke-width: 2;
+    stroke-dasharray: 6 5;
+}
+
+.pace-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.pace-figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 0.875rem 0 0.25rem;
+    font-size: var(--size-label);
+    color: var(--muted);
+}
+
+.pace-figures strong {
+    color: var(--text);
+}
+
+.pace-figures .is-over {
+    color: var(--bad);
+    font-weight: var(--weight-bold);
+}
+
+.pace-figures .is-under {
+    color: var(--accent-text);
+    font-weight: var(--weight-bold);
+}
+
 /* ---------------------------------------------------------------- density */
 
 /*

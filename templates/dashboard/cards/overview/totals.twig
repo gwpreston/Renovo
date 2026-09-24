@@ -1,0 +1,79 @@
+{#
+    The four figures.
+
+    Monthly and yearly spend each show their per-currency subtotals, with the
+    combined figure alongside only when every currency converts — so a tile
+    may be two lines tall, which is the correct answer rather than a
+    compromise. The budget note appears only against the household's monthly
+    overall budget, because the tile is the household's total and a
+    percentage must be a figure over its own limit.
+#}
+{% import 'partials/spend.twig' as metric %}
+
+<section class="metric-grid" aria-label="{{ t('dashboard.metrics') }}">
+    <article class="card stat metric kpi">
+        <header class="kpi-head">
+            <h2 class="stat-label">{{ t('dashboard.monthly_spend') }}</h2>
+            <span class="kpi-icon kpi-icon-info">{{ icon('payment-card') }}</span>
+        </header>
+        {{ metric.spend(kpis.monthly, t('dashboard.per_month_unit')) }}
+        {% if kpis.monthly.budget %}
+            {% set note = kpis.monthly.budget %}
+            <p class="kpi-note {{ note.is_over ? 'is-over' : 'is-under' }}">
+                {{ t('dashboard.percent_of_budget', {
+                    'percent': note.percent,
+                    'budget': note.limit.amountMinor|money(note.limit.currency),
+                }) }}
+            </p>
+        {% endif %}
+    </article>
+
+    <article class="card stat metric kpi">
+        <header class="kpi-head">
+            <h2 class="stat-label">{{ t('dashboard.yearly_run_rate') }}</h2>
+            <span class="kpi-icon kpi-icon-ok">{{ icon('trend-up') }}</span>
+        </header>
+        {{ metric.spend(kpis.yearly, t('dashboard.per_year_unit')) }}
+        <p class="kpi-note">{{ t('dashboard.at_todays_prices') }}</p>
+    </article>
+
+    <article class="card stat metric kpi">
+        <header class="kpi-head">
+            <h2 class="stat-label">{{ t('dashboard.due_next_days', {'days': kpis.due.days}) }}</h2>
+            <span class="kpi-icon kpi-icon-warn">{{ icon('calendar') }}</span>
+        </header>
+        <p class="stat-value num">{{ kpis.due.count|decimal(0) }}</p>
+        {% if kpis.due.totals is not empty %}
+            {% include 'dashboard/_charge_total.twig' with {'figures': kpis.due} only %}
+        {% else %}
+            <p class="kpi-note">{{ t('dashboard.nothing_due') }}</p>
+        {% endif %}
+    </article>
+
+    <article class="card stat metric kpi">
+        <header class="kpi-head">
+            <h2 class="stat-label">{{ t('dashboard.active') }}</h2>
+            <span class="kpi-icon kpi-icon-neutral">{{ icon('subscriptions') }}</span>
+        </header>
+        <p class="stat-value num">{{ kpis.active.count|decimal(0) }}</p>
+        <p class="kpi-note">{{ t('dashboard.trials_and_paused', {
+            'trials': kpis.active.trials,
+            'paused': kpis.active.paused,
+        }) }}</p>
+    </article>
+</section>
+
+{#
+    One-off and lifetime entries, kept out of the recurring figures on purpose:
+    spreading a lifetime licence over an arbitrary period would make the
+    monthly number mean nothing.
+#}
+{% if kpis.one_off is not empty %}
+    <p class="muted note">
+        {% for total in kpis.one_off %}
+            {{ t('dashboard.one_off_in', {'currency': total.currency}) }}
+            {{ total.total_minor|money(total.currency) }}
+            ({{ t('dashboard.one_off_note', {'count': total.count}) }}){{ not loop.last ? ' · ' : '' }}
+        {% endfor %}
+    </p>
+{% endif %}

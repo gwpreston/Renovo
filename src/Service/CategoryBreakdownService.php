@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Support\Distribution;
+use App\Support\MoneyFormatter;
 
 /**
  * Where the recurring spend goes, and what the shares are shares *of*.
@@ -14,9 +15,11 @@ use App\Support\Distribution;
  * share of a total. What it deliberately does not decide is the denominator,
  * because the denominator is the claim the picture makes.
  *
- * This is that decision, and it is now made on two screens: the my-subscriptions
- * widget draws it as proportion bars and the analytics screen draws it as a
- * donut. They are two pictures of one breakdown, so there is one breakdown.
+ * This is that decision, and it is made for several screens: the
+ * my-subscriptions widget and the Household dashboard draw it as proportion
+ * bars, and the analytics screen and the Overview dashboard draw it as a
+ * donut. They are pictures of one breakdown, so there is one breakdown — and
+ * one donut payload, built here.
  *
  * **The denominator is stated, and it degrades honestly.** When every currency
  * in play converts, there is one group and the total is the combined monthly
@@ -52,6 +55,7 @@ final class CategoryBreakdownService
 
     public function __construct(
         private readonly ExchangeRateService $rates,
+        private readonly MoneyFormatter $money,
     ) {
     }
 
@@ -89,6 +93,85 @@ final class CategoryBreakdownService
             'unconvertible' => $combined['unconvertible'],
             'groups' => $this->perCurrencyGroups($byCategory, $recurring),
         ];
+    }
+
+    /**
+     * The donut's payload — or nothing, which is the interesting case.
+     *
+     * A donut implies one whole. Its centre is that whole stated as a number,
+     * and its segments claim to be shares of it. When the categories span
+     * currencies that cannot all be converted to one base there is no such
+     * number, so there is no donut: the screen shows the per-currency figures
+     * the breakdown produced instead. Degrading to the honest view is the
+     * behaviour, not an edge case to paper over — a centre label reading a
+     * total that omits a currency would be worse than no picture at all.
+     *
+     * Every string the browser prints was formatted here by ICU, as on the
+     * spend chart. Nothing client-side divides a currency by a hundred.
+     *
+     * @param Breakdown $breakdown
+     * @return array<string, mixed>|null
+     */
+    public function donut(array $breakdown): ?array
+    {
+        if (!$breakdown['is_combined'] || $breakdown['groups'] === []) {
+            return null;
+        }
+
+        $group = $breakdown['groups'][0];
+        $currency = $group['currency'];
+
+        $slices = [];
+        foreach ($group['rows'] as $row) {
+            $slices[] = [
+                'name' => $row['name'],
+                'minor' => $row['amount_minor'],
+                'display' => $this->money->formatMinor($row['amount_minor'], $currency),
+                'percent' => $row['percent'],
+                'is_other' => false,
+                // A payment method's own colour when it has one; null takes
+                // the palette. Categories carry none, so their donut is as it
+                // was.
+                'colour' => $row['colour'],
+                // The subscriptions with no payment method, which the
+                // statistics name with the empty string. Its label is the
+                // canvas's `data-unassigned-label`, like the tail's.
+                'is_unassigned' => $row['name'] === '',
+            ];
+        }
+
+        // The tail is a segment like any other, and its name is the one string
+        // in this payload that needs translating. It arrives on the canvas as
+        // `data-other-label`, beside the `aria-label` already there, so the
+        // catalogue stays the single source of it.
+        if ($group['other'] !== null) {
+            $slices[] = [
+                'name' => null,
+                'minor' => $group['other']['amount_minor'],
+                'display' => $this->money->formatMinor($group['other']['amount_minor'], $currency),
+                'percent' => $group['other']['percent'],
+                'is_other' => true,
+                'colour' => null,
+                'is_unassigned' => false,
+            ];
+        }
+
+        $donut = [
+            'slices' => $slices,
+            'currency' => $currency,
+            'total_minor' => $group['total_minor'],
+            'total_display' => $this->money->formatMinor($group['total_minor'], $currency),
+        ];
+
+        // Encoded here rather than in the template: this is written inside a
+        // <script> element, and the tag-escaping flags are not a decision a
+        // template should be making one copy of.
+        $donut['json'] = json_encode(
+            $donut,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP,
+        );
+
+        return $donut;
     }
 
     /**

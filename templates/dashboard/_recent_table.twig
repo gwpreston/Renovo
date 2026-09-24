@@ -1,0 +1,77 @@
+{#
+    The chips and the rows they choose between, rendered on their own when a
+    chip asks for them and included by the card for a normal load, so the two
+    cannot drift apart.
+
+    Each chip is a real link, so it works with no script; with htmx it swaps
+    these rows alone.
+#}
+{% import 'partials/logo.twig' as logo %}
+<div id="dashboard-recent">
+    <div class="chip-row" role="group" aria-label="{{ t('dashboard.filter_rows') }}">
+        {% for view in table.views %}
+            <a class="chip chip-action {{ table.view == view ? 'is-active' : '' }}"
+               href="/?show={{ view }}"
+               hx-get="/?show={{ view }}"
+               hx-target="#dashboard-recent"
+               hx-swap="outerHTML"
+               {{ table.view == view ? 'aria-current="true"' : '' }}>
+                {{ t('dashboard.view_' ~ view) }}
+            </a>
+        {% endfor %}
+    </div>
+
+    {% if table.rows is empty %}
+        <p class="muted empty">
+            {{ table.view == 'expiring' ? t('dashboard.nothing_renewing') : t('subscriptions_list.empty') }}
+        </p>
+    {% else %}
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.name') }}</th>
+                    <th scope="col">{{ t('field.cycle') }}</th>
+                    <th scope="col">{{ t('field.next_charge') }}</th>
+                    <th scope="col" class="numeric">{{ t('field.price') }}</th>
+                    <th scope="col">{{ t('field.status') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for subscription in table.rows %}
+                    <tr class="{{ subscription.isActive ? '' : 'is-paused' }}">
+                        <th scope="row">
+                            <div class="cell-name">
+                                {{ logo.mark(subscription) }}
+                                <a href="/subscriptions/{{ subscription.id }}{{ can_edit_row(scope, subscription) ? '/edit' : '/money' }}">{{ subscription.name }}</a>
+                            </div>
+                        </th>
+                        <td>
+                            {% if subscription.billingCycle %}
+                                {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays) }}
+                            {% else %}
+                                {{ type_label(subscription.type.value) }}
+                            {% endif %}
+                        </td>
+                        <td class="num">
+                            {{ subscription.nextChargeDate
+                                ? subscription.nextChargeDate|local_date('d MMM y')
+                                : t('common.none_symbol') }}
+                        </td>
+                        <td class="numeric num">
+                            {{ subscription.price.amountMinor|money(subscription.price.currency) }}
+                        </td>
+                        <td>
+                            {# Derived in one place: Cancelled, Paused, Trial or Active. #}
+                            {% set status = subscription.status.value %}
+                            <span class="badge {{ status == 'trial' ? 'badge-warn' : '' }}" data-status="{{ status }}">
+                                {{ t(subscription.status.labelKey) }}
+                            </span>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>

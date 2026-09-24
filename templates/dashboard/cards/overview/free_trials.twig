@@ -1,0 +1,56 @@
+{#
+    Free trials still running: when each ends, who started it, and what it
+    becomes.
+
+    Cancel trial is the Phase 20 cancel, drawn only where the viewer may change
+    the row — and refused by the repository for anybody who forges it anyway.
+    There is no "Keep it": keeping a trial is what happens when nobody does
+    anything, so a button for it would have nothing to do.
+#}
+<section class="card trials-card" aria-labelledby="trials-card-heading">
+    <header class="card-header">
+        <h2 id="trials-card-heading" class="stat-label">{{ t('dashboard.free_trials') }}</h2>
+        <span class="card-icon">{{ icon('trial') }}</span>
+    </header>
+
+    {% if trials is empty %}
+        <p class="muted empty">{{ t('dashboard.no_trials') }}</p>
+    {% else %}
+        <ul class="plain trial-rows">
+            {% for row in trials %}
+                {% set trial = row.subscription %}
+                <li class="trial-row">
+                    <p class="trial-row-name"><strong>{{ trial.name }}</strong></p>
+                    <p class="hint">
+                        {% if row.days_left is not null and row.days_left <= 0 %}
+                            {{ t('dashboard.trial_ends_today') }}
+                        {% else %}
+                            {{ t('dashboard.trial_ends', {
+                                'date': row.ends|local_date('d MMM'),
+                                'days': row.days_left ?? 0,
+                            }) }}
+                        {% endif %}
+                        {% if trial.ownerName %} · {{ t('dashboard.trial_started_by', {'name': trial.ownerName}) }}{% endif %}
+                    </p>
+                    <p class="hint">
+                        {{ t('dashboard.converts_to') }}
+                        <strong class="num">{{ row.converts_to.amountMinor|money(row.converts_to.currency) }}</strong>{% if row.converts_to_cycle %} {{ cycle_label(row.converts_to_cycle.value, trial.cycleDaysAfterConversion) }}{% endif %}
+                        {% if row.approx_base %}
+                            <span class="num">({{ t('dashboard.approx', {'amount': row.approx_base.amountMinor|money(row.approx_base.currency)}) }})</span>
+                        {% endif %}
+                    </p>
+                    {% if row.may_cancel %}
+                        <form method="post" action="/subscriptions/{{ trial.id }}/cancel" class="inline">
+                            {{ csrf_field() }}
+                            <input type="hidden" name="return_to" value="/">
+                            <button type="submit" class="button button-danger"
+                                    aria-label="{{ t('dashboard.cancel_trial_named', {'name': trial.name}) }}">
+                                {{ t('dashboard.cancel_trial') }}
+                            </button>
+                        </form>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>

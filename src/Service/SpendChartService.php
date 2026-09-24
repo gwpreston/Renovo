@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Domain\Entity\Subscription;
 use App\Domain\Money;
 use App\Support\Clock;
+use App\Support\CssPercent;
 use App\Support\DateFormatter;
 use App\Support\MoneyFormatter;
 use DateTimeImmutable;
@@ -133,6 +134,109 @@ final class SpendChartService
         $partial = $today->format('j') === $today->format('t') ? null : count($months) - 1;
 
         return $this->build($months, $months === [] ? null : $partial, false);
+    }
+
+    /**
+     * The Overview dashboard's bar chart: the months behind, this month, and
+     * the months ahead.
+     *
+     * `$past` is the reconstruction ending yesterday, its last bucket being
+     * this month so far; `$future` is the forecast from today, its first bucket
+     * being the rest of this month. Past and future therefore meet at today
+     * without sharing a charge, and this month is one bar in two parts —
+     * already charged beneath, still due above — rather than two bars or a
+     * part month drawn as a dip. Every other bar is either past or forecast,
+     * and the forecast ones are exactly the Forecast page's months.
+     *
+     * The budget line, when there is one, is the household's monthly overall
+     * limit already converted into the base currency by the caller, and the
+     * axis is tall enough to show it. Heights come from `CssPercent`, worked
+     * out on minor units, so nothing here divides money as a float.
+     *
+     * @param list<MonthTotals> $past   Ending with this month so far.
+     * @param list<MonthTotals> $future Beginning with the rest of this month.
+     * @return array<string, mixed>
+     */
+    public function monthBars(array $past, array $future, ?int $budgetMinor): array
+    {
+        $currency = $this->settings->baseCurrency();
+
+        $union = [];
+        foreach (array_merge($past, $future) as $month) {
+            foreach ($month['by_currency'] as $code => $amount) {
+                $union[(string) $code] = ($union[(string) $code] ?? 0) + $amount;
+            }
+        }
+
+        $combined = $this->stats->combine($union);
+        $drawable = $combined['unconvertible'] === [];
+
+        $current = $past === [] ? null : $past[count($past) - 1];
+        $rows = [];
+
+        foreach (array_slice($past, 0, max(0, count($past) - 1)) as $month) {
+            $rows[] = ['month' => $month['month'], 'kind' => 'past', 'charged' => $month, 'due' => null];
+        }
+        if ($current !== null) {
+            $rows[] = [
+                'month' => $current['month'],
+                'kind' => 'current',
+                'charged' => $current,
+                'due' => $future[0] ?? null,
+            ];
+        }
+        foreach (array_slice($future, 1) as $month) {
+            $rows[] = ['month' => $month['month'], 'kind' => 'future', 'charged' => null, 'due' => $month];
+        }
+
+        $bars = [];
+        $max = 0;
+        $busiest = null;
+        foreach ($rows as $index => $row) {
+            $charged = $drawable && $row['charged'] !== null ? (int) ($row['charged']['combined_minor'] ?? 0) : 0;
+            $due = $drawable && $row['due'] !== null ? (int) ($row['due']['combined_minor'] ?? 0) : 0;
+            $total = $charged + $due;
+
+            $bars[] = [
+                'key' => $row['month'],
+                'label' => $this->dates->format(new DateTimeImmutable($row['month'] . '-01'), 'MMM'),
+                'long_label' => $this->dates->format(new DateTimeImmutable($row['month'] . '-01'), 'MMMM y'),
+                'kind' => $row['kind'],
+                'charged_minor' => $charged,
+                'due_minor' => $due,
+                'total_minor' => $total,
+                'charged_display' => $this->money->formatMinor($charged, $currency),
+                'due_display' => $this->money->formatMinor($due, $currency),
+                'total_display' => $this->money->formatMinor($total, $currency),
+            ];
+
+            // Ties go to the earlier month, as on the line charts.
+            if ($total > $max) {
+                $max = $total;
+                $busiest = $index;
+            }
+        }
+
+        $axisMax = $this->axisMax(max($max, $budgetMinor ?? 0));
+
+        foreach ($bars as $index => $bar) {
+            $bars[$index]['charged_height'] = CssPercent::of($bar['charged_minor'], $axisMax);
+            $bars[$index]['due_height'] = CssPercent::of($bar['due_minor'], $axisMax);
+            $bars[$index]['is_busiest'] = $index === $busiest && $max > 0;
+        }
+
+        return [
+            'bars' => $bars,
+            'busiest_index' => $max > 0 ? $busiest : null,
+            'axis_max' => $axisMax,
+            'ticks' => $this->ticks($axisMax, $currency),
+            'budget_minor' => $budgetMinor,
+            'budget_display' => $budgetMinor === null ? null : $this->money->formatMinor($budgetMinor, $currency),
+            'budget_height' => $budgetMinor === null ? null : CssPercent::of($budgetMinor, $axisMax),
+            'currency' => $currency,
+            'unconvertible' => $combined['unconvertible'],
+            'is_drawable' => $drawable,
+        ];
     }
 
     /**

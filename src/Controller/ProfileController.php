@@ -63,7 +63,7 @@ final class ProfileController extends Controller
             'week_starts' => WeekStart::cases(),
             'landing_views' => LandingView::cases(),
             'locale_choices' => $this->locales->choices(),
-            'dashboard_layout' => $this->dashboard->forUser($this->user($request)->id),
+            'dashboard_layouts' => $this->dashboard->allFor($this->user($request)->id),
             'avatar_max_kilobytes' => max(1, intdiv($this->avatarStorage->maxBytes(), 1024)),
         ]);
     }
@@ -126,7 +126,7 @@ final class ProfileController extends Controller
 
         $this->preferences->update($userId, $body);
 
-        $this->dashboard->update(
+        $this->dashboard->updateSubmitted(
             $userId,
             is_array($body['card_position'] ?? null) ? $body['card_position'] : [],
             is_array($body['card_visible'] ?? null) ? $body['card_visible'] : [],
