@@ -216,6 +216,20 @@ Built in phases:
   included — and it is rendered into the page before first paint. Every
   palette × theme is held to WCAG AA by a test that reads the same JSON the
   build does. No screen was rebuilt. See [The design system](#the-design-system).
+- **Phase 19 — the shell, rebuilt to the prototype — complete.** The rail, top
+  bar and narrow tab bar rebuilt on the Phase 18 tokens; no page's content
+  changed. The rail carries the brand, a household label ("N members · you're
+  Editor" — a label, not a switcher), Dashboard, Subscriptions with a count of
+  the active rows the viewer can actually see, Analytics, a "Household tools"
+  group, a secondary add button and a user card with sign-out. The top bar
+  gains a static subtitle per page, a rates chip that reads the cache and never
+  fetches, a light/dark toggle any member (a Viewer included) can use with or
+  without script, and a bell that links to the Calendar and shows a dot when a
+  trial conversion or cancel-by deadline is close. Destinations that lost their
+  rail row are claimed by one that kept one — Settings gains an interim row of
+  links until its own rebuild — and a test still proves every route is
+  reachable from a phone. No migration. See
+  [The application shell](#the-application-shell).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
@@ -875,27 +889,59 @@ content and nothing else.
 
 ### What it is made of
 
-- A fixed **240px rail** on the left: the mark, the primary destinations, and a
-  tools group pinned to the bottom. Each item is an existing route with a
-  tree-shaken Lucide icon.
-- A **top bar**: the page's `<h1>`, whatever that page offers (edit this, back
-  to the list), a search that goes to the subscriptions list, quick-add, and who
-  is signed in.
-- Below **768px** the rail becomes a **bottom tab bar** of the four most-used
-  destinations with the rest behind a `<details>` drawer. It is a disclosure
-  element rather than a scripted panel, so it opens with JavaScript off: a
-  narrow screen loses the layout and none of the reach.
+- A fixed **240px rail** on the left, top to bottom: the mark and instance
+  name; the **household label** (its name, the member count and your own role —
+  a label, not a menu, because there is no household switcher); Dashboard,
+  Subscriptions and Analytics; the **Household tools** group (Budgets, Calendar,
+  Members & roles, Notifications, Settings); a secondary **Add subscription**
+  button; and a **user card** linking to your profile, with sign-out beside it.
+  The Subscriptions item carries a badge counting the active subscriptions *you*
+  can see — in ISOLATED mode that is your own rows plus splits you share, never
+  the household's total.
+- A **top bar**: the page's `<h1>` with a short static subtitle beneath (from
+  the `page_subtitle` block), whatever that page offers, a search that goes to
+  the subscriptions list, the **rates chip**, the **theme toggle**, the
+  **bell**, and **Add new**.
+- Below **768px** the rail becomes a **bottom tab bar** — Home, Subs, a raised
+  Add, Analytics and More — with the rest, the household label and the user
+  card in a `<details>` sheet behind More. It is a disclosure element rather
+  than a scripted panel, so it opens with JavaScript off: a narrow screen loses
+  the layout and none of the reach.
+
+The rail has fewer rows than there are destinations, so the rest are
+**claimed**: Forecast lights Analytics, Cancel by lights Subscriptions (and is
+linked from that page), and Categories, Payment methods, Import, Backup, Audit
+log and API tokens light Settings, whose page carries a row of links to each
+until it is rebuilt with tabs. Members & roles goes to the member screen for an
+Owner/Admin and to the household overview for everyone else.
+
+The top bar's pieces are reads, assembled by `ShellService` so no controller
+or template computes them:
+
+- **Rates chip** — the base currency and when rates were last refreshed, or a
+  warning when they are stale or unavailable. It reads the cache and never
+  triggers a fetch; for an instance admin it links to the rate settings.
+- **Theme toggle** — flips your own account between light and dark (an account
+  on "system" moves to the opposite of what it is showing). It is a
+  CSRF-protected form, swapped in place by htmx when script is running; any
+  member, a Viewer included, may use it.
+- **Bell** — a link to the Calendar, not an inbox. A dot, with a text
+  equivalent for screen readers, shows when a trial converts or a cancel-by
+  deadline falls within the urgent window. Plain renewals do not light it, or
+  it would never be dark.
 
 Two things from the design mock are deliberately absent. There is no **Upgrade
 Plan** card — Renovo is self-hosted and there is no plan to sell — and no
 **Manage Balance** pill, because the application tracks what is due rather than
-a balance. Quick-add takes the prominent-action slot instead.
+a balance. **Add new** takes the prominent-action slot instead, in the ink fill
+rather than the accent, because the one accent button on a screen is that
+page's own action.
 
 ### One definition of the navigation
 
 `src/Service/NavigationService.php` declares every destination once: its label
 key, route, icon, the permission it needs, and the paths it claims. The rail,
-the tab bar and the drawer are three projections of that one list, so a page
+the tab bar and the More sheet are three projections of that one list, so a page
 cannot be reachable on a desktop and missing on a phone — a test asserts the
 two sets are equal.
 
