@@ -142,6 +142,25 @@ Both with explicit `down()`, verified on both engines.
 - The budget line and pace appear only when a relevant budget exists — never an
   invented limit.
 - Built on `phase-18-theme`, after Phases 18–20.
+- **The chart is thirteen bars**: six complete months reconstructed, the
+  current month split into already charged and still due, and six forecast
+  months. The current month's due part is `ForecastService::monthly()[0]` and
+  the six after it are `monthly()[1..6]`, so the future half equals the
+  Forecast page month for month. Drawn on the server as bars sized from minor
+  units, with the figures table beneath for assistive technology.
+- **Which budget the dashboard measures against.** A percentage must be the
+  tile's own figure over the limit, so the Monthly spend note, the chart's
+  budget line, the month-so-far marker and the pace card use the **household**
+  monthly (or yearly) overall budget, which measures the same household-wide
+  total those figures show. A member's personal budget measured against a
+  household total would be a wrong percentage, so it gets no line; it appears on
+  the Budgets card instead, where it is measured by itself. In ISOLATED mode
+  household budgets do not exist, so there is no line or note.
+- **The Budgets card is the calendar month**: charged so far (reconstructed,
+  1st to yesterday) and projected (that plus the forecast to the month's end),
+  so the two bars share one scale. A member budget counts that member's share;
+  past charges take today's split, because splits keep no history. The rolling
+  projection that budget alerts use is unchanged.
 
 ## Status
 
