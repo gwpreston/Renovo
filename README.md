@@ -328,14 +328,28 @@ Built in phases:
   `/settings/api-tokens` redirect to their sections. One migration (the
   budget-alert switch). This completes the re-skin begun in Phase 18. See
   [Notifications](#notifications).
+- **Phase 29 — the signed-out screens — complete.** Every page before you are
+  inside the application — sign in, the two-step challenge, forgotten
+  password and the reset, registration, email confirmation, invitations,
+  email-change links, the forced password change, error pages and the setup
+  wizard — shares one split layout: the brand panel beside a card, collapsing
+  to a slim header on a narrow screen. Sign in gains **Keep me signed in**, a
+  show/hide on the password, and the passkey button only where the browser
+  can use one; every new-password field has a strength meter, and the
+  lifetimes and minimums on screen are read from the code that enforces them.
+  Email confirmation can be sent again, under a rate limit of its own. The
+  setup wizard is three steps — the owner account, the household (currency,
+  isolation, rate provider and invitations), and reminders (mail relay and
+  channels, each with a test) — then a done page. Otherwise no authentication
+  rule, token or lifetime changed, and there are no migrations. See
+  [Signing in](#signing-in).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-The current phase is **Phase 28 — settings and notifications**, the last of
-the re-skin.
+The current phase is **Phase 29 — the signed-out screens**.
 `PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
 archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
@@ -410,8 +424,11 @@ printf 'SESSION_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
 docker compose up
 ```
 
-Then open **http://localhost:9090** and complete the first-run wizard. The
-account you create there is the instance administrator.
+Then open **http://localhost:9090** and complete the first-run wizard: the
+owner account, then the household (name and currency, isolation and the
+rate provider under More options, and anyone to invite), then reminders (the mail
+relay and any other channels, each with a test). The account you create there
+is the instance administrator.
 
 The `migrate` container applies the schema and then exits — seeing it as
 `Exited (0)` in `docker compose ps` is correct, not a failure.
@@ -551,6 +568,7 @@ list. `.env` is never committed. The ones that matter most:
 | `DB_DRIVER`                 | `pgsql` or `mysql`.                                           |
 | `DB_HOST`                   | Host-side value for CLI tools; containers always use `database`. |
 | `APP_URL`                   | Used to build links in emails — set it to the real URL.       |
+| `SESSION_BROWSER_LIFETIME_SECONDS` | How long a sign-in with **Keep me signed in** unticked survives unused. 12 hours by default; a ticked one lasts `SESSION_LIFETIME_SECONDS` (14 days). |
 | `SESSION_COOKIE_SECURE`     | Leave `true` unless you are serving plain HTTP on a trusted network. |
 | `AUTH_MAX_ATTEMPTS_PER_*`   | Login, reset and second-factor throttling, per account and per IP. |
 | `TOTP_ENCRYPTION_KEY`       | Optional. Encrypts stored two-factor secrets; falls back to `SESSION_KEY`. |
@@ -1531,6 +1549,13 @@ They are hashed like passwords, so nobody can read them back to you; regenerate
 a set from **Profile → New recovery codes** (it invalidates the old one) and
 store them somewhere other than the device they are protecting. Removing your
 last second factor clears them, because there is then nothing to recover into.
+
+**Keep me signed in.** Ticked, which is the default, a sign-in lasts
+`SESSION_LIFETIME_SECONDS` (14 days). Unticked, the cookie ends when the
+browser closes and the server forgets the session after
+`SESSION_BROWSER_LIFETIME_SECONDS` unused (12 hours). The choice carries
+through the second factor and a passkey sign-in, and revoking a session works
+the same either way.
 
 **The order of a sign-in.** Once *either* second factor is set up, a correct
 password alone is not a sign-in: it parks the browser on a two-step verification
