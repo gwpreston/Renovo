@@ -44,8 +44,12 @@ final class HouseholdMemberService
      * Seven days. An invite is read by somebody who was not expecting it and
      * may not open their mail until the weekend, which is a different problem
      * from a password reset the user asked for two minutes ago.
+     *
+     * A whole number of days rather than a modifier string, because the
+     * invite dialog tells the administrator how long the link lasts and the
+     * sentence has to be the token's own lifetime, not a second copy of it.
      */
-    private const INVITE_TTL = '+7 days';
+    public const INVITE_LIFETIME_DAYS = 7;
 
     /**
      * The alphabet a temporary password is drawn from.
@@ -119,6 +123,15 @@ final class HouseholdMemberService
         $email = $this->users->normaliseEmail($email);
 
         $errors = [];
+
+        // Nobody arrives as an Owner. Handing somebody the household before
+        // they have signed in once is a decision to make about a person who
+        // is here, so the route there is to invite and then promote — and it
+        // is refused here, not merely left off the form, because a form is
+        // not what stops a forged POST.
+        if ($role === Role::OwnerAdmin) {
+            $errors['role'] = 'error.member.invite_as_owner';
+        }
 
         if ($displayName === '') {
             $errors['display_name'] = 'error.name.required';
@@ -391,17 +404,24 @@ final class HouseholdMemberService
      * so a token naming this household stops reaching it the moment the
      * membership row goes, and still works for a household they are in.
      *
-     * @param bool $deleteData    Only honoured in ISOLATED mode.
-     * @param bool $deletePrivate Delete their private subscriptions while the
-     *                            rest is reassigned.
+     * **Where there is a question, it has to have been answered.** Rows
+     * nobody else has seen — all of them in ISOLATED, the private ones in
+     * SHARED — are neither handed over nor deleted on a default: a `null`
+     * choice for them is refused, so a form that forgot to ask, or a request
+     * that left the answer out, cannot quietly publish them to an Owner. Where
+     * there is nothing to ask, a `null` is simply "reassign".
+     *
+     * @param bool|null $deleteData    Only honoured in ISOLATED mode.
+     * @param bool|null $deletePrivate Delete their private subscriptions while
+     *                                 the rest is reassigned.
      * @throws ValidationException
      */
     public function remove(
         User $actor,
         Scope $scope,
         int $userId,
-        bool $deleteData,
-        bool $deletePrivate = false,
+        ?bool $deleteData,
+        ?bool $deletePrivate = null,
     ): void {
         $householdId = $this->assertAdministers($scope);
         $member = $this->requireMember($householdId, $userId);
@@ -412,10 +432,21 @@ final class HouseholdMemberService
 
         $this->assertOwnersRemain($householdId, $member->id);
 
+        $isolated = $scope->restrictsReadsToOwner();
+
+        if ($isolated && $deleteData === null && $this->memberData->countOwnedBy($scope, $member->id) > 0) {
+            throw ValidationException::field('data', 'error.member.removal_choice_required');
+        }
+
+        if (!$isolated && $deletePrivate === null && $this->memberData->countPrivateOwnedBy($scope, $member->id) > 0) {
+            throw ValidationException::field('private_data', 'error.member.removal_choice_required');
+        }
+
         // Deleting is only offered where the rows were private. In SHARED the
         // household could already see them, so there is nothing to disclose by
         // handing them over and no question worth asking.
-        $delete = $deleteData && $scope->restrictsReadsToOwner();
+        $delete = ($deleteData ?? false) && $isolated;
+        $deletePrivate = $deletePrivate ?? false;
 
         // One transaction, in the repository: the split rows, the owned rows
         // and the membership either all go or none of them do.
@@ -518,7 +549,7 @@ final class HouseholdMemberService
         $token = $this->tokens->issue(
             $member->id,
             TokenRepository::PURPOSE_INVITE,
-            $this->clock->now()->modify(self::INVITE_TTL),
+            $this->clock->now()->modify('+' . self::INVITE_LIFETIME_DAYS . ' days'),
         );
 
         $link = rtrim($this->appUrl, '/') . '/accept-invite?token=' . urlencode($token);
@@ -540,6 +571,7 @@ final class HouseholdMemberService
                 'inviter' => $actor->displayName,
                 'instance' => $this->settings->instanceName(),
                 'link' => $link,
+                'days' => self::INVITE_LIFETIME_DAYS,
             ], $locale),
         );
     }

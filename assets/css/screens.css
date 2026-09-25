@@ -2412,102 +2412,303 @@ a.segmented-option {
     padding: 0;
 }
 
-/* -------------------------------------------------------------- household */
+/* ------------------------------------------------------ members & roles */
 
-/*
- * A card per member, on the same grid the budgets use. Twenty rem is the width
- * at which a name, a pair of figures and a row of permission chips stop
- * wrapping awkwardly, and `min(100%, …)` is what keeps a single card from
- * overflowing a narrow screen rather than shrinking to fit it.
- */
-.member-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-    gap: 1rem;
-}
-
-.member-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-/* The card's header sits flush with the content below it. */
-.member-card .member-identity {
-    align-items: center;
-}
-
-/*
- * The two figures on a card, side by side while there is room for them.
- *
- * `auto-fit` rather than two fixed columns: a member whose spending is in two
- * currencies gets a taller cell, and at the narrow end the pair stacks instead
- * of squeezing a money figure into nine characters' width.
- */
-.member-figures {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
-    gap: 0.75rem;
-}
-
-/*
- * The KPI type is for a tile with one number on it. A member card carries two,
- * and a table cell carries one of many, so both ask the shared spend macro for
- * its figure at a size that belongs to a list rather than to a headline. The
- * markup is the same markup; only the scale changes.
- */
-.member-figures .stat-value,
-.member-figure .stat-value {
-    font-size: var(--size-heading);
-    margin-bottom: 0;
-}
-
-.member-figure .stat-lines {
-    align-items: flex-end;
-}
-
-/*
- * The ladder of what a role can do.
- *
- * A stacked list rather than a row of chips, because every card carries every
- * rung — including the ones this member has not got — and five short phrases
- * read down a column where five wrapped pills read as a crowd. Stacking also
- * makes the cards comparable line for line, which is the point of putting
- * people beside each other.
- */
-.capability-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    list-style: none;
-    margin: 0;
+.members-card {
     padding: 0;
+    overflow: hidden;
+}
+
+.members-table th,
+.members-table td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+}
+
+.members-table thead th {
+    background: var(--surface-2);
+}
+
+.member-you {
+    color: var(--muted);
+    font-weight: var(--weight-normal);
+}
+
+.member-cell-seen,
+.member-cell-status {
+    white-space: nowrap;
+}
+
+.member-role-form select {
+    width: auto;
+    min-width: 9rem;
+}
+
+.member-cell-status .badge {
+    margin-left: 0;
+}
+
+.member-cell-share .member-share,
+.member-cell-share .member-count {
+    display: block;
+}
+
+.member-share {
+    font-weight: var(--weight-semibold);
+}
+
+.members-actions-heading {
+    text-align: right;
+}
+
+.member-cell-actions .row-actions {
+    justify-content: flex-end;
+}
+
+/* Smaller than a form's buttons: four of them share one table cell. */
+.member-action {
+    min-height: 2rem;
+    padding: 0.3rem 0.65rem;
     font-size: var(--size-label);
 }
 
-.capability {
-    display: grid;
-    grid-template-columns: 1rem 1fr;
-    gap: 0.4rem;
-    align-items: baseline;
+.member-action .icon {
+    width: 0.8rem;
+    height: 0.8rem;
 }
 
-.capability-mark {
-    color: var(--ok);
-    text-align: center;
-    line-height: 1;
+.members-withheld-note {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
 }
 
 /*
- * Not held: greyed, and dimmer than the muted text around it so the two are
- * distinguishable rather than merely both quiet. The mark loses its colour
- * with the words, because a green tick beside faded text would be the one
- * thing on the row still claiming a yes.
+ * Below 768px each row is a card: the member and their status across the top,
+ * the role and their share beneath, then when they were last here and the
+ * actions. The same cells, placed by name, so nothing is in the markup twice.
  */
-.capability.is-absent,
-.capability.is-absent .capability-mark {
+@media (max-width: 767px) {
+    .members-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    .members-table,
+    .members-table tbody {
+        display: block;
+    }
+
+    .members-table .member-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "identity status"
+            "role share"
+            "seen seen"
+            "actions actions";
+        gap: 0.6rem 0.75rem;
+        align-items: center;
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .members-table .member-row:last-child {
+        border-bottom: 0;
+    }
+
+    .members-table .member-row td {
+        display: block;
+        padding: 0;
+        border: 0;
+        background: none;
+    }
+
+    .member-cell-identity { grid-area: identity; min-width: 0; }
+    .member-cell-status { grid-area: status; }
+    .member-cell-role { grid-area: role; }
+    .member-cell-share { grid-area: share; text-align: right; }
+    .member-cell-seen { grid-area: seen; color: var(--muted); font-size: var(--size-label); }
+    .member-cell-actions { grid-area: actions; }
+
+    .member-cell-actions:empty,
+    .member-cell-actions:not(:has(*)) {
+        display: none;
+    }
+
+    .member-cell-actions .row-actions {
+        justify-content: flex-start;
+    }
+
+    .member-email {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .member-role-form select {
+        min-height: 2.75rem;
+    }
+
+    .member-action {
+        min-height: 2.75rem;
+    }
+}
+
+/*
+ * The role table and the visibility card, side by side while there is room:
+ * the table takes the larger share, and each stacks at its own minimum rather
+ * than squeezing.
+ */
+.members-panels {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1.5rem;
+}
+
+.role-matrix {
+    flex: 3 1 30rem;
+    min-width: 0;
+}
+
+.data-visibility {
+    flex: 2 1 17.5rem;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.data-visibility p {
+    margin: 0;
+}
+
+.role-matrix-table {
+    min-width: 28rem;
+}
+
+.role-matrix-table tbody th {
+    font-size: var(--size-body);
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--text);
+}
+
+.role-matrix-table .grant-heading,
+.role-matrix-table .grant {
+    text-align: center;
+}
+
+/* A table to read across, not rows to pick: no hover band behind the words. */
+.role-matrix-table tbody tr:hover td {
+    background: none;
+}
+
+.grant {
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+}
+
+.grant-icon {
+    width: 1rem;
+    height: 1rem;
+    vertical-align: -0.15em;
+    margin-right: 0.25rem;
+}
+
+.grant-yes {
+    color: var(--ok);
+}
+
+.grant-own_only {
+    color: var(--warn);
+}
+
+.grant-no {
     color: var(--muted);
-    opacity: 0.65;
+    font-weight: var(--weight-normal);
+}
+
+.data-visibility-mode {
+    margin-left: 0;
+}
+
+.data-visibility-private {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    padding: 0.75rem;
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+.data-visibility-private .icon {
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+}
+
+/* The invitation: two fields abreast, then a card per role. */
+.member-invite-names {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 1rem;
+}
+
+.role-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.role-options > legend {
+    padding: 0;
+    margin-bottom: 0.4rem;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+}
+
+.role-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-button);
+    background: var(--surface);
+    cursor: pointer;
+}
+
+.role-option:hover {
+    border-color: var(--border-control);
+}
+
+.role-option input {
+    margin-top: 0.2rem;
+    accent-color: var(--accent);
+}
+
+.role-option:has(input:checked) {
+    border-color: var(--accent-text);
+    background: var(--accent-soft);
+}
+
+.role-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.role-option-name {
+    font-weight: var(--weight-bold);
 }
 
 /* ------------------------------------------------ dashboard: the two views */

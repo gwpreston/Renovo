@@ -32,6 +32,7 @@ use App\Support\DateFormatter;
 use App\Support\IconSprite;
 use App\Support\MoneyFormatter;
 use App\Support\NumberFormat;
+use App\Support\RelativeTime;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Twig\Extension\AbstractExtension;
@@ -70,6 +71,7 @@ final class AppExtension extends AbstractExtension
         private readonly DateFormatter $dates,
         private readonly NumberFormat $numbers,
         private readonly IconSprite $icons,
+        private readonly RelativeTime $relativeTime,
     ) {
     }
 
@@ -110,6 +112,7 @@ final class AppExtension extends AbstractExtension
         return [
             new TwigFilter('money', $this->formatMoney(...)),
             new TwigFilter('local_date', $this->formatDate(...)),
+            new TwigFilter('relative_date', $this->relativeTime->describe(...)),
             new TwigFilter('percent', $this->numbers->percent(...)),
             new TwigFilter('decimal', $this->numbers->decimal(...)),
             // For the places that have a name and no entity to ask — the owner

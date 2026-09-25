@@ -1,0 +1,84 @@
+{#
+    Invite somebody into the household. It is also what the members screen's
+    dialog loads, which is why it renders without the surrounding page when
+    htmx asks for it.
+
+    The roles offered are Editor, Contributor and Viewer. Nobody is invited as
+    an Owner — they are promoted once they are here — and the service refuses
+    one if a request asks anyway. The expiry in the first line is the invite
+    token's own lifetime, not a number written here.
+
+    Without an address, the member gets a temporary password shown once on the
+    members screen instead of an email; see HouseholdMemberService::add().
+#}
+{% extends is_htmx ? 'partials/bare.twig' : 'layout.twig' %}
+
+{% set household_name = household ? household.name : t('members.this_household') %}
+{% set chosen_role = values.role|default('contributor') %}
+
+{% block heading %}{{ t('members.invite_title', {'household': household_name}) }}{% endblock %}
+{% block page_subtitle %}{{ t('members.invite_expiry', {'count': invite_days}) }}{% endblock %}
+
+{% block content %}
+    {% include 'partials/errors.twig' %}
+
+    <section class="card narrow member-invite">
+        {% if is_htmx %}
+            <p class="muted">{{ t('members.invite_expiry', {'count': invite_days}) }}</p>
+        {% endif %}
+
+        <form method="post" action="/settings/members" class="stack" id="member-invite-form">
+            {{ csrf_field() }}
+
+            <div class="member-invite-names">
+                <div class="field">
+                    <label for="member_name">{{ t('field.name') }}</label>
+                    <input type="text" id="member_name" name="display_name" maxlength="100" required
+                           autocomplete="off" value="{{ values.display_name|default('') }}"
+                           {% if errors.display_name is defined %}aria-invalid="true" aria-describedby="member_name_error"{% endif %}>
+                    {% if errors.display_name is defined %}<p class="field-error" id="member_name_error">{{ error_message(errors.display_name) }}</p>{% endif %}
+                </div>
+
+                <div class="field">
+                    <label for="member_email">{{ t('field.email') }}</label>
+                    <input type="email" id="member_email" name="email" autocomplete="off"
+                           placeholder="{{ t('members.email_placeholder') }}"
+                           value="{{ values.email|default('') }}"
+                           data-requires-unchecked="member_without_email"
+                           {% if errors.email is defined %}aria-invalid="true" aria-describedby="member_email_error"{% endif %}>
+                    {% if errors.email is defined %}<p class="field-error" id="member_email_error">{{ error_message(errors.email) }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="choice" for="member_without_email">
+                    <input type="checkbox" id="member_without_email" name="without_email" value="1"
+                           {{ values.without_email|default('') == '1' ? 'checked' : '' }}>
+                    <span>{{ t('members.without_email') }}</span>
+                </label>
+                <p class="hint">{{ t('members.without_email_hint') }}</p>
+            </div>
+
+            <fieldset class="role-options"
+                      {% if errors.role is defined %}aria-describedby="member_role_error"{% endif %}>
+                <legend>{{ t('field.role') }}</legend>
+                {% for role in invite_roles %}
+                    <label class="role-option">
+                        <input type="radio" name="role" value="{{ role.value }}"
+                               {{ chosen_role == role.value ? 'checked' : '' }}>
+                        <span class="role-option-text">
+                            <span class="role-option-name">{{ role_label(role.value) }}</span>
+                            <span class="hint">{{ t('members.role_description_' ~ role.value) }}</span>
+                        </span>
+                    </label>
+                {% endfor %}
+                {% if errors.role is defined %}<p class="field-error" id="member_role_error">{{ error_message(errors.role) }}</p>{% endif %}
+            </fieldset>
+
+            <div class="form-actions">
+                <button type="submit" class="button button-primary">{{ icon('send') }}{{ t('members.send_invitation') }}</button>
+                <a class="button button-quiet" href="/settings/members" data-closes-dialog="member-dialog">{{ t('action.cancel') }}</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

@@ -47,6 +47,7 @@ final class AccessibilityTest extends DatabaseTestCase
     private int $householdId;
     private int $subscriptionId;
     private int $budgetId;
+    private int $memberId;
 
     protected function setUp(): void
     {
@@ -75,6 +76,11 @@ final class AccessibilityTest extends DatabaseTestCase
         $this->userId = $users->create('owner@example.test', 'Owner', 'hash', true, new DateTimeImmutable());
         $this->householdId = $households->create('Household', $this->userId);
         $memberships->create($this->householdId, $this->userId, Role::OwnerAdmin);
+
+        // Somebody else in the household, so the members screen draws its
+        // controls and the removal dialog has a member to ask about.
+        $this->memberId = $users->create('editor@example.test', 'Editor', 'hash', false, new DateTimeImmutable());
+        $memberships->create($this->householdId, $this->memberId, Role::Editor);
 
         $scope = Scope::forMember($this->userId, true, $this->householdId, Role::OwnerAdmin, IsolationMode::Shared);
 
@@ -142,6 +148,10 @@ final class AccessibilityTest extends DatabaseTestCase
             ['/payment-methods'],
             ['/profile'],
             ['/settings'],
+            ['/settings/members'],
+            // The invite dialog's form, as the page it is without script.
+            ['/settings/members/invite'],
+            ['/settings/members/{member}/remove'],
             ['/settings/notifications'],
             ['/settings/security'],
             ['/settings/api-tokens'],
@@ -406,7 +416,11 @@ final class AccessibilityTest extends DatabaseTestCase
 
     private function get(string $path): string
     {
-        $path = str_replace('{id}', (string) $this->subscriptionId, $path);
+        $path = str_replace(
+            ['{id}', '{member}'],
+            [(string) $this->subscriptionId, (string) $this->memberId],
+            $path,
+        );
 
         if (str_starts_with($path, 'household:')) {
             (new UserRepository($this->db))->updatePreferences($this->userId, ['dashboard_view' => 'household']);

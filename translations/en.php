@@ -120,6 +120,10 @@ return [
     'error.member.not_your_own_role' =>
         'You cannot change your own role. Ask another Owner to change it for you.',
     'error.member.not_yourself' => 'You cannot do that to your own account.',
+    'error.member.invite_as_owner' =>
+        'Invite them as an Editor, Contributor or Viewer, and make them an Owner once they have joined.',
+    'error.member.removal_choice_required' =>
+        'Choose what should happen to the subscriptions nobody else has seen.',
     'error.member.role_invalid' => 'Choose a role from the list.',
     'error.palette.unknown' => 'Choose one of the palettes shown.',
     'flash.avatar_missing' => 'There was no picture to remove.',
@@ -158,20 +162,26 @@ return [
     'mail.invite.body' =>
         "Hello {name},\n\n{inviter} has added you to their household on {instance}, a shared "
         . "subscription tracker.\n\nChoose a password and you are in:\n\n{link}\n\nThe link is "
-        . 'valid for seven days. If you were not expecting this, you can ignore this message.',
+        . 'valid for {days, plural, one {# day} other {# days}}. If you were not expecting this, you '
+        . 'can ignore this message.',
     'mail.invite.subject' => '{inviter} has invited you to {instance}',
     'members.actions' => 'Actions',
-    'members.add_button' => 'Add member',
-    'members.add_heading' => 'Add someone',
-    'members.add_intro' =>
-        'They get an invitation and choose their own password — you never see it. A member with no '
-        . 'mailbox of their own is the one exception; tick the box below for that.',
-    'members.change_role' => 'Change',
-    'members.email_hint' => 'Where their invitation goes. Leave it empty if they have no address.',
+    'members.email_placeholder' => 'name@example.com',
+    'members.figures_withheld_note' =>
+        'A dash is a figure that is not yours to see: other members\' spending is shown only where '
+        . 'you can see all of it.',
     'members.intro' =>
-        'Everybody who shares this household, what they may do in it, and whether they have arrived '
-        . 'yet.',
+        'Everyone in {household} and what their role lets them do. Only Owners can '
+        . 'change roles, invite people or remove them.',
+    'members.invite' => 'Invite member',
+    'members.invite_expiry' =>
+        'They\'ll get an email link that expires in {count, plural, one {# day} other {# days}}.',
+    'members.invite_title' => 'Invite to {household}',
     'members.last_seen' => 'Last seen',
+    'members.matrix_caption' => '"Own only" means only rows that member pays for.',
+    'members.matrix_heading' => 'What each role can do',
+    'members.matrix_permission' => 'Permission',
+    'members.monthly_share' => 'Monthly share',
     'members.never_signed_in' => 'Never',
     'members.no_mailbox' => 'No email address',
     'members.remove' => 'Remove',
@@ -195,10 +205,17 @@ return [
         'They keep {count, plural, one {# subscription} other {# subscriptions}} to themselves, which '
         . 'nobody else has seen. What should happen to {count, plural, one {it} other {them}}?',
     'members.remove_private_reassign' => 'Give them to me. They stay private — to me.',
-    'members.resend_invite' => 'Resend invitation',
+    'members.resend_invite' => 'Resend invite',
+    'members.role_description_contributor' =>
+        'Adds and edits their own subscriptions, prices, splits and budget.',
+    'members.role_description_editor' => 'Can change anything the household has.',
+    'members.role_description_viewer' => 'Sees subscriptions and totals. Changes nothing.',
     'members.restore_login' => 'Restore login',
     'members.revoke_login' => 'Revoke login',
-    'members.send_reset' => 'Send password reset',
+    'members.send_invitation' => 'Send invitation',
+    'members.send_reset' => 'Send reset',
+    'members.subtitle' => '{household} · {count, plural, one {# person} other {# people}}',
+    'members.table_heading' => 'Members',
     'members.temporary_password_heading' => 'Their temporary password',
     'members.temporary_password_note' =>
         'Give this to {name}. They will be asked to replace it as soon as they sign in.',
@@ -206,14 +223,28 @@ return [
         'This is the only time it is shown. Renovo keeps only a hash of it, so it cannot be looked '
         . 'up again — if it is lost, add nothing and simply issue a new one.',
     'members.this_household' => 'This household',
-    'members.title' => 'Household members',
+    'members.visibility_change' => 'Change it in instance settings',
+    'members.visibility_heading' => 'Data visibility',
+    'members.visibility_instance' => 'An instance administrator sets this for every household on the instance.',
+    'members.visibility_mode_isolated' => 'Isolated',
+    'members.visibility_mode_shared' => 'Shared',
+    'members.visibility_note_isolated' =>
+        'Each member of {household} sees only the subscriptions they pay for or share '
+        . 'the cost of, and changes only their own. That holds for every role, Owners included.',
+    'members.visibility_note_shared' =>
+        'Everyone in {household} sees all of its subscriptions and what they cost. '
+        . 'What each person may change is set by their role.',
+    'members.visibility_private' =>
+        'A subscription set to "Only me" is hidden from everyone else in either mode, and its cost '
+        . 'is left out of their totals.',
     'members.without_email' => 'This member has no email address',
     'members.without_email_hint' =>
         'For a child with no mailbox. Renovo creates the account with a one-time password shown to '
         . 'you once, which they must replace the first time they sign in.',
+    'members.you' => 'you',
     'membership_status.active' => 'Active',
-    'membership_status.pending' => 'Invited',
-    'membership_status.revoked' => 'Revoked',
+    'membership_status.pending' => 'Invite pending',
+    'membership_status.revoked' => 'Login revoked',
     'settings.more_pages' => 'More settings',
     'settings.manage_members' => 'Manage members',
     'type.recurring' => 'Recurring',
@@ -1115,22 +1146,11 @@ return [
     'hint.password_length' => 'At least 10 characters.',
 
     // household
-    'household.capability_held' => 'Yes',
-    'household.capability_not_held' => 'No',
     'household.figures_withheld' => 'Not shown',
-    'household.figures_withheld_note' =>
-        'This instance keeps each member\'s subscriptions private, so only your own figures can be '
-        . 'added up here.',
-    'household.intro' =>
-        'Everyone in this household, and the share of the bill each of them carries. A subscription '
-        . 'that is split counts towards each member at their own portion of it.',
-    'household.manage_members' => 'Manage members',
     'household.one_off_count' =>
         '{count, plural, one {# of these is one-off} other {# of these are one-off}}',
-    'household.role_grants' => 'What they can do',
     'household.subscriptions_count' =>
         '{count, plural, =0 {No subscriptions} one {# subscription} other {# subscriptions}}',
-    'household.title' => 'Household',
 
     // import_map
     'import_map.column_in_your_file' => 'Column in your file',
@@ -1263,12 +1283,10 @@ return [
     'subtitle.categories' => 'How subscriptions are grouped and tagged',
     'subtitle.dashboard' => 'Your household at a glance',
     'subtitle.forecast' => 'What the coming year will cost',
-    'subtitle.household' => 'What each member\'s share comes to',
     'subtitle.import' => 'Bring subscriptions in from a file',
     'subtitle.import_map' => 'Match your columns to the fields',
     'subtitle.import_preview' => 'Check it before anything is saved',
     'subtitle.member_remove' => 'What happens to what they own',
-    'subtitle.members' => 'Who is in the household, and what they can do',
     'subtitle.money' => 'Price history, splits and usage',
     'subtitle.notifications' => 'How and when you are reminded',
     'subtitle.payment_methods' => 'What each subscription is paid with',
@@ -1901,15 +1919,21 @@ return [
     'calendar.trial_description' => 'The free trial of {name} ends and it converts to {amount}.',
     'calendar.trial_summary' => '{name} trial ends ({amount})',
 
-    // capability — the household screen's plain-language ladder. Every card
-    // lists all five; the ones a member has not got are greyed rather than
-    // dropped, so the wording has to read the same either way. Third person,
-    // because a card is about somebody else as often as it is about you.
-    'capability.edit_anything' => 'Add and edit anything',
-    'capability.edit_own' => 'Add and edit their own',
-    'capability.manage_members' => 'Invite and remove members',
-    'capability.see_everything' => 'See every line',
-    'capability.set_budgets' => 'Set budgets',
+    // capability — the rows of the members screen's role table, one per
+    // RoleCapability. Each names a group of permissions a reader thinks of as
+    // one thing.
+    'capability.add_subscriptions' => 'Add subscriptions',
+    'capability.edit_money' => 'Edit prices, splits & invoices',
+    'capability.import_bulk_edit' => 'Import & bulk edit',
+    'capability.manage_budgets' => 'Manage budgets',
+    'capability.manage_household' => 'Members, backups & settings',
+    'capability.manage_shared' => 'Categories, tags & payment methods',
+    'capability.view_subscriptions' => 'View subscriptions & totals',
+
+    // capability_grant — one cell of that table, always a word beside its icon.
+    'capability_grant.no' => 'No',
+    'capability_grant.own_only' => 'Own only',
+    'capability_grant.yes' => 'Yes',
 
     // channel_field
     'channel_field.email.address' => 'Email address',
@@ -2076,6 +2100,13 @@ return [
         . 'which other bases are derived.',
     'rate_provider.frankfurter' =>
         'Free, no account needed. European Central Bank reference rates, updated each working day.',
+
+    // relative — how long ago something happened, for a moment within the
+    // last month. Older than that is shown as a date instead.
+    'relative.days_ago' => '{count, plural, one {# day ago} other {# days ago}}',
+    'relative.hours_ago' => '{count, plural, one {# hour ago} other {# hours ago}}',
+    'relative.just_now' => 'Just now',
+    'relative.minutes_ago' => '{count, plural, one {# minute ago} other {# minutes ago}}',
 
     // payment_methods
     'payment_methods.title' => 'Payment methods',

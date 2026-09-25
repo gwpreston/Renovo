@@ -6,9 +6,9 @@ namespace App\Controller;
 
 use App\Domain\Role;
 use App\I18n\Translator;
-use App\Repository\HouseholdRepository;
 use App\Security\SessionInterface;
 use App\Service\HouseholdMemberService;
+use App\Service\MembersScreenService;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -23,10 +23,11 @@ use Slim\Views\Twig;
  * member's rows — are all in `HouseholdMemberService`, so the API phase that
  * eventually exposes these actions gets them for free.
  *
- * The routes are behind `Permission::ManageHousehold`, which is where a Viewer
- * or an Editor is stopped. The service asks the scope the same question again
- * before it does anything, because a permission on a route is a fact about the
- * route and the rule belongs to the operation.
+ * The list is every member's to read. Everything else is behind
+ * `Permission::ManageHousehold`, which is where a Viewer, a Contributor or an
+ * Editor is stopped. The service asks the scope the same question again before
+ * it does anything, because a permission on a route is a fact about the route
+ * and the rule belongs to the operation.
  */
 final class MemberController extends Controller
 {
@@ -38,25 +39,61 @@ final class MemberController extends Controller
         SessionInterface $session,
         Translator $translator,
         private readonly HouseholdMemberService $members,
-        private readonly HouseholdRepository $households,
+        private readonly MembersScreenService $screen,
     ) {
         parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $scope = $this->scope($request);
-
-        return $this->render($request, $response, 'settings/members.twig', [
-            'members' => $this->members->list($scope),
-            'household' => $scope->hasHousehold() ? $this->households->findById((int) $scope->householdId) : null,
-            'roles' => Role::assignable(),
-            'is_isolated' => $scope->restrictsReadsToOwner(),
+        return $this->render($request, $response, 'settings/members.twig', $this->screen->screen(
+            $this->scope($request),
+        ) + [
+            'invite_roles' => $this->screen->invitableRoles(),
             // Shown once and never again. It is carried across the redirect in
             // the session and taken straight back out, so a reload of the page
             // does not show it a second time and nothing persists it.
             'temporary_password' => $this->takeOnce(self::TEMPORARY_PASSWORD_KEY),
             'temporary_password_for' => $this->takeOnce(self::TEMPORARY_PASSWORD_NAME_KEY),
+        ]);
+    }
+
+    /**
+     * `/household` was the read-only half of this screen. It is this screen
+     * now, and the path stays as a redirect rather than a 404 because it has
+     * been bookmarked. 302, not 301, for the reason `/profile/account` gives.
+     */
+    public function householdMoved(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->redirect($response, '/settings/members');
+    }
+
+    /**
+     * The invitation form: the dialog's body when htmx asks, a page of its own
+     * without script.
+     */
+    public function inviteForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->renderInvite($request, $response, ['role' => Role::Contributor->value], []);
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @param array<string, mixed> $errors
+     */
+    private function renderInvite(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $values,
+        array $errors,
+    ): ResponseInterface {
+        return $this->render($request, $response, 'settings/member_invite.twig', [
+            'is_htmx' => $this->isHtmx($request),
+            'household' => $this->screen->household($this->scope($request)),
+            'invite_roles' => $this->screen->invitableRoles(),
+            'invite_days' => $this->screen->inviteLifetimeDays(),
+            'values' => $values,
+            'errors' => $errors,
         ]);
     }
 
@@ -96,7 +133,7 @@ final class MemberController extends Controller
                 $this->flash('success', 'flash.member_invited');
             }
         } catch (ValidationException $exception) {
-            $this->flashErrors($exception);
+            return $this->renderInvite($request, $response->withStatus(422), $body, $exception->errors());
         }
 
         return $this->done($request, $response);
@@ -167,9 +204,10 @@ final class MemberController extends Controller
     }
 
     /**
-     * The confirmation step. In ISOLATED mode it asks what should happen to
-     * the member's private rows; in SHARED there is nothing to ask, because
-     * the household could already see them.
+     * The confirmation step: the dialog's body when htmx asks, a page of its
+     * own without script. Where the member owns rows nobody else has seen —
+     * everything in ISOLATED, their "only me" subscriptions in SHARED — it asks
+     * what should happen to them.
      */
     public function confirmRemoval(
         ServerRequestInterface $request,
@@ -192,6 +230,7 @@ final class MemberController extends Controller
         }
 
         return $this->render($request, $response, 'settings/member_remove.twig', [
+            'is_htmx' => $this->isHtmx($request),
             'member' => $member,
             'is_isolated' => $scope->restrictsReadsToOwner(),
             'owned_rows' => $this->members->ownedRowCount($scope, $userId),
@@ -205,23 +244,41 @@ final class MemberController extends Controller
         string $id,
     ): ResponseInterface {
         $body = $this->body($request);
-        $deleteData = ($body['data'] ?? 'reassign') === 'delete';
-        $deletePrivate = ($body['private_data'] ?? 'reassign') === 'delete';
+        $deleteData = $this->disposition($body['data'] ?? null);
+        $deletePrivate = $this->disposition($body['private_data'] ?? null);
 
-        return $this->act(
-            $request,
-            $response,
-            'flash.member_removed',
-            function () use ($request, $id, $deleteData, $deletePrivate): void {
-                $this->members->remove(
-                    $this->user($request),
-                    $this->scope($request),
-                    (int) $id,
-                    $deleteData,
-                    $deletePrivate,
-                );
-            },
-        );
+        try {
+            $this->members->remove(
+                $this->user($request),
+                $this->scope($request),
+                (int) $id,
+                $deleteData,
+                $deletePrivate,
+            );
+        } catch (ValidationException $exception) {
+            // Back to the question rather than to the list: the usual refusal
+            // here is an unanswered one, and the list does not ask it.
+            $this->flashErrors($exception);
+
+            return $this->redirectAfterWrite($request, $response, '/settings/members/' . (int) $id . '/remove');
+        }
+
+        $this->flash('success', 'flash.member_removed');
+
+        return $this->done($request, $response);
+    }
+
+    /**
+     * "delete", "reassign", or no answer at all — which the service refuses
+     * wherever there was a question to answer.
+     */
+    private function disposition(mixed $value): ?bool
+    {
+        return match ($value) {
+            'delete' => true,
+            'reassign' => false,
+            default => null,
+        };
     }
 
     /**

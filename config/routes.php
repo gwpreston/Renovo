@@ -45,7 +45,6 @@ use App\Controller\CategoryController;
 use App\Controller\PaymentMethodController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
-use App\Controller\HouseholdController;
 use App\Controller\ImportController;
 use App\Controller\MemberController;
 use App\Controller\NotificationController;
@@ -358,19 +357,10 @@ return static function (App $app): void {
         // service answers 404 for anybody outside it.
         $group->get('/avatars/{id:[0-9]+}', [AccountController::class, 'avatar'])->setName('avatar');
 
-        // ------------------------------------------------------------------
-        // The household, read-only
-        //
-        // Not under /settings, and not behind ManageHousehold: it administers
-        // nothing. What it shows is each member's share of what the household
-        // spends, which is why it asks for a writer's permission rather than a
-        // reader's — a Viewer has been given sight of the subscriptions, not of
-        // what everybody else pays for them. Managing the people themselves is
-        // /settings/members, which this links to for whoever may use it.
-        // ------------------------------------------------------------------
-        $group->get('/household', [HouseholdController::class, 'index'])
-            ->setName('household')
-            ->add($requires(Permission::ViewHousehold));
+        // The household's read-only overview became Members & roles in Phase
+        // 26. The path stays as a redirect for anybody who bookmarked it; the
+        // screen it lands on asks for its own permission.
+        $group->get('/household', [MemberController::class, 'householdMoved']);
 
         $group->get('/settings', [SettingsController::class, 'index'])->setName('settings');
 
@@ -381,16 +371,23 @@ return static function (App $app): void {
             ->add($requires(Permission::ManageInstance));
 
         // ------------------------------------------------------------------
-        // Phase 15: household members
+        // Phase 15: household members; Phase 26: Members & roles
         //
-        // Managing other people is household management, so every one of these
-        // names the permission an Owner/Admin has and an Editor or Viewer does
-        // not — including the list, which shows who has been invited, who has
-        // been revoked and when each of them was last here. The service asks
-        // the scope the same question again before it acts.
+        // The list is every member's to read: who is in the household with
+        // them and what each role may do. What it shows of anybody else's
+        // spending is decided row by row in HouseholdOverviewService, so the
+        // route asks only that the reader belongs here.
+        //
+        // Managing other people is household management, so every other route
+        // names the permission an Owner/Admin has and nobody else does. The
+        // service asks the scope the same question again before it acts.
         // ------------------------------------------------------------------
         $group->get('/settings/members', [MemberController::class, 'index'])
             ->setName('members')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->get('/settings/members/invite', [MemberController::class, 'inviteForm'])
+            ->setName('member-invite')
             ->add($requires(Permission::ManageHousehold));
 
         $group->post('/settings/members', [MemberController::class, 'add'])

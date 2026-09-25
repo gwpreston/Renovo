@@ -97,9 +97,9 @@ final class NavigationService
      *
      * @return list<NavItem>
      */
-    private function toolItems(?Scope $scope): array
+    private function toolItems(): array
     {
-        return array_values(array_filter([
+        return [
             new NavItem(
                 id: 'budgets',
                 labelKey: 'nav.budgets',
@@ -116,7 +116,16 @@ final class NavigationService
                 matches: ['/calendar'],
                 permission: Permission::ViewSubscriptions,
             ),
-            $this->membersItem($scope),
+            // One screen for every member: managed by an Owner/Admin, read
+            // by everybody else.
+            new NavItem(
+                id: 'members',
+                labelKey: 'nav.members',
+                href: '/settings/members',
+                icon: 'household',
+                matches: ['/settings/members'],
+                permission: Permission::ViewSubscriptions,
+            ),
             new NavItem(
                 id: 'notifications',
                 labelKey: 'nav.notifications',
@@ -131,38 +140,7 @@ final class NavigationService
                 icon: 'settings',
                 matches: ['/settings', '/import', '/categories', '/tags', '/payment-methods', '/audit'],
             ),
-        ]));
-    }
-
-    /**
-     * Members & roles, pointed at whichever of the two people screens this
-     * reader may open — or nothing, if neither.
-     *
-     * An Owner/Admin gets the member screen, where the people are managed. An
-     * Editor or Contributor may not manage anybody but may see the household's
-     * read-only overview, which was a rail row of its own before this phase;
-     * the same item takes them there, so the overview keeps its route. Both
-     * paths light the one item wherever you arrived from.
-     */
-    private function membersItem(?Scope $scope): ?NavItem
-    {
-        $href = match (true) {
-            $this->allows($scope, Permission::ManageHousehold) => '/settings/members',
-            $this->allows($scope, Permission::ViewHousehold) => '/household',
-            default => null,
-        };
-
-        if ($href === null) {
-            return null;
-        }
-
-        return new NavItem(
-            id: 'members',
-            labelKey: 'nav.members',
-            href: $href,
-            icon: 'household',
-            matches: ['/settings/members', '/household'],
-        );
+        ];
     }
 
     /**
@@ -189,7 +167,7 @@ final class NavigationService
     public function forPath(?Scope $scope, string $path): Navigation
     {
         $primary = $this->visible($this->primaryItems(), $scope);
-        $tools = $this->visible($this->toolItems($scope), $scope);
+        $tools = $this->visible($this->toolItems(), $scope);
         $account = $this->accountItem();
 
         $active = $this->activeItem([...$primary, ...$tools, $account], $path);

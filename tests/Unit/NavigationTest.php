@@ -57,7 +57,7 @@ final class NavigationTest extends TestCase
             'a new budget' => ['/budgets/new', 'nav.budgets'],
             'the member screen' => ['/settings/members', 'nav.members'],
             'removing a member' => ['/settings/members/4/remove', 'nav.members'],
-            'the household overview' => ['/household', 'nav.members'],
+            'inviting somebody' => ['/settings/members/invite', 'nav.members'],
             'settings' => ['/settings', 'nav.settings'],
             // The pages that lost their rows light Settings, whose page links
             // to each of them.
@@ -126,32 +126,21 @@ final class NavigationTest extends TestCase
     }
 
     /**
-     * Members & roles goes to whichever people screen the reader may open.
-     *
-     * An Owner/Admin manages the people; an Editor or Contributor may only
-     * see the household's overview, which had a rail row of its own before
-     * and keeps its route through this item. A Viewer may open neither and is
-     * offered neither.
+     * Members & roles is one screen for every member of the household: an
+     * Owner/Admin manages the people from it and everybody else reads it, a
+     * Viewer included. Which controls are drawn is the screen's business, not
+     * the rail's.
      */
-    public function testMembersPointsAtThePeopleScreenTheReaderMayOpen(): void
+    public function testMembersIsOneScreenForEveryMember(): void
     {
-        self::assertSame('/settings/members', $this->byLabel(
-            $this->navigation->forPath($this->owner(), '/')->tools,
-            'nav.members',
-        )?->href);
-
-        foreach ([Role::Editor, Role::Contributor] as $role) {
+        foreach (Role::assignable() as $role) {
             $scope = Scope::forMember(5, false, 1, $role, IsolationMode::Shared);
 
-            self::assertSame('/household', $this->byLabel(
+            self::assertSame('/settings/members', $this->byLabel(
                 $this->navigation->forPath($scope, '/')->tools,
                 'nav.members',
             )?->href, $role->value);
-
-            self::assertSame(['nav.members'], $this->activeLabels($this->navigation->forPath($scope, '/household')));
         }
-
-        self::assertNull($this->byLabel($this->navigation->forPath($this->viewer(), '/')->tools, 'nav.members'));
     }
 
     /**
@@ -173,6 +162,7 @@ final class NavigationTest extends TestCase
     /**
      * A Viewer sees the screens they can read and not the ones that would
      * answer 403. Hiding them is a courtesy; the middleware is the control.
+     * Members & roles is one they can read.
      */
     public function testAViewerIsNotOfferedWhatTheyMayNotDo(): void
     {
@@ -181,7 +171,7 @@ final class NavigationTest extends TestCase
         self::assertContains('nav.subscriptions', $labels);
         self::assertContains('nav.notifications', $labels);
         self::assertContains('nav.settings', $labels);
-        self::assertNotContains('nav.members', $labels, 'A Viewer may open neither people screen.');
+        self::assertContains('nav.members', $labels, 'A Viewer reads the members screen.');
     }
 
     /**

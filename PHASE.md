@@ -107,14 +107,14 @@ left out of their totals."
 
 ## Status
 
-- [ ] Phase 15 confirmed built (or built first)
-- [ ] Members table + mobile cards; inline role change with guard and audit
-- [ ] Actions: resend, reset, revoke/restore, remove (private-row prompt)
-- [ ] Invite modal (role cards; no-email path if built)
-- [ ] Generated permission matrix
-- [ ] Read-only data visibility card
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check` green on both engines
+- [x] Phase 15 confirmed built (or built first)
+- [x] Members table + mobile cards; inline role change with guard and audit
+- [x] Actions: resend, reset, revoke/restore, remove (private-row prompt)
+- [x] Invite modal (role cards; no-email path if built)
+- [x] Generated permission matrix
+- [x] Read-only data visibility card
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check` green on both engines
 
 ## Definition of done
 

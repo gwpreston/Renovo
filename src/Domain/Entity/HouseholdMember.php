@@ -58,6 +58,25 @@ final class HouseholdMember
         return $this->status->labelKey();
     }
 
+    /**
+     * The colour the status is drawn in, beside its word and never instead of
+     * it: a shut door is bad, an unanswered invitation is waiting, anything
+     * else is fine.
+     */
+    public function statusTone(): string
+    {
+        if ($this->isDisabled()) {
+            return 'bad';
+        }
+
+        return $this->status === MembershipStatus::Pending ? 'warn' : 'ok';
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === MembershipStatus::Pending;
+    }
+
     public function initials(): string
     {
         return Initials::of($this->displayName);

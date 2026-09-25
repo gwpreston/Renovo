@@ -6,6 +6,7 @@ namespace App\Tests\Functional;
 
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Domain\AuditAction;
+use App\Domain\CapabilityGrant;
 use App\Domain\IsolationMode;
 use App\Domain\MembershipStatus;
 use App\Domain\Role;
@@ -21,7 +22,10 @@ use App\Security\CsrfTokenManager;
 use App\Security\PasswordHasher;
 use App\Security\Scope;
 use App\Security\SessionInterface;
+use App\Service\HouseholdMemberService;
 use App\Service\InstanceSettingsService;
+use App\Security\RoleMatrix;
+use App\Support\Clock;
 use App\Tests\Integration\DatabaseTestCase;
 use App\Tests\Support\ArraySession;
 use App\Tests\Support\RecordingMailer;
@@ -104,8 +108,10 @@ final class MemberAdministrationTest extends DatabaseTestCase
      */
     public static function memberRoutes(): array
     {
+        // Not the list itself: since Phase 26 every member reads it. What
+        // they are shown on it is MembersPageTest's.
         return [
-            ['GET', '/settings/members'],
+            ['GET', '/settings/members/invite'],
             ['POST', '/settings/members'],
             ['POST', '/settings/members/{id}/role'],
             ['POST', '/settings/members/{id}/invite'],
@@ -117,9 +123,11 @@ final class MemberAdministrationTest extends DatabaseTestCase
         ];
     }
 
-    public function testEveryMemberRouteIsRefusedToAnEditorAndAViewer(): void
+    public function testEveryMemberRouteIsRefusedToAnEditorAContributorAndAViewer(): void
     {
-        foreach ([$this->editorId, $this->viewerId] as $userId) {
+        $contributorId = $this->memberWithRole('contrib@example.test', 'Cody Contributor', Role::Contributor);
+
+        foreach ([$this->editorId, $contributorId, $this->viewerId] as $userId) {
             $this->signIn($userId);
 
             foreach (self::memberRoutes() as [$method, $path]) {
@@ -171,7 +179,8 @@ final class MemberAdministrationTest extends DatabaseTestCase
     }
 
     /**
-     * Every assignable role reaches the two pick-lists on the members screen.
+     * Every assignable role reaches the inline role select on the members
+     * screen, which is the only form that can hand somebody Owner.
      *
      * Read off the enum rather than written out, so a role added to
      * `Role::assignable()` and forgotten in a template fails here. The failure
@@ -681,6 +690,345 @@ final class MemberAdministrationTest extends DatabaseTestCase
 
     // --------------------------------------------------------------- helpers
 
+    // ------------------------------------------------ Phase 26: the screen
+
+    /**
+     * Everybody in the household reads the list; only an Owner/Admin is drawn
+     * anything that changes it. The routes behind the controls are refused to
+     * the others regardless — see testEveryMemberRouteIsRefusedToAnEditorAContributorAndAViewer.
+     */
+    public function testEveryMemberReadsTheListAndOnlyAnOwnerIsDrawnControls(): void
+    {
+        $contributorId = $this->memberWithRole('contributor@example.test', 'Cora Contributor', Role::Contributor);
+
+        foreach ([$this->editorId, $contributorId, $this->viewerId] as $userId) {
+            $this->signIn($userId);
+            $html = (string) $this->request('GET', '/settings/members')->getBody();
+
+            self::assertStringContainsString('Olive Owner', $html);
+            self::assertStringNotContainsString('action="/settings/members', $html, 'A management form was drawn.');
+            self::assertStringNotContainsString('href="/settings/members/', $html, 'A management link was drawn.');
+            self::assertStringNotContainsString('id="member-dialog"', $html);
+            self::assertStringNotContainsString('Invite member', $html);
+        }
+
+        $this->signIn($this->ownerId);
+        $html = (string) $this->request('GET', '/settings/members')->getBody();
+
+        self::assertStringContainsString('Invite member', $html);
+        self::assertStringContainsString('action="/settings/members/' . $this->editorId . '/role"', $html);
+        self::assertStringContainsString('href="/settings/members/' . $this->editorId . '/remove"', $html);
+    }
+
+    /**
+     * Not on your own row: the service refuses you your own role and your own
+     * removal, so the controls would only be errors.
+     */
+    public function testAnOwnerIsDrawnNoControlsOnTheirOwnRow(): void
+    {
+        $this->signIn($this->ownerId);
+        $html = (string) $this->request('GET', '/settings/members')->getBody();
+
+        self::assertStringNotContainsString('/settings/members/' . $this->ownerId . '/', $html);
+        self::assertStringContainsString('· you', $html);
+    }
+
+    /**
+     * The inline select is one more way to ask for a demotion, and the answer
+     * for the last Owner is the same as ever — whether it comes from htmx or
+     * from the no-script Save button.
+     */
+    public function testTheLastOwnerCannotBeDemotedThroughTheInlineSelect(): void
+    {
+        $this->signIn($this->ownerId);
+
+        foreach ([[], ['HX-Request' => 'true']] as $headers) {
+            $this->request('POST', '/settings/members/' . $this->ownerId . '/role', ['role' => 'viewer'], $headers);
+
+            self::assertSame(Role::OwnerAdmin, $this->roleOf($this->ownerId));
+        }
+
+        // The change it is for still works, and says so from htmx.
+        $response = $this->request(
+            'POST',
+            '/settings/members/' . $this->editorId . '/role',
+            ['role' => 'contributor'],
+            ['HX-Request' => 'true'],
+        );
+
+        self::assertSame('/settings/members', $response->getHeaderLine('HX-Redirect'));
+        self::assertSame(Role::Contributor, $this->roleOf($this->editorId));
+        self::assertTrue($this->hasAudit(AuditAction::RoleChanged, $this->editorId));
+    }
+
+    /**
+     * Nobody arrives as an Owner: the form does not offer it, and a request
+     * that asks anyway creates nobody.
+     */
+    public function testAnInviteCannotCreateAnOwner(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $form = (string) $this->request('GET', '/settings/members/invite')->getBody();
+        self::assertStringNotContainsString('value="owner_admin"', $form);
+        foreach ([Role::Editor, Role::Contributor, Role::Viewer] as $role) {
+            self::assertStringContainsString('value="' . $role->value . '"', $form);
+        }
+
+        $response = $this->request('POST', '/settings/members', [
+            'display_name' => 'Pat Pretender',
+            'email' => 'pat@example.test',
+            'role' => Role::OwnerAdmin->value,
+        ]);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertFalse((new UserRepository($this->db))->emailExists('pat@example.test'));
+        self::assertSame([], $this->mailer->messages, 'An invitation went out for a refused member.');
+    }
+
+    /**
+     * The dialog says how long the link lasts, and it says the token's own
+     * lifetime rather than a number of its own.
+     */
+    public function testTheInviteExpiryIsTheTokenLifetime(): void
+    {
+        $days = HouseholdMemberService::INVITE_LIFETIME_DAYS;
+        $this->signIn($this->ownerId);
+
+        $fragment = $this->request('GET', '/settings/members/invite', [], ['HX-Request' => 'true']);
+        self::assertSame(200, $fragment->getStatusCode());
+        self::assertStringContainsString(sprintf('expires in %d days', $days), (string) $fragment->getBody());
+        self::assertStringNotContainsString(
+            '<html',
+            (string) $fragment->getBody(),
+            'The dialog was sent a whole page.',
+        );
+
+        $this->request('POST', '/settings/members', [
+            'display_name' => 'Nia New',
+            'email' => 'nia@example.test',
+            'role' => Role::Viewer->value,
+        ]);
+
+        $expires = $this->db->fetchValue(
+            'SELECT ' . $this->q('expires_at') . ' FROM ' . $this->q('auth_tokens')
+            . ' WHERE ' . $this->q('purpose') . ' = :purpose',
+            ['purpose' => TokenRepository::PURPOSE_INVITE],
+        );
+        self::assertIsString($expires);
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $expected = $container->get(Clock::class)->now()->modify('+' . $days . ' days');
+
+        self::assertEqualsWithDelta(
+            $expected->getTimestamp(),
+            (new DateTimeImmutable($expires, $expected->getTimezone()))->getTimestamp(),
+            120,
+        );
+    }
+
+    /**
+     * Rows nobody else has seen are never disposed of on a default: in SHARED
+     * that is their private subscriptions, and a removal that leaves the
+     * question unanswered is refused and removes nobody.
+     */
+    public function testASharedRemovalOfAMemberWithPrivateRowsRequiresAChoice(): void
+    {
+        $private = $this->subscriptionOwnedBy($this->editorId, private: true);
+        $this->signIn($this->ownerId);
+
+        $page = (string) $this->request('GET', '/settings/members/' . $this->editorId . '/remove')->getBody();
+        self::assertStringNotContainsString('checked', $page, 'An answer was chosen in advance.');
+
+        $response = $this->request('POST', '/settings/members/' . $this->editorId . '/remove', ['data' => 'reassign']);
+
+        self::assertSame('/settings/members/' . $this->editorId . '/remove', $response->getHeaderLine('Location'));
+        self::assertNotNull($this->roleOf($this->editorId), 'The member was removed without the question answered.');
+        self::assertSame($this->editorId, $this->ownerOf($private));
+
+        $this->request('POST', '/settings/members/' . $this->editorId . '/remove', [
+            'data' => 'reassign',
+            'private_data' => 'reassign',
+        ]);
+
+        self::assertNull($this->roleOf($this->editorId));
+        self::assertSame($this->ownerId, $this->ownerOf($private), 'Reassigned, not orphaned.');
+    }
+
+    public function testAnIsolatedRemovalOfAMemberWithRowsRequiresAChoice(): void
+    {
+        $this->setIsolated();
+        $theirs = $this->subscriptionOwnedBy($this->editorId);
+        $this->signIn($this->ownerId);
+
+        $this->request('POST', '/settings/members/' . $this->editorId . '/remove');
+
+        self::assertNotNull($this->roleOf($this->editorId));
+        self::assertSame($this->editorId, $this->ownerOf($theirs));
+    }
+
+    /**
+     * A member with nothing unseen is removed without a question, as before.
+     */
+    public function testARemovalWithNothingToAskNeedsNoAnswer(): void
+    {
+        $this->subscriptionOwnedBy($this->editorId);
+        $this->signIn($this->ownerId);
+
+        $this->request('POST', '/settings/members/' . $this->editorId . '/remove');
+
+        self::assertNull($this->roleOf($this->editorId));
+    }
+
+    /**
+     * Every action on the screen leaves its entry in the audit log, attributed
+     * to whoever took it and naming whom it was taken against.
+     */
+    public function testEveryActionOnTheScreenWritesItsAuditEntry(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $this->request('POST', '/settings/members', [
+            'display_name' => 'Ivy Invitee',
+            'email' => 'ivy@example.test',
+            'role' => Role::Viewer->value,
+        ]);
+        $invitee = (new UserRepository($this->db))->findByEmail('ivy@example.test');
+        self::assertNotNull($invitee);
+
+        $steps = [
+            [AuditAction::MemberAdded, $invitee->id, null],
+            [AuditAction::MemberInviteResent, $invitee->id, '/invite'],
+            [AuditAction::MemberPasswordResetSent, $this->editorId, '/reset-password'],
+            [AuditAction::MemberLoginRevoked, $this->editorId, '/revoke'],
+            [AuditAction::MemberLoginRestored, $this->editorId, '/restore'],
+            [AuditAction::RoleChanged, $this->editorId, '/role'],
+            [AuditAction::MemberRemoved, $this->editorId, '/remove'],
+        ];
+
+        foreach ($steps as [$action, $target, $path]) {
+            if ($path !== null) {
+                $this->request('POST', '/settings/members/' . $target . $path, ['role' => 'viewer']);
+            }
+
+            self::assertTrue($this->hasAudit($action, $target), $action->value . ' was not audited.');
+        }
+    }
+
+    /**
+     * The table on the page is RoleMatrix's, cell for cell, in both modes —
+     * and RoleMatrix is PermissionService's (see RoleMatrixTest), so what the
+     * page claims is what the routes enforce.
+     */
+    public function testTheRoleTableOnThePageIsTheGeneratedOne(): void
+    {
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $matrix = $container->get(RoleMatrix::class);
+
+        foreach ([IsolationMode::Shared, IsolationMode::Isolated] as $mode) {
+            $container->get(InstanceSettingsService::class)->setIsolationMode($mode);
+            $this->signIn($this->viewerId);
+            $html = (string) $this->request('GET', '/settings/members')->getBody();
+
+            foreach ($matrix->rows($mode) as $row) {
+                $start = strpos($html, 'data-capability="' . $row['capability']->value . '"');
+                self::assertNotFalse($start, $row['capability']->value . ' is missing from the page.');
+                $markup = substr($html, $start, (int) strpos($html, '</tr>', $start) - $start);
+
+                foreach ($row['cells'] as $cell) {
+                    self::assertMatchesRegularExpression(
+                        sprintf(
+                            '/class="grant grant-%s" data-role="%s">\s*<svg[^>]*>.*?<\/svg>\s*'
+                            . '<span class="grant-label">%s<\/span>/s',
+                            $cell['grant']->value,
+                            $cell['role']->value,
+                            preg_quote($this->grantWord($cell['grant']), '/'),
+                        ),
+                        $markup,
+                        sprintf('%s / %s in %s', $row['capability']->value, $cell['role']->value, $mode->value),
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * The visibility card states the mode and does not offer to change it,
+     * except to the one person who may: an instance administrator, who is
+     * sent to the instance setting.
+     */
+    public function testTheVisibilityCardIsReadOnlyAndLinksOnlyAnInstanceAdminToTheSetting(): void
+    {
+        $this->signIn($this->ownerId);
+        $html = (string) $this->request('GET', '/settings/members')->getBody();
+
+        self::assertStringContainsString('data-visibility-mode">Shared<', $html);
+        self::assertStringContainsString('hidden from everyone else in either mode', $html);
+        self::assertStringNotContainsString('name="isolation_mode"', $html);
+        self::assertStringNotContainsString('href="/settings#data-isolation"', $html);
+
+        $adminId = $this->memberWithRole('admin@example.test', 'Ada Admin', Role::Editor, instanceAdmin: true);
+        $this->setIsolated();
+        $this->signIn($adminId);
+        $html = (string) $this->request('GET', '/settings/members')->getBody();
+
+        self::assertStringContainsString('data-visibility-mode">Isolated<', $html);
+        self::assertStringContainsString('href="/settings#data-isolation"', $html);
+    }
+
+    /**
+     * A private subscription counts in its payer's share and nobody else's
+     * view of it: the Owner, who cannot see the row, is not shown its cost in
+     * the Editor's share, and the Editor is.
+     */
+    public function testMonthlyShareLeavesOutPrivateRowsForEveryoneButThePayer(): void
+    {
+        $this->subscriptionOwnedBy($this->editorId, private: true);
+
+        $this->signIn($this->ownerId);
+        self::assertStringNotContainsString('£5.00', (string) $this->request('GET', '/settings/members')->getBody());
+
+        $this->signIn($this->editorId);
+        self::assertStringContainsString('£5.00', (string) $this->request('GET', '/settings/members')->getBody());
+    }
+
+    public function testEachStatusIsDrawnInWordsAsWellAsColour(): void
+    {
+        $this->signIn($this->ownerId);
+        $this->request('POST', '/settings/members', [
+            'display_name' => 'Pip Pending',
+            'email' => 'pip@example.test',
+            'role' => Role::Viewer->value,
+        ]);
+        $this->request('POST', '/settings/members/' . $this->editorId . '/revoke');
+
+        $html = (string) $this->request('GET', '/settings/members')->getBody();
+
+        self::assertStringContainsString('<span class="badge badge-ok">Active</span>', $html);
+        self::assertStringContainsString('<span class="badge badge-warn">Invite pending</span>', $html);
+        self::assertStringContainsString('<span class="badge badge-bad">Login revoked</span>', $html);
+    }
+
+    private function grantWord(CapabilityGrant $grant): string
+    {
+        return match ($grant) {
+            CapabilityGrant::Yes => 'Yes',
+            CapabilityGrant::OwnOnly => 'Own only',
+            CapabilityGrant::No => 'No',
+        };
+    }
+
+    private function memberWithRole(string $email, string $name, Role $role, bool $instanceAdmin = false): int
+    {
+        $userId = (new UserRepository($this->db))
+            ->create($email, $name, 'hash', $instanceAdmin, new DateTimeImmutable());
+        (new MembershipRepository($this->db))->create($this->householdId, $userId, $role);
+
+        return $userId;
+    }
+
     private function setIsolated(): void
     {
         $container = $this->app->getContainer();
@@ -869,14 +1217,19 @@ final class MemberAdministrationTest extends DatabaseTestCase
 
     /**
      * @param array<string, mixed> $body
+     * @param array<string, string> $headers
      */
-    private function request(string $method, string $path, array $body = []): ResponseInterface
+    private function request(string $method, string $path, array $body = [], array $headers = []): ResponseInterface
     {
         $request = (new ServerRequestFactory())->createServerRequest(
             $method,
             'http://localhost' . $path,
             ['REMOTE_ADDR' => '127.0.0.1'],
         );
+
+        foreach ($headers as $name => $value) {
+            $request = $request->withHeader($name, $value);
+        }
 
         if ($method !== 'GET') {
             $container = $this->app->getContainer();

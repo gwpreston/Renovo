@@ -151,9 +151,6 @@ final class ShellTest extends DatabaseTestCase
             'categories' => ['/categories', '/settings'],
             'payment methods' => ['/payment-methods', '/settings'],
             'members' => ['/settings/members', '/settings/members'],
-            // The owner's Members & roles item points at the member screen,
-            // and the overview lights it too.
-            'the household' => ['/household', '/settings/members'],
             'settings' => ['/settings', '/settings'],
             'your own page' => ['/profile', '/profile'],
             'alerts' => ['/settings/notifications', '/settings/notifications'],
@@ -676,14 +673,15 @@ final class ShellTest extends DatabaseTestCase
     /**
      * Every destination that had a rail entry in Phase 9 is still reachable:
      * from the rail, from the Settings page's link row, or from a page that
-     * one of those reaches.
+     * one of those reaches. The household overview is the members screen
+     * since Phase 26, and `/household` redirects there.
      */
     public function testEveryPhase9DestinationIsStillReachable(): void
     {
         $phase9 = [
             '/', '/subscriptions', '/stats', '/calendar', '/budgets', '/cancellations', '/categories',
-            '/payment-methods', '/household', '/settings/notifications', '/audit', '/settings', '/profile',
-            '/import',
+            '/payment-methods', '/settings/members', '/settings/notifications', '/audit', '/settings',
+            '/profile', '/import',
         ];
 
         $reachable = $this->linksOn('/');
