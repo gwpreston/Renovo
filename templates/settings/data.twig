@@ -121,15 +121,5 @@
                 {% endif %}
             </section>
         {% endif %}
-
-        {% if can(scope, 'subscription.view') %}
-            <section class="card" id="calendar-feed-link" aria-labelledby="calendar-feed-link-heading">
-                <h2 id="calendar-feed-link-heading">{{ t('tokens.calendar_feed') }}</h2>
-                <p class="muted">{{ t('settings.feed_intro') }}</p>
-                <div class="form-actions">
-                    <a class="button" href="/calendar#calendar-feed">{{ icon('calendar') }}{{ t('settings.feed_link') }}</a>
-                </div>
-            </section>
-        {% endif %}
     </div>
 {% endblock %}

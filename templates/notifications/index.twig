@@ -32,7 +32,7 @@
             {% if channels is empty %}
                 <p class="muted empty">{{ t('notifications.channels_empty') }}</p>
             {% else %}
-                <ul class="account-rows">
+                <ul class="account-rows channel-rows">
                     {% for channel in channels %}
                         <li class="account-row channel-row{{ channel.isActive ? '' : ' is-off' }}">
                             <span class="account-row-icon" aria-hidden="true">{{ icon(channel_icon(channel.type)) }}</span>

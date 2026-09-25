@@ -90,6 +90,12 @@ final class Currency
         'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR',
     ];
 
+    /**
+     * The currencies a base-currency select leads with, in this order, ahead
+     * of the alphabetical rest.
+     */
+    private const PREFERRED = ['GBP', 'EUR', 'USD'];
+
     private function __construct()
     {
     }
@@ -134,5 +140,15 @@ final class Currency
     public static function all(): array
     {
         return self::ALL;
+    }
+
+    /**
+     * Every currency, the preferred ones first and the rest alphabetical.
+     *
+     * @return list<string>
+     */
+    public static function preferredFirst(): array
+    {
+        return [...self::PREFERRED, ...array_values(array_diff(self::ALL, self::PREFERRED))];
     }
 }

@@ -189,6 +189,21 @@ final class SettingsPageTest extends DatabaseTestCase
         self::assertFalse($this->instance->isDemoMode());
     }
 
+    public function testTheBaseCurrencySelectNamesEachCurrencyAndLeadsWithTheCommonThree(): void
+    {
+        $this->signIn($this->adminId);
+
+        $page = $this->body($this->request('GET', '/settings'));
+
+        preg_match_all('~<select id="base_currency".*?</select>~s', $page, $select);
+        self::assertNotEmpty($select[0], 'No base-currency select on the page.');
+        preg_match_all('~<option value="([A-Z]{3})"[^>]*>([^<]*)</option>~', $select[0][0], $options);
+
+        self::assertSame(['GBP', 'EUR', 'USD'], array_slice($options[1], 0, 3));
+        self::assertSame('GBP - Pounds sterling', trim($options[2][0]));
+        self::assertSame('EUR - Euro', trim($options[2][1]));
+    }
+
     // ------------------------------------------------------------------
     // General
     // ------------------------------------------------------------------
@@ -377,11 +392,11 @@ final class SettingsPageTest extends DatabaseTestCase
     {
         $this->signIn($this->ownerId);
         $owner = $this->body($this->request('GET', '/settings/data'));
-        foreach (['import', 'backup', 'export', 'api-tokens', 'recent-activity', 'calendar-feed-link'] as $id) {
+        foreach (['import', 'backup', 'export', 'api-tokens', 'recent-activity'] as $id) {
             self::assertStringContainsString('id="' . $id . '"', $owner, 'An Owner should see ' . $id);
         }
         self::assertStringContainsString('href="/audit"', $owner);
-        self::assertStringContainsString('href="/calendar#calendar-feed"', $owner);
+        self::assertStringNotContainsString('id="calendar-feed-link"', $owner);
 
         $this->signIn($this->viewerId);
         $response = $this->request('GET', '/settings/data');

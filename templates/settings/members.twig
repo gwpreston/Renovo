@@ -230,7 +230,8 @@
                             {% for cell in row.cells %}
                                 <td class="grant grant-{{ cell.grant.value }}" data-role="{{ cell.role.value }}">
                                     {{ icon(cell.grant.icon(), 'icon grant-icon') }}
-                                    <span class="grant-label">{{ t(cell.grant.labelKey()) }}</span>
+                                    {#- A tick or a dash says yes or no on its own; the word stays for a screen reader. #}
+                                    <span class="grant-label{% if cell.grant.value != 'own_only' %} visually-hidden{% endif %}">{{ t(cell.grant.labelKey()) }}</span>
                                 </td>
                             {% endfor %}
                         </tr>
@@ -258,7 +259,7 @@
                 <span>{{ t('members.visibility_private') }}</span>
             </p>
             {% if may_change_isolation %}
-                <p><a href="/settings#data-isolation">{{ t('members.visibility_change') }}</a></p>
+                <p><a href="/settings/instance#data-isolation">{{ t('members.visibility_change') }}</a></p>
             {% else %}
                 <p class="hint">{{ t('members.visibility_instance') }}</p>
             {% endif %}

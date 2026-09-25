@@ -502,29 +502,51 @@
     margin-top: 1rem;
 }
 
-/* The budget form: the slider with its percentage beside it. */
-.range-field {
+/*
+ * The budget form: the limit and its period share a row where there is room
+ * for both, and the slider runs the full width under a label that carries its
+ * percentage at the far end.
+ */
+.budget-form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 0.875rem;
+}
+
+.budget-form .segmented {
+    align-self: flex-start;
+}
+
+.range-label {
     display: flex;
-    align-items: center;
+    align-items: baseline;
+    justify-content: space-between;
     gap: 0.75rem;
 }
 
-.range-field input[type='range'] {
-    flex: 1;
-    min-width: 0;
-    accent-color: var(--accent);
+.range-label output {
+    font-weight: var(--weight-semibold);
 }
 
-.range-field output {
-    min-width: 3rem;
-    text-align: right;
-    font-weight: var(--weight-semibold);
+.range-input {
+    width: 100%;
+    accent-color: var(--accent);
 }
 
 /* In the dialog the form takes the dialog's width, under its title. */
 .dialog .budget-form {
     max-width: none;
     margin: 0;
+}
+
+.budget-form > .stack {
+    gap: 1rem;
+}
+
+.budget-form .field > label,
+.budget-form .group-label,
+.range-label label {
+    font-weight: var(--weight-semibold);
 }
 
 /* Delete to the left, away from Save. */
@@ -722,6 +744,44 @@ tr.is-passed > td {
     color: var(--muted);
 }
 
+/*
+ * The channel list: each channel its own bordered tile rather than a ruled
+ * row, with its edit disclosure a small quiet link under the detail so the
+ * name, the detail and the switch are what the eye lands on.
+ */
+.channel-rows {
+    display: grid;
+    gap: 0.6rem;
+}
+
+.channel-rows .account-row,
+.channel-rows .account-row:first-child {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    column-gap: 1rem;
+}
+
+.channel-rows .account-row-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--text);
+}
+
+.channel-rows .account-row-more > summary {
+    min-height: 0;
+    padding: 0.15rem 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: var(--size-label);
+    gap: 0.3rem;
+}
+
+.channel-rows .account-row-more > summary:hover {
+    color: var(--text);
+}
+
 .channel-switch {
     display: inline-flex;
     align-items: center;
@@ -759,6 +819,23 @@ tr.is-passed > td {
 .routing-table th[scope='col'].routing-channel,
 .routing-cell {
     text-align: center;
+}
+
+/*
+ * The alert types and the channel names are the grid's content, not column
+ * eyebrows, so they keep the case they are written in rather than `.table th`'s
+ * uppercase caption.
+ */
+.routing-table tbody th[scope='row'],
+.routing-table th[scope='col'].routing-channel {
+    font-size: var(--size-body);
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: var(--weight-medium);
+}
+
+.routing-table tbody th[scope='row'] {
+    color: var(--text);
 }
 
 .routing-cell input {
@@ -2793,6 +2870,11 @@ a.segmented-option {
     height: 1rem;
     vertical-align: -0.15em;
     margin-right: 0.25rem;
+}
+
+.grant-yes .grant-icon,
+.grant-no .grant-icon {
+    margin-right: 0;
 }
 
 .grant-yes {

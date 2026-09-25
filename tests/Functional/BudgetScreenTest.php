@@ -462,6 +462,26 @@ final class BudgetScreenTest extends DatabaseTestCase
         $page = (string) $this->request('GET', '/budgets')->getBody();
         self::assertStringContainsString('data-dialog-url="/budgets/' . $id . '/edit"', $page);
         self::assertStringContainsString('<dialog id="budget-dialog"', $page);
+        self::assertStringContainsString('class="dialog-mark"', $page);
+        self::assertStringContainsString('id="budget-dialog-subtitle"', $page);
+    }
+
+    public function testWhoseSpendingIsARadioGroupWithOneChoiceChecked(): void
+    {
+        $id = $this->budget(['amount' => '100.00', 'subject_user_id' => 'household']);
+
+        foreach (['/budgets/new', '/budgets/' . $id . '/edit'] as $path) {
+            $body = (string) $this->request('GET', $path, [], ['HX-Request' => 'true'])->getBody();
+            self::assertStringNotContainsString('<select id="budget-subject"', $body, $path);
+            self::assertSame(
+                1,
+                preg_match_all('/<input type="radio" name="subject_user_id"[^>]*\bchecked\b/', $body),
+                $path,
+            );
+        }
+
+        $edit = (string) $this->request('GET', '/budgets/' . $id . '/edit', [], ['HX-Request' => 'true'])->getBody();
+        self::assertMatchesRegularExpression('/value="household" id="budget-subject"\s+checked/', $edit);
     }
 
     // ------------------------------------------------------------ permissions
@@ -506,6 +526,13 @@ final class BudgetScreenTest extends DatabaseTestCase
         $page = (string) $this->request('GET', '/budgets')->getBody();
 
         self::assertStringContainsString('href="/budgets/new"', $page);
+        self::assertMatchesRegularExpression(
+            '#<main[^>]*>.*?<div class="page-header">\s*<p[^>]*>[^<]*</p>\s*'
+                . '<a class="button button-primary" href="/budgets/new"#s',
+            $page,
+            'New budget heads the content, filled with the accent.'
+        );
+        self::assertStringContainsString('<div class="topbar-page-actions"></div>', $page);
         self::assertStringNotContainsString('/budgets/' . $household . '/edit', $page);
         self::assertSame(404, $this->request('GET', '/budgets/' . $household . '/edit')->getStatusCode());
         self::assertMatchesRegularExpression('#/budgets/\d+/edit#', $page);

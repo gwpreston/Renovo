@@ -39,7 +39,7 @@
             <label for="base_currency">{{ t('settings.base_currency') }}</label>
             <select id="base_currency" name="base_currency" aria-describedby="base_currency_hint">
                 {% for code in currencies %}
-                    <option value="{{ code }}" {{ base_currency == code ? 'selected' : '' }}>{{ code }}</option>
+                    <option value="{{ code }}" {{ base_currency == code ? 'selected' : '' }}>{{ t('currency.option', { 'code': code, 'name': t('currency.name.' ~ code) }) }}</option>
                 {% endfor %}
             </select>
             <p class="hint" id="base_currency_hint">

@@ -946,9 +946,10 @@ final class MemberAdministrationTest extends DatabaseTestCase
                     self::assertMatchesRegularExpression(
                         sprintf(
                             '/class="grant grant-%s" data-role="%s">\s*<svg[^>]*>.*?<\/svg>\s*'
-                            . '<span class="grant-label">%s<\/span>/s',
+                            . '<span class="grant-label%s">%s<\/span>/s',
                             $cell['grant']->value,
                             $cell['role']->value,
+                            $cell['grant'] === CapabilityGrant::OwnOnly ? '' : ' visually-hidden',
                             preg_quote($this->grantWord($cell['grant']), '/'),
                         ),
                         $markup,
@@ -972,7 +973,7 @@ final class MemberAdministrationTest extends DatabaseTestCase
         self::assertStringContainsString('data-visibility-mode">Shared<', $html);
         self::assertStringContainsString('hidden from everyone else in either mode', $html);
         self::assertStringNotContainsString('name="isolation_mode"', $html);
-        self::assertStringNotContainsString('href="/settings#data-isolation"', $html);
+        self::assertStringNotContainsString('href="/settings/instance#data-isolation"', $html);
 
         $adminId = $this->memberWithRole('admin@example.test', 'Ada Admin', Role::Editor, instanceAdmin: true);
         $this->setIsolated();
@@ -980,7 +981,7 @@ final class MemberAdministrationTest extends DatabaseTestCase
         $html = (string) $this->request('GET', '/settings/members')->getBody();
 
         self::assertStringContainsString('data-visibility-mode">Isolated<', $html);
-        self::assertStringContainsString('href="/settings#data-isolation"', $html);
+        self::assertStringContainsString('href="/settings/instance#data-isolation"', $html);
     }
 
     /**

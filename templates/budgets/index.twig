@@ -13,18 +13,22 @@
 {% block heading %}{{ t('nav.budgets') }}{% endblock %}
 {% block page_subtitle %}{{ t('subtitle.budgets') }}{% endblock %}
 
-{% block page_actions %}
-    {% if may_create %}
-        <a class="button button-quiet" href="/budgets/new"
-           data-opens-dialog="budget-dialog" data-dialog-url="/budgets/new"
-           data-dialog-title="{{ t('budgets.new_budget') }}">
-            {{ icon('add') }}<span class="button-label">{{ t('budgets.new_budget') }}</span>
-        </a>
-    {% endif %}
-{% endblock %}
-
 {% block content %}
-    <p class="muted note">{{ t('budgets.intro') }}</p>
+    {#
+        New budget is what this screen is for, so it wears the accent and
+        sits at the head of the content rather than among the top bar's
+        page actions.
+    #}
+    <div class="page-header">
+        <p class="muted note">{{ t('budgets.intro') }}</p>
+        {% if may_create %}
+            <a class="button button-primary" href="/budgets/new"
+               data-opens-dialog="budget-dialog" data-dialog-url="/budgets/new"
+               data-dialog-title="{{ t('budgets.new_budget') }}">
+                {{ icon('add') }}<span>{{ t('budgets.new_budget') }}</span>
+            </a>
+        {% endif %}
+    </div>
 
     <section class="metric-grid budget-tiles" aria-label="{{ t('budgets.tiles') }}">
         <article class="card stat metric kpi">
@@ -96,7 +100,7 @@
                             {% if card.may_edit %}
                                 <a class="button-icon" href="/budgets/{{ budget.id }}/edit"
                                    data-opens-dialog="budget-dialog" data-dialog-url="/budgets/{{ budget.id }}/edit"
-                                   data-dialog-title="{{ t('budgets_form.edit_title') }}"
+                                   data-dialog-title="{{ t('budgets.edit_named', {'name': budget.name}) }}"
                                    aria-label="{{ t('budgets.edit_named', {'name': budget.name}) }}"
                                    title="{{ t('action.edit') }}">{{ icon('edit') }}</a>
                             {% endif %}
@@ -210,11 +214,16 @@
         opener names the page in data-dialog-url, and without script (or
         without <dialog>) the same links go to it.
     #}
-    <dialog id="budget-dialog" class="dialog" aria-labelledby="budget-dialog-title">
+    <dialog id="budget-dialog" class="dialog dialog-sectioned" aria-labelledby="budget-dialog-title"
+            aria-describedby="budget-dialog-subtitle">
         <div class="dialog-header">
-            <h2 id="budget-dialog-title" data-dialog-title>{{ t('budgets.new_budget') }}</h2>
+            <span class="dialog-mark">{{ icon('budget') }}</span>
+            <div class="dialog-heading">
+                <h2 id="budget-dialog-title" data-dialog-title>{{ t('budgets.new_budget') }}</h2>
+                <p class="dialog-subtitle" id="budget-dialog-subtitle">{{ t('subtitle.budget_form') }}</p>
+            </div>
             <button type="button" class="button-icon" data-closes-dialog="budget-dialog"
-                    aria-label="{{ t('action.close') }}">×</button>
+                    aria-label="{{ t('action.close') }}">{{ icon('close') }}</button>
         </div>
         <div class="dialog-body" data-dialog-body data-url="/budgets/new">
             <p class="muted">{{ t('quick_add.loading') }}</p>

@@ -31,30 +31,32 @@
                 {% if errors.name is defined %}<p class="field-error" id="budget-name-error">{{ error_message(errors.name) }}</p>{% endif %}
             </div>
 
-            <div class="field">
-                <label for="budget-amount">{{ t('budgets_form.limit_in', {'currency': currency}) }}</label>
-                <input type="text" id="budget-amount" name="amount" inputmode="decimal" class="num"
-                       value="{{ values.amount|default('') }}" placeholder="{{ 150|decimal(2) }}" required
-                       {% if errors.amount is defined or errors.currency is defined %}aria-invalid="true" aria-describedby="budget-amount-error"{% endif %}>
-                {% if errors.amount is defined %}<p class="field-error" id="budget-amount-error">{{ error_message(errors.amount) }}</p>{% endif %}
-                {% if errors.currency is defined %}<p class="field-error" id="budget-amount-error">{{ error_message(errors.currency) }}</p>{% endif %}
-            </div>
-
-            {% set period = values.period|default('monthly') %}
-            <div class="field" role="radiogroup" aria-labelledby="budget-period-label"
-                 {% if errors.period is defined %}aria-describedby="budget-period-error"{% endif %}>
-                <span class="group-label" id="budget-period-label">{{ t('field.period') }}</span>
-                <div class="segmented">
-                    {% for option in periods %}
-                        <label class="segmented-option">
-                            <input type="radio" name="period" value="{{ option.value }}"
-                                   {% if loop.first %}id="budget-period"{% endif %}
-                                   {{ period == option.value ? 'checked' : '' }}>
-                            <span>{{ budget_period_label(option.value) }}</span>
-                        </label>
-                    {% endfor %}
+            <div class="budget-form-row">
+                <div class="field">
+                    <label for="budget-amount">{{ t('budgets_form.limit_in', {'currency': currency}) }}</label>
+                    <input type="text" id="budget-amount" name="amount" inputmode="decimal" class="num"
+                           value="{{ values.amount|default('') }}" placeholder="{{ 150|decimal(2) }}" required
+                           {% if errors.amount is defined or errors.currency is defined %}aria-invalid="true" aria-describedby="budget-amount-error"{% endif %}>
+                    {% if errors.amount is defined %}<p class="field-error" id="budget-amount-error">{{ error_message(errors.amount) }}</p>{% endif %}
+                    {% if errors.currency is defined %}<p class="field-error" id="budget-amount-error">{{ error_message(errors.currency) }}</p>{% endif %}
                 </div>
-                {% if errors.period is defined %}<p class="field-error" id="budget-period-error">{{ error_message(errors.period) }}</p>{% endif %}
+
+                {% set period = values.period|default('monthly') %}
+                <div class="field" role="radiogroup" aria-labelledby="budget-period-label"
+                     {% if errors.period is defined %}aria-describedby="budget-period-error"{% endif %}>
+                    <span class="group-label" id="budget-period-label">{{ t('field.period') }}</span>
+                    <div class="segmented">
+                        {% for option in periods %}
+                            <label class="segmented-option">
+                                <input type="radio" name="period" value="{{ option.value }}"
+                                       {% if loop.first %}id="budget-period"{% endif %}
+                                       {{ period == option.value ? 'checked' : '' }}>
+                                <span>{{ budget_period_label(option.value) }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    {% if errors.period is defined %}<p class="field-error" id="budget-period-error">{{ error_message(errors.period) }}</p>{% endif %}
+                </div>
             </div>
 
             <div class="field">
@@ -73,6 +75,18 @@
             </div>
 
             {% set subject = values.subject_user_id|default(current_user.id) %}
+            {#
+                A select falls back to its first option; a radio group does
+                not, so a subject that is not among the choices checks the
+                first one rather than sending nothing.
+            #}
+            {% set subject_offered = subjects.household and subject == 'household' %}
+            {% for member in subjects.members %}
+                {% set subject_offered = subject_offered or subject == member.id %}
+            {% endfor %}
+            {% if not subject_offered %}
+                {% set subject = subjects.household ? 'household' : (subjects.members|first).id|default(null) %}
+            {% endif %}
             {% if locked_subject %}
                 {# Not a choice this viewer has: shown, and not sent, so an edit keeps it. #}
                 <div class="field">
@@ -83,37 +97,42 @@
                     <p class="hint">{{ t('budgets_form.subject_locked_hint') }}</p>
                 </div>
             {% else %}
-                <div class="field">
-                    <label for="budget-subject">{{ t('budgets_form.whose_spending') }}</label>
-                    <select id="budget-subject" name="subject_user_id" aria-describedby="budget-subject-hint"
-                            {% if errors.subject_user_id is defined %}aria-invalid="true"{% endif %}>
+                <div class="field" role="radiogroup" aria-labelledby="budget-subject-label"
+                     aria-describedby="budget-subject-hint{% if errors.subject_user_id is defined %} budget-subject-error{% endif %}">
+                    <span class="group-label" id="budget-subject-label">{{ t('budgets_form.whose_spending') }}</span>
+                    <div class="segmented">
                         {% if subjects.household %}
-                            <option value="household" {{ subject == 'household' ? 'selected' : '' }}>
-                                {{ t('budgets.household') }}
-                            </option>
+                            <label class="segmented-option">
+                                <input type="radio" name="subject_user_id" value="household" id="budget-subject"
+                                       {{ subject == 'household' ? 'checked' : '' }}>
+                                <span>{{ t('budgets.household') }}</span>
+                            </label>
                         {% endif %}
                         {% for member in subjects.members %}
-                            <option value="{{ member.id }}" {{ subject == member.id ? 'selected' : '' }}>
-                                {{ member.display_name }}
-                            </option>
+                            <label class="segmented-option">
+                                <input type="radio" name="subject_user_id" value="{{ member.id }}"
+                                       {% if loop.first and not subjects.household %}id="budget-subject"{% endif %}
+                                       {{ subject == member.id ? 'checked' : '' }}>
+                                <span>{{ member.display_name }}</span>
+                            </label>
                         {% endfor %}
-                    </select>
+                    </div>
                     <p class="hint" id="budget-subject-hint">{{ t('budgets_form.subject_hint') }}</p>
                     {% if errors.subject_user_id is defined %}
-                        <p class="field-error">{{ error_message(errors.subject_user_id) }}</p>
+                        <p class="field-error" id="budget-subject-error">{{ error_message(errors.subject_user_id) }}</p>
                     {% endif %}
                 </div>
             {% endif %}
 
             {% set threshold = values.warn_threshold_percent|default(85) %}
             <div class="field">
-                <label for="budget-warn">{{ t('budgets_form.warn_at') }}</label>
-                <div class="range-field">
-                    <input type="range" id="budget-warn" name="warn_threshold_percent"
-                           min="1" max="100" step="1" value="{{ threshold }}"
-                           aria-describedby="budget-warn-hint" data-range-output="budget-warn-output">
+                <div class="range-label">
+                    <label for="budget-warn">{{ t('budgets_form.warn_at') }}</label>
                     <output id="budget-warn-output" for="budget-warn" class="num">{{ t('budgets.percent', {'percent': threshold}) }}</output>
                 </div>
+                <input type="range" id="budget-warn" name="warn_threshold_percent" class="range-input"
+                       min="1" max="100" step="1" value="{{ threshold }}"
+                       aria-describedby="budget-warn-hint" data-range-output="budget-warn-output">
                 <p class="hint" id="budget-warn-hint">{{ t('budgets_form.threshold_hint') }}</p>
                 {% if errors.warn_threshold_percent is defined %}
                     <p class="field-error">{{ error_message(errors.warn_threshold_percent) }}</p>

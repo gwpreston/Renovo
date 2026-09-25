@@ -95,8 +95,9 @@ final class ThemeContrastTest extends TestCase
         // The ring and the active item's icon on the rail; the signed-out
         // brand panel's feature icons on their tile.
         'rail-accent' => ['rail', 'rail-active:rail', 'rail-tint:rail'],
-        // The edge of a field, of a filter chip, of the toggle's track.
-        'border-control' => ['bg', 'surface'],
+        // The edge of a field, of a filter chip, of the toggle's track. A
+        // field is filled with surface-2, so its edge is found against that too.
+        'border-control' => ['bg', 'surface', 'surface-2'],
         // Chart series, on the card a chart is drawn on.
         's1' => ['surface'],
         's2' => ['surface'],

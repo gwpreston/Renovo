@@ -43,12 +43,12 @@
             <select id="base_currency" name="base_currency" aria-describedby="base_currency_hint">
                 <optgroup label="{{ t('setup_wizard.currencies_common') }}">
                     {% for code in featured_currencies %}
-                        <option value="{{ code }}" {{ chosen_currency == code ? 'selected' : '' }}>{{ code }}</option>
+                        <option value="{{ code }}" {{ chosen_currency == code ? 'selected' : '' }}>{{ t('currency.option', { 'code': code, 'name': t('currency.name.' ~ code) }) }}</option>
                     {% endfor %}
                 </optgroup>
                 <optgroup label="{{ t('setup_wizard.currencies_all') }}">
                     {% for code in currencies %}
-                        <option value="{{ code }}" {{ chosen_currency == code ? 'selected' : '' }}>{{ code }}</option>
+                        <option value="{{ code }}" {{ chosen_currency == code ? 'selected' : '' }}>{{ t('currency.option', { 'code': code, 'name': t('currency.name.' ~ code) }) }}</option>
                     {% endfor %}
                 </optgroup>
             </select>

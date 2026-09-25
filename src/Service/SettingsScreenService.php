@@ -108,7 +108,7 @@ final class SettingsScreenService
         return [
             'household' => $scope->hasHousehold() ? $this->households->findById((int) $scope->householdId) : null,
             'base_currency' => $this->settings->baseCurrency(),
-            'currencies' => Currency::all(),
+            'currencies' => Currency::preferredFirst(),
             'rate_providers' => $this->rateProviders->all(),
             'rates' => $this->rates(array_keys($inUse)),
             'categories' => array_map(

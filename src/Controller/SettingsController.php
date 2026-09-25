@@ -27,7 +27,7 @@ use Slim\Views\Twig;
  *    currency and exchange rates, and the household's categories, tags and
  *    payment methods.
  *  - **Data & integrations** (`/settings/data`) — import, backup and restore,
- *    export, API tokens, recent activity and the calendar feed.
+ *    export, API tokens and recent activity.
  *  - **Instance** (`/settings/instance`) — registration, isolation, trusted
  *    hosts, demo mode and the server's own status. Instance administrators
  *    only; the route answers 403 to everybody else.

@@ -63,6 +63,16 @@ main.container {
     margin: 0;
 }
 
+.page-header > p {
+    flex: 1 1 20rem;
+    margin: 0;
+}
+
+.page-header > .button {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
 .columns {
     display: grid;
     gap: 1rem;
@@ -1533,7 +1543,7 @@ textarea {
     font: inherit;
     font-size: var(--size-body);
     color: var(--text);
-    background: var(--surface);
+    background: var(--surface-2);
     /*
      * The control border is a heavier token than the hairline that separates
      * cards. The edge of an input is a user-interface component boundary, and
@@ -1546,13 +1556,16 @@ textarea {
 }
 
 /*
- * Focus: the control's own edge takes the ring colour as well as the global
- * outline, so a field that is being typed into is unmistakable.
+ * Focus: the control's own edge takes the rail accent inside the global
+ * outline, so a field that is being typed into is unmistakable. The edge is
+ * decoration, not the indicator: the light palettes' rail accents fall short
+ * of 3:1 on a white surface, and it is the outline, in `--focus-ring`, that
+ * the contrast test holds to it.
  */
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-    border-color: var(--focus-ring);
+    border-color: var(--rail-accent);
     outline-offset: 1px;
 }
 
@@ -2098,6 +2111,76 @@ legend {
 
 .dialog-header h2 {
     margin: 0;
+}
+
+/*
+ * A sectioned dialog: the header and the form's actions are bands across the
+ * full width, ruled off from the fields between them. The header carries a
+ * mark — the screen's icon on the soft accent — beside the title and a line
+ * saying what the form is for.
+ */
+.dialog-sectioned {
+    width: min(32.5rem, calc(100vw - 2rem));
+    padding: 0;
+}
+
+.dialog-sectioned .dialog-header {
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.dialog-sectioned .dialog-body {
+    padding: 1.25rem 1.5rem;
+}
+
+.dialog-sectioned .form-actions {
+    margin: 1.25rem -1.5rem -1.25rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.dialog-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.625rem;
+    height: 2.625rem;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.dialog-mark svg {
+    width: 1.375rem;
+    height: 1.375rem;
+}
+
+.dialog-heading {
+    flex: 1;
+    min-width: 0;
+}
+
+.dialog-subtitle {
+    margin: 0.125rem 0 0;
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+.dialog-sectioned .dialog-header .button-icon {
+    justify-content: center;
+    width: 2.125rem;
+    height: 2.125rem;
+    padding: 0;
+    border-radius: var(--radius-control);
+}
+
+.dialog-sectioned .dialog-header .button-icon:hover {
+    color: var(--text);
+    background: var(--surface-2);
 }
 
 .dialog .card {
