@@ -460,9 +460,12 @@ final class CalendarPageTest extends DatabaseTestCase
 
         $url = $this->feedUrl($this->page('/calendar'));
         self::assertNotNull($url, 'The new link was not shown.');
-        self::assertStringStartsWith('http://localhost/api/v1/calendar.ics?token=rnv_', $url);
+        // Built from APP_URL, not the request's host: behind a proxy the
+        // request's host is the inside one.
+        $appUrl = $this->container()->get('settings')['app']['url'];
+        self::assertStringStartsWith(rtrim($appUrl, '/') . '/api/v1/calendar.ics?token=rnv_', $url);
 
-        $feed = $this->request('GET', substr($url, strlen('http://localhost')));
+        $feed = $this->request('GET', $this->pathOf($url));
         self::assertSame(200, $feed->getStatusCode());
         self::assertStringContainsString('Streaming', (string) $feed->getBody());
 
@@ -494,8 +497,8 @@ final class CalendarPageTest extends DatabaseTestCase
         self::assertNotNull($old);
         self::assertNotNull($new);
         self::assertNotSame($old, $new);
-        self::assertSame(401, $this->request('GET', substr($old, strlen('http://localhost')))->getStatusCode());
-        self::assertSame(200, $this->request('GET', substr($new, strlen('http://localhost')))->getStatusCode());
+        self::assertSame(401, $this->request('GET', $this->pathOf($old))->getStatusCode());
+        self::assertSame(200, $this->request('GET', $this->pathOf($new))->getStatusCode());
         self::assertSame(200, $this->request('GET', '/api/v1/calendar.ics?token=' . $own)->getStatusCode());
     }
 
@@ -506,7 +509,7 @@ final class CalendarPageTest extends DatabaseTestCase
         self::assertSame(302, $this->request('POST', '/calendar/feed-link')->getStatusCode());
         $url = $this->feedUrl($this->page('/calendar'));
         self::assertNotNull($url);
-        self::assertSame(200, $this->request('GET', substr($url, strlen('http://localhost')))->getStatusCode());
+        self::assertSame(200, $this->request('GET', $this->pathOf($url))->getStatusCode());
     }
 
     public function testCreatingALinkNeedsTheFormsToken(): void
@@ -534,7 +537,7 @@ final class CalendarPageTest extends DatabaseTestCase
         $url = $this->feedUrl($this->page('/calendar'));
         self::assertNotNull($url);
 
-        $response = $this->request('GET', substr($url, strlen('http://localhost')));
+        $response = $this->request('GET', $this->pathOf($url));
         $feed = str_replace("\r\n ", '', (string) $response->getBody());
         self::assertStringContainsString('Mine', $feed);
         foreach (['Paused thing', 'Cancelled thing', 'Therapy'] as $absent) {
@@ -676,6 +679,12 @@ final class CalendarPageTest extends DatabaseTestCase
         $input = $this->find($page, '//input[@id="calendar-feed-url"]');
 
         return $input?->getAttribute('value');
+    }
+
+    /** The path and query of a feed address, to request it from the test app. */
+    private function pathOf(string $url): string
+    {
+        return (string) parse_url($url, PHP_URL_PATH) . '?' . (string) parse_url($url, PHP_URL_QUERY);
     }
 
     private function hiddenInputs(DOMElement $context): int

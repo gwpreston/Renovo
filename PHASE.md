@@ -141,6 +141,9 @@ Notes from the build:
   and a confirm button, so it asks without script. The Copy button is revealed
   by `assets/js/copy-field.js`; without it the read-only input is selected and
   copied by hand.
+- The feed address is built from `APP_URL`, as email links are, rather than
+  from the request's host: the app reads no forwarded headers, so behind a
+  TLS-terminating proxy the request's host would be the inside one.
 - The rail's insight and "Next up" cards are gone with their strings; the
   dashboard's Coming up card already answers "what is next".
   `CalendarRailTest` became `CalendarMonthTest`.

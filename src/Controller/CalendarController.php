@@ -36,6 +36,7 @@ final class CalendarController extends Controller
         private readonly CalendarService $calendar,
         private readonly CatchUpService $catchUp,
         private readonly ApiTokenService $tokens,
+        private readonly string $appUrl,
     ) {
         parent::__construct($view, $session, $translator);
     }
@@ -68,8 +69,7 @@ final class CalendarController extends Controller
             $issued = is_string($flashed) ? $flashed : null;
         }
 
-        $feedUrl = rtrim((string) $request->getUri()->withPath('')->withQuery('')->withFragment(''), '/')
-            . ApiPath::PREFIX . '/calendar.ics';
+        $feedUrl = rtrim($this->appUrl, '/') . ApiPath::PREFIX . '/calendar.ics';
 
         return $this->renderMaybeFragment(
             $request,

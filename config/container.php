@@ -251,6 +251,14 @@ return static function (ContainerBuilder $builder, array $settings): void {
             factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
         ),
 
+        // The feed's address is pasted into a calendar app elsewhere, so it is
+        // built from APP_URL rather than from whatever host this request came
+        // in on — behind a TLS-terminating proxy that would be the inside one.
+        \App\Controller\CalendarController::class => autowire()->constructorParameter(
+            'appUrl',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
+
         ReminderRunner::class => autowire()->constructorParameter(
             'appUrl',
             factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
