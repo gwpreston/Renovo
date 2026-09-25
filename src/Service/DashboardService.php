@@ -76,7 +76,6 @@ final class DashboardService
 
     public function __construct(
         private readonly StatsService $stats,
-        private readonly SpendHistoryService $history,
         private readonly ForecastService $forecast,
         private readonly BudgetMonthService $budgets,
         private readonly SubscriptionService $subscriptions,
@@ -185,26 +184,19 @@ final class DashboardService
      * The monthly spend chart: six months reconstructed, this month split,
      * six forecast.
      *
-     * The reconstruction ends yesterday and the forecast starts today, so the
-     * two halves meet without sharing a charge. The forecast is asked for this
-     * month plus six, which makes its months exactly `ForecastService::monthly()`
-     * — the Forecast page's own figures.
+     * `SpendChartService::window()`, which the analytics screen asks for
+     * twelve months either side — so these thirteen bars are thirteen of its
+     * twenty-five, by construction rather than by agreement.
      *
      * @return array<string, mixed>
      */
     private function chart(Scope $scope, ?Money $budget): array
     {
-        $yesterday = $this->clock->today()->modify('-1 day');
-        $past = $this->history->history($scope, self::CHART_PAST_MONTHS + 1, $yesterday);
-        $future = $this->forecast->monthly($scope, self::CHART_FUTURE_MONTHS + 1);
-
         $budgetMinor = $budget === null
             ? null
             : $this->rates->convertMinor($budget->amountMinor, $budget->currency, $this->settings->baseCurrency());
 
-        return $this->spendChart->monthBars($past['months'], $future, $budgetMinor) + [
-            'excluded_count' => $past['excluded_count'],
-        ];
+        return $this->spendChart->window($scope, self::CHART_PAST_MONTHS, self::CHART_FUTURE_MONTHS, $budgetMinor);
     }
 
     /**

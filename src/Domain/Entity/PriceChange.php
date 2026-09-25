@@ -56,4 +56,36 @@ final class PriceChange
 
         return $this->price->amountMinor - $previous->price->amountMinor;
     }
+
+    /**
+     * True when this row is a provider putting the price up from `$previous`.
+     *
+     * One definition, read by the insight rules, the analytics screen's
+     * price-rise count and its household price history, so that the three
+     * cannot disagree about what counts. A higher price in the same currency,
+     * and not a trial converting: a trial ending reads "£0, then £12.99",
+     * which is a rise from nothing rather than news. A currency change is a
+     * re-denomination, which `differenceFrom()` already refuses to subtract.
+     */
+    public function isRiseFrom(?self $previous): bool
+    {
+        if ($this->source === PriceChangeSource::TrialConversion || $this->isConversionFrom($previous)) {
+            return false;
+        }
+
+        $step = $this->differenceFrom($previous);
+
+        return $step !== null && $step > 0;
+    }
+
+    /**
+     * True when this row re-denominates the price rather than changing it:
+     * recorded as a currency change, or simply in a different currency from
+     * the row before.
+     */
+    public function isConversionFrom(?self $previous): bool
+    {
+        return $this->source === PriceChangeSource::CurrencyChange
+            || ($previous !== null && $previous->price->currency !== $this->price->currency);
+    }
 }

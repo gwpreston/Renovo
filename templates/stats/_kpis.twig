@@ -1,33 +1,55 @@
 {#
-    The KPI row.
+    The KPI row: what this year has cost so far, the average month, the next
+    twelve months, and this year's price rises.
 
-    Monthly spend, annual spend, active subscriptions — three figures the
-    Statistics page already produced, arranged as the design's row of headline
-    numbers.
+    Spent this year is reconstructed — Renovo keeps no ledger — from 1 January
+    to yesterday; today's charges are the forecast's, and the next twelve
+    months begin with them. The comparison is the same stretch of last year.
 
-    The two money figures go through the partial the dashboard's tiles and the
-    my-subscriptions strip use, which is the per-currency rule written once: a
-    single clean number when there is an honest single number, the combined
-    total with its subtotals when everything converts, and the subtotals alone
-    when one currency has no rate. A headline that quietly dropped a currency
-    would be a wrong number rather than a tidy one.
+    Every money figure goes through the per-currency partial: one clean number
+    when there is an honest one, the combined figure with its subtotals when
+    everything converts, and the subtotals alone when a currency has no rate.
+    The price rises' yearly effect is one line per currency and never summed
+    across them, as the insight rules state their figures.
 #}
 {% import 'partials/spend.twig' as figure %}
 
-<section class="metric-grid" id="analytics-kpis" aria-label="{{ t('dashboard.metrics') }}">
+<section class="metric-grid analytics-kpis" id="analytics-kpis" aria-label="{{ t('dashboard.metrics') }}">
     <article class="card stat metric">
-        <h2 class="stat-label">{{ t('dashboard.monthly_spend') }}</h2>
-        {{ figure.spend(kpis.monthly, t('dashboard.per_month_unit')) }}
+        <h2 class="stat-label">{{ t('stats.kpi_spent') }}</h2>
+        {{ figure.spend(kpis.spent, '') }}
+        {% if kpis.spent.change_tenths is not null %}
+            <p class="kpi-note {{ kpis.spent.change_tenths > 0 ? 'is-increase' : 'is-decrease' }}">
+                {{ t('stats.kpi_vs_last_year', {
+                    'percent': (kpis.spent.change_tenths / 10)|percent(true, 1),
+                }) }}
+            </p>
+        {% endif %}
     </article>
 
     <article class="card stat metric">
-        <h2 class="stat-label">{{ t('dashboard.yearly_spend') }}</h2>
-        {{ figure.spend(kpis.yearly, t('dashboard.per_year_unit')) }}
+        <h2 class="stat-label">{{ t('stats.kpi_average') }}</h2>
+        {{ figure.spend(kpis.average, t('dashboard.per_month_unit')) }}
+        <p class="kpi-note muted">
+            {{ t('stats.kpi_average_note', {'count': kpis.average.active_count, 'months': kpis.months_elapsed}) }}
+        </p>
     </article>
 
     <article class="card stat metric">
-        <h2 class="stat-label">{{ t('dashboard.active_subscriptions') }}</h2>
-        <p class="stat-value num">{{ kpis.active_count }}</p>
-        <p class="muted">{{ t('subscriptions.active_note') }}</p>
+        <h2 class="stat-label">{{ t('stats.kpi_ahead') }}</h2>
+        {{ figure.spend(kpis.ahead, '') }}
+        <p class="kpi-note muted">{{ t('stats.kpi_ahead_note') }}</p>
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('stats.kpi_rises', {'year': kpis.year}) }}</h2>
+        <p class="stat-value num {{ kpis.rises.count > 0 ? 'is-increase' : '' }}">{{ kpis.rises.count }}</p>
+        {% for effect in kpis.rises.effect %}
+            <p class="kpi-note is-increase num">
+                {{ t('stats.kpi_rises_effect', {'amount': effect.amount_minor|money(effect.currency, true)}) }}
+            </p>
+        {% else %}
+            <p class="kpi-note muted">{{ t('stats.kpi_rises_none') }}</p>
+        {% endfor %}
     </article>
 </section>

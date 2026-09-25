@@ -8,7 +8,6 @@ use App\Domain\Entity\PriceChange;
 use App\Domain\Entity\Subscription;
 use App\Domain\InsightKind;
 use App\Domain\Money;
-use App\Domain\PriceChangeSource;
 use App\Security\Scope;
 use App\Support\Clock;
 use DateTimeImmutable;
@@ -344,40 +343,35 @@ final class SpendInsightService
             $current = $effective === [] ? null : $effective[count($effective) - 1];
             $previous = count($effective) > 1 ? $effective[count($effective) - 2] : null;
 
+            // `PriceChange::isRiseFrom()` is the rule — not a trial converting,
+            // not a currency change — shared with the analytics screen's
+            // price-rise count and price history.
             if (
                 $current !== null
-                && $previous !== null
-                && $current->source !== PriceChangeSource::TrialConversion
                 && $current->effectiveFrom > $earliest
+                && $current->isRiseFrom($previous)
             ) {
-                // `differenceFrom` is null across a currency change, which is a
-                // re-denomination rather than a rise — the same judgement the
-                // trend view makes about the same pair of rows.
-                $step = $current->differenceFrom($previous);
-                if ($step !== null && $step > 0) {
-                    $insights[] = $this->insight(
-                        InsightKind::PriceRisen,
-                        $subscription,
-                        $cycle->annualMinor($step, $subscription->cycleDays),
-                        $current->price->currency,
-                        difference: $step,
-                        date: $current->effectiveFrom,
-                    );
-                }
+                $step = (int) $current->differenceFrom($previous);
+                $insights[] = $this->insight(
+                    InsightKind::PriceRisen,
+                    $subscription,
+                    $cycle->annualMinor($step, $subscription->cycleDays),
+                    $current->price->currency,
+                    difference: $step,
+                    date: $current->effectiveFrom,
+                );
             }
 
-            if ($scheduled !== null) {
-                $step = $scheduled->differenceFrom($current);
-                if ($step !== null && $step > 0) {
-                    $insights[] = $this->insight(
-                        InsightKind::PriceRising,
-                        $subscription,
-                        $cycle->annualMinor($step, $subscription->cycleDays),
-                        $scheduled->price->currency,
-                        difference: $step,
-                        date: $scheduled->effectiveFrom,
-                    );
-                }
+            if ($scheduled !== null && $scheduled->isRiseFrom($current)) {
+                $step = (int) $scheduled->differenceFrom($current);
+                $insights[] = $this->insight(
+                    InsightKind::PriceRising,
+                    $subscription,
+                    $cycle->annualMinor($step, $subscription->cycleDays),
+                    $scheduled->price->currency,
+                    difference: $step,
+                    date: $scheduled->effectiveFrom,
+                );
             }
         }
 

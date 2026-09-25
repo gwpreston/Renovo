@@ -1,0 +1,125 @@
+{#
+    The insights: every rule `SpendInsightService` found firing, most urgent
+    first, as a list of icon, heading and sentence.
+
+    There is no model behind these and they are not labelled as though there
+    were: each is a rule over the household's own subscriptions, naming the
+    subscriptions behind it, and every figure is one subscription's own money
+    so the member can check it against their bill. When no rule fired there is
+    no list at all — silence is a result, and an empty box saying "nothing to
+    report" is a worse one.
+
+    Each links to the subscription's money page, which enforces its own
+    permissions; the insight was derived from rows this reader can already
+    see, and the link is not what makes that true.
+#}
+{#
+    Twig 3 removed calling a macro through `_self` directly, so the two wording
+    macros at the foot of this file are imported by name.
+#}
+{% import _self as wording %}
+
+{% if insights is not empty %}
+    <section class="analytics-insights" id="analytics-insight" aria-labelledby="analytics-insight-heading">
+        <h2 id="analytics-insight-heading">{{ t('insight.title') }}</h2>
+
+        <ul class="plain insight-list">
+            {% for insight in insights|slice(0, 4) %}
+                {{ wording.row(insight) }}
+            {% endfor %}
+        </ul>
+
+        {#
+            The rest fold away behind a `<details>`, which needs no script to
+            open: the list sits beside the price history and should end near
+            where it does.
+        #}
+        {% if insights|length > 4 %}
+            <details class="insight-more">
+                <summary>{{ t('insight.more', {'count': insights|length - 4}) }}</summary>
+                <ul class="plain insight-list">
+                    {% for insight in insights|slice(4) %}
+                        {{ wording.row(insight) }}
+                    {% endfor %}
+                </ul>
+            </details>
+        {% endif %}
+
+        <p class="hint">{{ t('insight.note') }}</p>
+    </section>
+{% endif %}
+
+{# One insight: its icon, its heading, its sentence and its link. #}
+{% macro row(insight) %}
+    {% import _self as wording %}
+    <li class="card insight-row">
+        <span class="insight-icon tone-{{ insight.kind.tone }}" aria-hidden="true">{{ icon(insight.kind.icon) }}</span>
+        <div class="insight-body">
+            <h3>{{ wording.headline(insight) }}</h3>
+            <p>{{ wording.detail(insight) }}</p>
+            <p>
+                <a href="/subscriptions/{{ insight.subscription.id }}/money">{{ t('insight.action') }}</a>
+            </p>
+        </div>
+    </li>
+{% endmacro %}
+
+{#
+    Each kind's heading. The overlap one carries the category and the count,
+    because "two subscriptions in Design" is the observation itself rather than
+    a decoration on it.
+#}
+{% macro headline(insight) %}
+    {%- if insight.kind.value == 'overlap' -%}
+        {{ t('insight.overlap.headline', {
+            'count': insight.count,
+            'category': insight.category_name,
+        }) }}
+    {%- else -%}
+        {{ t(insight.kind.labelKey) }}
+    {%- endif -%}
+{% endmacro %}
+
+{#
+    Each kind's sentence: the subscriptions it is about, and the arithmetic.
+
+    Every amount is printed in the currency the service attached to it — one
+    subscription's own — so nothing here is a converted figure and no two
+    currencies are added together.
+#}
+{% macro detail(insight) %}
+    {%- set kind = insight.kind.value -%}
+    {%- set amount = insight.annual_minor|money(insight.currency) -%}
+    {%- if kind == 'trial_converting' -%}
+        {{ t('insight.trial_converting.detail', {
+            'name': insight.subscription.name,
+            'date': insight.date|local_date,
+            'days': insight.days,
+            'amount': amount,
+        }) }}
+    {%- elseif kind == 'price_rising' or kind == 'price_risen' -%}
+        {{ t(insight.kind.detailKey, {
+            'name': insight.subscription.name,
+            'difference': insight.difference_minor|money(insight.currency),
+            'date': insight.date|local_date,
+            'amount': amount,
+        }) }}
+    {%- elseif kind == 'overlap' -%}
+        {{ t('insight.overlap.detail', {
+            'name': insight.subscription.name,
+            'amount': amount,
+            'others': insight.related|map(other => other.name)|join(', '),
+        }) }}
+    {%- else -%}
+        {{ t('insight.rarely_used.detail', {
+            'name': insight.subscription.name,
+            'amount': amount,
+            'count': insight.count,
+        }) }}
+        {%- if insight.cost_per_use_minor is not null %}
+            {{ t('insight.rarely_used.per_use', {
+                'amount': insight.cost_per_use_minor|money(insight.currency),
+            }) }}
+        {%- endif -%}
+    {%- endif -%}
+{% endmacro %}

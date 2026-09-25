@@ -1519,33 +1519,342 @@ a.segmented-option {
 /* ------------------------------------------------------------- analytics */
 
 /*
- * The trajectory and the donut side by side on a wide screen, stacked on a
- * narrow one. Horizontal gap only: cards space themselves vertically with their
- * own margin, and a row gap on top of that is a double space on every phone.
+ * The KPI row and the chart space themselves from the cards below them with
+ * the cards' own margin; the pairs are two columns on a wide screen — the
+ * wider for the chart or the table, the narrower for the stack beside it —
+ * and one on a narrow one. Horizontal gap only, as everywhere here: cards
+ * bring their own vertical margin, and a row gap on top of that is a double
+ * space on every phone.
  */
-.analytics-layout {
+.analytics-kpis {
+    margin-bottom: 1rem;
+}
+
+/* The dashboard's KPI note, coloured by what it says: a rise is bad news. */
+.analytics-kpis .kpi-note {
+    margin-top: 0.25rem;
+}
+
+.analytics-kpis .kpi-note.is-increase {
+    color: var(--bad);
+}
+
+.analytics-kpis .kpi-note.is-decrease {
+    color: var(--ok);
+}
+
+.analytics-pair,
+.analytics-breakdown {
     display: grid;
     gap: 0 1rem;
     align-items: start;
 }
 
 @media (min-width: 1100px) {
-    .analytics-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+    /* Two columns only when there is a second thing to put in one: with no
+       insight firing, the price history keeps the full width. */
+    .analytics-pair:has(> :nth-child(2)) {
+        grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr);
+    }
+}
+
+@media (min-width: 900px) {
+    .analytics-breakdown {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 /* A grid item defaults to refusing to be narrower than its content, which is
    how a wide table pushes a whole page sideways instead of scrolling inside
    its own wrapper. */
-.analytics-main,
-.analytics-side {
+.analytics-pair > *,
+.analytics-breakdown > * {
     min-width: 0;
 }
 
+/* Twenty-five bars: closer together than the dashboard's thirteen. */
+.analytics-months .spend-bars-plot,
+.analytics-months .spend-bars-labels {
+    gap: 0.25rem;
+}
+
+/* Twenty-five labels do not fit much below a laptop: every other one, this
+   month always. */
+@media (min-width: 480px) and (max-width: 899px) {
+    .analytics-months .spend-bars-labels span:nth-child(even):not(.is-current) {
+        visibility: hidden;
+    }
+}
+
+@media (max-width: 899px) {
+    .analytics-months .spend-bars-labels span {
+        overflow: visible;
+        white-space: nowrap;
+    }
+}
+
+/* On a phone even every other one collides: every third, which still lands on
+   this month (the thirteenth). */
+@media (max-width: 479px) {
+    .analytics-months .spend-bars-labels span:not(:nth-child(3n + 1)):not(.is-current) {
+        visibility: hidden;
+    }
+
+    /* Outranks the dashboard's every-other rule, which would hide the even
+       ones among these. */
+    .analytics-months .spend-bars-labels span:nth-child(3n + 1):not(.is-current) {
+        visibility: visible;
+    }
+}
+
 /*
- * The review: the figures to read in one column — year over year, the notable
- * pair and the same cost by period — and the cost-per-use table beside them.
+ * Today: a dashed rule through this month's bar and a word at its head. The
+ * bar is already this month's in two parts, so the rule marks where the
+ * reconstruction meets the forecast rather than a position of its own.
+ */
+.spend-bar.is-current {
+    position: relative;
+}
+
+.spend-bar-today {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    bottom: 0;
+    border-left: 1px dashed var(--faint);
+    font-size: var(--size-caption);
+    font-style: normal;
+    font-weight: var(--weight-bold);
+    color: var(--faint);
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding-left: 0.3rem;
+    pointer-events: none;
+}
+
+/* This year against last: a pair of bars a month, last year's quieter. */
+.analytics-yoy .chart-legend {
+    display: flex;
+    margin: 0;
+}
+
+.chart-key-previous,
+.chart-key-current {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-top: 0;
+    border-radius: 3px;
+}
+
+.chart-key-previous {
+    background: var(--s6);
+}
+
+.chart-key-current {
+    background: var(--accent);
+}
+
+.yoy-bars-plot {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    height: 12.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.yoy-month {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.yoy-bar {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.yoy-bar-previous {
+    height: auto;
+    background: var(--s6);
+    border-radius: 3px 3px 0 0;
+}
+
+.yoy-bar > span {
+    display: block;
+    flex-shrink: 0;
+}
+
+.yoy-bar > span:first-of-type {
+    border-radius: 3px 3px 0 0;
+}
+
+.yoy-bar-charged {
+    background: var(--accent);
+}
+
+.yoy-labels {
+    gap: 0.5rem;
+}
+
+.yoy-summary {
+    margin: 0.85rem 0 0;
+}
+
+@media (max-width: 479px) {
+    .yoy-bars-plot,
+    .yoy-labels {
+        gap: 0.25rem;
+    }
+}
+
+/* The most expensive five: rank, name, monthly figure. */
+.top-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0.5rem 0 0;
+}
+
+.top-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.625rem;
+}
+
+.top-rank {
+    width: 1rem;
+    color: var(--faint);
+}
+
+.top-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: var(--weight-semibold);
+}
+
+.top-figure {
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+}
+
+/* Dates, amounts and changes in the price history do not break mid-figure;
+   the table is set a step smaller, as the prototype's is, so its five columns
+   fit beside the insights before they need to scroll. */
+.price-history-table {
+    font-size: var(--size-label);
+}
+
+.price-history-table .nowrap {
+    white-space: nowrap;
+}
+
+.top-figure .stat-unit {
+    margin-left: 0.2rem;
+}
+
+.insight-more {
+    margin-top: 0.75rem;
+}
+
+.insight-more > summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+.insight-more .insight-list {
+    margin-top: 0.75rem;
+}
+
+/*
+ * The insights: a card each, an icon tile in the kind's tone, a heading and
+ * the sentence with its arithmetic.
+ */
+.analytics-insights > h2 {
+    margin: 0.25rem 0 0.75rem;
+    font-size: var(--size-heading);
+}
+
+.insight-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+}
+
+.insight-row {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0;
+}
+
+.insight-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.125rem;
+    height: 2.125rem;
+    border-radius: 8px;
+}
+
+.insight-icon svg {
+    width: 1.0625rem;
+    height: 1.0625rem;
+}
+
+.insight-icon.tone-info {
+    background: var(--info-bg);
+    color: var(--info);
+}
+
+.insight-icon.tone-warn {
+    background: var(--warn-bg);
+    color: var(--warn);
+}
+
+.insight-icon.tone-accent {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.insight-icon.tone-neutral {
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.insight-body {
+    min-width: 0;
+}
+
+.insight-row h3 {
+    /*
+     * A sentence, not a label. The eyebrow styling the KPI headings use sets
+     * its text in caps, and "A PRICE IS GOING UP" reads as shouting rather
+     * than as the heading of a paragraph.
+     */
+    margin: 0;
+    font-size: var(--size-body);
+    font-weight: var(--weight-semibold);
+}
+
+.insight-row p {
+    margin: 0.2rem 0 0;
+    font-size: var(--size-label);
+}
+
+.analytics-insights > .hint {
+    margin-top: 0.75rem;
+}
+
+/*
+ * The review: the same cost by period in one column, and the cost-per-use table
+ * beside it.
  *
  * The table takes the wider share because it is the only six-column thing on
  * the page, and it breaks at the same 1100px the charts above it do, so the
@@ -1649,105 +1958,6 @@ a.segmented-option {
     display: block;
     font-size: var(--size-label);
     color: var(--muted);
-}
-
-/*
- * The spend-insight card.
- *
- * The one card on this screen edged in the accent, which is what
- * `.card-featured` is for and why it has waited until now to be used: the rule
- * is one featured card per screen, and a card that tells the member to go and
- * do something is the one that earns it here.
- *
- * Its own type scale is deliberately modest. The KPI row below states the
- * figures; this states a sentence, and a sentence set at KPI size would shout
- * over the numbers it was derived from.
- */
-.insight-headline {
-    margin: 0.35rem 0 0;
-    font-size: var(--size-heading);
-    font-weight: var(--weight-semibold);
-}
-
-.insight-detail {
-    margin: 0.35rem 0 0;
-    max-width: 60ch;
-}
-
-.insight-action {
-    margin: 0.85rem 0 0;
-}
-
-/*
- * The rest of the insights, folded away. `<details>` rather than a script:
- * this is a disclosure and the browser has one, so the card works before any
- * JavaScript loads and on a page where none does.
- */
-.insight-more {
-    margin-top: 0.85rem;
-}
-
-.insight-more > summary {
-    cursor: pointer;
-    color: var(--muted);
-    font-size: var(--size-label);
-}
-
-.insight-list {
-    display: grid;
-    gap: 0.75rem;
-    margin: 0.75rem 0 0;
-}
-
-.insight-row {
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.insight-row:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
-}
-
-.insight-row h3 {
-    /*
-     * A sentence, not a label. The eyebrow styling the KPI headings use sets
-     * its text in caps, and "A PRICE IS GOING UP" reads as shouting rather
-     * than as the heading of a paragraph.
-     */
-    margin: 0;
-    font-size: var(--size-body);
-    font-weight: var(--weight-semibold);
-}
-
-.insight-row p {
-    margin: 0.2rem 0 0;
-}
-
-/* The provenance line, kept off the last insight above it. */
-.insight-card > .hint {
-    margin-top: 0.85rem;
-}
-
-/* The most and the least expensive, one above the other. */
-.notable-list {
-    display: grid;
-    gap: 0.75rem;
-    margin: 0.5rem 0 0;
-}
-
-.notable-row {
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.notable-row:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
-}
-
-.notable-name {
-    margin: 0.1rem 0;
 }
 
 /*
@@ -2750,8 +2960,9 @@ a.segmented-option {
     gap: 0.35rem;
 }
 
-:root[data-density='compact'] .notable-row {
-    padding-bottom: 0.4rem;
+:root[data-density='compact'] .top-list,
+:root[data-density='compact'] .insight-list {
+    gap: 0.4rem;
 }
 
 /* ------------------------------------------------------- forced colours */

@@ -16,55 +16,48 @@
 
 {% block content %}
     {#
-        The design's arrangement: the KPI row, the twelve months behind and the
-        spending trajectory ahead, the category donut, and the comparative
-        pair. Not one figure on any of them is computed for this screen — the
-        KPIs are the statistics this page already reported, the trajectory is
-        the dashboard's own chart payload, the months behind it are the
-        reconstruction year over year is totalled from, the donut is the
-        breakdown the my-subscriptions widget draws as bars, and year over year
-        is that same reconstruction stated as a pair of totals.
+        The prototype's arrangement: the KPI row; twelve months back and twelve
+        ahead; this year against last beside who pays and the most expensive;
+        the price history beside the insights. Then what this page has always
+        carried: the two breakdown donuts, and the review — the same cost by
+        period, and the cost-per-use table with its usage form.
 
-        Below them, the review: the comparative cards and the same cost
-        expressed over each period people think in, gathered into one column,
-        with the cost-per-use ranking standing beside them in a column of its
-        own. Those three are figures to read; "Worth it?" is the table to act
-        on, and it is a row per subscription, so it earns both the wider share
-        and its own full height rather than a place at the end of a queue.
+        Not one figure here is computed for this screen. See
+        `AnalyticsScreenService` for which service each one binds to.
     #}
-    {#
-        The insight card leads, when there is one. It is the only thing on this
-        screen that tells the member to go and do something, so burying it beneath
-        the figures it is drawn from would be the wrong way round; and when no
-        rule fired it is absent entirely and the page begins where it used to.
-    #}
-    {% include 'stats/_insight.twig' %}
-
     {% include 'stats/_kpis.twig' %}
 
-    {#
-        The two twelve-month charts are stacked in the main column, the year
-        behind above the year ahead, so they are read in the order they
-        happened and share an x-axis width the eye can carry a figure across.
-        The donut keeps the side column beside both of them; the layout's gap
-        is horizontal only, so cards space themselves vertically with their own
-        margin and the stack needs nothing new from the stylesheet.
-    #}
-    <div class="analytics-layout">
-        <div class="analytics-main">
-            {% include 'stats/_history.twig' %}
-            {% include 'stats/_trajectory.twig' %}
+    {% include 'stats/_months.twig' %}
+
+    <div class="analytics-pair">
+        {% include 'stats/_year_against_year.twig' %}
+        <div class="analytics-stack">
+            {#
+                The household dashboard's card, with its data scoped the same
+                way — only the reader's own share in ISOLATED mode.
+            #}
+            <div id="analytics-who-pays">
+                {% include 'dashboard/cards/household/who_pays.twig' %}
+            </div>
+            {% include 'stats/_most_expensive.twig' %}
         </div>
-        <aside class="analytics-side">
-            {% include 'stats/_categories.twig' %}
-            {% include 'stats/_payment_methods.twig' %}
-        </aside>
+    </div>
+
+    <div class="analytics-pair">
+        {% include 'stats/_price_history.twig' %}
+        <div class="analytics-stack">
+            {% include 'stats/_insights.twig' %}
+        </div>
+    </div>
+
+    <h2 class="section-heading">{{ t('stats.breakdown') }}</h2>
+    <div class="analytics-breakdown">
+        {% include 'stats/_categories.twig' %}
+        {% include 'stats/_payment_methods.twig' %}
     </div>
 
     <div class="analytics-review">
         <div class="analytics-review-figures">
-            {% include 'stats/_comparison.twig' %}
-
             <section class="card">
                 <h2>{{ t('stats.per_period') }}</h2>
 

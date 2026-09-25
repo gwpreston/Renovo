@@ -299,7 +299,6 @@ final class DesignTokensTest extends TestCase
      */
     public static function chartScripts(): iterable
     {
-        yield 'spend chart' => ['spend-chart.js'];
         yield 'category donut' => ['category-donut.js'];
     }
 

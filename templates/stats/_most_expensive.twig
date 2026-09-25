@@ -1,0 +1,36 @@
+{#
+    The five most expensive subscriptions, dearest first.
+
+    Ranked on cost per month converted into the base currency — the only way
+    two prices in different currencies have an order — and each shown in the
+    currency it is actually charged in, so nobody is shown a price they have
+    never paid. A subscription whose currency has no rate is left out and
+    counted; one-off and lifetime entries, running trials, and paused and
+    cancelled rows are not ranked at all.
+#}
+<section class="card analytics-top" id="analytics-most-expensive" aria-labelledby="analytics-top-heading">
+    <h2 id="analytics-top-heading">{{ t('stats.most_expensive') }}</h2>
+
+    {% if most_expensive.rows is empty %}
+        <p class="muted empty">{{ t('stats.notable_empty') }}</p>
+    {% else %}
+        <ol class="plain top-list">
+            {% for row in most_expensive.rows %}
+                <li class="top-row">
+                    <span class="top-rank num">{{ loop.index }}</span>
+                    <a class="top-name" href="/subscriptions/{{ row.subscription.id }}/money">{{ row.subscription.name }}</a>
+                    <span class="top-figure num">
+                        {{ row.monthly_minor|money(row.subscription.price.currency) }}<span class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
+                    </span>
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+
+    <p class="hint">
+        {{ t('stats.notable_note') }}
+        {% if most_expensive.excluded_count > 0 %}
+            {{ t('stats.notable_excluded', {'count': most_expensive.excluded_count}) }}
+        {% endif %}
+    </p>
+</section>

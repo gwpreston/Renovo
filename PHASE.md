@@ -116,16 +116,43 @@ page stays.
 
 ## Status
 
-- [ ] KPI row (reconstructed YTD, average, next 12, price rises)
-- [ ] 24-month chart; dashboard window equality
-- [ ] Year over year with excluded note
-- [ ] Who pays what (scoped)
-- [ ] Most expensive (top five, own currency, exclusions counted)
-- [ ] Household price history (scheduled, conversions, paging)
-- [ ] Insights list
-- [ ] Breakdown row + retained Phase 12 sections
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check` green on both engines
+- [x] KPI row (reconstructed YTD, average, next 12, price rises)
+- [x] 24-month chart; dashboard window equality
+- [x] Year over year with excluded note
+- [x] Who pays what (scoped)
+- [x] Most expensive (top five, own currency, exclusions counted)
+- [x] Household price history (scheduled, conversions, paging)
+- [x] Insights list
+- [x] Breakdown row + retained Phase 12 sections
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check` green on both engines (2439 tests on
+      PostgreSQL 16 and MySQL 8.4)
+
+### Notes from the build
+
+- **One chart method.** `SpendChartService::window($scope, $past, $future)` is
+  what the dashboard (6, 6) and this screen (12, 12) both call; the dashboard's
+  private copy of the fetch is gone. The bar markup is one partial,
+  `partials/month_bars.twig`.
+- **Spent this year and the next twelve months are the Household dashboard's**
+  figures (`HouseholdDashboardService::yearToDate()` / `yearAhead()`, now
+  public), not a second computation of them; a test holds the two screens
+  together.
+- **One rise rule.** `PriceChange::isRiseFrom()` — higher, same currency, not a
+  trial converting, not a currency change — is read by the insight rules, the
+  price-rise KPI and the price history.
+- **Price history is built over the scoped subscriptions**, not over the history
+  table's own predicate, so a row's history is listed only when the row is.
+- **Most expensive skips cancelled rows by name**: a cancelled row can still be
+  flagged active, and Phase 12's ranking only asked `isActive`.
+- **Open: the trial line is gone.** The old trajectory drew spend with and
+  without trials converting ("what trials will add"). The plan said the
+  Forecast page still draws that split; it does not — it badges each trial
+  conversion in its list. Until that is restored or dropped by decision, the
+  "nothing the old page carried is lost" clause of the Definition of done is
+  not met.
+- New icon: `rarely-used` (Lucide `battery-low`) for the rarely-used insight.
+- Twenty-five strings removed from the catalogue with the charts that used them.
 
 ## Definition of done
 

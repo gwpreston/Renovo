@@ -889,7 +889,6 @@ return [
 
     // dashboard
     'dashboard.active' => 'Active',
-    'dashboard.active_subscriptions' => 'Active subscriptions',
     'dashboard.all_subscriptions' => 'All subscriptions',
     'dashboard.already_charged' => 'Already charged',
     'dashboard.approx' => '≈ {amount}',
@@ -909,10 +908,6 @@ return [
     'dashboard.cancel_trial_named' => 'Cancel the {name} trial',
     'dashboard.charged_of_due' => 'already charged of {total} due this month',
     'dashboard.charges_count' => '{count, plural, =0 {No charges} one {# charge} other {# charges}}',
-    'dashboard.chart_unconvertible' =>
-        'The twelve-month chart is not drawn, because no exchange rate is available for {currencies} and '
-        . 'a month missing one of its currencies would be drawn as a cheap month rather than an unknown '
-        . 'one. The forecast shows those months per currency.',
     'dashboard.coming_up' => 'Coming up',
     'dashboard.coming_up_more' =>
         'And {count, plural, one {# more charge} other {# more charges}} in the next {days} days.',
@@ -957,7 +952,6 @@ return [
     'dashboard.pace_unconvertible' =>
         'No exchange rate for {currencies}, so this year’s spend cannot be added up in one currency.',
     'dashboard.pace_under' => '{amount} under pace',
-    'dashboard.peak_month' => 'Busiest month',
     'dashboard.one_off_in' => 'One-off & lifetime · {currency}',
     'dashboard.one_off_note' => '{count, plural, one {# entry} other {# entries}}, not included in monthly totals',
     'dashboard.per_month_unit' => '/ month',
@@ -979,16 +973,6 @@ return [
     'dashboard.series_budget' => 'Budget {budget}',
     'dashboard.series_forecast' => 'Forecast',
     'dashboard.share_of_spend' => '{name}: {percent}% of monthly spend',
-    'dashboard.part_month' => 'Part month',
-    'dashboard.part_month_note' =>
-        'The first month counts only the charges still ahead of today, so it is short by whatever has '
-        . 'already been paid this month.',
-    'dashboard.history_part_month_note' =>
-        'This month counts only the charges taken so far, so it is short by whatever is still to come '
-        . 'before the month is out.',
-    'dashboard.series_committed' => 'Excluding trial conversions',
-    'dashboard.series_trial_gap' => 'What trials will add',
-    'dashboard.series_with_trials' => 'Including trial conversions',
     // The year ahead is no longer a dashboard card, but these three keep their
     // `dashboard.` prefix: they describe the picture `partials/spend_chart.twig`
     // draws, which the Analytics trajectory renders and which asks for them by
@@ -1000,19 +984,7 @@ return [
     'dashboard.spend_bars_unconvertible' =>
         'The monthly spend chart is not drawn: no exchange rate is available for {currencies}, and a month '
         . 'missing one of its currencies would look like a cheap month rather than an unknown one.',
-    'dashboard.spend_chart_alt' =>
-        'Line chart of spend per month for the next twelve months, in {currency}: one line including trial '
-        . 'conversions and one excluding them. The same figures are in the table that follows.',
-    // The same chart with no trial converting inside the horizon, where the
-    // second line would sit exactly on the first and is not drawn. The
-    // description has to match the picture, and the table under it.
-    'dashboard.spend_chart_alt_single' =>
-        'Line chart of spend per month for the next twelve months, in {currency}. The same figures are in '
-        . 'the table that follows.',
     'dashboard.spend_chart_note' => 'What was charged each month, and the forecast for the next six',
-    'dashboard.spend_history_alt' =>
-        'Line chart of spend per month over the last twelve months, in {currency}. The same figures are '
-        . 'in the table that follows.',
     // Said rather than implied: the application records what is due, not a
     // ledger of payments taken, so these months were rebuilt from start dates,
     // billing cycles and price history. A reader comparing them with a bank
@@ -1040,7 +1012,6 @@ return [
     'dashboard.who_pays_note' => 'Monthly share after splits',
     'dashboard.year_to_date' => 'Year to date',
     'dashboard.yearly_run_rate' => 'Yearly run-rate',
-    'dashboard.yearly_spend' => 'Yearly spend',
     'dashboard.unconvertible' =>
         'Totals are shown per currency. They cannot be combined because no exchange rate is available '
         . 'for {currencies} — a total leaving that out would be a wrong number rather than an approximate '
@@ -1059,6 +1030,7 @@ return [
     'field.category' => 'Category',
     'field.payment_method' => 'Payment method',
     'field.change' => 'Change',
+    'field.date' => 'Date',
     'field.channel' => 'Channel',
     'field.confirm_password' => 'Confirm password',
     'field.currency' => 'Currency',
@@ -1277,7 +1249,7 @@ return [
     'subtitle.profile' => 'Your account, sign-in and appearance',
     'subtitle.security' => 'Two-step sign-in, passkeys and sessions',
     'subtitle.settings' => 'Choices for the household and the instance',
-    'subtitle.stats' => 'Where the money goes',
+    'subtitle.stats' => 'Spending, forecast and price history',
     'subtitle.subscription_form' => 'Price, renewal date, who pays and who can see it',
     'subtitle.subscriptions' => 'Everything the household pays for',
     'subtitle.tokens' => 'Keys for the API',
@@ -1501,6 +1473,37 @@ return [
     'state.trial_converts' => 'Trial converts',
 
     // stats
+    'stats.breakdown' => 'Breakdown',
+    'stats.converted' => 'Converted',
+    'stats.kpi_ahead' => 'Next 12 months',
+    'stats.kpi_ahead_note' => 'Forecast, including trials converting and scheduled price changes',
+    'stats.kpi_average' => 'Average month',
+    'stats.kpi_average_note' =>
+        '{months, plural, one {# month} other {# months}} so far this year · '
+        . '{count, plural, one {# active subscription} other {# active subscriptions}}',
+    'stats.kpi_rises' => 'Price rises in {year}',
+    'stats.kpi_rises_effect' => '{amount} a year',
+    'stats.kpi_rises_none' => 'None recorded or scheduled',
+    'stats.kpi_spent' => 'Spent this year',
+    'stats.kpi_vs_last_year' => '{percent} vs the same period last year',
+    'stats.months_alt' =>
+        'Monthly spend in {currency}: twelve months reconstructed, this month so far and still due, '
+        . 'and twelve months forecast.',
+    'stats.months_heading' => 'Twelve months back, twelve months ahead',
+    'stats.months_note' => 'Forecast includes trials converting and scheduled price changes',
+    'stats.old_new' => 'Old → new',
+    'stats.per_year' => 'Per year',
+    'stats.price_history' => 'Price history',
+    'stats.price_history_empty' => 'No price changes recorded yet.',
+    'stats.price_history_note' =>
+        'Every recorded change, newest first, in each subscription\'s own currency. A free trial ending '
+        . 'is not a price change, and a currency conversion changes the currency, not the price.',
+    'stats.price_history_pages' => 'Price history pages',
+    'stats.today' => 'Today',
+    'stats.yoy_alt' => 'Spend in {currency} for each month of this year and last.',
+    'stats.yoy_heading' => '{year} against {previous}',
+    'stats.yoy_note' => 'Same month, year over year. The rest of this year is the forecast.',
+    'stats.yoy_rolling' => 'Last 12 months {current}, against {previous} the 12 before:',
     'stats.cost_per_use' => 'Cost per use',
     'stats.donut_alt' =>
         'Doughnut chart of recurring monthly spend by category, in {currency}. The same figures are in '
@@ -1520,14 +1523,11 @@ return [
         . 'its own currency\'s monthly total.',
     'stats.no_payment_method' => 'No payment method',
     'stats.other_payment_methods' => '{count, plural, one {# other method} other {# other methods}}',
-    'stats.last_12_months' => 'Last 12 months',
-    'stats.least_expensive' => 'Least expensive',
     'stats.most_expensive' => 'Most expensive',
     'stats.no_previous_year' =>
         'Nothing recorded for the year before last, so there is nothing to compare against. {amount} in '
         . 'the last twelve months.',
     'stats.no_uses_recorded' => 'No uses recorded',
-    'stats.notable' => 'Notable subscriptions',
     'stats.notable_empty' => 'Nothing with a monthly cost to compare yet.',
     'stats.notable_excluded' =>
         '{count, plural, one {# subscription is} other {# subscriptions are}} not ranked: no exchange '
@@ -1543,27 +1543,9 @@ return [
         'All four are derived from the yearly figure, so they always multiply up to one another. Days '
         . 'and weeks use the mean Gregorian year of 365.25 days. One-off and lifetime entries are '
         . 'excluded.',
-    'stats.history' => 'The last 12 months',
-    // The dashboard's version of this sentence sends the reader to Analytics.
-    // This *is* Analytics, so it names the figures further down this page —
-    // the per-currency yearly totals the cost-by-period card falls back to
-    // when the same conversion fails there.
-    'stats.history_unconvertible' =>
-        'The chart of the last twelve months is not drawn, because no exchange rate is available for '
-        . '{currencies} and a month missing one of its currencies would be drawn as a cheap month rather '
-        . 'than an unknown one. The per-currency figures further down this page are the complete picture.',
-    'stats.history_note' =>
-        'What has already been spent, month by calendar month. Reconstructed from start dates, billing '
-        . 'cycles and recorded price history — this tracks what is due rather than a ledger of payments '
-        . 'taken, so a subscription with no start date is left out rather than guessed at.',
     'stats.rarely_used' => 'Rarely used',
     'stats.rating_label' => '{rating} out of {max}',
-    'stats.the_12_before_that' => 'The 12 before that',
     'stats.title' => 'Analytics',
-    'stats.trajectory' => 'Spending trajectory',
-    'stats.trajectory_note' =>
-        'Each renewal in the month it actually falls, with scheduled price changes and trial conversions '
-        . 'applied from their own dates. The same figures the dashboard chart and the forecast show.',
     'stats.unconvertible' =>
         'These cannot be combined into {currency}: no exchange rate is available for {currencies}. The '
         . 'per-currency figures below are the complete picture; a combined number leaving that spending '
@@ -1575,7 +1557,6 @@ return [
         'Cost per use, highest first. Something with no uses recorded is unmeasured rather than poor '
         . 'value, and sorts to the bottom.',
     'stats.worth_it' => 'Worth it?',
-    'stats.year_over_year' => 'Year over year',
     'stats.year_over_year_empty' => 'Not enough convertible data to compare the two years.',
     'stats.year_over_year_excluded' =>
         '{count, plural, one {# subscription has} other {# subscriptions have}} no start date and so '
@@ -1585,7 +1566,6 @@ return [
         . 'tracks what is due rather than keeping a ledger of payments taken.',
 
     // subscriptions
-    'subscriptions.active_note' => 'Running right now, paused ones aside.',
     'subscriptions.add_subscription' => 'Add subscription',
     'subscriptions.apply_filters' => 'Apply filters',
     'subscriptions.cancel_by_all' => 'All deadlines',

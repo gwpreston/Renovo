@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
-use App\Domain\Entity\Subscription;
-use App\Domain\Money;
+use App\Security\Scope;
 use App\Support\Clock;
 use App\Support\CssPercent;
 use App\Support\DateFormatter;
@@ -13,71 +12,40 @@ use App\Support\MoneyFormatter;
 use DateTimeImmutable;
 
 /**
- * Twelve months of spend, as the payload a chart is drawn from.
+ * Spend month by month, as the bars a chart is drawn from.
  *
- * This was the dashboard's, and it is now the dashboard's and the analytics
- * screen's, which is the reason it is a class rather than a private method. The
- * two screens must agree about what March costs, and the way to make that a
- * fact about the code instead of a claim in a comment is for there to be one
- * piece of code that decides it. A second copy would agree on the day it was
- * written and drift afterwards.
+ * The dashboard's and the analytics screen's, which is the reason it is a
+ * class rather than a private method. The two screens must agree about what
+ * March costs, and the way to make that a fact about the code instead of a
+ * claim in a comment is for there to be one piece of code that decides it: the
+ * dashboard's six-and-six chart is `window()` asked for six months either side,
+ * and the analytics screen's is the same call asked for twelve.
  *
- * **Two windows, one builder.** `fromMonths()` draws the twelve months ahead
- * and `fromHistory()` the twelve behind, and they differ in exactly two ways —
- * which end of the row is a part month, and whether trials are worth a second
- * line — both of which are arguments to the one private builder. The axis, the
- * ticks, the peak and every formatted string are therefore decided in one
- * place, so the past and the future are drawn to the same rules and a reader
- * comparing them is comparing like with like.
+ * Both halves are read from the services that own them. The months behind are
+ * `SpendHistoryService`'s reconstruction ending yesterday, the months ahead are
+ * `ForecastService`'s from today, and this month is the one bar that holds
+ * both — already charged beneath, still due above. Nothing here walks a
+ * subscription itself.
  *
- * The design's chart was income against expenses. There is no income in a
- * subscription tracker, so this is spend over time: each renewal in the month
- * it actually falls, trials priced from their conversion date and scheduled
- * changes from theirs — which is what makes a yearly subscription a bill in
- * March rather than a twelfth of itself every month.
+ * Everything the browser draws is a height worked out on integer minor units
+ * by `CssPercent`, and every string it prints was formatted here by ICU. The
+ * axis is pinned to ticks named here for the same reason: an axis label is a
+ * money value, and money values are formatted in one place.
  *
- * Everything the browser draws is an integer number of minor units, and every
- * string it prints was formatted here by ICU. The client never divides a
- * currency by a hundred, so the question of a float amount reaching a chart
- * does not arise. The axis is pinned to ticks named here for the same reason:
- * an axis label is a money value, and money values are formatted in one place.
- *
- * **When a month cannot be combined, there is no chart.** A line drawn through
- * a missing total would slope towards it as though the month were cheap rather
- * than unknown — the one failure mode worth refusing outright. The caller says
- * which currencies have no rate and points at the Forecast page, which shows
- * those months per currency.
- *
- * **Two lines, and the gap between them is the point.** `minor` is every charge
- * the horizon holds. `committed_minor` is the same walk with the trials taken
- * out, so the distance between the two is what converting trials will add to a
- * month that is not paying for them yet. A trial is the one future cost a user
- * can still avoid, and a single line either hides it or overstates today.
- *
- * The split is made on `isTrial`, not on a charge's `reason`. A trial that
- * converts inside the horizon goes on renewing afterwards, and those later
- * charges are reasoned `renewal` like any other — filtering on the reason would
- * count the conversion as trial-driven and then quietly count the renewals it
- * caused as committed. Every charge a trial produces belongs to the trial.
+ * **When a month cannot be combined, there is no chart.** A bar for a month
+ * whose total is missing would read as a cheap month rather than an unknown
+ * one — the one failure mode worth refusing outright. The payload names the
+ * currencies with no rate, and the card says so instead of drawing.
  *
  * @phpstan-import-type MonthTotals from ForecastService
- * @phpstan-type ChartMonth array{
- *     key: string,
- *     label: string,
- *     minor: int,
- *     display: string,
- *     committed_minor: int,
- *     committed_display: string,
- *     trial_minor: int,
- *     trial_display: string,
- *     is_partial: bool
- * }
  * @phpstan-type ChartTick array{value: int, label: string}
  */
 final class SpendChartService
 {
     public function __construct(
         private readonly StatsService $stats,
+        private readonly SpendHistoryService $history,
+        private readonly ForecastService $forecast,
         private readonly InstanceSettingsService $settings,
         private readonly MoneyFormatter $money,
         private readonly DateFormatter $dates,
@@ -86,54 +54,117 @@ final class SpendChartService
     }
 
     /**
-     * The payload for the forecast chart: the twelve months ahead.
+     * `$pastMonths` complete months reconstructed, this month split at today,
+     * and `$futureMonths` forecast.
      *
-     * @param list<MonthTotals> $months
+     * The reconstruction ends yesterday and the forecast starts today, so the
+     * two halves meet without sharing a charge. The forecast is asked for this
+     * month plus `$futureMonths`, which makes its months exactly
+     * `ForecastService::monthly()` — the Forecast page's own figures.
+     *
+     * The count of subscriptions the reconstruction could not place, for want
+     * of a start date, comes back with the bars, because a reconstructed
+     * figure owes its reader that number.
+     *
      * @return array<string, mixed>
      */
-    public function fromMonths(array $months): array
+    public function window(Scope $scope, int $pastMonths, int $futureMonths, ?int $budgetMinor = null): array
     {
-        // The horizon starts today, so unless today *is* the first of the
-        // month the opening bucket holds only the part of the month still
-        // ahead.
-        $partial = $this->clock->today()->format('j') === '1' ? null : 0;
+        $yesterday = $this->clock->today()->modify('-1 day');
+        $past = $this->history->history($scope, $pastMonths + 1, $yesterday);
+        $future = $this->forecast->monthly($scope, $futureMonths + 1);
 
-        return $this->build($months, $months === [] ? null : $partial, true);
+        return $this->monthBars($past['months'], $future, $budgetMinor) + [
+            'excluded_count' => $past['excluded_count'],
+        ];
     }
 
     /**
-     * The payload for the history chart: the twelve months behind.
+     * This calendar year against the last, month by month.
      *
-     * The same picture drawn from the other direction, and deliberately the
-     * same builder — a second one would agree about the axis on the day it was
-     * written and drift afterwards. Two things differ, and both are arguments
-     * rather than settings:
+     * Last year's twelve months and this year's months so far are the
+     * reconstruction, ending yesterday; the rest of this year — the rest of
+     * this month included — is the forecast from today, drawn as forecast.
+     * That is the same seam `window()` uses, so this month's two parts here
+     * are the same two figures as this month's bar there.
      *
-     * **The partial month is the last, not the first.** The window ends today,
-     * so the closing bucket holds only the part of this month that has already
-     * happened. Reusing the forecast's rule would dash the segment leaving the
-     * *oldest* month and call a month that completed a year ago incomplete.
+     * The year-over-year card's rolling totals are the same reconstruction
+     * read over a different window, which is why the two agree about every
+     * charge and differ only in which charges they count.
      *
-     * **There is no trial line.** "What converting trials will add" is a claim
-     * about the future; a trial that ran last spring either converted, in which
-     * case the charges it produced are in these months as themselves, or it did
-     * not, in which case it cost nothing. So the committed line sits exactly on
-     * the total, `has_trials` stays false, and the second series, the legend
-     * and the third column of the table all drop out on their own.
-     *
-     * @param list<MonthTotals> $months
      * @return array<string, mixed>
      */
-    public function fromHistory(array $months): array
+    public function yearAgainstYear(Scope $scope): array
     {
         $today = $this->clock->today();
+        $currency = $this->settings->baseCurrency();
+        $monthOfYear = (int) $today->format('n');
 
-        // The mirror of the forecast's rule: complete only when today is the
-        // last day of its month, because then there is no rest of the month
-        // left to come.
-        $partial = $today->format('j') === $today->format('t') ? null : count($months) - 1;
+        // From last January to this month, counted back from today: twelve
+        // buckets for last year, then this year's so far.
+        $past = $this->history->history($scope, 12 + $monthOfYear, $today->modify('-1 day'));
+        // From this month to December.
+        $future = $this->forecast->monthly($scope, 13 - $monthOfYear);
 
-        return $this->build($months, $months === [] ? null : $partial, false);
+        $union = [];
+        foreach (array_merge($past['months'], $future) as $month) {
+            foreach ($month['by_currency'] as $code => $amount) {
+                $union[(string) $code] = ($union[(string) $code] ?? 0) + $amount;
+            }
+        }
+
+        $combined = $this->stats->combine($union);
+        $drawable = $combined['unconvertible'] === [];
+
+        $rows = [];
+        $max = 0;
+        for ($index = 0; $index < 12; $index++) {
+            $previous = $past['months'][$index];
+            $charged = $past['months'][12 + $index] ?? null;
+            $due = $index >= $monthOfYear - 1 ? ($future[$index - $monthOfYear + 1] ?? null) : null;
+
+            $previousMinor = $drawable ? (int) ($previous['combined_minor'] ?? 0) : 0;
+            $chargedMinor = $drawable && $charged !== null ? (int) ($charged['combined_minor'] ?? 0) : 0;
+            $dueMinor = $drawable && $due !== null ? (int) ($due['combined_minor'] ?? 0) : 0;
+            $monthStart = new DateTimeImmutable($previous['month'] . '-01');
+
+            $rows[] = [
+                'label' => $this->dates->format($monthStart, 'MMM'),
+                'long_label' => $this->dates->format($monthStart, 'MMMM'),
+                'kind' => match (true) {
+                    $index + 1 < $monthOfYear => 'past',
+                    $index + 1 === $monthOfYear => 'current',
+                    default => 'future',
+                },
+                'previous_minor' => $previousMinor,
+                'previous_display' => $this->money->formatMinor($previousMinor, $currency),
+                'charged_minor' => $chargedMinor,
+                'due_minor' => $dueMinor,
+                'current_minor' => $chargedMinor + $dueMinor,
+                'current_display' => $this->money->formatMinor($chargedMinor + $dueMinor, $currency),
+            ];
+
+            $max = max($max, $previousMinor, $chargedMinor + $dueMinor);
+        }
+
+        $axisMax = $this->axisMax($max);
+        foreach ($rows as $index => $row) {
+            $rows[$index]['previous_height'] = CssPercent::of($row['previous_minor'], $axisMax);
+            $rows[$index]['charged_height'] = CssPercent::of($row['charged_minor'], $axisMax);
+            $rows[$index]['due_height'] = CssPercent::of($row['due_minor'], $axisMax);
+        }
+
+        return [
+            'months' => $rows,
+            'year' => (int) $today->format('Y'),
+            'previous_year' => (int) $today->format('Y') - 1,
+            'axis_max' => $axisMax,
+            'ticks' => $this->ticks($axisMax, $currency),
+            'currency' => $currency,
+            'unconvertible' => $combined['unconvertible'],
+            'is_drawable' => $drawable,
+            'excluded_count' => $past['excluded_count'],
+        ];
     }
 
     /**
@@ -237,141 +268,6 @@ final class SpendChartService
             'unconvertible' => $combined['unconvertible'],
             'is_drawable' => $drawable,
         ];
-    }
-
-    /**
-     * One chart's payload, JSON included.
-     *
-     * @param list<MonthTotals> $months
-     * @param int|null          $partialIndex Which bucket covers part of a month, if any.
-     * @param bool              $splitTrials  Whether to draw the committed line under the total.
-     * @return array<string, mixed>
-     */
-    private function build(array $months, ?int $partialIndex, bool $splitTrials): array
-    {
-        $currency = $this->settings->baseCurrency();
-
-        // One definition of "can this be combined", applied to every currency
-        // the horizon contains at once. A currency without a rate makes its own
-        // months null, so asking about the union asks about each of them.
-        $union = [];
-        foreach ($months as $month) {
-            foreach ($month['by_currency'] as $code => $amount) {
-                $union[(string) $code] = ($union[(string) $code] ?? 0) + $amount;
-            }
-        }
-
-        $combined = $this->stats->combine($union);
-        $drawable = $combined['unconvertible'] === [];
-
-        // A bucket that covers part of a month reads as a cheap month, which
-        // is worse as a line than as a bar: it reads as a fall. So the month
-        // says it is partial, the chart draws the segment beside it dashed and
-        // the figures carry a note. Which end it falls at is the caller's to
-        // say — it is the opening month of a forecast and the closing month of
-        // a history.
-        $points = [];
-        $max = 0;
-        $peak = null;
-        $hasTrials = false;
-
-        foreach ($months as $index => $month) {
-            $minor = $drawable ? (int) ($month['combined_minor'] ?? 0) : 0;
-            $committed = $drawable && $splitTrials ? $this->committedTotal($month['events']) : $minor;
-            $trial = $minor - $committed;
-
-            if ($trial !== 0) {
-                $hasTrials = true;
-            }
-
-            $points[] = [
-                'key' => $month['month'],
-                'label' => $this->dates->format(
-                    new DateTimeImmutable($month['month'] . '-01'),
-                    'MMM',
-                ),
-                'minor' => $minor,
-                'display' => $this->money->formatMinor($minor, $currency),
-                'committed_minor' => $committed,
-                'committed_display' => $this->money->formatMinor($committed, $currency),
-                'trial_minor' => $trial,
-                'trial_display' => $this->money->formatMinor($trial, $currency),
-                'is_partial' => $index === $partialIndex,
-            ];
-
-            // Ties go to the earlier month: the first time spending reaches its
-            // high point is the month worth looking at. Measured on the total
-            // rather than the committed line, because the peak of the chart is
-            // the peak of its upper edge.
-            if ($minor > $max) {
-                $max = $minor;
-                $peak = $index;
-            }
-        }
-
-        $axisMax = $this->axisMax($max);
-
-        $chart = [
-            'months' => $points,
-            'peak_index' => $max > 0 ? $peak : null,
-            // Named rather than left to be found: the template's footnote and
-            // the browser's dashed segment both need to know which bucket it
-            // is, and looking for the first month flagged partial only
-            // happens to be right for a chart whose partial month is first.
-            'partial_index' => $partialIndex,
-            'axis_max' => $axisMax,
-            'ticks' => $this->ticks($axisMax, $currency),
-            'currency' => $currency,
-            'unconvertible' => $combined['unconvertible'],
-            'is_drawable' => $drawable,
-            // False when no trial converts inside the horizon, which is the
-            // common case. The second line would then sit exactly on the first,
-            // and two lines saying one thing is noise — so the chart, the
-            // legend and the table all drop to one series on this flag.
-            'has_trials' => $hasTrials,
-        ];
-
-        // Encoded here rather than in the template, for the reason the
-        // catalogue's own JSON is: this is written inside a <script> element,
-        // and the tag-escaping flags are not a decision a template should be
-        // making one copy of.
-        $chart['json'] = json_encode(
-            $chart,
-            JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP,
-        );
-
-        return $chart;
-    }
-
-    /**
-     * One month's spend with the trials taken out, in the base currency.
-     *
-     * Summed from the charges the forecast already walked rather than by
-     * walking it a second time: `monthly()` hands every event over, so the
-     * committed line is a second reading of one forecast, not a second
-     * forecast. Two walks would agree on the day this was written.
-     *
-     * Combined through `StatsService` for the same reason the total is —
-     * one definition of what converting a currency means. The caller has
-     * already established that every currency in the horizon has a rate, and
-     * these charges are a subset of those, so the combination cannot fail
-     * here if it succeeded there.
-     *
-     * @param list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}> $events
-     */
-    private function committedTotal(array $events): int
-    {
-        $byCurrency = [];
-        foreach ($events as $event) {
-            if ($event['subscription']->isTrial) {
-                continue;
-            }
-
-            $amount = $event['amount'];
-            $byCurrency[$amount->currency] = ($byCurrency[$amount->currency] ?? 0) + $amount->amountMinor;
-        }
-
-        return $this->stats->combine($byCurrency)['amount_minor'] ?? 0;
     }
 
     /**

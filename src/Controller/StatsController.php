@@ -15,14 +15,15 @@ use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
 
 /**
- * The analytics screen: the spend-insight card, the KPI row, the twelve months
- * behind, the spending trajectory, the category donut, year over year and the
- * notable subscriptions — and, below them, the cost-per-period figures and the
- * "worth it?" ranking this page has always carried.
+ * The analytics screen: the year-to-date KPI row, twelve months back and
+ * twelve ahead, this year against last, who pays what, the most expensive
+ * subscriptions, the household's price history and the insights — and, below
+ * them, the breakdown donuts, the cost-per-period figures and the "worth it?"
+ * ranking this page has always carried.
  *
  * Thin, like every controller here. `AnalyticsScreenService` assembles the
- * screen, insights and usage ranking included, so this hands it a scope and
- * hands the template what comes back.
+ * screen, so this hands it a scope and a page number and hands the template
+ * what comes back.
  */
 final class StatsController extends Controller
 {
@@ -40,39 +41,22 @@ final class StatsController extends Controller
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $scope = $this->scope($request);
+        $page = $request->getQueryParams()['history_page'] ?? '1';
 
         // Runs the catch-up before it reads anything, so the figures below are
         // computed from current prices.
-        $overview = $this->analytics->overview($scope);
+        $overview = $this->analytics->overview($scope, is_numeric($page) ? (int) $page : 1);
 
-        /** @var array<string, mixed> $kpis */
-        $kpis = $overview['kpis'];
         /** @var array{currency: string, amount_minor: int|null, unconvertible: list<string>} $combinedYearly */
-        $combinedYearly = $kpis['yearly']['combined'];
+        $combinedYearly = $overview['yearly']['combined'];
 
-        return $this->render($request, $response, 'stats/index.twig', [
-            // Rule-based, and absent when no rule fired: the card states a
-            // figure only when it can name the subscriptions behind it.
-            'insights' => $overview['insights'],
-            'kpis' => $kpis,
-            'trajectory' => $overview['trajectory'],
-            // The same chart drawn over the window that has already happened.
-            // Reconstructed rather than recorded, which the card says on its
-            // own behalf rather than leaving the reader to assume a ledger.
-            'history' => $overview['history'],
-            'categories' => $overview['categories'],
-            'payment_methods' => $overview['payment_methods'],
-            'year_over_year' => $overview['year_over_year'],
-            'notable' => $overview['notable'],
+        return $this->render($request, $response, 'stats/index.twig', $overview + [
             // The per-period figures derive from the annual one rather than
             // from each other, so a weekly number always multiplies up to its
             // own yearly one.
             'per_period' => $this->stats->perPeriod($combinedYearly['amount_minor']),
             'combined_yearly' => $combinedYearly,
-            'yearly_by_currency' => $kpis['yearly']['totals'],
-            // The same ranking the insight rules read, computed once by the
-            // assembler above rather than a second time here.
-            'value_signals' => $overview['value_signals'],
+            'yearly_by_currency' => $overview['yearly']['totals'],
             'base_currency' => $this->settings->baseCurrency(),
             'max_rating' => UsageService::MAX_RATING,
         ]);

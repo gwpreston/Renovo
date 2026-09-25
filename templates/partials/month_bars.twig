@@ -1,0 +1,97 @@
+{#
+    Spend month by month as bars: the months behind, this month in two parts
+    (already charged beneath, still due above) and the months ahead, hatched.
+
+    The dashboard's six-and-six and the analytics screen's twelve-and-twelve,
+    both from `SpendChartService::window()`. The card around it is the
+    caller's; this is the chart, the table a screen reader reads in its place,
+    and the note saying the past is reconstructed.
+
+    `chart`    the payload
+    `caption`      the hidden table's caption
+    `today_label`  optional: a "Today" marker on this month's bar
+#}
+{% if not chart.is_drawable %}
+    <p class="muted empty">
+        {{ t('dashboard.spend_bars_unconvertible', {'currencies': chart.unconvertible|join(', ')}) }}
+    </p>
+{% else %}
+    <div class="spend-bars" aria-hidden="true">
+        <div class="spend-bars-axis">
+            {% for tick in chart.ticks|reverse %}
+                <span class="num">{{ tick.label }}</span>
+            {% endfor %}
+        </div>
+        <div class="spend-bars-body">
+            <div class="spend-bars-plot">
+                {% if chart.budget_height is not null %}
+                    <div class="spend-bars-budget" style="bottom: {{ chart.budget_height }}"></div>
+                {% endif %}
+                {% for bar in chart.bars %}
+                    <div class="spend-bar is-{{ bar.kind }}{{ bar.is_busiest ? ' is-busiest' : '' }}"
+                         title="{{ bar.long_label }} · {{ bar.total_display }}">
+                        {% if bar.kind == 'current' and today_label is defined %}
+                            <i class="spend-bar-today">{{ today_label }}</i>
+                        {% endif %}
+                        {% if bar.is_busiest %}
+                            <b class="spend-bar-peak num">{{ bar.total_display }}</b>
+                        {% endif %}
+                        {% if bar.due_minor > 0 %}
+                            <span class="spend-bar-due" style="height: {{ bar.due_height }}"></span>
+                        {% endif %}
+                        {% if bar.charged_minor > 0 %}
+                            <span class="spend-bar-charged" style="height: {{ bar.charged_height }}"></span>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="spend-bars-labels">
+                {% for bar in chart.bars %}
+                    <span class="{{ bar.kind == 'current' ? 'is-current' : '' }}">{{ bar.label }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {#
+        The figures, for a screen reader: the bars above are hidden from
+        assistive technology and this table, drawn from the same payload,
+        says what they show.
+    #}
+    <div class="visually-hidden table-scroll">
+            <table class="table">
+                <caption class="visually-hidden">{{ caption }}</caption>
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.month') }}</th>
+                    <th scope="col" class="numeric">{{ t('dashboard.series_actual') }}</th>
+                    <th scope="col" class="numeric">{{ t('dashboard.series_forecast') }}</th>
+                    <th scope="col" class="numeric">{{ t('field.total') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for bar in chart.bars %}
+                    <tr{{ bar.is_busiest ? ' class="is-peak"' : '' }}>
+                        <th scope="row">
+                            {{ bar.long_label }}
+                            {% if bar.kind == 'current' %}<span class="badge">{{ t('dashboard.this_month') }}</span>{% endif %}
+                        </th>
+                        <td class="numeric num">{{ bar.kind == 'future' ? t('common.none_symbol') : bar.charged_display }}</td>
+                        <td class="numeric num">{{ bar.kind == 'past' ? t('common.none_symbol') : bar.due_display }}</td>
+                        <td class="numeric num">
+                            {{ bar.total_display }}
+                            {% if bar.is_busiest %}<span class="badge badge-warn">{{ t('dashboard.busiest_month') }}</span>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+    </div>
+
+    <p class="hint chart-note">
+        {{ t('dashboard.reconstructed_note') }}
+        {% if chart.excluded_count > 0 %}
+            {{ t('dashboard.excluded_note', {'count': chart.excluded_count}) }}
+        {% endif %}
+    </p>
+{% endif %}

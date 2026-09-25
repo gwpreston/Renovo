@@ -127,6 +127,36 @@ final class SpendHistoryService
     }
 
     /**
+     * What the charges in `($from, $to]` added up to, per currency and
+     * combined, and how many subscriptions could not be counted.
+     *
+     * `charges()` totalled, for a figure that is a sum over a window rather
+     * than a series of months — the analytics screen's year to date and the
+     * same stretch of last year it is compared with. Combined through
+     * `StatsService`, so a currency with no rate withholds the total and is
+     * named, as every other combined figure is.
+     *
+     * @return array{by_currency: array<string, int>, combined: Combined, excluded_count: int}
+     */
+    public function spent(Scope $scope, DateTimeImmutable $from, DateTimeImmutable $to): array
+    {
+        $walk = $this->charges($scope, $from, $to);
+
+        $byCurrency = [];
+        foreach ($walk['charges'] as $charge) {
+            $currency = $charge['amount']->currency;
+            $byCurrency[$currency] = ($byCurrency[$currency] ?? 0) + $charge['amount']->amountMinor;
+        }
+        ksort($byCurrency);
+
+        return [
+            'by_currency' => $byCurrency,
+            'combined' => $this->stats->combine($byCurrency),
+            'excluded_count' => $walk['excluded_count'],
+        ];
+    }
+
+    /**
      * Month-by-month spend over the window that has just been lived through.
      *
      * The mirror of `ForecastService::monthly()`, and shaped exactly like it so

@@ -27,7 +27,6 @@ import { onThemeChange, renderChart } from './charts.js';
 import { drawCategoryDonuts } from './category-donut.js';
 import { icon } from './icons.js';
 import { enhancePaymentMethodFields } from './payment-method-field.js';
-import { drawSpendCharts } from './spend-chart.js';
 import { enhanceSubscriptionForms } from './subscription-form.js';
 import { enhanceSubscriptionLists } from './subscription-list.js';
 import { enhanceTagFields } from './tag-field.js';
@@ -45,12 +44,13 @@ window.Renovo = {
 /**
  * Every kind of chart this application draws.
  *
- * Each returns immediately on a page that has none of its kind, so a page with
- * no chart pays for two `querySelectorAll` calls and nothing else; Chart.js is
- * fetched only when there is something to draw with it.
+ * The spend charts are drawn on the server as bars, so the donut is the one
+ * kind left. It returns immediately on a page that has none, so a page with no
+ * chart pays for one `querySelectorAll` and nothing else; Chart.js is fetched
+ * only when there is something to draw with it.
  */
 function drawCharts(root = document) {
-    return Promise.all([drawSpendCharts(root), drawCategoryDonuts(root)]);
+    return drawCategoryDonuts(root);
 }
 
 /*

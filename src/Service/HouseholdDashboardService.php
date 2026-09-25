@@ -162,39 +162,49 @@ final class HouseholdDashboardService
      * year.
      *
      * Both windows end yesterday's date — this year's and a year before it —
-     * so the comparison is like for like. The change is a percentage only when
-     * both sides total and last year's is above zero.
+     * so the comparison is like for like, and a charge falling today is the
+     * forecast's rather than counted twice. The change is a percentage only
+     * when both sides total and last year's is above zero: whole, and in
+     * tenths for a screen that states it to one place.
+     *
+     * Public because the analytics screen's KPI row states the same figure,
+     * and it reads it here rather than working it out a second time.
      *
      * @return array<string, mixed>
      */
-    private function yearToDate(Scope $scope): array
+    public function yearToDate(Scope $scope): array
     {
         $yesterday = $this->clock->today()->modify('-1 day');
         $newYearsEve = $this->clock->today()->modify('first day of january this year')->modify('-1 day');
 
-        $current = $this->history->charges($scope, $newYearsEve, $yesterday);
-        $previous = $this->history->charges($scope, $newYearsEve->modify('-1 year'), $yesterday->modify('-1 year'));
+        $current = $this->history->spent($scope, $newYearsEve, $yesterday);
+        $previous = $this->history->spent($scope, $newYearsEve->modify('-1 year'), $yesterday->modify('-1 year'));
 
-        $now = $this->figures($this->byCurrency($current['charges']));
-        $then = $this->figures($this->byCurrency($previous['charges']));
+        $nowMinor = $current['combined']['amount_minor'];
+        $thenMinor = $previous['combined']['amount_minor'];
+        $comparable = $nowMinor !== null && $thenMinor !== null && $thenMinor > 0;
 
-        $nowMinor = $now['combined']['amount_minor'];
-        $thenMinor = $then['combined']['amount_minor'];
-
-        return $now + [
-            'change_percent' => $nowMinor !== null && $thenMinor !== null && $thenMinor > 0
+        return $this->figures($current['by_currency']) + [
+            'by_currency' => $current['by_currency'],
+            'change_percent' => $comparable
                 ? Rounding::multiplyDivide($nowMinor - $thenMinor, 100, $thenMinor)
+                : null,
+            'change_tenths' => $comparable
+                ? Rounding::multiplyDivide($nowMinor - $thenMinor, 1000, $thenMinor)
                 : null,
             'excluded_count' => $current['excluded_count'],
         ];
     }
 
     /**
-     * What the next twelve months are forecast to cost.
+     * What the next twelve months are forecast to cost: the Forecast page's
+     * twelve months, added up.
+     *
+     * Public for the reason `yearToDate()` is — the analytics screen's KPI.
      *
      * @return Figures
      */
-    private function yearAhead(Scope $scope): array
+    public function yearAhead(Scope $scope): array
     {
         $byCurrency = [];
         foreach ($this->forecast->monthly($scope, self::YEAR_AHEAD_MONTHS) as $month) {

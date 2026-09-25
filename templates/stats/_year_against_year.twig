@@ -1,0 +1,118 @@
+{#
+    This year against last, month by month.
+
+    Both years are the reconstruction — start dates, billing cycles and price
+    history — except the rest of this year, which is the forecast and is drawn
+    hatched, as on the chart above. Heights are percentages worked out on
+    minor units by the server; the hidden table says what the bars show.
+
+    Beneath the bars, the rolling comparison this card has always made: the
+    last twelve months against the twelve before them.
+#}
+{% set chart = year_against_year %}
+{% set yoy = year_over_year %}
+
+<section class="card analytics-yoy" id="analytics-year-over-year" aria-labelledby="analytics-yoy-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="analytics-yoy-heading">{{ t('stats.yoy_heading', {
+                'year': chart.year,
+                'previous': chart.previous_year,
+            }) }}</h2>
+            <p class="muted">{{ t('stats.yoy_note') }}</p>
+        </div>
+        {% if chart.is_drawable %}
+            <ul class="chart-legend" aria-hidden="true">
+                <li><span class="chart-key chart-key-previous"></span>{{ chart.previous_year }}</li>
+                <li><span class="chart-key chart-key-current"></span>{{ chart.year }}</li>
+            </ul>
+        {% endif %}
+    </header>
+
+    {% if not chart.is_drawable %}
+        <p class="muted empty">
+            {{ t('dashboard.spend_bars_unconvertible', {'currencies': chart.unconvertible|join(', ')}) }}
+        </p>
+    {% else %}
+        <div class="yoy-bars" aria-hidden="true">
+            <div class="yoy-bars-plot">
+                {% for month in chart.months %}
+                    <div class="yoy-month is-{{ month.kind }}">
+                        <span class="yoy-bar yoy-bar-previous" style="height: {{ month.previous_height }}"
+                              title="{{ month.long_label }} {{ chart.previous_year }} · {{ month.previous_display }}"></span>
+                        <span class="yoy-bar yoy-bar-current"
+                              title="{{ month.long_label }} {{ chart.year }} · {{ month.current_display }}">
+                            {% if month.due_minor > 0 %}
+                                <span class="spend-bar-due" style="height: {{ month.due_height }}"></span>
+                            {% endif %}
+                            {% if month.charged_minor > 0 %}
+                                <span class="yoy-bar-charged" style="height: {{ month.charged_height }}"></span>
+                            {% endif %}
+                        </span>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="spend-bars-labels yoy-labels">
+                {% for month in chart.months %}
+                    <span class="{{ month.kind == 'current' ? 'is-current' : '' }}">{{ month.label }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="visually-hidden table-scroll">
+            <table class="table">
+                <caption class="visually-hidden">{{ t('stats.yoy_alt', {'currency': chart.currency}) }}</caption>
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.month') }}</th>
+                    <th scope="col" class="numeric">{{ chart.previous_year }}</th>
+                    <th scope="col" class="numeric">{{ chart.year }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for month in chart.months %}
+                    <tr>
+                        <th scope="row">{{ month.long_label }}</th>
+                        <td class="numeric num">{{ month.previous_display }}</td>
+                        <td class="numeric num">
+                            {{ month.current_display }}
+                            {% if month.kind == 'future' %}<span class="badge">{{ t('dashboard.series_forecast') }}</span>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {#
+        The rolling comparison: the last twelve months against the twelve
+        before, as one line rather than three tiles now that the bars above
+        carry the picture.
+    #}
+    <p class="yoy-summary">
+        {% if yoy.current.amount_minor is null or yoy.previous.amount_minor is null %}
+            <span class="muted">{{ t('stats.year_over_year_empty') }}</span>
+        {% elseif yoy.previous.amount_minor == 0 %}
+            <span class="muted">{{ t('stats.no_previous_year', {
+                'amount': yoy.current.amount_minor|money(yoy.current.currency),
+            }) }}</span>
+        {% else %}
+            {{ t('stats.yoy_rolling', {
+                'current': yoy.current.amount_minor|money(yoy.current.currency),
+                'previous': yoy.previous.amount_minor|money(yoy.previous.currency),
+            }) }}
+            <strong class="num {{ yoy.change_minor > 0 ? 'is-increase' : 'is-decrease' }}">
+                {{ yoy.change_minor|money(yoy.current.currency, true) }}{% if yoy.change_percent is not null %}
+                    ({{ yoy.change_percent|percent(true) }}){% endif %}
+            </strong>
+        {% endif %}
+    </p>
+
+    <p class="hint">
+        {{ t('stats.year_over_year_note') }}
+        {% if chart.excluded_count > 0 %}
+            {{ t('stats.year_over_year_excluded', {'count': chart.excluded_count}) }}
+        {% endif %}
+    </p>
+</section>

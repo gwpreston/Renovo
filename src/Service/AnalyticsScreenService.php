@@ -5,47 +5,69 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Domain\Entity\Subscription;
+use App\Domain\Rounding;
 use App\Security\Scope;
+use App\Support\Clock;
 
 /**
- * The analytics screen: the KPI row, the twelve months behind and the twelve
- * ahead, the category donut, year over year and the notable subscriptions.
+ * The analytics screen: the year-to-date KPI row, twelve months back and twelve
+ * ahead, this year against last, who pays what, the most expensive
+ * subscriptions, the household's price history and the insights — then the
+ * breakdown donuts and the review figures the page has always carried.
  *
  * The third of these assemblers, after DashboardService and
  * SubscriptionScreenService, and held to the same rule: **not one figure here
- * is computed for this screen.** The KPIs are the statistics the page already
- * reported, the trajectory is the payload the dashboard's chart is drawn from,
- * the donut is the category breakdown the my-subscriptions widget draws as
- * bars, and year over year is the reconstruction `StatsService` performs. This
- * phase is how the numbers are shown, not what they are.
+ * is computed for this screen.** Spend already paid is
+ * `SpendHistoryService`'s reconstruction, spend still to come is
+ * `ForecastService`'s, the chart is the dashboard's own chart asked for twelve
+ * months a side, who pays is the household dashboard's card, the price history
+ * is `PriceHistoryService`'s, and the insights are `SpendInsightService`'s.
+ * This class decides what goes where, and what "most expensive" ranks on —
+ * see `mostExpensive()`.
  *
- * The one thing it does decide is what "notable" means, because nothing
- * computed it before. See `notable()` for the ranking and what it leaves out.
- *
- * Phase 13 put one exception beside that claim, and it is worth naming rather
- * than leaving the paragraph above quietly untrue: the insight card is a
- * genuinely new observation, not a restyle of an old one. It is assembled here
- * because it reads the rows this screen has already loaded, but the rules and
- * the figures are `SpendInsightService`'s.
+ * **Known cost: several walks of the household for one page.** The statistics
+ * read every subscription; the chart, this year against last and the two
+ * year-to-date sums each reconstruct the past with their own window; the
+ * forecast is walked for the chart, the year and the next twelve months. Each
+ * reconstruction reads price history once per subscription. Sharing one walk
+ * would mean changing what those services hand back rather than what they
+ * compute, which is a change to services three screens depend on. Worth
+ * fixing when something else touches it; stated here so it is a known cost
+ * rather than a surprise.
  *
  * @phpstan-import-type Breakdown from CategoryBreakdownService
+ * @phpstan-import-type Combined from StatsService
+ * @phpstan-import-type HouseholdChange from PriceHistoryService
  * @phpstan-import-type Insight from SpendInsightService
  * @phpstan-import-type ValueSignal from UsageService
- * @phpstan-type NotableRow array{subscription: Subscription, monthly_minor: int, comparable_minor: int}
+ * @phpstan-type RankedRow array{subscription: Subscription, monthly_minor: int, comparable_minor: int}
+ * @phpstan-type Figures array{totals: list<array{currency: string, amount_minor: int}>, combined: Combined}
  */
 final class AnalyticsScreenService
 {
+    /** How many subscriptions "Most expensive" lists. */
+    public const MOST_EXPENSIVE_ROWS = 5;
+
+    /** Price history rows per page. */
+    public const PRICE_HISTORY_PER_PAGE = 20;
+
+    /** Months of the chart either side of this one. */
+    public const CHART_MONTHS = 12;
+
     public function __construct(
         private readonly StatsService $stats,
         private readonly SpendHistoryService $history,
-        private readonly ForecastService $forecast,
         private readonly SpendChartService $spendChart,
         private readonly CategoryBreakdownService $breakdown,
         private readonly SubscriptionService $subscriptions,
         private readonly UsageService $usage,
         private readonly SpendInsightService $insights,
+        private readonly PriceHistoryService $priceHistory,
+        private readonly HouseholdOverviewService $household,
+        private readonly HouseholdDashboardService $householdDashboard,
         private readonly ExchangeRateService $rates,
         private readonly InstanceSettingsService $settings,
+        private readonly Clock $clock,
     ) {
     }
 
@@ -57,45 +79,36 @@ final class AnalyticsScreenService
      * second time for them would be two answers to one question waiting to
      * differ — the arrangement the dashboard uses for its near-window query.
      *
-     * **Known cost: four walks of the household for one page.** The statistics
-     * read every subscription, this reads them again because `notable` and the
-     * usage ranking both want the rows, and `yearOverYear` and the history
-     * chart each read them again with their own argument and their own window.
-     * Sharing one read would mean changing what `StatsService` hands back
-     * rather than what it computes, which is a change to a service three
-     * screens depend on and not a restyle's to make. Worth fixing when
-     * something else touches it; stated here so it is a known cost rather than
-     * a surprise.
-     *
      * @return array{
      *     kpis: array<string, mixed>,
-     *     trajectory: array<string, mixed>,
-     *     history: array<string, mixed>,
+     *     yearly: array{totals: list<array{currency: string, amount_minor: int}>, combined: Combined},
+     *     chart: array<string, mixed>,
+     *     year_against_year: array<string, mixed>,
+     *     year_over_year: array<string, mixed>,
+     *     who_pays: array<string, mixed>,
+     *     most_expensive: array{rows: list<RankedRow>, excluded_count: int},
+     *     price_history: array{rows: list<HouseholdChange>, page: int, pages: int, total: int},
      *     categories: array<string, mixed>,
      *     payment_methods: array<string, mixed>,
-     *     year_over_year: array<string, mixed>,
-     *     notable: array{highest: NotableRow|null, lowest: NotableRow|null, excluded_count: int},
      *     insights: list<Insight>,
      *     value_signals: list<ValueSignal>,
      *     subscriptions: list<Subscription>
      * }
      */
-    public function overview(Scope $scope): array
+    public function overview(Scope $scope, int $historyPage = 1): array
     {
         // First, because it runs the catch-up: due price changes, ended trials
         // and overdue payment dates are brought up to date before anything
         // below reads a figure the next page load would correct.
         $stats = $this->stats->dashboard($scope);
 
-        // The dashboard's call, argument for argument. A `$forUserId` here
-        // would give this screen one member's share and the dashboard the
-        // household's, and "the two agree by construction" would stop being
-        // true the moment anybody had a split.
-        $months = $this->forecast->monthly($scope, ForecastService::DEFAULT_MONTHS);
-
         $all = $this->subscriptions->allForStats($scope);
         $breakdown = $this->breakdown->fromStats($stats);
         $byMethod = $this->breakdown->fromStats($stats, CategoryBreakdownService::BY_PAYMENT_METHOD);
+
+        // Paused and cancelled rows have a price history too, and "every
+        // recorded change" includes theirs.
+        $changes = $this->priceHistory->householdChanges($scope, $this->subscriptions->allForStats($scope, false));
 
         // Computed once and handed to both the insight rules and the ranking
         // at the foot of the page. It is a pure read of the rows above, but two
@@ -104,23 +117,38 @@ final class AnalyticsScreenService
         $valueSignals = $this->usage->valueSignals($all);
 
         return [
-            'kpis' => $this->kpis($stats),
-            'trajectory' => $this->spendChart->fromMonths($months),
-            // What the trajectory is a continuation of. The same payload
-            // builder as the trajectory and the same reconstruction the
-            // year-over-year card is totalled from, so one walk of the
-            // household answers both — over twelve calendar months here and a
-            // rolling year there, which is why the totals are close rather
-            // than equal.
-            'history' => $this->spendChart->fromHistory($this->history->monthly($scope)),
+            'kpis' => $this->kpis($scope, $stats, $changes),
+            // The recurring cost over a year, which the per-period figures at
+            // the foot of the page are derived from.
+            'yearly' => [
+                'totals' => array_map(
+                    static fn (array $row): array => [
+                        'currency' => $row['currency'],
+                        'amount_minor' => $row['yearly_minor'],
+                    ],
+                    $stats['recurring'],
+                ),
+                'combined' => $stats['combined_yearly'],
+            ],
+            // The dashboard's chart, asked for twelve months a side rather than
+            // six: its thirteen bars are thirteen of these.
+            'chart' => $this->spendChart->window($scope, self::CHART_MONTHS, self::CHART_MONTHS),
+            'year_against_year' => $this->spendChart->yearAgainstYear($scope),
+            // The rolling twelve months against the twelve before, kept as the
+            // summary line beneath the calendar-year bars.
+            'year_over_year' => $this->history->yearOverYear($scope),
+            // The household dashboard's card, scoped the same way: only the
+            // viewer's own share in ISOLATED mode, private rows only for their
+            // payer.
+            'who_pays' => $this->household->whoPays($scope),
+            'most_expensive' => $this->mostExpensive($all),
+            'price_history' => $this->page($changes, $historyPage),
             'categories' => $breakdown + ['donut' => $this->breakdown->donut($breakdown)],
             // The same breakdown and the same degrade, grouped by what each
             // subscription is paid with rather than what it is for.
             'payment_methods' => $byMethod + ['donut' => $this->breakdown->donut($byMethod)],
-            'year_over_year' => $this->history->yearOverYear($scope),
-            'notable' => $this->notable($all),
             // After the catch-up, like everything else here: insights read
-            // prices and trial states that are already up to date, so the card
+            // prices and trial states that are already up to date, so the list
             // cannot contradict the KPI row above it.
             'insights' => $this->insights->insights($scope, $all, $valueSignals),
             'value_signals' => $valueSignals,
@@ -129,53 +157,116 @@ final class AnalyticsScreenService
     }
 
     /**
-     * Monthly spend, annual spend, active subscriptions.
+     * The KPI row: spent this year, the average month, the next twelve months
+     * and this year's price rises.
      *
-     * The two money figures are shaped for `partials/spend.twig`, which is the
-     * per-currency rule written once: one line for one currency, a combined
-     * total when every currency converts, subtotals and no total when one does
-     * not. The design's single clean number is the common case rather than the
-     * only one — a headline that silently dropped a currency would be a wrong
-     * number, not a tidy one.
+     * **Spent this year and the next twelve months are the household
+     * dashboard's** (`HouseholdDashboardService::yearToDate()` and
+     * `yearAhead()`). Spent this year runs to yesterday, not today: the
+     * forecast starts today, so a charge falling today is in the next twelve
+     * months, and the chart beneath draws the same seam. It is compared with
+     * the same stretch of last year rather than with the rolling year the
+     * year-over-year line reports.
+     *
+     * Every money figure is shaped for `partials/spend.twig`, the per-currency
+     * rule written once.
      *
      * @param array<string, mixed> $stats
+     * @param list<HouseholdChange> $changes
      * @return array<string, mixed>
      */
-    private function kpis(array $stats): array
+    private function kpis(Scope $scope, array $stats, array $changes): array
     {
-        /** @var list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring */
-        $recurring = $stats['recurring'];
+        $today = $this->clock->today();
+        $monthsElapsed = (int) $today->format('n');
+
+        // The household dashboard's own two figures, read rather than
+        // recomputed, so the two screens cannot state different numbers for
+        // the same stretch of time.
+        $spent = $this->householdDashboard->yearToDate($scope);
+        $ahead = $this->householdDashboard->yearAhead($scope);
+
+        /** @var array<string, int> $spentByCurrency */
+        $spentByCurrency = $spent['by_currency'];
+        $average = array_map(
+            static fn (int $amount): int => Rounding::divide($amount, $monthsElapsed),
+            $spentByCurrency,
+        );
+
+        $year = $today->format('Y');
+        $rises = array_values(array_filter(
+            $changes,
+            static fn (array $row): bool => $row['is_rise'] && $row['change']->effectiveFrom->format('Y') === $year,
+        ));
+        $riseEffect = [];
+        foreach ($rises as $row) {
+            if ($row['annual_minor'] === null) {
+                continue;
+            }
+            $currency = $row['to']->currency;
+            $riseEffect[$currency] = ($riseEffect[$currency] ?? 0) + $row['annual_minor'];
+        }
+        ksort($riseEffect);
 
         return [
-            'monthly' => [
-                'totals' => array_map(
-                    static fn (array $row): array => [
-                        'currency' => $row['currency'],
-                        'amount_minor' => $row['monthly_minor'],
-                    ],
-                    $recurring,
-                ),
-                'combined' => $stats['combined_monthly'],
+            'spent' => [
+                'totals' => $spent['totals'],
+                'combined' => $spent['combined'],
+                'change_tenths' => $spent['change_tenths'],
+                'excluded_count' => $spent['excluded_count'],
             ],
-            'yearly' => [
-                'totals' => array_map(
-                    static fn (array $row): array => [
-                        'currency' => $row['currency'],
-                        'amount_minor' => $row['yearly_minor'],
-                    ],
-                    $recurring,
-                ),
-                'combined' => $stats['combined_yearly'],
+            'average' => $this->figures($average) + ['active_count' => $stats['active_count']],
+            'ahead' => $ahead,
+            'rises' => [
+                'count' => count($rises),
+                'effect' => $this->figures($riseEffect)['totals'],
             ],
-            'active_count' => $stats['active_count'],
+            'year' => (int) $year,
+            'months_elapsed' => $monthsElapsed,
         ];
     }
 
     /**
-     * The most and least expensive subscription.
+     * Per-currency amounts as the shape `partials/spend.twig` draws.
      *
-     * Nothing computed this before, so the ranking is stated rather than
-     * implied. Three decisions, each of which follows a rule the rest of the
+     * @param array<string, int> $byCurrency
+     * @return Figures
+     */
+    private function figures(array $byCurrency): array
+    {
+        $totals = [];
+        foreach ($byCurrency as $currency => $amount) {
+            $totals[] = ['currency' => (string) $currency, 'amount_minor' => $amount];
+        }
+
+        return ['totals' => $totals, 'combined' => $this->stats->combine($byCurrency)];
+    }
+
+    /**
+     * One page of the price history.
+     *
+     * @param list<HouseholdChange> $changes
+     * @return array{rows: list<HouseholdChange>, page: int, pages: int, total: int}
+     */
+    private function page(array $changes, int $page): array
+    {
+        $total = count($changes);
+        $pages = max(1, intdiv($total + self::PRICE_HISTORY_PER_PAGE - 1, self::PRICE_HISTORY_PER_PAGE));
+        $page = min(max(1, $page), $pages);
+
+        return [
+            'rows' => array_slice($changes, ($page - 1) * self::PRICE_HISTORY_PER_PAGE, self::PRICE_HISTORY_PER_PAGE),
+            'page' => $page,
+            'pages' => $pages,
+            'total' => $total,
+        ];
+    }
+
+    /**
+     * The most expensive subscriptions, dearest first.
+     *
+     * Phase 12's ranking, now the top five rather than the highest and the
+     * lowest. The decisions it makes, each following a rule the rest of the
      * application already keeps:
      *
      * **It ranks on monthly-normalised cost.** Comparing a yearly subscription
@@ -187,30 +278,23 @@ final class AnalyticsScreenService
      * amounts in currencies with no rate between them have no order, and
      * inventing one by comparing the digits would rank 900 JPY above 50 GBP.
      * A subscription whose currency has no rate is therefore left out and
-     * counted, and the count is shown — the same answer `yearOverYear` gives to
-     * the same kind of gap.
+     * counted, and the count is shown.
      *
-     * **It is recurring subscriptions only.** `monthlyMinor()` is null for a
-     * one-off or a lifetime purchase, which `StatsService` already keeps out of
-     * the recurring totals for the reason that applies here: a lifetime licence
-     * has no monthly cost to be the highest or lowest of.
-     *
-     * **And a running trial is not ranked either.** Its price is zero until it
-     * converts, so it would take the "least expensive" line every time and
-     * report £0.00 — which is what the trial costs today and not what it costs.
-     * The trials section says what each one will convert to; this card would be
-     * contradicting it. Pricing it at `priceAfterConversion()` instead was the
-     * alternative and is worse: the same subscription would then be one figure
-     * here and another in the KPI row above, on one screen.
+     * **It is running recurring subscriptions only.** `monthlyMinor()` is null
+     * for a one-off or a lifetime purchase, which has no monthly cost to rank.
+     * A running trial costs nothing until it converts, and pricing it at its
+     * converted price would make it one figure here and another in the KPI
+     * row. Paused and cancelled rows are not costing anything either — a
+     * cancelled row can still be flagged active, so it is asked for by name.
      *
      * Each result is displayed in **its own currency** — the conversion decides
      * the order and nothing else, so nobody is shown a price they have never
      * been charged.
      *
      * @param list<Subscription> $all
-     * @return array{highest: NotableRow|null, lowest: NotableRow|null, excluded_count: int}
+     * @return array{rows: list<RankedRow>, excluded_count: int}
      */
-    private function notable(array $all): array
+    private function mostExpensive(array $all): array
     {
         $base = $this->settings->baseCurrency();
 
@@ -218,13 +302,7 @@ final class AnalyticsScreenService
         $excluded = 0;
 
         foreach ($all as $subscription) {
-            if (!$subscription->isActive) {
-                continue;
-            }
-
-            // Free today, priced later: neither the cheapest thing in the
-            // household nor a comparison anybody can act on.
-            if ($subscription->isTrial) {
+            if (!$subscription->isActive || $subscription->isCancelled() || $subscription->isTrial) {
                 continue;
             }
 
@@ -246,23 +324,13 @@ final class AnalyticsScreenService
             ];
         }
 
-        if ($ranked === []) {
-            return ['highest' => null, 'lowest' => null, 'excluded_count' => $excluded];
-        }
-
-        // Cheapest first, and alphabetically within a tie so that two
+        // Dearest first, and alphabetically within a tie so that two
         // subscriptions costing the same do not swap places between page loads.
-        usort($ranked, static fn (array $a, array $b): int => $a['comparable_minor'] <=> $b['comparable_minor']
+        usort($ranked, static fn (array $a, array $b): int => $b['comparable_minor'] <=> $a['comparable_minor']
             ?: strcmp($a['subscription']->name, $b['subscription']->name));
 
-        $highest = $ranked[count($ranked) - 1];
-
         return [
-            'highest' => $highest,
-            // One subscription is both the most and the least expensive thing
-            // in the household, and printing it twice says nothing the first
-            // line did not.
-            'lowest' => count($ranked) > 1 ? $ranked[0] : null,
+            'rows' => array_slice($ranked, 0, self::MOST_EXPENSIVE_ROWS),
             'excluded_count' => $excluded,
         ];
     }
