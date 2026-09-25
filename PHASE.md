@@ -4,175 +4,135 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 23 — analytics
+# Phase 24 — budgets
 
-The Analytics screen (`/stats`) rebuilt to the prototype: a year-to-date KPI row,
-a 24-month chart that joins the past to the forecast, year over year, who pays
-what, the most expensive subscriptions, a household-wide price history, and the
-insights list. It introduces no new computation. It reads `SpendHistoryService`
-(Phase 21), `ForecastService`, the year-over-year figures, the split service, the
-notable ranking (Phase 12), price history and `SpendInsightService` (Phase 13).
+A dedicated Budgets screen, reached from the rail's Household tools. Budgets
+already exist (Phase 2) and gained named-member and household subjects in Phase
+20; this phase gives them the prototype's page and form. Projections still come
+from `ForecastService`, so a budget cannot disagree with the forecast; the history
+chart comes from `SpendHistoryService`, so it cannot disagree with the dashboard.
 
 ## Depends on
 
-- **Phase 21** — `SpendHistoryService` (reconstructed past spend).
-- **Phase 20** — private rows, cancelled/paused exclusions, the price-change
-  sources.
-- **Phases 12, 13, 17** — the notable ranking, the breakdown donuts (category and
-  payment method), `SpendInsightService`, `AnalyticsScreenService`.
+- **Phase 20** — `budgets.subject_user_id` (member and household budgets) and
+  their permission rules.
+- **Phase 21** — `SpendHistoryService`.
+- **Phases 2, 3** — budget projection, warning threshold, the alert crossing
+  state, per-user routing.
 
 ## In scope this phase (build ONLY these)
 
-### A. KPI row
+### A. The page
 
-| KPI | Binds to |
-| --- | --- |
-| **Spent this year** | January to today, reconstructed; note "+N% vs the same period last year" |
-| **Average month** | this year's reconstructed spend ÷ elapsed months |
-| **Next 12 months** | forecast total |
-| **Price rises this year** | count of genuine rises recorded or scheduled this year (not trial or currency conversions), with their combined yearly effect per currency |
+- An intro line: each budget compares a limit with what subscriptions will cost
+  in the period, including trials about to convert; you are alerted when one is
+  projected over.
+- **New budget** — a secondary button in the page header (the top bar's
+  "Add new" stays the one primary action), shown only to roles that may create a
+  budget.
 
-Every figure follows the per-currency rule.
+### B. Status tiles
 
-### B. Twelve months back, twelve ahead
+**On track**, **Warning** (past its warning threshold), **Projected over**, and
+**Household limit** — the monthly household budget if one exists (SHARED), else
+the tile is absent. Counts are of budgets the viewer can see.
 
-One chart: twelve reconstructed months, a **Today** marker, twelve forecast
-months (hatched). Caption "Forecast includes trials converting and scheduled
-price changes"; the reconstructed half carries the excluded-count note. The
-dashboard's six-and-six chart is a window of this series — the same service, and
-a test says so. Withheld with the currency named when a month cannot be combined.
+### C. Budget cards
 
-### C. 2026 against 2025
+One per visible budget:
 
-Same-month bars for this year and last, from the existing year-over-year figures,
-with the note "N subscriptions left out — no start date" when N > 0.
+- Name; meta line "{Monthly|Yearly} · {category or All categories} · {member
+  name or Household}".
+- State badge with text: On track (ok) / Warning (warn) / Over (bad).
+- **Projected** value "of {limit}" and a bar showing charged-so-far solid and
+  projected lighter, with a tick at the warning threshold.
+- Note: "{amount} left", "{N}% used — past the {W}% warning", "Over by
+  {amount}", or "Projected {amount} if trials convert — over by {amount}".
+- Percentage.
+- **Alerts line** from the owner's real routing: "Alert when projected over ·
+  Email, Slack", or "Alerts off" — never a fixed string. (Only projected-over
+  alerts are sent; the warning threshold is shown, not alerted — Phase 3's rule.)
+- Edit, drawn only where the viewer may edit that budget.
 
-### D. Who pays what
+Budgets are in base currency. A budget whose projection is `null` (spend in a
+currency with no rate) shows "Projection unavailable — no rate for {currency}"
+instead of a figure, matching the alert state machine's refusal to call it under.
 
-Monthly share after splits, per member, as bars. Scoped exactly as the
-dashboard's "Who pays": in ISOLATED mode only the viewer's own share ("Your
-share"); private rows count only for their payer.
+### D. Household total, last six months
 
-### E. Most expensive
+Bars of reconstructed monthly spend for the last six months against the monthly
+household limit, "over in N of 6". Shown only when a monthly household budget
+exists, in SHARED mode. Captioned as reconstructed, with the excluded count.
 
-The top five by monthly cost converted to base currency (Phase 12's ranking),
-each shown in **its own currency**, rank, name and monthly figure. Rows whose
-currency has no rate are left out and counted. One-off, lifetime, running trials,
-paused and cancelled rows are not ranked (Phase 12's rules, plus Phase 20's
-states).
+### E. The budget form (modal, full page without script)
 
-### F. Price history
-
-Every recorded change across the household, newest first: date (or
-**Scheduled** badge for a future row), service, old → new, change (amount and %),
-effect per year — each in the subscription's own currency. Trial conversions are
-not listed as changes (Phase 13's guard); a currency conversion is listed as
-"Converted" with no percentage, because the price did not change. Paged at 20
-rows, with a link to each subscription.
-
-### G. Insights
-
-`SpendInsightService`'s rules rendered as the prototype's list: icon, title,
-body naming the subscriptions and the arithmetic. Silence is still a result — no
-card when no rule fires. Each links to the subscription, permission-checked. Not
-called "AI".
-
-### H. Kept from Phase 12 and 17, beneath the new sections
-
-A **Breakdown** row with the category donut and the payment-method donut (both
-degrade to per-currency figures), then the existing per-period costs
-(day/week/month/year), the per-year-by-currency list and the cost-per-use ranking
-with its usage form. Nothing the page carried is dropped. A link to the Forecast
-page stays.
+- Name
+- Limit ({base currency})
+- Period — Monthly / Yearly
+- Category — All categories, or one flat category (decision 4)
+- Whose spending — **Household** (SHARED only) or a member; a Contributor sees
+  only themselves; an Editor in ISOLATED only themselves
+- Warn me at — slider, with its percentage
+- Delete (edit only), Cancel, Save budget
 
 ## Data-model changes
 
-**None.**
+**None** (Phase 20 added the subject).
 
 ## Explicitly out of scope
 
-- New insight rules; a model-backed insight.
-- A dashboard insight tile (still deferred from Phase 13).
+- Per-payment-method budgets (Phase 17's seam, still a seam).
+- Category-group budgets (decision 4).
+- Alerting at the warning threshold.
 
 ## Decisions & assumptions (settled before build)
 
-- **Most expensive shows the top five only**; Phase 12's "least expensive" line
-  is dropped, as the prototype drops it.
-- Both donuts are kept in a Breakdown row below the prototype's sections.
-- A currency conversion appears in price history as "Converted", without a
-  percentage.
-- **The chart is 25 bars**: twelve reconstructed, this month split at today into
-  already charged and still due, twelve forecast — the dashboard's shape, so its
-  thirteen bars are a window of these.
-- **This year against last** is same-month bars from the reconstruction (last
-  January to yesterday) with the rest of this year from the forecast, hatched.
-  The rolling twelve-months totals stay as one line beneath it.
-- **Spent this year runs to yesterday**: today's charges are the forecast's, as
-  on the chart.
-- Price history includes paused and cancelled rows; a scheduled change on a
-  cancelled row is left out of the table and the KPI.
-- The two line charts (the year behind, the trajectory) and their script are
-  removed; the 24-month chart replaces both.
+- **New budget is secondary**, beside a primary "Add new" in the top bar.
+- The alerts line describes the **owner's** routing, as **channel types only**
+  ("Email, Slack") — never a channel's name, address or URL, since every member
+  who can see the budget reads it.
+- The six-month history appears only with a monthly household budget.
+- **Cards read the calendar period**: this month for a Monthly budget, this
+  calendar year for a Yearly one — charged so far (reconstructed, to
+  yesterday) plus the forecast to the period's end, as the dashboard's budget
+  card already reads the month. The projected-over alert (Phase 3) still
+  projects a rolling horizon from today, so a card can turn Over on a different
+  day from the alert; aligning the two is a seam, not this phase.
+- **Over** is the projection including trials converting; the note tells "over
+  on what is committed" from "over only if trials convert".
+- **No Active toggle** in the form: Delete replaces deactivating, an edit leaves
+  `is_active` as it is, and an inactive budget stays hidden as today.
+- **New budgets are in base currency**; an existing budget in another currency
+  keeps it on edit, and its limit is labelled with that currency.
+- **Warn me at** defaults to 85%; a budget with no threshold draws no tick.
 
 ## Status
 
-- [x] KPI row (reconstructed YTD, average, next 12, price rises)
-- [x] 24-month chart; dashboard window equality
-- [x] Year over year with excluded note
-- [x] Who pays what (scoped)
-- [x] Most expensive (top five, own currency, exclusions counted)
-- [x] Household price history (scheduled, conversions, paging)
-- [x] Insights list
-- [x] Breakdown row + retained Phase 12 sections
-- [x] New strings in `translations/en.php`
-- [x] `composer check`, `i18n:check` green on both engines (2439 tests on
-      PostgreSQL 16 and MySQL 8.4)
-
-### Notes from the build
-
-- **One chart method.** `SpendChartService::window($scope, $past, $future)` is
-  what the dashboard (6, 6) and this screen (12, 12) both call; the dashboard's
-  private copy of the fetch is gone. The bar markup is one partial,
-  `partials/month_bars.twig`.
-- **Spent this year and the next twelve months are the Household dashboard's**
-  figures (`HouseholdDashboardService::yearToDate()` / `yearAhead()`, now
-  public), not a second computation of them; a test holds the two screens
-  together.
-- **One rise rule.** `PriceChange::isRiseFrom()` — higher, same currency, not a
-  trial converting, not a currency change — is read by the insight rules, the
-  price-rise KPI and the price history.
-- **Price history is built over the scoped subscriptions**, not over the history
-  table's own predicate, so a row's history is listed only when the row is.
-- **Most expensive skips cancelled rows by name**: a cancelled row can still be
-  flagged active, and Phase 12's ranking only asked `isActive`.
-- **Open: the trial line is gone.** The old trajectory drew spend with and
-  without trials converting ("what trials will add"). The plan said the
-  Forecast page still draws that split; it does not — it badges each trial
-  conversion in its list. Until that is restored or dropped by decision, the
-  "nothing the old page carried is lost" clause of the Definition of done is
-  not met.
-- New icon: `rarely-used` (Lucide `battery-low`) for the rarely-used insight.
-- Twenty-five strings removed from the catalogue with the charts that used them.
+- [ ] Page + intro + New budget (permission-gated)
+- [ ] Status tiles (scoped counts)
+- [ ] Budget cards: projected bar, warn tick, notes, real alerts line,
+      unavailable projection
+- [ ] Six-month reconstructed history (SHARED, household budget)
+- [ ] Form with subject rules
+- [ ] New strings in `translations/en.php`
+- [ ] `composer check`, `i18n:check` green on both engines
 
 ## Definition of done
 
-Every figure binds to an existing service; the 24-month chart and the dashboard
-chart agree; nothing reveals a private row or, in ISOLATED, another member's
-spend; the per-currency rule holds on every KPI, chart and donut; nothing the old
-page carried is lost; all palettes × themes, wide and narrow; gates green on both
-engines. Then update `PHASE.md` to the next phase.
+The page shows only budgets the viewer may see, with projections equal to the
+forecast and history equal to `SpendHistoryService`; subjects obey Phase 20's
+rules in both modes; states and notes are correct at the boundaries; nothing is
+invented where no budget exists; all palettes × themes, wide and narrow; gates
+green on both engines. Then update `PHASE.md` to the next phase.
 
 ## Tests
 
-- The dashboard's twelve months equal the corresponding twelve here.
-- Price rises: trial conversions and currency conversions are not counted;
-  scheduled rises are.
-- Most expensive: order by converted monthly cost, display in own currency,
-  unconvertible rows excluded and counted, trials/paused/cancelled absent.
-- Price history: newest first; scheduled rows flagged; a Viewer sees it; a
-  non-payer never sees a private row's history.
-- Who pays: ISOLATED shows only the viewer's share.
-- Per-currency: an unconvertible currency withholds combined KPIs and the chart,
-  naming the currency.
-- `AccessibilityTest` passes; the retained usage form still posts and returns
-  here.
+- Projection equals `ForecastService` for the subject and period.
+- State boundaries: just under the threshold, at it, just over the limit, and
+  over only if trials convert.
+- A `null` projection renders "unavailable" and never "on track".
+- Subject options: Contributor sees only themselves; Household absent in
+  ISOLATED; a forged POST for a disallowed subject is refused.
+- The alerts line reflects the owner's routing and changes when routing changes.
+- Viewer: no New budget, no Edit, 403 on every mutating endpoint.
+- `AccessibilityTest` passes on the page and the form.
