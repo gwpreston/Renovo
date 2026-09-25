@@ -123,6 +123,7 @@ Built in phases:
   a single whole exists; where a currency has no rate the screen shows the
   per-currency figures instead of a centre label standing for a number nobody
   computed. It introduces no new computation and the route is still `/stats`.
+  *Phase 23 rebuilt this screen to the prototype; see below.*
 
 - **Phase 13 — spend insights — complete.** The one phase in the re-skin that
   adds capability rather than restyling it, built as rules over data the
@@ -272,13 +273,20 @@ Built in phases:
   form shows the prototype's fields, keeps the rest under More details, saves
   the split with the row and computes its currency note on the server. No
   migrations. See [My subscriptions](#my-subscriptions).
+- **Phase 23 — analytics — complete.** The Analytics screen rebuilt to the
+  prototype: a year-to-date KPI row, twelve months back and twelve ahead in one
+  chart (the dashboard's chart is a window of it), this year against last month
+  by month, who pays what, the five most expensive subscriptions, the
+  household's price history and the insights as a list. The breakdown donuts,
+  the per-period figures and the cost-per-use ranking are kept beneath them. No
+  new computation and no migrations. See [Analytics](#analytics).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-The current phase is **Phase 22 — subscriptions: the list and the form**.
+The current phase is **Phase 23 — analytics**.
 `PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
 archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
@@ -1199,6 +1207,41 @@ change**; invoices and receipts; and Cancel or Undo cancel, and Delete. Each is
 a form of its own after the main one, and comes back to the edit page. The cost
 page stays as the read-only view of a subscription and is where usage is
 recorded.
+
+## Analytics
+
+`/stats`, arranged to the prototype. Nothing on it is computed for it: every
+figure is one another screen already shows.
+
+- **The KPI row.** Spent this year, from 1 January to yesterday, against the
+  same stretch of last year. The average month, which is that figure divided by
+  the months so far. The next twelve months, which are the Forecast page's
+  months added up. The price rises dated this year, recorded or scheduled, with
+  what they add over a year in each currency. A trial converting and a currency
+  conversion are not counted as rises.
+- **Twelve months back, twelve ahead.** The dashboard's chart asked for twelve
+  months either side instead of six, so its thirteen bars are thirteen of these
+  twenty-five. The past half is reconstructed. The forecast half, hatched,
+  includes trials converting and scheduled price changes.
+- **This year against last.** Same-month bars from last January to this month,
+  reconstructed. The rest of this year is the forecast. Beneath them, the
+  rolling comparison: the last twelve months against the twelve before.
+- **Who pays what.** The household dashboard's card, scoped the same way.
+  Under ISOLATED you see only your own share.
+- **Most expensive.** The top five by cost per month converted into the base
+  currency, each shown in its own currency. Anything with no rate is left out
+  and counted. One-off, lifetime, running trials, paused and cancelled rows are
+  not ranked.
+- **Price history.** Every recorded change across the household, newest first,
+  twenty to a page. A future change carries a Scheduled badge. A currency change
+  shows as Converted with no percentage, and a trial ending is not listed. A
+  private subscription's history is visible only to its payer.
+- **Insights.** The Phase 13 rules as a list, each naming its subscriptions and
+  linking to them. When no rule fires there is no list.
+
+Beneath those: the category and payment-method donuts, the same cost by period,
+and the cost-per-use ranking with its "Used it" button. The Forecast page is one
+click away from the page header.
 
 ## Money features
 
