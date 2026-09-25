@@ -4,200 +4,237 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 28 — settings and notifications
+# Phase 29 — the signed-out screens
 
-The last screens of the re-skin. **Settings** becomes a tabbed page for the
-household (and, for an instance administrator, the instance). **Notifications**
-becomes its own per-user page (decision 13) — the prototype put it under
-household Settings, but each person's channels and reminders are their own. With
-this phase the interim link row Phase 19 added to Settings is removed, because
-everything it pointed at now has a place in a tab.
+Every screen someone sees before they are inside the application — sign in, the
+two-step challenge, forgotten password, the reset, registration, invitations,
+email confirmations and the first-run setup wizard — restyled to the Claude
+Design auth prototype (`Renovo_Auth_dc.html`). It is a restyle over flows that
+already work: no authentication rule, token, rate limit or lifetime changes. The
+prototype shows five of these screens; the others follow the same pattern so the
+signed-out experience reads as one design rather than five designed pages and a
+dozen old ones.
+
+These pages sit outside the Phase 19 shell (there is no shell before there is an
+account), so this phase can be built any time after Phase 18 and is independent
+of Phases 19–28.
 
 ## Depends on
 
-- **Phases 2, 5, 17** — rate providers and cache, categories, tags, payment
-  methods, import, backup/restore, export, API tokens.
-- **Phases 3, 16, 20** — channels (all eleven), lead times, digests, routing, the
-  price-change alert.
-- **Phase 4** — the audit log; **Phase 6** — demo mode, metrics, health.
+- **Phase 18** — the tokens, fonts, icons, component vocabulary, and the rule
+  that signed-out pages render as **navy + system**.
+- **Phase 1** — sign in, registration, email verification, password reset, rate
+  limiting, the setup wizard (extended in Phases 2 and 3).
+- **Phase 4** — TOTP, passkeys (as a login method and as a second factor),
+  recovery codes.
+- **Phase 15** — invitations, the email-change confirmation link, and the
+  temporary-credential path if it was built.
+- **Phase 6** — `LocaleMiddleware` (the only locale available before sign-in),
+  demo mode.
+
+## The layout
+
+A split screen, as in the prototype:
+
+- **Brand panel** (left, `--rail` background): the mark, "Renovo", "Household
+  spend", a one-line pitch, three feature points with icons, and a footer line.
+  Below 900px it collapses to a slim header with the mark and name only, so the
+  form is the first thing on a phone.
+- **Form card** (right, centred): 14px radius, `--surface`, `--shadow`, an icon
+  tile where the prototype has one, a heading (the page's single `<h1>`), a
+  one-line explanation, the form, and secondary links beneath.
+- **Demo banner** above the card when demo mode is on, stating that the instance
+  is a read-only demonstration.
+
+The prototype hardcodes `#00D084`, `#E53E3E` and `#F59E0B` in about 27 places;
+every one becomes a token (`--accent`, `--bad`, `--warn`, `--ok`). It also loads
+its fonts from Google and Lucide from unpkg — Phase 18 already vendors both.
+
+### Brand panel copy, corrected
+
+The pitch points are kept, with two corrections because the panel must not make
+claims the application does not keep:
+
+| Prototype | Shipped |
+| --- | --- |
+| "…by email, Slack or Gotify." | "…by email, chat apps or push notifications." — there are eleven channels, and the list will change |
+| "Self-hosted on your own server. Nothing leaves it." | "Self-hosted. Your data stays on your own server." — exchange rates are fetched and alerts are sent out, so "nothing leaves it" is untrue |
+
+All panel text is catalogued.
 
 ## In scope this phase (build ONLY these)
 
-### A. Settings — General tab
+### A. Sign in
 
-- **Household**: household name; base currency (the full ISO list, with the
-  note "Totals, budgets and forecasts are shown in this currency"). **Save
-  household**. No rounding option (decision 14).
-- **Exchange rates**: provider — the existing three, Frankfurter (ECB) default,
-  exchangerate.host, Fixer (decision 11) — with the key field where one applies
-  (environment key wins, as now); a table of pair · rate · "Last refreshed {date,
-  time}"; **Refresh now**, which runs the existing refresh through the shared
-  client and respects the one-hour failure back-off.
-- **Categories**: chips with each category's subscription count; **rename
-  inline**, delete (unassigns), add. Gated by `category.manage`.
-- **Tags**: the same pattern (the prototype has no tag section; tags need one).
-- **Payment methods**: Phase 17's management, as a section here.
+- Heading **Sign in**, subtitle **"Welcome back."** — not the prototype's
+  "Welcome back to the Jenkins household": a signed-out visitor is anonymous,
+  an instance may hold several households, and naming one to anybody who loads
+  the page is a disclosure.
+- The failure message stays generic ("That email and password don't match an
+  account") and appears in a `bad` alert with an icon, announced to screen
+  readers (`role="alert"`). The throttle's lock-out message uses the same alert,
+  with the wait time.
+- Email, Password with a **show/hide** button (a real `<button>` with an
+  `aria-label` that changes with state; without script the field is a plain
+  password field), **Forgot password?** link.
+- **Sign in** (primary). An "or" divider, then **Sign in with a passkey**
+  (secondary) — shown only where WebAuthn is available, since it needs script
+  and a secure context.
+- Footer: **Create an account** only when public registration is open. The
+  prototype's "Setting Renovo up for the first time?" link is not shown: until
+  setup is complete every request is redirected to the wizard anyway.
 
-### B. Settings — Data & integrations tab
+### B. Two-step verification
 
-- **Import**: "Drop a CSV or JSON file — you map the columns and preview every
-  row before anything is saved", into the existing wizard.
-- **Backup & restore**: what the file contains (per Phase 20's decision on
-  private rows), **Download backup**, **Restore from file**. The prototype's
-  "Last backup · size" line is not shown — the application does not record
-  backups, and a figure it cannot source is not printed.
-- **Export**: CSV / JSON of subscriptions.
-- **API tokens**: each with name, ability (Read only / Read & write — already
-  built), last used; **New token** (shown once); Revoke.
-- **Recent activity**: the five latest household audit entries, and a link to the
-  full audit log.
-- **Calendar feed**: a link to the Calendar's feed card.
+- Icon tile, **Two-step verification**, "Enter the 6-digit code from your
+  authenticator app for {email}".
+- The six boxes are drawn around **one** input (`inputmode="numeric"`,
+  `autocomplete="one-time-code"`, `maxlength="6"`), so pasting, autofill and
+  screen readers see a single field; without script it is that field, styled.
+- **Verify and continue**; **Use a recovery code** (a second form on the same
+  page, revealed by a link or `<details>`); **Use a passkey instead** when the
+  account has one; **← Back to sign in**.
 
-### C. Settings — Instance tab (instance administrators only)
+### C. Forgotten password
 
-Public registration on/off; isolation mode (the one place it is changed —
-decision 3); the trusted-host/CIDR allowlist; demo mode; read-only status of
-SMTP (from the environment), metrics and the scheduler's last run. Hidden and 403
-for everyone else.
+- **Reset your password**: "Enter the email you sign in with. If it belongs to
+  an account, we'll send a link that works for {N} minutes." N is **the real
+  reset-token lifetime**, read from configuration — not the prototype's fixed 60.
+- **Check your inbox**: "If {email} has an account, a reset link is on its way.
+  It expires in {N} minutes and works once." The same page whether or not the
+  account exists, so the flow still reveals nothing. "Nothing arrived? Check
+  spam, or ask your household Owner to send a reset from Members & roles."
+  **Send again** (a re-post of the form, under the existing rate limit) and
+  **Back to sign in**.
+- **Choose a new password** (the page the link opens — not in the prototype):
+  new password with the strength meter (section F), confirm, **Save password**;
+  then a success state with **Sign in**. An expired or used link gets its own
+  state with **Send a new link**.
 
-Tabs are links (`/settings`, `/settings/data`, `/settings/instance`), so each
-works without script and the rail's active item stays Settings.
+### D. The other signed-out screens (same pattern, not in the prototype)
 
-### D. Notifications (per user)
+- **Create an account** (when registration is open): name, email, password with
+  meter, confirm.
+- **Confirm your email**: "we've sent a link to {email}" with resend, and the
+  landing states for a valid, expired and already-used link.
+- **Accept an invitation** (Phase 15): "{inviter} invited you to {household}" —
+  here naming the household is correct, because the link was sent to this
+  person — then set a password.
+- **Email change confirmed / expired** (Phase 15's link, which may be opened
+  signed out).
+- **Choose a new password** on first sign-in, if Phase 15's temporary-credential
+  path was built.
+- **Signed-out error pages** (404, 403, 500, session expired) in the same
+  layout, with a way back to sign in.
 
-At its existing route, rebuilt:
+### E. First-run setup
 
-- **Channels**: every configured channel — Email and any of the ten others —
-  with its masked description, on/off, **Send test** and edit; **Add a channel**
-  listing all eleven types. Secrets are never rendered back (Phase 16's rule).
-- **When to remind you**: for renewals, trial conversions and cancel-by
-  deadlines, **one or more** lead times each (1, 3, 7, 14, 30 days) — the
-  application's multiple lead times, not the prototype's single choice
-  (decision 12).
-- **Delivery**: Immediate / Weekly digest / Monthly digest (decision 12).
-- **Budget alerts**: on/off — "when a budget is projected over".
-- **Price changes**: on/off — Phase 20's alert.
-- **Routing**: a matrix of alert type × **every** configured channel (the
-  prototype omitted Webhook); channels that are off are shown disabled.
+The prototype's three-step wizard, carrying everything the current wizard
+collects (Phases 1–3), so nothing it configures today is lost:
+
+- **Progress**: "Step N of 3" with three labelled bars — **Your account**,
+  **Household**, **Reminders**. Each step is its own request (the current
+  wizard's state handling), so Back and Continue work without script.
+- **1 · Your account** — "Create the owner account — you'll manage members,
+  backups and household settings." Name, email, password with meter, confirm.
+  Pre-verified, as today.
+- **2 · Household** — household name; base currency (the **full ISO list**, the
+  common few first, not only three) with "Totals, budgets and forecasts are shown
+  in this currency"; and a **More options** `<details>` holding **data
+  visibility** (Shared / Isolated, default Shared) and the **exchange-rate
+  provider** (Frankfurter default, key field where needed) — both already in the
+  wizard, both easy to leave on their defaults. **Invite members** (optional,
+  comma-separated emails, "Invitees join as Contributors. You can change roles
+  later.") only if Phase 15 is built; invitations are sent when setup finishes,
+  and an address that fails validation is reported on this step.
+- **3 · Reminders** — "Reminders go out before a renewal, a trial conversion or a
+  cancel-by deadline." The **mail relay the instance will use** (from the
+  environment, as Phase 3 decided) with **Send test email**; toggles for
+  **Email** and **Budget alerts**; **Add another channel** (optional: pick a
+  type, its fields rendered from the channel's own `fields()`, with **Send
+  test**) — the prototype's hardcoded "Gotify push" becomes this choice; and
+  **Remind me** as one or more lead times.
+- **Done** — "{household} is ready", a summary ("Totals will show in {currency}.
+  Invitations went to …" or "You can invite members any time from Members &
+  roles."), and **Add your first subscription** (primary).
+
+### F. The password meter
+
+A four-bar meter with a label (Too short / Weak / Fair / Good / Strong) under
+every new-password field. It is a **hint drawn from the server's rules**, not a
+second set of rules: its minimum and label thresholds come from the same
+validator `AuthService` applies, and the caption states the real minimum ("at
+least {N} characters") rather than the prototype's fixed 12. Without script the
+caption remains and the server's message is the answer. A mismatched confirm
+field shows `bad` with text, not only a red border.
 
 ## Data-model changes
 
-~~None.~~ **One column**, agreed before the build: `notification_preferences.
-budget_alerts` (boolean, default true), the budget switch's storage — the
-price-change switch already had its column and the budget one had none.
-Migration `20261201000001`, with a `down()` that drops it.
+**None.**
 
-## Explicitly out of scope
+## Explicitly out of scope (leave clean seams, do NOT stub)
 
-- Rounding (decision 14); new rate providers (decision 11).
-- Recording backup history.
-- Browser push (still deferred from Phase 16).
+- **"Keep me signed in on this device"** — see the open decision; not built by
+  default.
+- A theme switch on signed-out pages (they follow the device, per Phase 18).
+- OIDC / SSO buttons (OIDC is not built).
+- Any change to token lifetimes, rate limits or password rules.
 
 ## Decisions & assumptions (confirm or correct before build)
 
-- Settings has three tabs — General, Data & integrations, Instance (admins only);
-  Notifications is its own per-user page.
-- The instance tab is where isolation is changed.
-- Tags get a section beside categories.
-- The "Last backup" line is not shown.
-
-Settled with the user before the build:
-
-- **One set of lead times, not one per alert type.** `lead_days` is one list, so
-  the chips (1, 3, 7, 14, 30) apply to renewals, trial conversions and cancel-by
-  deadlines alike — decision 12's "multiple lead times", without a migration.
-  A stored value outside the five (from the old free-text field) is drawn as a
-  chip of its own, so saving the page keeps it.
-- **Budget alerts get a column** (above). Off drops the alert and nothing else:
-  the budget's armed/breached state is still evaluated, so turning it back on
-  does not announce an old crossing as new.
-- **The base currency and the rate provider stay the instance's.** They are
-  drawn on General, where a reader looks for them, but only an instance
-  administrator can change them (`POST /settings/currency`, `POST
-  /settings/rates/refresh`, both `instance.manage`); everybody else is told what
-  they are and who sets them.
-
-Made during the build:
-
-- **Refresh now is refused only while a *failed* attempt is inside its retry
-  window** (`ExchangeRateService::retryAfter()`: the last attempt is newer than
-  the last table). A successful refresh does not hold the button back.
-  Changing the base or the provider drops the table *and* the attempt marker
-  (`invalidate()`), since a back-off belongs to the provider it was earned
-  against — otherwise the success just before the change would read as a
-  failure and lock the button out for an hour.
-- **The rate table lists the currencies the household's subscriptions are in**,
-  as "1 EUR → GBP", to four places; the rest of the provider's table is counted.
-- **Recent activity is the head of the log the "Full audit log" link opens** —
-  the same `AuditLogService::page()` read — so an instance administrator sees
-  the instance's latest, as `/audit` shows them.
-- **Export gained JSON** (`/subscriptions/export.json`): the CSV's rows under the
-  CSV's headings. Both files round-trip through the importer's automatic preset
-  (`ImportTest::testTheListExportIsReadBackByTheAutomaticPreset`).
-- **A new or reissued token lands on `#new-token`**, the callout holding its
-  one-time secret at the top of the tab, not on the tokens card below it.
-- **`InstanceAdminService::apply()` leaves a switch alone when it is not
-  posted.** The instance settings are on two tabs now, and each form posts only
-  its own; absent used to mean "off".
-- **A channel's switch is its own route** (`…/channels/{id}/active`) that
-  rewrites the stored label and configuration unchanged, so turning a channel
-  off never round-trips a secret through a form.
-- **Routing shows what is delivered.** The old grid drew a channel with no rows
-  as all-ticked even when routing was saved and delivery treated it as muted.
-  The grid now ticks exactly what `channelsFor()` delivers, and a channel added
-  after routing was saved is given every alert type, so adding one still works.
-  A channel that is off is drawn disabled; its choices ride in hidden fields.
-- **The old screens' paths redirect** (302) to their sections: `/categories` →
-  `/settings#categories`, `/payment-methods` → `/settings#payment-methods`,
-  `/settings/backup` → `/settings/data#backup`, `/settings/api-tokens` →
-  `/settings/data#api-tokens`. Every write kept its path and returns to its
-  section; a failed category, tag or payment-method form redraws General with
-  the error beside its row.
+- **"Keep me signed in" — open.** The prototype shows it; the application has no
+  long-lived session. Building it means a second session lifetime, a
+  remember-token, and revocation of that token everywhere sessions are revoked —
+  an authentication change, not a restyle. **Default: not built in this phase**,
+  noted as a candidate phase of its own. Say if you want it included.
+- **No household name on the sign-in page**; it appears only where the visitor is
+  already known to it (an invitation).
+- **No theme toggle** on signed-out pages: navy + system, as Phase 18 set.
+- The brand panel's two claims are corrected as above.
+- Wizard: three steps, with visibility and rate provider under More options, and
+  invitations only if Phase 15 is built.
+- Lifetimes and password minimums on screen are read from the application, never
+  typed into a template.
 
 ## Status
 
-- [x] General: household, rates (existing providers, refresh), categories
-      (inline rename), tags, payment methods
-- [x] Data & integrations: import, backup/restore, export, API tokens, recent
-      activity, feed link
-- [x] Instance tab (admin only, 403 otherwise)
-- [x] Notifications page: channels, multi lead times, delivery, budget and price
-      toggles, full routing matrix
-- [x] Phase 19's interim Settings link row removed; every destination reachable
-- [x] New strings in `translations/en.php`
-- [x] `composer check`, `i18n:check` green on both engines
+- [ ] Signed-out layout: brand panel (catalogued, corrected copy), card, narrow
+      header, demo banner; all hardcoded colours tokenised
+- [ ] Sign in (generic error, lock-out, show/hide, passkey, registration link
+      only when open)
+- [ ] Two-step: single-input code boxes, recovery code, passkey fallback
+- [ ] Forgot, sent, choose new password, expired link — real lifetimes
+- [ ] Register, confirm email, accept invitation, email change landing, forced
+      password change (if built), signed-out error pages
+- [ ] Setup wizard: three steps, More options, invites (if Phase 15), SMTP test,
+      optional channel with test, lead times, done
+- [ ] Password meter driven by the server's rules
+- [ ] New strings in `translations/en.php`
+- [ ] `composer check`, `i18n:check`, offline guard green on both engines
 
 ## Definition of done
 
-Every household, instance and per-user setting has a place in the new layout;
-nothing reachable before is unreachable now; permissions gate each tab and
-section server-side; no secret is rendered; all palettes × themes, wide and
-narrow; gates green on both engines. The re-skin that began in Phase 18 is
-complete — record in this file anything left for later, and update CLAUDE.md's
-"Current phase".
+Every signed-out page uses the new layout in light and dark (following the
+device), wide and narrow; every flow behaves exactly as before; nothing on these
+pages names a household to an anonymous visitor or states a lifetime or rule the
+server does not apply; every form works without script; the gates pass on both
+engines. Then update `PHASE.md` to the next phase.
 
 ## Tests
 
-- Instance tab: 403 for every non-admin role; visible to an instance admin.
-- Category inline rename persists; delete unassigns without deleting
-  subscriptions; a Viewer cannot manage either (403).
-- Refresh now respects the failure back-off and goes through the shared client.
-- Lead times: several per alert type persist and each fires (Phase 3's suite).
-- Routing matrix includes every configured channel type, including Webhook.
-- No channel secret appears in the rendered page.
-- Every route the Phase 19 link row pointed to is reachable from a tab.
-- `AccessibilityTest` passes on every tab and the Notifications page.
-
-## Left for later
-
-The re-skin is complete. Nothing on these screens is deferred beyond what the
-phase already ruled out (rounding, new rate providers, backup history, browser
-push). Two things noticed and left alone:
-
-- Lead times are one set for every dated alert. Per-type lead times would need
-  a column per type; the chips' markup (`lead_types`) already names the types,
-  so the seam is there if it is ever wanted.
-- Clearing every box in the routing grid still means "everything everywhere",
-  as it always has (no rows is the default). The hint says so. Silencing an
-  alert type entirely is done with its switch (budgets, price changes), with no
-  lead times (the dated alerts), or by turning channels off.
+- The existing auth, rate-limit, reset, verification, 2FA, passkey and wizard
+  suites pass unchanged.
+- Sign in renders no household name; the error for an unknown email and a wrong
+  password is identical.
+- "Check your inbox" is identical for an existing and a non-existent address.
+- The lifetime shown on the forgot and sent pages equals the configured token
+  lifetime; the meter's stated minimum equals the validator's.
+- The registration link appears only when registration is open.
+- The two-step form accepts a pasted six-digit code in one field and a recovery
+  code in the other.
+- The wizard persists every value the old wizard did — base currency, isolation
+  mode, rate provider and key, channel — and a skipped optional step leaves the
+  defaults.
+- Every signed-out page passes `AccessibilityTest` (one `<h1>`, `main`, `lang`,
+  named controls, `role="alert"` on errors).
+- No signed-out page loads anything from a third-party host.
