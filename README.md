@@ -295,13 +295,23 @@ Built in phases:
   heaviest day, a list by day on a phone, and the calendar feed's card — copy
   the link, or create a new one and retire the old. No migrations. See
   [Calendar](#calendar).
+- **Phase 26 — members & roles — complete.** One Members & roles screen for
+  every member of the household, replacing the Owner-only member list and the
+  read-only `/household` overview (which now redirects to it). A row per
+  member with their status in words, when they were last here and their
+  monthly share as far as the reader may see it; an Owner/Admin changes roles
+  inline and invites and removes people through a dialog. A table of what each
+  role can do, generated from `PermissionService` and the scoping layer, and a
+  read-only statement of the instance's isolation mode. Nobody can be invited
+  as an Owner, and a removal that would dispose of rows nobody else has seen
+  must say how. No migrations. See [Households and people](#households-and-people).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-The current phase is **Phase 25 — the calendar**.
+The current phase is **Phase 26 — members & roles**.
 `PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
 archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
@@ -987,8 +997,8 @@ The rail has fewer rows than there are destinations, so the rest are
 **claimed**: Forecast lights Analytics, Cancel by lights Subscriptions (and is
 linked from that page), and Categories, Payment methods, Import, Backup, Audit
 log and API tokens light Settings, whose page carries a row of links to each
-until it is rebuilt with tabs. Members & roles goes to the member screen for an
-Owner/Admin and to the household overview for everyone else.
+until it is rebuilt with tabs. Members & roles is one screen for every member:
+an Owner/Admin manages the people from it and everybody else reads it.
 
 The top bar's pieces are reads, assembled by `ShellService` so no controller
 or template computes them:
@@ -1721,16 +1731,32 @@ location with `ATTACHMENT_DIRECTORY`.
 ## Households and people
 
 A household is what Renovo scopes everything to, and an **Owner/Admin** is the
-person who decides who is in it. **Settings → Members** lists everybody, with
-their role, whether they have taken up their invitation, and when they were last
-here; the controls beside each row are drawn only for an Owner, and an Editor or
-Viewer reaching one of those routes directly gets a 403 rather than a hidden
+person who decides who is in it. **Members & roles** lists everybody, with
+their role, whether they have taken up their invitation, when they were last
+here and their monthly share after splits. Every member of the household may
+read it; the controls beside each row are drawn only for an Owner, and anybody
+else reaching one of those routes directly gets a 403 rather than a hidden
 button.
+
+What a share shows depends on who is looking. A Viewer sees their own and a
+dash for everybody else, because what other people spend is not an onlooker's
+business; on an ISOLATED instance everybody sees only their own, because
+anybody else's would be a fraction of the truth; and a member's "only me"
+subscriptions count in nobody's view but their own.
+
+Beneath the list, **What each role can do** is a table generated from the
+permissions the server enforces and the scoping rules — Yes, Own only or No,
+each in a word and an icon — so it cannot claim something a route would refuse.
+On an ISOLATED instance every role's view and edit cells read Own only, an
+Owner's included. **Data visibility** states the instance's mode; only an
+instance administrator is shown the way to the setting that changes it.
 
 Adding somebody creates an account and a membership **of this household** —
 never a second household, which is the one thing that separates this from open
-sign-up. They are sent a link, and they choose their own password: an
-administrator never sets one and never sees one.
+sign-up. They are sent a link that lasts seven days, and they choose their own
+password: an administrator never sets one and never sees one. Nobody is invited
+as an Owner — invite them as an Editor, Contributor or Viewer and promote them
+once they are here.
 
 The exception is a member with no mailbox of their own — a child, in practice.
 Tick **this member has no email address** and Renovo creates the account with a
@@ -1744,8 +1770,9 @@ has, everywhere, at once — and remove them from the household. Two things are
 refused however they are attempted: acting on the household's **last Owner**, so
 it cannot lock itself out, and leaving a row behind that belongs to nobody. On
 removal, what the departing member owned is handed to the Owner doing the
-removing; on an ISOLATED instance, where those rows were private, you are asked
-first whether to reassign or delete them.
+removing. Where they own rows nobody else has seen — everything on an ISOLATED
+instance, their "only me" subscriptions on a SHARED one — you must choose
+whether to reassign or delete them, and a removal that does not say is refused.
 
 Everything an Owner does to somebody else's account is written to the audit log
 with both the actor and the target.
