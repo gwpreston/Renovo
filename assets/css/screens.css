@@ -1048,14 +1048,16 @@ tr.is-passed > td {
     text-decoration: underline;
 }
 
+/* Wraps rather than truncating: "notice period 30 days" is the point of the line. */
 .calendar-item-what {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 0.25rem;
     min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+}
+
+.calendar-item-what .calendar-kind-icon {
+    align-self: center;
 }
 
 .calendar-item.is-trial .calendar-kind-icon {
