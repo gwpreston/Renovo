@@ -825,19 +825,33 @@ tr.is-passed > td {
 }
 
 /*
- * The toolbar: the category chips and the search box on the first line, the
- * status and scope segments with saved views, density and export on the
- * second. Everything wraps rather than scrolling — on a phone the chips are
- * two lines, not a sideways strip nobody finds the end of.
+ * The toolbar, as the prototype lays it out: the category chips with the
+ * search box at the end of their line, the tag chips beneath them when there
+ * are any, then a rule and the status and scope segments with saved views,
+ * density and export at the far end. Everything wraps rather than scrolling —
+ * on a phone the chips are two lines, not a sideways strip nobody finds the
+ * end of.
+ *
+ * The markup is three blocks — the search form, `#list-filters` and
+ * `#list-tools` — because the last two are swapped out of band by their ids
+ * with every list request. `#list-filters` is `display: contents`, so its
+ * chips, tags and segments are laid out as cells of this grid in their own
+ * right. Dense placement lets the tags row simply not exist when there are no
+ * tags, instead of leaving an empty track and a double gap.
  */
 .subscriptions-toolbar {
     display: grid;
-    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-auto-flow: row dense;
+    gap: 0.75rem 0;
+    align-items: center;
 }
 
 .list-search {
+    grid-column: 2;
     display: flex;
     gap: 0.5rem;
+    padding-left: 1rem;
 }
 
 .list-search-field {
@@ -845,7 +859,8 @@ tr.is-passed > td {
     display: flex;
     align-items: center;
     flex: 1 1 auto;
-    max-width: 24rem;
+    width: 18rem;
+    max-width: 100%;
 }
 
 .list-search-field svg {
@@ -862,12 +877,65 @@ tr.is-passed > td {
 }
 
 .list-filters {
-    display: grid;
-    gap: 0.6rem;
+    display: contents;
 }
 
 .list-filters .chip-row {
+    grid-column: 1;
     margin-bottom: 0;
+}
+
+.list-filters .chip-row-tags {
+    grid-column: 1 / -1;
+}
+
+/* The second line, under a rule that runs the width of the card: the
+   segments on one side, the tools on the other. No column gap in this grid,
+   so the two halves of the rule meet. */
+.list-segments,
+.list-tools {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.list-segments {
+    grid-column: 1;
+}
+
+.list-tools {
+    grid-column: 2;
+    justify-content: flex-end;
+    padding-left: 1rem;
+}
+
+/* Narrower than the two can share a line: one column, search first, and a
+   single rule above the segments. */
+@media (max-width: 899px) {
+    .subscriptions-toolbar {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .list-search,
+    .list-filters .chip-row,
+    .list-segments,
+    .list-tools {
+        grid-column: 1;
+    }
+
+    .list-search,
+    .list-tools {
+        padding-left: 0;
+    }
+
+    .list-search-field {
+        width: auto;
+    }
+
+    .list-tools {
+        justify-content: flex-start;
+        padding-top: 0;
+        border-top: 0;
+    }
 }
 
 .chip-action[aria-current='true'] {
