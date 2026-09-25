@@ -516,6 +516,30 @@ final class HouseholdMemberService
         return $user;
     }
 
+    /**
+     * The household an invitation is to, for the page its link opens.
+     *
+     * Named there and nowhere else before sign-in: the link was sent to this
+     * person, so the name tells them nothing they were not already told — the
+     * email said it too. Null for a spent or unknown token, and for an invite
+     * whose membership has since been withdrawn.
+     */
+    public function invitedHouseholdName(string $token): ?string
+    {
+        $userId = $this->tokens->findValidUserId($token, TokenRepository::PURPOSE_INVITE);
+        if ($userId === null) {
+            return null;
+        }
+
+        foreach ($this->memberships->findAllForUser($userId) as $membership) {
+            if ($membership->status === MembershipStatus::Pending && $membership->householdName !== null) {
+                return $membership->householdName;
+            }
+        }
+
+        return null;
+    }
+
     public function isInviteTokenValid(string $token): bool
     {
         return $this->tokens->findValidUserId($token, TokenRepository::PURPOSE_INVITE) !== null;

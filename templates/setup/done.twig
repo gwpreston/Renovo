@@ -1,0 +1,29 @@
+{% extends 'auth/_layout.twig' %}
+
+{#
+    Where setup ends: what was set, what was sent, and the one thing to do
+    next. Shown once — SetupController::done() reads the summary and forgets
+    it — so a reload goes where the button points.
+#}
+
+{% set card_icon = 'ok' %}
+
+{% block title %}{{ t('setup_done.title', {'household': summary.household}) }} — {{ instance_name }}{% endblock %}
+{% block card_title %}{{ t('setup_done.title', {'household': summary.household}) }}{% endblock %}
+{% block card_intro %}
+    {{- t('setup_done.currency', {'currency': summary.currency}) }}
+    {{ summary.invited is empty
+        ? t('setup_done.invite_later')
+        : t('setup_done.invited', {'addresses': summary.invited|join(', ')}) -}}
+{% endblock %}
+
+{% block card_body %}
+    {% if summary.failed is not empty %}
+        {% include 'auth/_alert.twig' with {
+            'message': t('setup_done.invites_failed', {'addresses': summary.failed|join(', ')})
+        } only %}
+    {% endif %}
+
+    <a class="button button-primary auth-submit" href="/subscriptions/new">{{ t('setup_done.add_first') }}</a>
+    <p class="auth-links"><a href="/">{{ t('setup_done.go_to_dashboard') }}</a></p>
+{% endblock %}

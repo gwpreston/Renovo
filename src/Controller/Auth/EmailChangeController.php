@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Auth;
 
+use App\Application\Middleware\AuthenticationMiddleware;
 use App\Controller\Controller;
 use App\I18n\Translator;
 use App\Security\SessionInterface;
@@ -39,16 +40,24 @@ final class EmailChangeController extends Controller
     {
         $token = $request->getQueryParams()['token'] ?? '';
 
+        // Where "carry on" goes: the account page for a browser that is signed
+        // in, the sign-in form for one that is not — the link is as likely to
+        // be opened on a phone that has never signed in as on the laptop that
+        // asked for the change.
+        $signedIn = is_int($this->session->get(AuthenticationMiddleware::SESSION_USER_ID));
+
         try {
-            $this->account->confirmEmailChange(is_string($token) ? $token : '');
+            $user = $this->account->confirmEmailChange(is_string($token) ? $token : '');
         } catch (ValidationException $exception) {
             return $this->render($request, $response->withStatus(410), 'auth/email_change_failed.twig', [
                 'errors' => $exception->errors(),
+                'signed_in' => $signedIn,
             ]);
         }
 
-        $this->flash('success', 'flash.email_change_confirmed');
-
-        return $this->redirect($response, '/profile');
+        return $this->render($request, $response, 'auth/email_change_done.twig', [
+            'email' => $user->email,
+            'signed_in' => $signedIn,
+        ]);
     }
 }

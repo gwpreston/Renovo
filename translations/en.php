@@ -31,6 +31,7 @@ return [
         'This account has no mailbox of its own. An Owner of your household can give it an address.',
     'account.email_pending' => 'Waiting for confirmation of {email} —',
     'account.email_resend' => 'resend',
+    'account.temporary_password' => 'Temporary password',
     'account.must_change_heading' => 'Choose a password of your own',
     'account.must_change_note' =>
         'You are signed in with a password somebody else chose for you. Set one of your own below '
@@ -63,6 +64,29 @@ return [
     'audit_action.member.removed' => 'Member removed from household',
     'audit_action.member.temporary_password_issued' => 'Temporary password issued',
     'auth.back_to_sign_in' => 'Back to sign in',
+    'auth.demo_banner' => 'This instance is a read-only demonstration. You can look around; nothing you change is saved.',
+    'auth.email_placeholder' => 'you@example.com',
+    'auth.hide_password' => 'Hide password',
+    'auth.meter.fair' => 'Fair',
+    'auth.meter.good' => 'Good',
+    'auth.meter.minimum' => 'At least {count, plural, one {# character} other {# characters}}.',
+    'auth.meter.strong' => 'Strong',
+    'auth.meter.too_short' => 'Too short',
+    'auth.meter.weak' => 'Weak',
+    'auth.or' => 'or',
+    'auth.show_password' => 'Show password',
+    'auth_brand.currency_body' => 'Pay in euros or dollars; totals and budgets convert to your base currency.',
+    'auth_brand.currency_title' => 'Any currency, one total',
+    'auth_brand.footer' => 'Self-hosted. Your data stays on your own server.',
+    'auth_brand.household_body' =>
+        'Owners, Editors, Contributors and Viewers each see and change what their role allows.',
+    'auth_brand.household_title' => 'Built for the whole household',
+    'auth_brand.pitch' => 'Every subscription and recurring bill in the household, in one place.',
+    'auth_brand.reminders_body' =>
+        'Renewals, trial conversions, price rises and budgets, by email, chat apps or push notifications.',
+    'auth_brand.reminders_title' => 'Reminders before money moves',
+    'auth_email_change_done.intro' => 'Your account now signs in and receives mail at {email}.',
+    'auth_email_change_done.title' => 'Email address changed',
     'auth_email_change_failed.back' => 'Back to your account',
     'auth_email_change_failed.intro' =>
         'Confirmation links are valid for one hour and can be used once. Your address has not been '
@@ -73,6 +97,9 @@ return [
     'auth_invite.intro' =>
         'Your account is nearly ready. Choose a password and it is yours — nobody else, including '
         . 'whoever invited you, ever sees it.',
+    'auth_invite.intro_named' =>
+        'You have been invited to join {household}. Choose a password and it is yours — nobody else, '
+        . 'including whoever invited you, ever sees it.',
     'auth_invite.join' => 'Set password and join',
     'auth_invite.title' => 'Join the household',
     'auth_invite_expired.intro' =>
@@ -126,8 +153,6 @@ return [
     'flash.avatar_removed' => 'Your picture has been removed.',
     'flash.avatar_saved' => 'Your picture has been saved.',
     'flash.email_change_cancelled' => 'The pending email change has been cancelled.',
-    'flash.email_change_confirmed' =>
-        'Your email address has been changed. Use the new one to sign in from now on.',
     'flash.email_change_requested' =>
         'Check the new address for a confirmation link. Until you follow it, your current address '
         . 'stays your sign-in.',
@@ -368,10 +393,15 @@ return [
         'Use at least {count, plural, one {# character} other {# characters}}.',
     'error.recovery_code.invalid' => 'That recovery code is not valid, or has already been used.',
     'error.totp.code_wrong' => 'That code is not correct.',
-    'error.auth.credentials' => 'Those credentials are not correct.',
+    'error.auth.credentials' => 'That email and password don’t match an account.',
     'error.auth.unverified' => 'Confirm your email address before signing in. Check your inbox for the link.',
     'error.auth.throttled' =>
         'Too many attempts. Try again in {minutes, plural, one {# minute} other {# minutes}}.',
+    'error.verify.throttled' =>
+        'Too many requests for a new link. Try again in {minutes, plural, one {# minute} other {# minutes}}.',
+    'error.setup.household_name_required' => 'Give the household a name.',
+    'error.setup.invites_invalid' => 'These cannot be invited: {addresses}. Check each is an address nobody here uses yet.',
+    'error.setup.invites_too_many' => 'Invite at most {max} people here; add the rest from Members & roles.',
     'error.reset.throttled' =>
         'Too many reset requests. Try again in {minutes, plural, one {# minute} other {# minutes}}.',
     'error.reset.invalid_token' => 'That reset link has expired or has already been used.',
@@ -534,7 +564,6 @@ return [
         'Cancellation undone. The subscription is paused until you resume it.',
     'flash.welcome_back' => 'Welcome back, {name}.',
     'flash.signed_out' => 'You have been signed out.',
-    'flash.email_confirmed' => 'Your email address is confirmed. You can sign in now.',
     'flash.password_changed' => 'Your password has been changed. Sign in with it now.',
     'flash.two_factor_expired' => 'That sign-in attempt expired. Start again.',
     'flash.preferences_saved' => 'Your preferences have been saved.',
@@ -619,9 +648,9 @@ return [
     'flash.trusted_host_added' => 'Trusted host added. Notifications may now reach it.',
     'flash.trusted_host_removed' => 'Trusted host removed.',
 
-    'flash.setup_ready' => 'Your instance is ready. One more step: where should reminders go?',
     'flash.setup_channel_added' => 'Channel added. Send yourself a test message to confirm it arrives.',
-    'flash.setup_finished' => 'All set. Add your first subscription to get started.',
+    'flash.setup_test_email_off' => 'Turn Email on to send a test message.',
+    'flash.setup_test_email_sent' => 'A test message is on its way to {address}.',
 
     // -----------------------------------------------------------------------
     // Notifications
@@ -654,6 +683,7 @@ return [
     'action.back_to_sign_in' => 'Back to sign in',
     'action.cancel' => 'Cancel',
     'action.close' => 'Close',
+    'action.back' => 'Back',
     'action.continue' => 'Continue',
     'action.delete' => 'Delete',
     'action.edit' => 'Edit',
@@ -718,58 +748,83 @@ return [
     'auth.link_expired' => 'Link expired',
 
     // auth_forgot_password
-    'auth_forgot_password.intro' => 'Enter your email address and we will send you a link to set a new password.',
+    'auth_forgot_password.intro' =>
+        'Enter the email you sign in with. If it belongs to an account, we’ll send a link that works for '
+        . '{minutes, plural, one {# minute} other {# minutes}}.',
     'auth_forgot_password.send_reset_link' => 'Send reset link',
     'auth_forgot_password.title' => 'Reset your password',
 
     // auth_forgot_password_sent
     'auth_forgot_password_sent.intro' =>
-        'If that address has an account, a reset link is on its way. It is valid for one hour.',
+        'If {email} has an account, a reset link is on its way. It expires in '
+        . '{minutes, plural, one {# minute} other {# minutes}} and works once.',
+    'auth_forgot_password_sent.nothing_arrived' =>
+        'Nothing arrived? Check spam, or ask your household Owner to send a reset from Members & roles.',
+    'auth_forgot_password_sent.send_again' => 'Send again',
     'auth_forgot_password_sent.title' => 'Check your inbox',
 
     // auth_login
-    'auth_login.forgotten_your_password' => 'Forgotten your password?',
+    'auth_login.forgot_password' => 'Forgot password?',
+    'auth_login.keep_signed_in' => 'Keep me signed in on this device',
+    'auth_login.no_account' => 'New here?',
     'auth_login.passkey' => 'Sign in with a passkey',
     'auth_login.title' => 'Sign in',
+    'auth_login.welcome_back' => 'Welcome back.',
 
     // auth_register
     'auth_register.already_have_an_account' => 'Already have an account?',
     'auth_register.create_account' => 'Create account',
+    'auth_register.intro' => 'Your own account, with a household of your own to start in.',
     'auth_register.title' => 'Create an account',
 
     // auth_register_sent
-    'auth_register_sent.follow_it' => 'Follow it to finish setting up your account. The link is valid for two days.',
-    'auth_register_sent.sent_to' => 'We have sent a confirmation link to',
+    'auth_register_sent.intro' =>
+        'We’ve sent a link to {email}. Follow it to finish setting up your account; it works for '
+        . '{days, plural, one {# day} other {# days}}.',
+    'auth_register_sent.nothing_arrived' => 'Nothing arrived? Check spam, or send the link again.',
+    'auth_register_sent.resent' => 'If that address is waiting to be confirmed, a new link is on its way.',
+    'auth_register_sent.send_again' => 'Send again',
     'auth_register_sent.title' => 'Confirm your email',
 
     // auth_reset_expired
-    'auth_reset_expired.intro' => 'Reset links last one hour and can only be used once.',
-    'auth_reset_expired.request_a_new_link' => 'Request a new link',
+    'auth_reset_expired.intro' =>
+        'Reset links work for {minutes, plural, one {# minute} other {# minutes}} and only once. Ask for a '
+        . 'new one and use it straight away.',
+    'auth_reset_expired.send_a_new_link' => 'Send a new link',
     'auth_reset_expired.title' => 'That reset link has expired',
 
     // auth_reset_password
-    'auth_reset_password.change_password' => 'Change password',
+    'auth_reset_done.intro' => 'Your password has been changed. Sign in with the new one.',
+    'auth_reset_done.title' => 'Password saved',
     'auth_reset_password.confirm_new_password' => 'Confirm new password',
+    'auth_reset_password.intro' => 'Choose a password you have not used here before.',
     'auth_reset_password.new_password' => 'New password',
+    'auth_reset_password.save_password' => 'Save password',
     'auth_reset_password.title' => 'Choose a new password',
 
     // auth_two_factor
-    'auth_two_factor.cancel' => 'Cancel and sign in as someone else',
     'auth_two_factor.code_label' => 'Code from your authenticator app',
-    'auth_two_factor.greeting' => 'Hello {name} — one more step to finish signing in.',
+    'auth_two_factor.enter_code' => 'Enter the 6-digit code from your authenticator app for {email}.',
     'auth_two_factor.no_factor' => 'This account has no second factor available. Ask an administrator for help.',
-    'auth_two_factor.passkey' => 'Use a passkey or security key',
+    'auth_two_factor.passkey' => 'Use a passkey instead',
     'auth_two_factor.recovery_code' => 'Recovery code',
-    'auth_two_factor.recovery_toggle' => 'Lost your device? Use a recovery code',
+    'auth_two_factor.recovery_hint' => 'One of the codes you saved when you turned on two-step verification.',
     'auth_two_factor.title' => 'Two-step verification',
+    'auth_two_factor.use_a_recovery_code' => 'Use a recovery code',
+    'auth_two_factor.use_passkey_intro' => 'Use the passkey registered to {email} to finish signing in.',
     'auth_two_factor.use_recovery_code' => 'Use recovery code',
-    'auth_two_factor.verify' => 'Verify',
+    'auth_two_factor.verify' => 'Verify and continue',
 
     // auth_verify_failed
     'auth_verify_failed.intro' =>
-        'Confirmation links expire after two days and can only be used once. Sign in to request a new '
-        . 'one.',
+        'Confirmation links work for {days, plural, one {# day} other {# days}} and only once. Enter your '
+        . 'email and we’ll send a new one.',
+    'auth_verify_failed.send_new_link' => 'Send a new link',
     'auth_verify_failed.title' => 'That link is no longer valid',
+    'auth_verify_done.intro' => 'Your email address is confirmed. Sign in to start.',
+    'auth_verify_done.title' => 'Email confirmed',
+    'auth_verify_used.intro' => 'This link has been used already, so your address is confirmed. Sign in to carry on.',
+    'auth_verify_used.title' => 'Already confirmed',
 
     // backup
     'backup.archive_label' => 'Backup archive (format {version})',
@@ -1127,7 +1182,6 @@ return [
     'form.has_errors' => 'Check the highlighted fields and try again.',
 
     // hint
-    'hint.password_length' => 'At least 10 characters.',
 
     // household
     'household.figures_withheld' => 'Not shown',
@@ -1415,32 +1469,50 @@ return [
     'settings.you' => '(you)',
 
     // setup_notifications
-    'setup_notifications.configured' => 'Configured',
-    'setup_notifications.finish' => 'Finish',
-    'setup_notifications.intro' =>
-        'Step 2 of 2. Renovo will tell you before a subscription renews, before a free trial starts '
-        . 'charging, before a cancellation deadline passes, and when a budget is heading over. Add '
-        . 'somewhere for it to send that — and send yourself a test message, because a token that looks '
-        . 'right and is not is the sort of thing you want to find out now rather than the week you miss a '
-        . 'renewal.',
+    'setup_notifications.add_another_channel' => 'Add another channel',
+    'setup_notifications.add_another_hint' =>
+        'Optional. Chat apps, push services and webhooks — pick one, fill in what it asks for, then send '
+        . 'it a test.',
+    'setup_notifications.email' => 'Email',
+    'setup_notifications.intro' => 'Reminders go out before a renewal, a trial conversion or a cancel-by deadline.',
     'setup_notifications.later_note' =>
         'You can add more channels, or change any of this, later under Settings → Notifications. Every '
         . 'member configures their own.',
-    'setup_notifications.skip_for_now' => 'Skip for now',
     'setup_notifications.mail_relay' => 'Mail goes out through {host}, from {from}. Those come from the environment:',
-    'setup_notifications.mail_relay_env' =>
-        'An instance secret belongs in the environment, not in the database, so they are not set here. '
-        . 'Add an Email channel below and send a test to confirm the relay actually works.',
+    'setup_notifications.other_channels' => 'Other channels',
+    'setup_notifications.remind_me' => 'Remind me',
+    'setup_notifications.send_test_email' => 'Send test email',
+    'setup_notifications.send_test_to' => 'Send a test message to {label}',
     'setup_notifications.test_message_delivered' => 'Test message delivered.',
     'setup_notifications.title' => 'Set up notifications',
     'setup_notifications.where_should_reminders_go' => 'Where should reminders go?',
 
     // setup_wizard
+    'setup_done.add_first' => 'Add your first subscription',
+    'setup_done.currency' => 'Totals will show in {currency}.',
+    'setup_done.go_to_dashboard' => 'Go to the dashboard',
+    'setup_done.invite_later' => 'You can invite members any time from Members & roles.',
+    'setup_done.invited' => 'Invitations went to {addresses}.',
+    'setup_done.invites_failed' =>
+        'These could not be invited, because an account now uses the address: {addresses}. Invite '
+        . 'them again from Members & roles.',
+    'setup_done.title' => '{household} is ready',
+    'setup_wizard.create_owner' => 'Create the owner account',
+    'setup_wizard.create_owner_intro' => 'You’ll manage members, backups and household settings.',
+    'setup_wizard.currencies_all' => 'All currencies',
+    'setup_wizard.currencies_common' => 'Common',
     'setup_wizard.finish_setup' => 'Finish setup',
-    'setup_wizard.intro' =>
-        'This instance has no accounts yet. The account you create here is the instance administrator.',
+    'setup_wizard.household' => 'Household',
+    'setup_wizard.household_intro' => 'Name it, and choose the currency it counts in.',
+    'setup_wizard.household_name' => 'Household name',
+    'setup_wizard.household_title' => 'Name your household',
+    'setup_wizard.invite_hint' => 'Invitees join as Contributors. You can change roles later.',
+    'setup_wizard.invite_members' => 'Invite members (optional, comma-separated)',
+    'setup_wizard.invite_placeholder' => 'alex@example.com, sam@example.com',
+    'setup_wizard.more_options' => 'More options',
+    'setup_wizard.reminders' => 'Reminders',
+    'setup_wizard.step_of' => 'Step {step} of {count}',
     'setup_wizard.title' => 'Set up {instance}',
-    'setup_wizard.welcome' => 'Welcome',
     'setup_wizard.your_account' => 'Your account',
 
     // state
@@ -1971,6 +2043,7 @@ return [
     'error.auth.throttled_short' => 'Too many attempts. Try again shortly.',
     'error.auth.unverified_short' => 'Confirm your email address before signing in.',
     'error.csrf.expired' => 'The form has expired. Reload the page and try again.',
+    'error.page.session_expired_title' => 'Session expired',
     'error.passkey.unexpected_response' => 'The browser sent an unexpected response.',
     'error.reminder_days.none_chosen' => 'Choose at least one day to be reminded, or pick “Use my defaults”.',
     'error.two_factor.expired' => 'That sign-in attempt expired.',

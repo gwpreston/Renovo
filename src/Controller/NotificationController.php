@@ -260,7 +260,11 @@ final class NotificationController extends Controller
         $body = $this->body($request);
         $target = is_scalar($body['return_to'] ?? null) ? (string) $body['return_to'] : '';
 
-        return $target === '/setup/notifications' ? $target : self::PAGE . '#channels';
+        // The wizard's reminders step is the one other page with a test
+        // button, and the only other place this sends anybody.
+        return $target === '/setup/notifications' || $target === '/setup/notifications#channels'
+            ? $target
+            : self::PAGE . '#channels';
     }
 
     /**

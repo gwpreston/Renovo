@@ -1,66 +1,97 @@
-{% extends 'layout.twig' %}
+{% extends 'auth/_layout.twig' %}
 
-{% block title %}{{ t('auth_two_factor.title') }} — {{ instance_name }}{% endblock %}
+{#
+    The second factor.
 
-{% block content %}
-    <section class="card narrow">
-        <h1>{{ t('auth_two_factor.title') }}</h1>
-        <p class="muted">{{ t('auth_two_factor.greeting', {'name': display_name}) }}</p>
+    The six boxes are drawn around one input, not six: pasting a code, a
+    password manager's autofill and a screen reader all see a single field
+    with `autocomplete="one-time-code"`. Without script the boxes are not
+    drawn and that field is simply there, styled. See auth-forms.js.
 
-        {% if methods.passkey %}
-            <div class="stack" id="passkey-block">
-                <button type="button" class="button" id="passkey-button">
-                    {{ t('auth_two_factor.passkey') }}
-                </button>
-                <p class="field-error" id="passkey-error" hidden></p>
+    A recovery code is a second form on the same page, behind a <details>, so
+    it works without script too. The passkey is offered only where the account
+    has one and the browser can use it.
+#}
+
+{% set card_icon = 'security' %}
+
+{% block card_title %}{{ t('auth_two_factor.title') }}{% endblock %}
+{% block card_intro %}
+    {%- if methods.totp -%}
+        {{ t('auth_two_factor.enter_code', {'email': email}) }}
+    {%- else -%}
+        {{ t('auth_two_factor.use_passkey_intro', {'email': email}) }}
+    {%- endif -%}
+{% endblock %}
+
+{% block card_body %}
+    {% if errors.code is defined %}
+        {% include 'auth/_alert.twig' with {'message': error_message(errors.code)} only %}
+    {% endif %}
+
+    {% if methods.totp %}
+        <form method="post" action="/login/two-factor" class="auth-form">
+            {{ csrf_field() }}
+
+            <div class="auth-field">
+                <label for="code" class="visually-hidden">{{ t('auth_two_factor.code_label') }}</label>
+                <div class="code-entry" data-code-entry>
+                    <input type="text" id="code" name="code" class="code-input num" inputmode="numeric"
+                           autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"
+                           {% if errors.code is defined %}aria-invalid="true"{% endif %} required autofocus>
+                    <div class="code-boxes" aria-hidden="true">
+                        {% for i in 1..6 %}<span class="code-box num"></span>{% endfor %}
+                    </div>
+                </div>
             </div>
 
-            {% if methods.totp %}<hr class="divider">{% endif %}
-        {% endif %}
-
-        {% if methods.totp %}
-            <form method="post" action="/login/two-factor" class="stack">
-                {{ csrf_field() }}
-
-                <label for="code">{{ t('auth_two_factor.code_label') }}</label>
-                <input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code"
-                       pattern="[0-9]{6}" maxlength="6" required autofocus>
-                {% if errors.code is defined %}<p class="field-error">{{ error_message(errors.code) }}</p>{% endif %}
-
-                <button type="submit" class="button button-primary">{{ t('auth_two_factor.verify') }}</button>
-            </form>
-
-        {% elseif not methods.passkey %}
-            <p class="field-error">
-                {{ t('auth_two_factor.no_factor') }}
-            </p>
-        {% endif %}
-
-        {#
-            Offered whichever factor is set up: losing the only registered
-            passkey is exactly as locking-out as losing the authenticator.
-        #}
-        {% if methods.recovery %}
-            <details class="stack">
-                <summary>{{ t('auth_two_factor.recovery_toggle') }}</summary>
-
-                <form method="post" action="/login/two-factor" class="stack">
-                    {{ csrf_field() }}
-                    <input type="hidden" name="mode" value="recovery">
-
-                    <label for="recovery-code">{{ t('auth_two_factor.recovery_code') }}</label>
-                    <input type="text" id="recovery-code" name="code" autocomplete="off" required>
-
-                    <button type="submit" class="button">{{ t('auth_two_factor.use_recovery_code') }}</button>
-                </form>
-            </details>
-        {% endif %}
-
-        <form method="post" action="/login/two-factor/cancel" class="inline">
-            {{ csrf_field() }}
-            <button type="submit" class="button button-quiet">{{ t('auth_two_factor.cancel') }}</button>
+            <button type="submit" class="button button-primary auth-submit">{{ t('auth_two_factor.verify') }}</button>
         </form>
-    </section>
+    {% elseif not methods.passkey %}
+        {% include 'auth/_alert.twig' with {'message': t('auth_two_factor.no_factor')} only %}
+    {% endif %}
+
+    {% if methods.passkey %}
+        <div class="auth-passkey" id="passkey-block" hidden>
+            {% if methods.totp %}<p class="auth-divider"><span>{{ t('auth.or') }}</span></p>{% endif %}
+            <button type="button" class="button auth-submit" id="passkey-button">
+                {{ icon('key') }}
+                <span>{{ t('auth_two_factor.passkey') }}</span>
+            </button>
+            <p class="field-error" id="passkey-error" role="alert" hidden></p>
+        </div>
+    {% endif %}
+
+    {#
+        Offered whichever factor is set up: losing the only registered passkey
+        is exactly as locking-out as losing the authenticator.
+    #}
+    {% if methods.recovery %}
+        <details class="auth-details" {{ recovery_open|default(false) ? 'open' : '' }}>
+            <summary>{{ t('auth_two_factor.use_a_recovery_code') }}</summary>
+
+            <form method="post" action="/login/two-factor" class="auth-form">
+                {{ csrf_field() }}
+                <input type="hidden" name="mode" value="recovery">
+
+                {% include 'auth/_input.twig' with {
+                    'id': 'recovery-code',
+                    'name': 'code',
+                    'label': t('auth_two_factor.recovery_code'),
+                    'autocomplete': 'off',
+                    'hint': t('auth_two_factor.recovery_hint'),
+                    'required': true,
+                } only %}
+
+                <button type="submit" class="button auth-submit">{{ t('auth_two_factor.use_recovery_code') }}</button>
+            </form>
+        </details>
+    {% endif %}
+
+    <form method="post" action="/login/two-factor/cancel" class="auth-links">
+        {{ csrf_field() }}
+        <button type="submit" class="button-link auth-back">← {{ t('action.back_to_sign_in') }}</button>
+    </form>
 
     {% if methods.passkey %}
         <script src="{{ asset('/assets/webauthn.js') }}" defer></script>
@@ -69,6 +100,7 @@
                 window.renovoWebAuthn.bindAuthentication({
                     button: document.getElementById('passkey-button'),
                     error: document.getElementById('passkey-error'),
+                    reveal: document.getElementById('passkey-block'),
                     optionsUrl: '/login/two-factor/passkey/options',
                     verifyUrl: '/login/two-factor/passkey',
                     csrf: '{{ csrf_token() }}',

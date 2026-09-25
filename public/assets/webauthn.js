@@ -93,6 +93,15 @@
 
     /**
      * Sign in, or present a second factor, with an existing credential.
+     *
+     * `config.reveal`, when given, is an element the page renders hidden and
+     * this unhides only where a passkey can actually be used — it needs both
+     * this script and a secure context, so without either the offer is never
+     * made. Without it, the button is disabled and says why, as before.
+     *
+     * `config.verifyUrl` may be a function, read at the moment of the click,
+     * for a URL that carries something the visitor can still change — the
+     * sign-in form's "Keep me signed in".
      */
     function bindAuthentication(config) {
         if (!config.button) {
@@ -100,10 +109,18 @@
         }
 
         if (!supported()) {
+            if (config.reveal) {
+                return;
+            }
+
             config.button.disabled = true;
             show(config.error, message('unsupported'));
 
             return;
+        }
+
+        if (config.reveal) {
+            config.reveal.hidden = false;
         }
 
         config.button.addEventListener('click', async () => {
@@ -127,7 +144,8 @@
 
                 const assertion = await navigator.credentials.get({ publicKey: options });
 
-                const verifyResponse = await post(config.verifyUrl, config.csrf, {
+                const verifyUrl = typeof config.verifyUrl === 'function' ? config.verifyUrl() : config.verifyUrl;
+                const verifyResponse = await post(verifyUrl, config.csrf, {
                     id: assertion.id,
                     rawId: bufferToBase64Url(assertion.rawId),
                     type: assertion.type,

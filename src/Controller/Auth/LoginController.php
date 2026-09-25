@@ -65,6 +65,11 @@ final class LoginController extends Controller
 
         $next = $this->safeRedirectTarget($this->nextTarget($request));
 
+        // The form posts a hidden "0" ahead of the checkbox, so an unticked box
+        // still names the setting. A post that does not name it at all — any
+        // client written before the box — keeps the lifetime sessions always had.
+        $remember = ($body['remember'] ?? '1') !== '0';
+
         // The password is only half the answer when a second factor is set up.
         // Note what does NOT happen here: the session's user id is not written,
         // so as far as every authenticated route is concerned this browser is
@@ -74,12 +79,12 @@ final class LoginController extends Controller
             // into the challenge, where it could be waiting for the sign-in it
             // is about to be granted.
             $this->session->regenerate();
-            $this->twoFactor->beginChallenge($user, $next);
+            $this->twoFactor->beginChallenge($user, $next, $remember);
 
             return $this->redirect($response, '/login/two-factor');
         }
 
-        $this->signIn->establish($user, SignInService::METHOD_PASSWORD);
+        $this->signIn->establish($user, SignInService::METHOD_PASSWORD, $remember);
 
         $this->flash('success', 'flash.welcome_back', ['name' => $user->displayName]);
 

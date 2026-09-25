@@ -63,6 +63,7 @@ final class RegisterController extends Controller
 
         return $this->render($request, $response, 'auth/register_sent.twig', [
             'email' => $values['email'],
+            'days' => $this->auth->verificationLifetimeDays(),
         ]);
     }
 

@@ -60,9 +60,10 @@ final class SignInService
     }
 
     /**
+     * @param bool $remember Whether the session should outlive the browser.
      * @throws AccountDisabledException when the account's login is revoked.
      */
-    public function establish(User $user, string $method): void
+    public function establish(User $user, string $method, bool $remember = true): void
     {
         // Before anything else, and before any of the four steps below. Each
         // route has already refused a revoked account with a message of its
@@ -73,6 +74,10 @@ final class SignInService
         }
 
         $this->session->regenerate();
+        // "Keep me signed in", decided at the moment the privilege is granted
+        // and on the new id, so whichever route signed this browser in, the
+        // cookie it leaves with has the lifetime that was asked for.
+        $this->session->setPersistent($remember);
         $this->csrf->rotate();
 
         $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $user->id);

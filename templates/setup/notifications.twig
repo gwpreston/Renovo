@@ -1,98 +1,166 @@
-{% extends 'layout.twig' %}
+{% extends 'auth/_layout.twig' %}
+
+{#
+    Step three of three: reminders.
+
+    The mail relay is shown, not described — it comes from the environment,
+    and the operator's job here is to see which one it is and prove it
+    delivers. "Email" and "Budget alerts" are the two switches the
+    Notifications page has too, and mean the same: Email is a channel to the
+    owner's own address. Another channel is optional, drawn from each
+    channel's own fields(), and each one can send a test.
+
+    The step's own settings are one form (`#setup-reminders`); adding a
+    channel is a second, beside it rather than inside it, because a form
+    cannot contain another. The Finish button belongs to the first by its
+    `form` attribute.
+#}
 
 {% block title %}{{ t('setup_notifications.title') }} — {{ instance_name }}{% endblock %}
 
-{% block content %}
-    <div class="page-header">
-        <h1>{{ t('setup_notifications.where_should_reminders_go') }}</h1>
-    </div>
+{% set posted = submitted.reminders is defined %}
+{% set chosen_lead = posted and submitted.lead_days is defined and submitted.lead_days is iterable
+    ? submitted.lead_days : lead_days %}
 
-    <p class="muted note">
-        {{ t('setup_notifications.intro') }}
-    </p>
+{% block card_top %}{% include 'setup/_progress.twig' with {'step': 3} only %}{% endblock %}
+{% block card_title %}{{ t('setup_notifications.where_should_reminders_go') }}{% endblock %}
+{% block card_intro %}{{ t('setup_notifications.intro') }}{% endblock %}
 
-    <p class="muted note">
-        {{ t('setup_notifications.mail_relay', {'host': smtp_host, 'from': mail_from}) }}
-        <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>MAIL_FROM_ADDRESS</code>.
-        {{ t('setup_notifications.mail_relay_env') }}
-    </p>
+{% block card_body %}
+    {% include 'partials/errors.twig' %}
 
-    <p class="muted note">
-        {{ t('setup_notifications.later_note') }}
-    </p>
+    <form method="post" action="/setup/notifications/finish" class="auth-form" id="setup-reminders">
+        {{ csrf_field() }}
+        <input type="hidden" name="reminders" value="1">
 
-    {% if channels is not empty %}
-        <section class="card">
-            <h2>{{ t('setup_notifications.configured') }}</h2>
-            <ul class="channel-list">
+        <div class="auth-note" id="mail-relay">
+            <p>{{ t('setup_notifications.mail_relay', {'host': smtp_host, 'from': mail_from}) }}
+                <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>MAIL_FROM_ADDRESS</code>.</p>
+            <button type="submit" class="button auth-inline-button" formaction="/setup/notifications/test-email">
+                {{ icon('send') }}
+                <span>{{ t('setup_notifications.send_test_email') }}</span>
+            </button>
+        </div>
+
+        <input type="hidden" name="email" value="0">
+        <label class="choice toggle-row">
+            <span class="auth-option-icon">{{ icon('mail') }}</span>
+            <span>
+                <span class="choice-title">{{ t('setup_notifications.email') }}</span>
+                <span class="choice-note">{{ user_email }}</span>
+            </span>
+            <input type="checkbox" class="toggle" role="switch" name="email" value="1"
+                   {{ (posted ? submitted.email|default('0') == '1' : email_on) ? 'checked' : '' }}>
+        </label>
+
+        <input type="hidden" name="budget_alerts" value="0">
+        <label class="choice toggle-row">
+            <span class="auth-option-icon">{{ icon('budget') }}</span>
+            <span>
+                <span class="choice-title">{{ t('notifications.budget_alerts') }}</span>
+                <span class="choice-note">{{ t('notifications.budget_alerts_hint') }}</span>
+            </span>
+            <input type="checkbox" class="toggle" role="switch" name="budget_alerts" value="1"
+                   {{ (posted ? submitted.budget_alerts|default('0') == '1' : budget_alerts) ? 'checked' : '' }}>
+        </label>
+
+        <fieldset class="auth-fieldset">
+            <legend>{{ t('setup_notifications.remind_me') }}</legend>
+            <input type="hidden" name="lead_days[]" value="">
+            <div class="chip-choices">
+                {% for days in offered_lead_days %}
+                    <label class="filter-chip">
+                        <input type="checkbox" name="lead_days[]" value="{{ days }}"
+                               {{ days in chosen_lead or (days ~ '') in chosen_lead ? 'checked' : '' }}>
+                        {{ t('notifications.days_before', {'count': days}) }}
+                    </label>
+                {% endfor %}
+            </div>
+            {% if errors.lead_days is defined %}<p class="field-error">{{ error_message(errors.lead_days) }}</p>{% endif %}
+        </fieldset>
+    </form>
+
+    <section class="auth-section" id="channels" aria-labelledby="channels-heading">
+        <h2 id="channels-heading" class="auth-section-title">{{ t('setup_notifications.other_channels') }}</h2>
+
+        {% if channels is not empty %}
+            <ul class="auth-channels">
                 {% for channel in channels %}
-                    <li class="channel">
-                        <div>
-                            <strong>{{ channel.label }}</strong>
-                            <span class="muted">{{ channel_description(channel) }}</span>
+                    <li class="auth-channel">
+                        <span class="auth-option-icon">{{ icon(channel_icon(channel.type)) }}</span>
+                        <span class="auth-channel-text">
+                            <span class="choice-title">{{ channel.label }}</span>
+                            <span class="choice-note">{{ channel_description(channel) }}</span>
                             {% if channel.lastError %}
-                                <p class="field-error">{{ t('notifications.last_error', {'reason': channel.lastError}) }}</p>
+                                <span class="field-error">{{ t('notifications.last_error', {'reason': channel.lastError}) }}</span>
                             {% elseif channel.lastSuccessAt %}
-                                <p class="hint">{{ t('setup_notifications.test_message_delivered') }}</p>
+                                <span class="hint">{{ t('setup_notifications.test_message_delivered') }}</span>
                             {% endif %}
-                        </div>
-                        <div class="channel-actions">
-                            <form method="post" action="/settings/notifications/channels/{{ channel.id }}/test"
-                                  class="inline">
-                                {{ csrf_field() }}
-                                <input type="hidden" name="return_to" value="/setup/notifications">
-                                <button type="submit" class="button button-quiet">{{ t('action.send_test') }}</button>
-                            </form>
-                        </div>
+                        </span>
+                        <form method="post" action="/settings/notifications/channels/{{ channel.id }}/test">
+                            {{ csrf_field() }}
+                            <input type="hidden" name="return_to" value="/setup/notifications#channels">
+                            <button type="submit" class="button button-quiet"
+                                    aria-label="{{ t('setup_notifications.send_test_to', {'label': channel.label}) }}">
+                                {{ t('action.send_test') }}
+                            </button>
+                        </form>
                     </li>
                 {% endfor %}
             </ul>
-        </section>
-    {% endif %}
+        {% endif %}
 
-    <section class="card">
-        <h2>{{ t('notifications.add_a_channel') }}</h2>
+        <details class="auth-details" {{ submitted.channel_type is defined ? 'open' : '' }}>
+            <summary>{{ t('setup_notifications.add_another_channel') }}</summary>
 
-        {% for notifier in notifiers %}
-            <details class="channel-form" {{ submitted.channel_type is defined
-                and submitted.channel_type == notifier.key ? 'open' : '' }}>
-                <summary>{{ notifier.label }}</summary>
+            <p class="hint">{{ t('setup_notifications.add_another_hint') }}</p>
 
-                <form method="post" action="/setup/notifications/channels" class="stack">
-                    {{ csrf_field() }}
-                    <input type="hidden" name="channel_type" value="{{ notifier.key }}">
+            {% for notifier in notifiers %}
+                <details class="auth-details auth-details-nested" {{ submitted.channel_type is defined
+                    and submitted.channel_type == notifier.key ? 'open' : '' }}>
+                    <summary>{{ notifier.label }}</summary>
 
-                    <label for="{{ notifier.key }}_label">{{ t('field.name') }}</label>
-                    <input type="text" id="{{ notifier.key }}_label" name="label"
-                           placeholder="{{ notifier.label }}">
+                    <form method="post" action="/setup/notifications/channels" class="auth-form">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="channel_type" value="{{ notifier.key }}">
 
-                    {% for field in notifier.fields %}
-                        <label for="{{ notifier.key }}_{{ field.name }}">{{ t(field.label) }}</label>
-                        <input type="{{ field.type }}"
-                               id="{{ notifier.key }}_{{ field.name }}"
-                               name="{{ field.name }}"
-                               {{ field.required ? 'required' : '' }}
-                               autocomplete="off">
-                        {% if field.hint %}<p class="hint">{{ t(field.hint) }}</p>{% endif %}
-                        {% if errors[field.name] is defined %}
-                            <p class="field-error">{{ errors[field.name] }}</p>
-                        {% endif %}
-                    {% endfor %}
+                        {% include 'auth/_input.twig' with {
+                            'id': notifier.key ~ '_label',
+                            'name': 'label',
+                            'label': t('field.name'),
+                            'placeholder': notifier.label,
+                            'autocomplete': 'off',
+                        } only %}
 
-                    <button type="submit" class="button">
-                        {{ t('notifications.add_channel_of_type', {'type': notifier.label}) }}
-                    </button>
-                </form>
-            </details>
-        {% endfor %}
+                        {% for field in notifier.fields %}
+                            {% include 'auth/_input.twig' with {
+                                'id': notifier.key ~ '_' ~ field.name,
+                                'name': field.name,
+                                'type': field.type,
+                                'label': t(field.label),
+                                'autocomplete': 'off',
+                                'hint': field.hint ? t(field.hint) : '',
+                                'required': field.required,
+                                'error': submitted.channel_type is defined and submitted.channel_type == notifier.key
+                                    ? errors[field.name]|default(null) : null,
+                            } only %}
+                        {% endfor %}
+
+                        <button type="submit" class="button auth-submit">
+                            {{ t('notifications.add_channel_of_type', {'type': notifier.label}) }}
+                        </button>
+                    </form>
+                </details>
+            {% endfor %}
+        </details>
     </section>
 
-    <form method="post" action="/setup/notifications/finish" class="stack">
-        {{ csrf_field() }}
-        <button type="submit" class="button button-primary">
-            {{ channels is empty
-                ? t('setup_notifications.skip_for_now')
-                : t('setup_notifications.finish') }}
+    <p class="hint">{{ t('setup_notifications.later_note') }}</p>
+
+    <div class="wizard-nav">
+        <a class="button" href="/setup/household">{{ t('action.back') }}</a>
+        <button type="submit" form="setup-reminders" class="button button-primary auth-submit">
+            {{ t('setup_wizard.finish_setup') }}
         </button>
-    </form>
+    </div>
 {% endblock %}

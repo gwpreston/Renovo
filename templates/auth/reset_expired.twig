@@ -1,11 +1,11 @@
-{% extends 'layout.twig' %}
+{% extends 'auth/_layout.twig' %}
 
-{% block title %}{{ t('auth.link_expired') }} — {{ instance_name }}{% endblock %}
+{% set card_icon = 'clock' %}
 
-{% block content %}
-    <section class="card narrow">
-        <h1>{{ t('auth_reset_expired.title') }}</h1>
-        <p class="muted">{{ t('auth_reset_expired.intro') }}</p>
-        <p><a class="button" href="/forgot-password">{{ t('auth_reset_expired.request_a_new_link') }}</a></p>
-    </section>
+{% block card_title %}{{ t('auth_reset_expired.title') }}{% endblock %}
+{% block card_intro %}{{ t('auth_reset_expired.intro', {'minutes': minutes}) }}{% endblock %}
+
+{% block card_body %}
+    <a class="button button-primary auth-submit" href="/forgot-password">{{ t('auth_reset_expired.send_a_new_link') }}</a>
+    <p class="auth-links"><a class="auth-back" href="/login">← {{ t('action.back_to_sign_in') }}</a></p>
 {% endblock %}

@@ -31,6 +31,21 @@ interface SessionInterface
     public function id(): string;
 
     /**
+     * Whether this session outlives the browser — the sign-in form's "Keep me
+     * signed in on this device". True unless sign-in turned it off, so every
+     * session that predates the choice keeps the lifetime it always had.
+     */
+    public function isPersistent(): bool;
+
+    /**
+     * Keep this session past the browser closing, or end it with the browser.
+     *
+     * The session is still one row and still revoked by deleting it; only the
+     * cookie's expiry and the row's idle lifetime depend on this.
+     */
+    public function setPersistent(bool $persistent): void;
+
+    /**
      * Store a message for the next request only.
      *
      * What is stored is a translation key and its arguments, not a sentence.

@@ -1,12 +1,31 @@
-{% extends 'layout.twig' %}
+{% extends 'auth/_layout.twig' %}
 
-{% block title %}{{ t('auth_register_sent.title') }} — {{ instance_name }}{% endblock %}
+{#
+    Where registration ends, and where "send it again" comes back to. The
+    same page whatever became of a resend — sent, already confirmed, or no
+    such account — so it cannot be used to learn who has signed up.
+#}
 
-{% block content %}
-    <section class="card narrow">
-        <h1>{{ t('auth_register_sent.title') }}</h1>
-        <p>{{ t('auth_register_sent.sent_to') }} <strong>{{ email }}</strong></p>
-        <p>{{ t('auth_register_sent.follow_it') }}</p>
-        <p><a class="button" href="/login">{{ t('action.back_to_sign_in') }}</a></p>
-    </section>
+{% set card_icon = 'mail-sent' %}
+
+{% block card_title %}{{ t('auth_register_sent.title') }}{% endblock %}
+{% block card_intro %}{{ t('auth_register_sent.intro', {'email': email, 'days': days}) }}{% endblock %}
+
+{% block card_body %}
+    {% if errors.email is defined %}
+        {% include 'auth/_alert.twig' with {'message': error_message(errors.email)} only %}
+    {% elseif resent|default(false) %}
+        <p class="auth-note" role="status">{{ t('auth_register_sent.resent') }}</p>
+    {% endif %}
+
+    <p class="auth-note">{{ t('auth_register_sent.nothing_arrived') }}</p>
+
+    <div class="auth-actions">
+        <form method="post" action="/verify-email/resend">
+            {{ csrf_field() }}
+            <input type="hidden" name="email" value="{{ email }}">
+            <button type="submit" class="button auth-submit">{{ t('auth_register_sent.send_again') }}</button>
+        </form>
+        <a class="button button-secondary auth-submit" href="/login">{{ t('action.back_to_sign_in') }}</a>
+    </div>
 {% endblock %}

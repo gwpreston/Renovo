@@ -173,7 +173,83 @@ final class AccessibilityTest extends DatabaseTestCase
             ['/settings/notifications'],
             ['/import'],
             ['/audit'],
+            // The wizard's signed-in steps (Phase 29), in the signed-out
+            // layout: the owner here is an instance administrator and the
+            // wizard has not been finished.
+            ['/setup/household'],
+            ['/setup/notifications'],
         ];
+    }
+
+    /**
+     * The pages somebody sees before they are inside the application, with
+     * the status each answers — a spent link is a 410, a missing page a 404,
+     * and both are pages a reader has to be able to find their way out of.
+     *
+     * @return list<array{0: string, 1: int}>
+     */
+    public static function signedOutPages(): array
+    {
+        return [
+            ['/login', 200],
+            ['/forgot-password', 200],
+            ['/register', 200],
+            ['/reset-password?token=spent', 410],
+            ['/verify-email?token=spent', 410],
+            ['/accept-invite?token=spent', 410],
+            ['/confirm-email-change?token=spent', 410],
+            ['/no-such-page', 404],
+        ];
+    }
+
+    /**
+     * @dataProvider signedOutPages
+     */
+    public function testEverySignedOutPageIsStructurallyNavigableAndNamed(string $path, int $status): void
+    {
+        $this->session->clear();
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $container->get(InstanceSettingsService::class)->setRegistrationAllowed(true);
+
+        $response = $this->app->handle(
+            (new ServerRequestFactory())->createServerRequest(
+                'GET',
+                'http://localhost' . $path,
+                ['REMOTE_ADDR' => '127.0.0.1'],
+            ),
+        );
+
+        self::assertSame($status, $response->getStatusCode(), $path);
+        $html = (string) $response->getBody();
+
+        self::assertSame(1, preg_match_all('/<h1\b/', $html), $path . ' should have exactly one <h1>.');
+        self::assertStringContainsString('<main', $html, $path . ' has no main landmark.');
+        self::assertMatchesRegularExpression('/<html[^>]+lang="[a-zA-Z-]+"/', $html, $path . ' declares no language.');
+        self::assertStringContainsString('class="skip-link"', $html, $path . ' has no skip link.');
+        self::assertSame([], $this->unnamedControls($html), $path . ' has controls a screen reader cannot name.');
+    }
+
+    /**
+     * A failure on a signed-out form is announced, not only drawn.
+     */
+    public function testASignedOutFormsFailureIsAnAlert(): void
+    {
+        $this->session->clear();
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+
+        $response = $this->app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('POST', 'http://localhost/login', ['REMOTE_ADDR' => '127.0.0.1'])
+                ->withParsedBody(['email' => 'owner@example.test', 'password' => 'not the password'])
+                ->withHeader(CsrfTokenManager::HEADER_NAME, $container->get(CsrfTokenManager::class)->token()),
+        );
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringContainsString('role="alert"', (string) $response->getBody());
     }
 
     /**

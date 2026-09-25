@@ -120,6 +120,10 @@ return static function (App $app): void {
     $app->post('/register', [RegisterController::class, 'submit']);
 
     $app->get('/verify-email', [VerifyEmailController::class, 'verify'])->setName('verify-email');
+    // "Send the confirmation again", from the page registration ends on. Shaped
+    // like the reset request: the same answer whether or not the address has
+    // an account waiting, under a rate limit of its own.
+    $app->post('/verify-email/resend', [VerifyEmailController::class, 'resend']);
 
     $app->get('/forgot-password', [PasswordResetController::class, 'showRequestForm'])->setName('forgot-password');
     $app->post('/forgot-password', [PasswordResetController::class, 'submitRequest']);
@@ -612,15 +616,30 @@ return static function (App $app): void {
             [AttachmentController::class, 'delete'],
         )->add($requires(Permission::ManageAttachments));
 
-        // The wizard's second step. Inside the authenticated group because it
-        // runs after the administrator account exists — see
-        // SetupGuardMiddleware for why this one /setup path stays open.
+        // The wizard's second and third steps, and the page it ends on. Inside
+        // the authenticated group because they run after the administrator
+        // account exists — see SetupGuardMiddleware for why these /setup paths
+        // stay open, and SetupWizardService::isOpenTo() for who they are open to.
+        // The household step renames the household and sets instance-wide
+        // settings, so it takes both permissions, whoever the wizard is open to.
+        $group->get('/setup/household', [SetupController::class, 'showHousehold'])
+            ->setName('setup-household')
+            ->add($requires(Permission::ManageHousehold))
+            ->add($requires(Permission::ManageInstance));
+        $group->post('/setup/household', [SetupController::class, 'saveHousehold'])
+            ->add($requires(Permission::ManageHousehold))
+            ->add($requires(Permission::ManageInstance));
+
         $group->get('/setup/notifications', [SetupController::class, 'showNotifications'])
             ->setName('setup-notifications');
 
         $group->post('/setup/notifications/channels', [SetupController::class, 'addNotificationChannel']);
 
+        $group->post('/setup/notifications/test-email', [SetupController::class, 'sendTestEmail']);
+
         $group->post('/setup/notifications/finish', [SetupController::class, 'finishNotifications']);
+
+        $group->get('/setup/done', [SetupController::class, 'done'])->setName('setup-done');
         // Added to the group and therefore runs on every route in it, which is
         // the point: a member still on the temporary password an administrator
         // gave them is sent to the account page until they replace it, and a

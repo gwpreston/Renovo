@@ -73,6 +73,16 @@ final class ArraySession implements SessionInterface
         return $this->id;
     }
 
+    public function isPersistent(): bool
+    {
+        return ($this->data['_persistent'] ?? true) !== false;
+    }
+
+    public function setPersistent(bool $persistent): void
+    {
+        $this->data['_persistent'] = $persistent;
+    }
+
     /**
      * Pin the id, for a test about which session survives something.
      *

@@ -1,24 +1,29 @@
-{% extends 'layout.twig' %}
-
-{% block title %}{{ title }} — {{ instance_name }}{% endblock %}
+{% extends 'auth/_layout.twig' %}
 
 {#
-    The shell renders the <h1> for a signed-in page, and there is no shell on an
-    error a signed-out visitor sees — a bad reset link, a 404 before login. So
-    the heading is declared for the first case and repeated inside the card for
-    the second, never both: exactly one <h1> either way.
-#}
-{% block heading %}{{ title }}{% endblock %}
+    Every error page — 404, 403, 500, an expired session — in the signed-out
+    layout.
 
-{% block content %}
-    <section class="card narrow">
-        {% if not current_user %}
-            <h1>{{ title }}</h1>
-        {% endif %}
-        <p class="muted">{{ message }}</p>
-        {% if trace %}
-            <pre class="trace">{{ trace }}</pre>
-        {% endif %}
-        <p><a class="button" href="/">{{ t('error.back_to_the_dashboard') }}</a></p>
-    </section>
+    HttpErrorHandler renders with no user whoever is reading, because the
+    failure may have come before the account was loaded; so this page is the
+    same card for everybody. What differs is the way back, which the handler
+    decides from whether the session names an account: a stranger is offered
+    the sign-in form, a signed-in reader their dashboard.
+#}
+
+{% set card_icon = status == 500 ? 'warn' : 'alert' %}
+
+{% block title %}{{ title }} — {{ instance_name }}{% endblock %}
+{% block card_title %}{{ title }}{% endblock %}
+{% block card_intro %}{{ message }}{% endblock %}
+
+{% block card_body %}
+    {% if trace %}
+        <pre class="trace">{{ trace }}</pre>
+    {% endif %}
+
+    {% set signed_in = signed_in|default(false) %}
+    <a class="button button-primary auth-submit" href="{{ signed_in ? '/' : '/login' }}">
+        {{- signed_in ? t('error.back_to_the_dashboard') : t('action.back_to_sign_in') -}}
+    </a>
 {% endblock %}

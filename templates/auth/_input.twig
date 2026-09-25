@@ -1,0 +1,28 @@
+{#
+    One labelled field on a signed-out card.
+
+    id, name, label       required
+    type                  defaults to text
+    value, autocomplete, inputmode, placeholder, hint
+    required, autofocus   booleans
+    error                 a ValidationError or key; drawn under the field and
+                          tied to it by aria-describedby, with aria-invalid set
+#}
+{% set field_error = error is defined and error ? error_message(error) : '' %}
+{% set described = [
+    hint is defined and hint ? id ~ '-hint' : null,
+    field_error ? id ~ '-error' : null
+]|filter(v => v) %}
+<div class="auth-field">
+    <label for="{{ id }}">{{ label }}</label>
+    <input type="{{ type|default('text') }}" id="{{ id }}" name="{{ name }}"
+           value="{{ value|default('') }}"
+           {% if autocomplete is defined and autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+           {% if inputmode is defined and inputmode %}inputmode="{{ inputmode }}"{% endif %}
+           {% if placeholder is defined and placeholder %}placeholder="{{ placeholder }}"{% endif %}
+           {% if described is not empty %}aria-describedby="{{ described|join(' ') }}"{% endif %}
+           {% if field_error %}aria-invalid="true"{% endif %}
+           {{ required|default(false) ? 'required' : '' }} {{ autofocus|default(false) ? 'autofocus' : '' }}>
+    {% if hint is defined and hint %}<p class="hint" id="{{ id }}-hint">{{ hint }}</p>{% endif %}
+    {% if field_error %}<p class="field-error" id="{{ id }}-error">{{ field_error }}</p>{% endif %}
+</div>

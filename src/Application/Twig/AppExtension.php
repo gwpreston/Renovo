@@ -23,6 +23,7 @@ use App\Notification\NotifierRegistry;
 use App\Security\CsrfTokenManager;
 use App\Security\PermissionService;
 use App\Security\Scope;
+use App\Service\AuthService;
 use App\Service\NavigationService;
 use App\Service\ShellService;
 use App\Service\ValidationError;
@@ -106,6 +107,9 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('channel_icon', $this->channelIcon(...)),
             new TwigFunction('channel_type_label', $this->channelTypeLabel(...)),
             new TwigFunction('percent_symbol', $this->numbers->percentSymbol(...)),
+            // The password meter's thresholds, from the validator that applies
+            // the rule — see AuthService::passwordMeterRules().
+            new TwigFunction('password_rules', AuthService::passwordMeterRules(...)),
         ];
     }
 

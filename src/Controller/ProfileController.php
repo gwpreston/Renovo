@@ -72,6 +72,15 @@ final class ProfileController extends Controller
     {
         $user = $this->user($request);
 
+        // A member still on the temporary password an Owner gave them is held
+        // on this page, and on this page only the password form works — so
+        // they see that form and nothing else, in the signed-out layout: the
+        // shell's navigation would be a list of links that all bring them
+        // straight back here. See PasswordChangeRequiredMiddleware.
+        if ($user->mustChangePassword) {
+            return $this->render($request, $response, 'auth/change_password.twig');
+        }
+
         // Shown once: read and forgotten in the same breath, so a refresh
         // cannot bring them back. See SecurityController::RECOVERY_CODES_KEY.
         $codes = $this->session->get(SecurityController::RECOVERY_CODES_KEY);

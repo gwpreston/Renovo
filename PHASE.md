@@ -198,19 +198,54 @@ field shows `bad` with text, not only a red border.
 
 ## Status
 
-- [ ] Signed-out layout: brand panel (catalogued, corrected copy), card, narrow
+- [x] Signed-out layout: brand panel (catalogued, corrected copy), card, narrow
       header, demo banner; all hardcoded colours tokenised
-- [ ] Sign in (generic error, lock-out, show/hide, passkey, registration link
-      only when open)
-- [ ] Two-step: single-input code boxes, recovery code, passkey fallback
-- [ ] Forgot, sent, choose new password, expired link — real lifetimes
-- [ ] Register, confirm email, accept invitation, email change landing, forced
-      password change (if built), signed-out error pages
-- [ ] Setup wizard: three steps, More options, invites (if Phase 15), SMTP test,
-      optional channel with test, lead times, done
-- [ ] Password meter driven by the server's rules
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check`, offline guard green on both engines
+- [x] Sign in (generic error, lock-out, show/hide, passkey, registration link
+      only when open) — plus "Keep me signed in" (see Decisions as built)
+- [x] Two-step: single-input code boxes, recovery code, passkey fallback
+- [x] Forgot, sent, choose new password, expired link — real lifetimes
+- [x] Register, confirm email, accept invitation, email change landing, forced
+      password change, signed-out error pages
+- [x] Setup wizard: three steps, More options, invites, SMTP test, optional
+      channel with test, lead times, done
+- [x] Password meter driven by the server's rules
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check`, offline guard green on both engines
+
+## Decisions as built
+
+- **Keep me signed in — built** (the owner chose to include it). Sessions were
+  already a 14-day persistent cookie with a sliding database expiry, so no
+  remember-token was needed: ticked (the default) keeps exactly that; unticked
+  makes the cookie a browser-session cookie and gives the row a shorter idle
+  lifetime, `SESSION_BROWSER_LIFETIME_SECONDS` (default 12 hours). Revocation
+  is unchanged — deleting the row ends either kind. The choice is carried
+  through the second factor and the passkey sign-in.
+- **The theme switch stays** on signed-out pages (it existed since Phase 18);
+  it moved to the form pane's top corner. Error pages still carry none.
+- **The wizard's household step is new behaviour**: the old wizard asked only
+  for the account. Step 1 still creates the account (and a household called
+  Home) and signs the owner in; steps 2 and 3 are signed-in routes
+  (`/setup/household`, `/setup/notifications`, `/setup/done`) named one by one
+  in SetupGuardMiddleware, and every value goes through the service that owns
+  it (HouseholdSettingsService, InstanceAdminService,
+  NotificationSettingsService). Invitations are checked on step 2, held in the
+  session and sent on Finish, as Contributors named after their address's
+  local part. "Email" is an email channel to the owner's own address.
+- **No inviter is named** on the invitation page ("You have been invited to join
+  {household}"): nothing stores who sent an invite, and adding it would be a
+  data-model change.
+- **Email confirmation gained "Send again"** (`POST /verify-email/resend`),
+  shaped like the reset request: same page whatever the address, own rate
+  limit. A spent confirmation link says "Already confirmed".
+- **Lifetimes on screen come from code**: `PasswordResetService::tokenLifetimeMinutes()`
+  and `AuthService::verificationLifetimeDays()`; the meter reads
+  `AuthService::passwordMeterRules()`.
+- **Error pages** use the card; the way back is "Back to sign in" or "Back to the
+  dashboard" depending on whether the session names an account. An expired
+  CSRF token is titled "Session expired".
+- A completed reset and a confirmed email now land on their own page rather
+  than a flash over the sign-in form.
 
 ## Definition of done
 

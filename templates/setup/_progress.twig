@@ -1,0 +1,19 @@
+{#
+    "Step N of 3" and the three labelled bars above the wizard's card.
+
+    A list, so a screen reader hears three steps and which one this is
+    (`aria-current="step"`); the bars are decoration on top of it. Done steps
+    and the current one are filled; the rest are not.
+#}
+<div class="wizard-progress">
+    <p class="wizard-step">{{ t('setup_wizard.step_of', {'step': step, 'count': 3}) }}</p>
+    <ol class="wizard-steps">
+        {% for label in ['setup_wizard.your_account', 'setup_wizard.household', 'setup_wizard.reminders'] %}
+            <li class="wizard-steps-item{{ loop.index <= step ? ' is-reached' : '' }}"
+                {% if loop.index == step %}aria-current="step"{% endif %}>
+                <span class="wizard-steps-bar" aria-hidden="true"></span>
+                <span>{{ t(label) }}</span>
+            </li>
+        {% endfor %}
+    </ol>
+</div>

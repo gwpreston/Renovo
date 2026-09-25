@@ -1,0 +1,804 @@
+/*
+ * The signed-out layout: the brand panel beside the card.
+ *
+ * Every page rendered before the application is the reader's to navigate —
+ * signing in, the second factor, resetting a password, registering, an
+ * invitation, the first-run wizard, the error pages — is the same two panes,
+ * so the signed-out experience reads as one design rather than a dozen pages.
+ * The prototype (`Renovo Auth.dc.html`) wrote its colours as literals; here
+ * every one is a token, so the panel and the card follow the palette and the
+ * theme exactly as the shell does.
+ *
+ * Below 900px the brand panel collapses to a slim header with the mark and the
+ * name, so on a phone the form is the first thing on the screen.
+ */
+
+.auth-shell {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: 100dvh;
+    background: var(--bg);
+}
+
+/* ------------------------------------------------------------ brand panel */
+
+.auth-brand {
+    flex: 1 1 420px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 2rem;
+    padding: clamp(1.5rem, 4vw, 3rem);
+    background: var(--rail);
+    color: var(--rail-ink);
+}
+
+.auth-brand-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.auth-mark {
+    height: 2.25rem;
+    width: auto;
+    flex-shrink: 0;
+}
+
+.auth-instance {
+    margin: 0;
+    font-size: 1.375rem;
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+}
+
+.auth-tagline {
+    margin: 0;
+    font-size: 0.625rem;
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--rail-accent);
+}
+
+.auth-pitch {
+    max-width: 27.5rem;
+}
+
+.auth-pitch-title {
+    margin: 0;
+    font-size: clamp(1.625rem, 3vw, 2.25rem);
+    line-height: 1.15;
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.02em;
+    text-wrap: pretty;
+}
+
+.auth-points {
+    list-style: none;
+    margin: 1.75rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+.auth-point {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.auth-point-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-control);
+    background: var(--rail-tint);
+    color: var(--rail-accent);
+}
+
+.auth-point-icon .icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.auth-point-title {
+    display: block;
+    font-size: var(--size-body);
+    font-weight: var(--weight-bold);
+}
+
+.auth-point-body {
+    display: block;
+    margin-top: 0.125rem;
+    font-size: var(--size-dense);
+    color: var(--rail-muted);
+}
+
+.auth-brand-foot {
+    margin: 0;
+    font-size: var(--size-label);
+    color: var(--rail-faint);
+}
+
+@media (min-width: 900px) {
+    .auth-brand {
+        min-height: 100dvh;
+        position: sticky;
+        top: 0;
+    }
+}
+
+/* --------------------------------------------------------------- the form */
+
+.auth-main {
+    flex: 1 1 480px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.25rem;
+    min-width: 0;
+    padding: clamp(1rem, 4vw, 3rem);
+    color: var(--text);
+}
+
+/* The theme switch, where the prototype puts it: the pane's top corner. */
+.auth-theme {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: var(--surface);
+}
+
+.auth-column {
+    width: 100%;
+    max-width: 27.5rem;
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.auth-column .flashes {
+    margin: 0;
+}
+
+.auth-demo {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    margin: 0;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius-control);
+    background: var(--info-bg);
+    color: var(--info);
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+}
+
+.auth-demo .icon {
+    width: 0.9375rem;
+    height: 0.9375rem;
+    margin-top: 0.0625rem;
+}
+
+.auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.auth-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.125rem;
+    padding: clamp(1.375rem, 4vw, 2rem);
+}
+
+.auth-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.auth-icon .icon {
+    width: 1.375rem;
+    height: 1.375rem;
+}
+
+.auth-card-head h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+}
+
+.auth-intro {
+    margin: 0.375rem 0 0;
+    font-size: var(--size-dense);
+    color: var(--muted);
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.auth-field > label,
+.auth-label-row label {
+    font-size: var(--size-label);
+    font-weight: var(--weight-bold);
+}
+
+.auth-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.auth-label-link {
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    color: var(--accent-text);
+}
+
+.auth-card input[type='text'],
+.auth-card input[type='email'],
+.auth-card input[type='password'],
+.auth-card input[type='url'],
+.auth-card input[type='number'],
+.auth-card select {
+    padding: 0.6875rem 0.75rem;
+    background: var(--surface-2);
+}
+
+.auth-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--size-dense);
+    font-weight: var(--weight-normal);
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.auth-check input {
+    width: 1rem;
+    height: 1rem;
+}
+
+.auth-submit {
+    width: 100%;
+    padding: 0.75rem 1.125rem;
+    font-weight: var(--weight-bold);
+}
+
+.auth-card .button:not(.button-primary, .button-secondary, .button-quiet) {
+    background: var(--surface);
+    border-color: var(--border);
+}
+
+.auth-card .button:not(.button-primary, .button-secondary, .button-quiet):hover {
+    background: var(--surface-2);
+}
+
+.auth-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+}
+
+.auth-actions > * {
+    flex: 1 1 10rem;
+}
+
+.auth-alert {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    padding: 0.625rem 0.75rem;
+    border-radius: var(--radius-control);
+    background: var(--bad-bg);
+    color: var(--bad);
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+}
+
+.auth-alert p {
+    margin: 0;
+}
+
+.auth-alert .icon {
+    width: 0.9375rem;
+    height: 0.9375rem;
+    margin-top: 0.0625rem;
+}
+
+.auth-note {
+    margin: 0;
+    padding: 0.75rem 0.875rem;
+    border-radius: var(--radius-button);
+    background: var(--surface-2);
+    font-size: var(--size-label);
+    color: var(--muted);
+    text-wrap: pretty;
+}
+
+.auth-note p {
+    margin: 0 0 0.625rem;
+    overflow-wrap: anywhere;
+}
+
+.auth-inline-button .icon {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.auth-passkey {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.auth-passkey[hidden] {
+    display: none;
+}
+
+.auth-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--size-label);
+}
+
+.auth-back {
+    color: var(--muted);
+    font-weight: var(--weight-semibold);
+    text-decoration: none;
+    font-size: var(--size-label);
+}
+
+.auth-back:hover {
+    color: var(--text);
+}
+
+.auth-links a:not(.auth-back),
+.auth-foot a {
+    color: var(--accent-text);
+    font-weight: var(--weight-bold);
+}
+
+.auth-foot {
+    margin: 0;
+    text-align: center;
+    font-size: var(--size-dense);
+    color: var(--muted);
+}
+
+.auth-details {
+    border-top: 1px solid var(--border);
+    padding-top: 0.875rem;
+}
+
+.auth-details > summary {
+    font-size: var(--size-dense);
+    font-weight: var(--weight-bold);
+    color: var(--accent-text);
+    cursor: pointer;
+}
+
+.auth-details[open] > summary {
+    margin-bottom: 0.875rem;
+}
+
+.auth-details > * + * {
+    margin-top: 0.875rem;
+}
+
+.auth-details-nested {
+    padding-top: 0.625rem;
+}
+
+.auth-details-nested > summary {
+    color: var(--text);
+}
+
+.auth-fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    /* No margin of its own: inside More options the details' own spacing
+       separates one fieldset from the next. */
+    padding: 0;
+    border: 0;
+}
+
+.auth-fieldset > legend {
+    margin-bottom: 0.5rem;
+    font-size: var(--size-label);
+    font-weight: var(--weight-bold);
+}
+
+.auth-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.auth-section-title {
+    margin: 0;
+    font-size: var(--size-label);
+    font-weight: var(--weight-bold);
+}
+
+.auth-channels {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.auth-channel {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-button);
+}
+
+.auth-channel-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.auth-channel-text > span {
+    display: block;
+}
+
+.auth-option-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.auth-card .choice.toggle-row > span:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.auth-card .trace {
+    max-height: 16rem;
+    overflow: auto;
+    font-size: var(--size-caption);
+}
+
+/* ----------------------------------------------------- show/hide password */
+
+.password-field {
+    position: relative;
+}
+
+.password-field input {
+    padding-right: 2.75rem;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.375rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: var(--radius-small);
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
+}
+
+.password-toggle:hover {
+    color: var(--text);
+}
+
+.password-toggle .icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.password-toggle[hidden],
+.password-toggle[aria-pressed='false'] .password-toggle-hide,
+.password-toggle[aria-pressed='true'] .password-toggle-show {
+    display: none;
+}
+
+/* ------------------------------------------------------- password meter */
+
+/*
+ * Four bars and a label. The score is set by auth-forms.js as `data-score`
+ * (0–4); without script there is no score and only the caption — the rule —
+ * is shown.
+ */
+.password-meter {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-top: -0.5rem;
+}
+
+.password-meter-bars {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.password-meter-bars span {
+    flex: 1;
+    height: 0.25rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+}
+
+.password-meter:not([data-score]) .password-meter-bars {
+    display: none;
+}
+
+.password-meter[data-score='1'] .password-meter-bars span:nth-child(-n + 1) {
+    background: var(--bad);
+}
+
+.password-meter[data-score='2'] .password-meter-bars span:nth-child(-n + 2),
+.password-meter[data-score='3'] .password-meter-bars span:nth-child(-n + 3) {
+    background: var(--warn);
+}
+
+.password-meter[data-score='4'] .password-meter-bars span {
+    background: var(--ok);
+}
+
+.password-meter-caption {
+    margin: 0;
+    font-size: var(--size-caption);
+    color: var(--muted);
+}
+
+.password-meter-label:not(:empty)::after {
+    content: ' · ';
+}
+
+.password-meter-label {
+    font-weight: var(--weight-semibold);
+    color: var(--text);
+}
+
+/* ---------------------------------------------------- the six code boxes */
+
+/*
+ * One input with six boxes drawn behind it, both in the figures' face by way
+ * of `.num`, as every figure is. Without script the boxes are not
+ * drawn (`is-enhanced` is never set) and the input is simply a field. With it,
+ * the input is laid transparently over the boxes, so a click, a paste or an
+ * autofill still lands in the one real field, and auth-forms.js copies each
+ * digit into its box.
+ */
+.code-entry {
+    position: relative;
+}
+
+.code-boxes {
+    display: none;
+    gap: 0.5rem;
+}
+
+.code-input {
+    letter-spacing: 0.3em;
+}
+
+.code-entry.is-enhanced .code-boxes {
+    display: flex;
+}
+
+.code-entry.is-enhanced .code-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: text;
+}
+
+.code-box {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 3.25rem;
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    font-size: 1.375rem;
+    font-weight: var(--weight-bold);
+}
+
+.code-entry.is-focused .code-box.is-next {
+    border-color: var(--focus-ring);
+    box-shadow: 0 0 0 1px var(--focus-ring);
+}
+
+.code-entry.is-enhanced .code-input[aria-invalid='true'] ~ .code-boxes .code-box {
+    border-color: var(--bad);
+}
+
+/* ------------------------------------------------------------- the wizard */
+
+.wizard-progress {
+    padding: 1.25rem clamp(1.375rem, 4vw, 2rem) 0;
+}
+
+.wizard-step {
+    margin: 0;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+}
+
+.wizard-steps {
+    list-style: none;
+    display: flex;
+    gap: 0.375rem;
+    margin: 0.625rem 0 0;
+    padding: 0;
+}
+
+.wizard-steps-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--faint);
+}
+
+.wizard-steps-bar {
+    height: 0.25rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-3);
+}
+
+.wizard-steps-item.is-reached {
+    color: var(--text);
+}
+
+.wizard-steps-item.is-reached .wizard-steps-bar {
+    background: var(--accent);
+}
+
+.wizard-nav {
+    display: flex;
+    gap: 0.625rem;
+    margin-top: 0.25rem;
+}
+
+.wizard-nav .auth-submit {
+    flex: 1;
+    width: auto;
+}
+
+/* ------------------------------------------------------ the narrow layout */
+
+/*
+ * Below 900px: the mark and the name as a header, and nothing else.
+ * The pitch stays in the document for a screen reader — the panel is a
+ * complementary landmark read before the form — but not on a phone's screen,
+ * where it would push the form below the fold.
+ *
+ * Last in the file, so it overrides the rules above at equal specificity.
+ */
+@media (max-width: 899.98px) {
+    /* The theme switch joins the flow, so a tall card cannot slide under it. */
+    .auth-theme {
+        position: static;
+        align-self: flex-end;
+    }
+
+    .auth-column {
+        margin-top: 0;
+    }
+
+    /* A column, so the header is only as tall as its content and the card's
+       pane takes the rest — wrapped rows would share the height out. */
+    .auth-shell {
+        flex-direction: column;
+    }
+
+    .auth-brand {
+        flex: 0 0 auto;
+        padding: 1rem;
+    }
+
+    .auth-main {
+        flex: 1 0 auto;
+        justify-content: flex-start;
+    }
+
+    .auth-mark {
+        height: 1.75rem;
+    }
+
+    .auth-instance {
+        font-size: 1.125rem;
+    }
+
+    .auth-pitch,
+    .auth-brand-foot {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}

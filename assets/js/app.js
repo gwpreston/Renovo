@@ -23,6 +23,7 @@
  *     element.append(window.Renovo.icon('calendar'));
  */
 
+import { enhanceAuthForms } from './auth-forms.js';
 import { onThemeChange, renderChart } from './charts.js';
 import { drawCategoryDonuts } from './category-donut.js';
 import { enhanceCopyFields } from './copy-field.js';
@@ -62,6 +63,7 @@ function drawCharts(root = document) {
  * is a module fetched from cache faster than the parser.
  */
 function hydrate() {
+    enhanceAuthForms(document);
     enhanceTagFields(document);
     enhancePaymentMethodFields(document);
     enhanceSubscriptionForms(document);

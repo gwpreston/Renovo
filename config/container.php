@@ -129,6 +129,7 @@ return static function (ContainerBuilder $builder, array $settings): void {
         PdoSessionHandler::class => static fn (ContainerInterface $c): PdoSessionHandler => new PdoSessionHandler(
             $c->get(Database::class),
             $c->get('settings')['session']['lifetime'],
+            $c->get('settings')['session']['browser_lifetime'],
         ),
 
         // ------------------------------------------------------------------

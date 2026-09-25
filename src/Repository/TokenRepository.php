@@ -87,6 +87,40 @@ final class TokenRepository extends AbstractRepository
         return $plain;
     }
 
+    public const STATE_VALID = 'valid';
+    public const STATE_USED = 'used';
+    public const STATE_EXPIRED = 'expired';
+    public const STATE_UNKNOWN = 'unknown';
+
+    /**
+     * What became of a token: still good, already spent, run out, or never
+     * issued for this purpose.
+     *
+     * For the landing page a link opens, which can say "already confirmed —
+     * sign in" instead of offering a spent link a retry. It says nothing a
+     * holder of the link does not already know: the plain token is the only
+     * key to the row.
+     *
+     * @return self::STATE_*
+     */
+    public function state(string $plainToken, string $purpose): string
+    {
+        $row = $this->db->fetchOne(
+            'SELECT ' . $this->quote('consumed_at') . ', ' . $this->quote('expires_at')
+            . ' FROM ' . $this->quote('auth_tokens')
+            . ' WHERE ' . $this->quote('token_hash') . ' = :hash'
+            . ' AND ' . $this->quote('purpose') . ' = :purpose',
+            ['hash' => $this->hash($plainToken), 'purpose' => $purpose],
+        );
+
+        return match (true) {
+            $row === null => self::STATE_UNKNOWN,
+            $row['consumed_at'] !== null => self::STATE_USED,
+            (string) $row['expires_at'] <= $this->now() => self::STATE_EXPIRED,
+            default => self::STATE_VALID,
+        };
+    }
+
     /**
      * Look up a valid, unconsumed token and return the user it belongs to.
      */

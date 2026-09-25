@@ -46,6 +46,7 @@ final class InviteController extends Controller
 
         return $this->render($request, $response, 'auth/accept_invite.twig', [
             'token' => $token,
+            'household' => $this->members->invitedHouseholdName($token),
             'errors' => [],
         ]);
     }
@@ -71,6 +72,7 @@ final class InviteController extends Controller
 
             return $this->render($request, $response->withStatus(422), 'auth/accept_invite.twig', [
                 'token' => $token,
+                'household' => $this->members->invitedHouseholdName($token),
                 'errors' => $exception->errors(),
             ]);
         }

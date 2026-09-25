@@ -361,7 +361,7 @@ final class ShellTest extends DatabaseTestCase
         $html = $this->get($path);
 
         self::assertStringContainsString('id="renovo-mark"', $html, $path . ' has no brand mark to draw.');
-        self::assertStringContainsString('class="auth-header"', $html, $path . ' has no branded header.');
+        self::assertStringContainsString('class="auth-brand"', $html, $path . ' has no brand panel.');
         self::assertStringContainsString('data-theme-switch', $html, $path . ' offers no theme switch.');
 
         // All three states, and exactly one of them marked as current.
@@ -377,10 +377,10 @@ final class ShellTest extends DatabaseTestCase
      *
      * `HttpErrorHandler` renders with no user because it cannot know whether
      * there was one — the failure may have come before the account was
-     * loaded. The layout would otherwise read that as "before there is an
-     * account" and offer a signed-in reader hitting a 404 the sign-in
-     * screen's theme switch, which writes a cookie that none of their own
-     * pages read: a control that visibly does nothing.
+     * loaded. Since Phase 29 it is drawn in the signed-out layout, like every
+     * page with no shell, but it still does not offer a signed-in reader
+     * hitting a 404 the sign-in screen's theme switch, which writes a cookie
+     * that none of their own pages read: a control that visibly does nothing.
      */
     public function testAnErrorPageIsNotDressedAsASignInScreen(): void
     {
@@ -397,7 +397,6 @@ final class ShellTest extends DatabaseTestCase
         $html = (string) $response->getBody();
 
         self::assertStringNotContainsString('data-theme-switch', $html, 'The error page offers a theme switch.');
-        self::assertStringNotContainsString('class="auth-header"', $html);
         self::assertSame(1, preg_match_all('/<h1\b/', $html), 'An error page still has exactly one heading.');
     }
 

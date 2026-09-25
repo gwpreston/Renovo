@@ -92,8 +92,9 @@ final class ThemeContrastTest extends TestCase
     /** Graphic => the grounds it has to be found on, at AA_NON_TEXT. */
     private const NON_TEXT_PAIRS = [
         'focus-ring' => ['bg', 'surface', 'surface-2'],
-        // The ring and the active item's icon on the rail.
-        'rail-accent' => ['rail', 'rail-active:rail'],
+        // The ring and the active item's icon on the rail; the signed-out
+        // brand panel's feature icons on their tile.
+        'rail-accent' => ['rail', 'rail-active:rail', 'rail-tint:rail'],
         // The edge of a field, of a filter chip, of the toggle's track.
         'border-control' => ['bg', 'surface'],
         // Chart series, on the card a chart is drawn on.

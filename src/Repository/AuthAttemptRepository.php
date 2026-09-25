@@ -23,6 +23,8 @@ final class AuthAttemptRepository extends AbstractRepository
 {
     public const KIND_LOGIN = 'login';
     public const KIND_RESET = 'reset';
+    /** A request to send the email-confirmation link again. */
+    public const KIND_VERIFY_RESEND = 'verify_resend';
     // The second-factor step has its own budget. Sharing the login one would
     // mean a user who mistyped their password twice had fewer tries left for a
     // six-digit code than the code's own guessing odds assume.

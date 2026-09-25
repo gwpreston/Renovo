@@ -21,51 +21,32 @@
 
     `ProfileController` renders it; `AccountController` answers the details,
     password and picture forms and `SecurityController` the second factors
-    and sessions. Each section is a partial of its own.
+    and sessions. Each section is a partial of its own. A member still on a
+    temporary password gets `auth/change_password.twig` instead.
 #}
 {% block content %}
-    {#
-        A member still on the temporary password an Owner gave them sees this
-        page and no other — PasswordChangeRequiredMiddleware sends them back
-        here from everywhere else — so the callout explains why rather than
-        leaving them to discover it.
-
-        And while it is showing, the page is only what it needs to be: the
-        callout and the password form. Everything else here posts to a route
-        the same middleware blocks, so offering it would be offering a form
-        that throws the reader back to this page the moment they saved it.
-    #}
-    {% if current_user.mustChangePassword %}
-        <section class="card callout">
-            <h2>{{ t('account.must_change_heading') }}</h2>
-            <p>{{ t('account.must_change_note') }}</p>
-        </section>
-
+    <div class="profile-row">
+        {% include 'profile/_details.twig' %}
         {% include 'profile/_password.twig' %}
-    {% else %}
-        <div class="profile-row">
-            {% include 'profile/_details.twig' %}
-            {% include 'profile/_password.twig' %}
-        </div>
+    </div>
 
-        <div class="profile-row">
-            {% include 'profile/_two_step.twig' %}
-            {% include 'profile/_sessions.twig' %}
-        </div>
+    <div class="profile-row">
+        {% include 'profile/_two_step.twig' %}
+        {% include 'profile/_sessions.twig' %}
+    </div>
 
-        {% include 'profile/_appearance.twig' %}
-        {% include 'profile/_dashboard_cards.twig' %}
+    {% include 'profile/_appearance.twig' %}
+    {% include 'profile/_dashboard_cards.twig' %}
 
-        {#
-            The way out, at the foot of the page as well as in the rail's user
-            card: the end of a page about your account is where a reader who
-            came to leave it looks.
-        #}
-        <form method="post" action="/logout" class="profile-signout">
-            {{ csrf_field() }}
-            <button type="submit" class="button button-quiet">
-                {{ icon('sign-out') }}{{ t('nav.sign_out') }}
-            </button>
-        </form>
-    {% endif %}
+    {#
+        The way out, at the foot of the page as well as in the rail's user
+        card: the end of a page about your account is where a reader who
+        came to leave it looks.
+    #}
+    <form method="post" action="/logout" class="profile-signout">
+        {{ csrf_field() }}
+        <button type="submit" class="button button-quiet">
+            {{ icon('sign-out') }}{{ t('nav.sign_out') }}
+        </button>
+    </form>
 {% endblock %}

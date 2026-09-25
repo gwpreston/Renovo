@@ -20,6 +20,9 @@ final class Session implements SessionInterface
 {
     private const FLASH_KEY = '_flashes';
 
+    /** Absent means persistent: see isPersistent(). */
+    private const PERSISTENT_KEY = '_persistent';
+
     /**
      * @param SessionSettings $settings
      */
@@ -90,6 +93,14 @@ final class Session implements SessionInterface
     {
         if ($this->isStarted()) {
             session_regenerate_id(true);
+
+            // PHP issues the new id with the configured lifetime, which is the
+            // persistent one. A session that is to end with the browser has to
+            // say so again every time its id changes, or the first password
+            // change would quietly turn it into one that does not.
+            if (!$this->isPersistent()) {
+                $this->sendCookie(false);
+            }
         }
     }
 
@@ -106,6 +117,44 @@ final class Session implements SessionInterface
     public function id(): string
     {
         return session_id() ?: '';
+    }
+
+    public function isPersistent(): bool
+    {
+        return ($_SESSION[self::PERSISTENT_KEY] ?? true) !== false;
+    }
+
+    public function setPersistent(bool $persistent): void
+    {
+        $_SESSION[self::PERSISTENT_KEY] = $persistent;
+
+        if ($this->isStarted()) {
+            $this->sendCookie($persistent);
+        }
+    }
+
+    /**
+     * Re-issue the session cookie with the expiry this session now has.
+     *
+     * The cookie parameters cannot be changed once a session has started, so
+     * this is the cookie PHP would have sent, sent again with a different
+     * expiry: 0 makes it a browser-session cookie. A later Set-Cookie for the
+     * same name, path and domain replaces an earlier one in the same response.
+     */
+    private function sendCookie(bool $persistent): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+
+        setcookie(session_name() ?: $this->settings['name'], $this->id(), [
+            'expires' => $persistent ? time() + $this->settings['lifetime'] : 0,
+            'path' => $this->settings['path'],
+            'domain' => $this->settings['domain'],
+            'secure' => $this->settings['secure'],
+            'httponly' => true,
+            'samesite' => $this->settings['samesite'],
+        ]);
     }
 
     public function flash(string $type, string $key, array $parameters = []): void
