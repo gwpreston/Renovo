@@ -280,13 +280,21 @@ Built in phases:
   household's price history and the insights as a list. The breakdown donuts,
   the per-period figures and the cost-per-use ranking are kept beneath them. No
   new computation and no migrations. See [Analytics](#analytics).
+- **Phase 24 — budgets — complete.** The Budgets screen rebuilt to the
+  prototype: tiles for On track, Warning, Projected over and the household
+  limit; a card per budget with the month or year charged so far and
+  projected, a tick at its warning threshold, a note that says whether it is
+  trials that push it over, and the owner's real alert routing; and the
+  household's last six months against its monthly limit. New and Edit open one
+  dialog, which is the full-page form without script. No migrations. See
+  [Budgets](#budgets).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-The current phase is **Phase 23 — analytics**.
+The current phase is **Phase 24 — budgets**.
 `PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
 archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
@@ -1303,10 +1311,22 @@ the viewer can see, so another member's private subscription is never in it. A
 breach is announced to the owner and, when it is somebody else, to the member
 it measures. The trigger is **projected**
 spend, taken from the same forecast the Forecast page shows, so the two can
-never disagree. Both periods are rolling windows from today ("the next month",
-"the next 12 months") rather than calendar periods, because this application
-tracks what is *due* rather than keeping a ledger of what has been *paid*, and a
-calendar month would have to leave out whatever was charged earlier in it.
+never disagree.
+
+The Budgets screen reads each budget over its **calendar period** — this month,
+or this calendar year — as charged so far (reconstructed from start dates and
+price history, to yesterday) plus the forecast to the period's end, which is how
+the dashboard's budget card reads the month. A budget is **Over** when that
+projection, trials converting included, passes its limit, and the card says when
+it is only the trials. It shows **Warning** once the projection reaches its
+warning threshold; only a projected breach sends an alert, and the card's alert
+line names the channel types its owner routes that alert to. A budget whose
+spending includes a currency with no rate shows no figure and counts as nothing.
+The alert itself still projects a rolling window from today (the next month,
+the next 12 months), so a card can turn Over on a different day from the alert.
+
+New budgets are in the base currency; one set in another currency earlier keeps
+it.
 
 ### Forecast
 
