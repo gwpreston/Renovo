@@ -4,69 +4,81 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 27 — profile
+# Phase 28 — settings and notifications
 
-One page for everything a person sets for their own account: who they are, their
-password, two-step verification and passkeys, where they are signed in, and how
-the application looks and behaves for them. Today these are spread across
-`/profile`, the appearance section of Settings and the security pages; the
-prototype gathers them, and this phase moves them onto `/profile` with the old
-routes redirecting. It is self-service throughout — it acts on the signed-in
-account only and needs no household permission, so a Viewer can use all of it.
+The last screens of the re-skin. **Settings** becomes a tabbed page for the
+household (and, for an instance administrator, the instance). **Notifications**
+becomes its own per-user page (decision 13) — the prototype put it under
+household Settings, but each person's channels and reminders are their own. With
+this phase the interim link row Phase 19 added to Settings is removed, because
+everything it pointed at now has a place in a tab.
 
 ## Depends on
 
-- **Phase 15** — name, email change with re-verification, password change with
-  "sign out other sessions", avatars.
-- **Phase 4** — TOTP, passkeys, recovery codes, the session list and revocation.
-- **Phase 18** — the palette preference; **Phase 6** — density, week start,
-  language, landing view; theme (Phase 1).
+- **Phases 2, 5, 17** — rate providers and cache, categories, tags, payment
+  methods, import, backup/restore, export, API tokens.
+- **Phases 3, 16, 20** — channels (all eleven), lead times, digests, routing, the
+  price-change alert.
+- **Phase 4** — the audit log; **Phase 6** — demo mode, metrics, health.
 
 ## In scope this phase (build ONLY these)
 
-### A. Who you are
+### A. Settings — General tab
 
-Avatar with **Upload picture** / **Remove** — PNG, JPEG, WebP or GIF, re-encoded,
-with the size cap Phase 15 set (the prototype's "JPG or PNG, up to 512 KB" is
-replaced by the real rule). Name. Email, with the hint "Changing it sends a
-confirmation link to the new address" and, while a change is pending, "Waiting
-for confirmation of {new address} — resend / cancel". **Save changes**.
+- **Household**: household name; base currency (the full ISO list, with the
+  note "Totals, budgets and forecasts are shown in this currency"). **Save
+  household**. No rounding option (decision 14).
+- **Exchange rates**: provider — the existing three, Frankfurter (ECB) default,
+  exchangerate.host, Fixer (decision 11) — with the key field where one applies
+  (environment key wins, as now); a table of pair · rate · "Last refreshed {date,
+  time}"; **Refresh now**, which runs the existing refresh through the shared
+  client and respects the one-hour failure back-off.
+- **Categories**: chips with each category's subscription count; **rename
+  inline**, delete (unassigns), add. Gated by `category.manage`.
+- **Tags**: the same pattern (the prototype has no tag section; tags need one).
+- **Payment methods**: Phase 17's management, as a section here.
 
-### B. Password
+### B. Settings — Data & integrations tab
 
-Current password, new password, confirm, a **Sign out my other sessions**
-checkbox (ticked by default), **Update password**.
+- **Import**: "Drop a CSV or JSON file — you map the columns and preview every
+  row before anything is saved", into the existing wizard.
+- **Backup & restore**: what the file contains (per Phase 20's decision on
+  private rows), **Download backup**, **Restore from file**. The prototype's
+  "Last backup · size" line is not shown — the application does not record
+  backups, and a figure it cannot source is not printed.
+- **Export**: CSV / JSON of subscriptions.
+- **API tokens**: each with name, ability (Read only / Read & write — already
+  built), last used; **New token** (shown once); Revoke.
+- **Recent activity**: the five latest household audit entries, and a link to the
+  full audit log.
+- **Calendar feed**: a link to the Calendar's feed card.
 
-### C. Two-step verification & passkeys
+### C. Settings — Instance tab (instance administrators only)
 
-- **Authenticator app**: "On since {date} · {N} of 10 recovery codes left", with
-  Turn off (re-authenticated) — or Set up when off.
-- **Passkeys**: each with its name and date added, rename and remove; **Add a
-  passkey**.
-- **New recovery codes** (shown once, replacing the old set).
+Public registration on/off; isolation mode (the one place it is changed —
+decision 3); the trusted-host/CIDR allowlist; demo mode; read-only status of
+SMTP (from the environment), metrics and the scheduler's last run. Hidden and 403
+for everyone else.
 
-### D. Where you're signed in
+Tabs are links (`/settings`, `/settings/data`, `/settings/instance`), so each
+works without script and the rail's active item stays Settings.
 
-Each session: device from the user agent, **IP address** and last seen — no
-location (decision 17). "This device" badge on the current one; **Sign out** on
-each other session; **Sign out everywhere else**.
+### D. Notifications (per user)
 
-### E. Appearance & preferences
+At its existing route, rebuilt:
 
-- Theme — System / Light / Dark
-- Colour scheme — the five palette swatches (moved here from Phase 18's
-  interim place)
-- List density — Comfortable / Compact
-- Week starts on — Monday / Sunday
-- Language — only the catalogues that exist (today: English); the control is
-  hidden while there is one
-- Open on — Dashboard / Subscriptions / Calendar
-
-Each saves on change (htmx; one Save button without script).
-
-### F. Sign out
-
-At the foot of the page, as well as in the rail's user card.
+- **Channels**: every configured channel — Email and any of the ten others —
+  with its masked description, on/off, **Send test** and edit; **Add a channel**
+  listing all eleven types. Secrets are never rendered back (Phase 16's rule).
+- **When to remind you**: for renewals, trial conversions and cancel-by
+  deadlines, **one or more** lead times each (1, 3, 7, 14, 30 days) — the
+  application's multiple lead times, not the prototype's single choice
+  (decision 12).
+- **Delivery**: Immediate / Weekly digest / Monthly digest (decision 12).
+- **Budget alerts**: on/off — "when a budget is projected over".
+- **Price changes**: on/off — Phase 20's alert.
+- **Routing**: a matrix of alert type × **every** configured channel (the
+  prototype omitted Webhook); channels that are off are shown disabled.
 
 ## Data-model changes
 
@@ -74,43 +86,48 @@ At the foot of the page, as well as in the rail's user card.
 
 ## Explicitly out of scope
 
-- Session locations (decision 17).
-- OIDC-linked identities (OIDC is not built).
-- New preferences.
+- Rounding (decision 14); new rate providers (decision 11).
+- Recording backup history.
+- Browser push (still deferred from Phase 16).
 
 ## Decisions & assumptions (confirm or correct before build)
 
-- Old appearance/security routes **redirect** to the matching `/profile`
-  section rather than being removed outright, so bookmarks keep working.
-- "Sign out my other sessions" is ticked by default on password change.
-- The language control is hidden while only English exists.
+- Settings has three tabs — General, Data & integrations, Instance (admins only);
+  Notifications is its own per-user page.
+- The instance tab is where isolation is changed.
+- Tags get a section beside categories.
+- The "Last backup" line is not shown.
 
 ## Status
 
-- [x] Who you are (avatar rules, pending email state)
-- [x] Password with sign-out-others
-- [x] TOTP, passkeys, recovery codes
-- [x] Sessions (no location), sign out one / everywhere else
-- [x] Appearance & preferences, including the palette picker
-- [x] Redirects from the old routes; rail user card active on `/profile`
-- [x] New strings in `translations/en.php`
-- [x] `composer check`, `i18n:check` green on both engines
+- [ ] General: household, rates (existing providers, refresh), categories
+      (inline rename), tags, payment methods
+- [ ] Data & integrations: import, backup/restore, export, API tokens, recent
+      activity, feed link
+- [ ] Instance tab (admin only, 403 otherwise)
+- [ ] Notifications page: channels, multi lead times, delivery, budget and price
+      toggles, full routing matrix
+- [ ] Phase 19's interim Settings link row removed; every destination reachable
+- [ ] New strings in `translations/en.php`
+- [ ] `composer check`, `i18n:check` green on both engines
 
 ## Definition of done
 
-Every account setting is on `/profile`, works for every role, with and without
-script, and the old routes land on the right section; all palettes × themes,
-wide and narrow; gates green on both engines. Then update `PHASE.md` to the next
-phase.
+Every household, instance and per-user setting has a place in the new layout;
+nothing reachable before is unreachable now; permissions gate each tab and
+section server-side; no secret is rendered; all palettes × themes, wide and
+narrow; gates green on both engines. The re-skin that began in Phase 18 is
+complete — record in this file anything left for later, and update CLAUDE.md's
+"Current phase".
 
 ## Tests
 
-- A Viewer can change every setting on the page; nobody can change another
-  account's.
-- Password: a wrong current password leaves the hash unchanged; the checkbox
-  revokes other sessions and keeps the current one.
-- Email change keeps the old address live until confirmation.
-- Avatar: disguised and oversized files rejected; remove restores initials.
-- Sessions: revoking one invalidates it immediately; no location is rendered.
-- Every old route redirects to its `/profile` section.
-- `AccessibilityTest` passes.
+- Instance tab: 403 for every non-admin role; visible to an instance admin.
+- Category inline rename persists; delete unassigns without deleting
+  subscriptions; a Viewer cannot manage either (403).
+- Refresh now respects the failure back-off and goes through the shared client.
+- Lead times: several per alert type persist and each fires (Phase 3's suite).
+- Routing matrix includes every configured channel type, including Webhook.
+- No channel secret appears in the rendered page.
+- Every route the Phase 19 link row pointed to is reachable from a tab.
+- `AccessibilityTest` passes on every tab and the Notifications page.
