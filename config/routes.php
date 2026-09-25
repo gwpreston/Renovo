@@ -163,6 +163,12 @@ return static function (App $app): void {
             ->setName('subscriptions-export')
             ->add($requires(Permission::ViewSubscriptions));
 
+        // The same rows as JSON, under the same headings, for Settings' Export
+        // section (Phase 28).
+        $group->get('/subscriptions/export.json', [SubscriptionController::class, 'exportJson'])
+            ->setName('subscriptions-export-json')
+            ->add($requires(Permission::ViewSubscriptions));
+
         // The form's "≈ base at today's rate" note. It discloses an exchange
         // rate and nothing about any subscription.
         $group->get('/subscriptions/conversion-note', [SubscriptionController::class, 'conversionNote'])
@@ -286,9 +292,12 @@ return static function (App $app): void {
             ->setName('stats')
             ->add($requires(Permission::ViewSubscriptions));
 
-        $group->get('/categories', [CategoryController::class, 'index'])
-            ->setName('categories')
-            ->add($requires(Permission::ViewSubscriptions));
+        // Categories, tags and payment methods are sections of Settings'
+        // General tab since Phase 28. The two screens they had redirect there
+        // for bookmarks, asking for nothing themselves: the page they land on
+        // asks for its own. Every write stays where it was, and returns to
+        // its section.
+        $group->get('/categories', [CategoryController::class, 'moved'])->setName('categories');
 
         $group->post('/categories', [CategoryController::class, 'create'])
             ->add($requires(Permission::ManageCategories));
@@ -299,14 +308,18 @@ return static function (App $app): void {
         $group->post('/categories/{id:[0-9]+}/delete', [CategoryController::class, 'delete'])
             ->add($requires(Permission::ManageCategories));
 
+        $group->post('/tags', [CategoryController::class, 'createTag'])
+            ->add($requires(Permission::ManageTags));
+
+        $group->post('/tags/{id:[0-9]+}', [CategoryController::class, 'renameTag'])
+            ->add($requires(Permission::ManageTags));
+
         $group->post('/tags/{id:[0-9]+}/delete', [CategoryController::class, 'deleteTag'])
             ->add($requires(Permission::ManageTags));
 
         // Payment methods are the same kind of household metadata as
         // categories, and the same people look after them.
-        $group->get('/payment-methods', [PaymentMethodController::class, 'index'])
-            ->setName('payment-methods')
-            ->add($requires(Permission::ViewSubscriptions));
+        $group->get('/payment-methods', [PaymentMethodController::class, 'moved'])->setName('payment-methods');
 
         $group->post('/payment-methods', [PaymentMethodController::class, 'create'])
             ->add($requires(Permission::ManageCategories));
@@ -366,10 +379,34 @@ return static function (App $app): void {
         // screen it lands on asks for its own permission.
         $group->get('/household', [MemberController::class, 'householdMoved']);
 
-        $group->get('/settings', [SettingsController::class, 'index'])->setName('settings');
+        // ------------------------------------------------------------------
+        // Phase 28: Settings, as three tabs
+        //
+        // General and Data & integrations open for every member, and gate each
+        // section where it is drawn and again at the route its form posts to.
+        // The Instance tab is the instance's, so its page asks for instance
+        // administration and answers 403 to everybody else.
+        //
+        // The base currency and the rate provider are drawn on General but
+        // belong to the instance: their posts take instance administration,
+        // whoever else can see them.
+        // ------------------------------------------------------------------
+        $group->get('/settings', [SettingsController::class, 'general'])->setName('settings');
+
+        $group->get('/settings/data', [SettingsController::class, 'data'])->setName('settings-data');
+
+        $group->get('/settings/instance', [SettingsController::class, 'instance'])
+            ->setName('settings-instance')
+            ->add($requires(Permission::ManageInstance));
 
         $group->post('/settings/household', [SettingsController::class, 'updateHousehold'])
             ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/currency', [SettingsController::class, 'updateCurrency'])
+            ->add($requires(Permission::ManageInstance));
+
+        $group->post('/settings/rates/refresh', [SettingsController::class, 'refreshRates'])
+            ->add($requires(Permission::ManageInstance));
 
         $group->post('/settings/instance', [SettingsController::class, 'updateInstance'])
             ->add($requires(Permission::ManageInstance));
@@ -447,6 +484,12 @@ return static function (App $app): void {
             [NotificationController::class, 'updateChannel'],
         );
 
+        // The switch beside a channel: on or off, and nothing else about it.
+        $group->post(
+            '/settings/notifications/channels/{id:[0-9]+}/active',
+            [NotificationController::class, 'setActive'],
+        );
+
         $group->post(
             '/settings/notifications/channels/{id:[0-9]+}/delete',
             [NotificationController::class, 'deleteChannel'],
@@ -515,8 +558,9 @@ return static function (App $app): void {
         // an export is the whole household in one file and a restore adds rows
         // wholesale, so both take the household-management role.
         // ------------------------------------------------------------------
-        $group->get('/settings/api-tokens', [ApiTokenController::class, 'index'])
-            ->setName('api-tokens');
+        // The tokens and backup screens are sections of Settings' Data &
+        // integrations tab since Phase 28; their paths redirect there.
+        $group->get('/settings/api-tokens', [ApiTokenController::class, 'moved'])->setName('api-tokens');
 
         $group->post('/settings/api-tokens', [ApiTokenController::class, 'create']);
 
@@ -544,9 +588,7 @@ return static function (App $app): void {
         $group->post('/import/cancel', [ImportController::class, 'cancel'])
             ->add($requires(Permission::ImportData));
 
-        $group->get('/settings/backup', [BackupController::class, 'index'])
-            ->setName('backup')
-            ->add($requires(Permission::ManageBackups));
+        $group->get('/settings/backup', [BackupController::class, 'moved'])->setName('backup');
 
         $group->post('/settings/backup/export', [BackupController::class, 'export'])
             ->add($requires(Permission::ManageBackups));

@@ -94,14 +94,14 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
     {
         $this->signIn($this->ownerId);
 
-        $page = $this->body($this->request('GET', '/payment-methods'));
+        $page = $this->body($this->request('GET', '/settings'));
         self::assertStringContainsString('action="/payment-methods/defaults"', $page);
 
         self::assertSame(302, $this->request('POST', '/payment-methods/defaults')->getStatusCode());
         self::assertSame(302, $this->request('POST', '/payment-methods/defaults')->getStatusCode());
         self::assertCount(10, $this->methods());
 
-        $page = $this->body($this->request('GET', '/payment-methods'));
+        $page = $this->body($this->request('GET', '/settings'));
         self::assertStringNotContainsString('action="/payment-methods/defaults"', $page);
         // The generic icon, drawn by the server from the sprite.
         self::assertMatchesRegularExpression('~<use href="/build/sprite-[^"]+\.svg#payment-bank">~', $page);
@@ -164,7 +164,7 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
         (new PaymentMethodRepository($this->db))->create($this->ownerScope(), 'Joint card', null, 'payment-card', null);
 
         $this->signIn($this->viewerId);
-        $response = $this->request('GET', '/payment-methods');
+        $response = $this->request('GET', '/settings');
 
         self::assertSame(200, $response->getStatusCode());
         $page = $this->body($response);

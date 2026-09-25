@@ -53,6 +53,7 @@ final class NotificationPreferenceRepository extends AbstractRepository
             DigestMode::tryFromString((string) $row['digest_mode']) ?? DigestMode::Immediate,
             (int) $row['digest_day'],
             $this->db->platform()->toBoolean($row['price_change_alerts'] ?? true),
+            $this->db->platform()->toBoolean($row['budget_alerts'] ?? true),
         );
     }
 
@@ -66,6 +67,7 @@ final class NotificationPreferenceRepository extends AbstractRepository
             . ' ' . $this->quote('digest_mode') . ' = :mode,'
             . ' ' . $this->quote('digest_day') . ' = :day,'
             . ' ' . $this->quote('price_change_alerts') . ' = :price_change,'
+            . ' ' . $this->quote('budget_alerts') . ' = :budget,'
             . ' ' . $this->quote('updated_at') . ' = :now'
             . ' WHERE ' . $this->quote('user_id') . ' = :user',
             [
@@ -73,6 +75,7 @@ final class NotificationPreferenceRepository extends AbstractRepository
                 'mode' => $preferences->digestMode->value,
                 'day' => $preferences->digestDay,
                 'price_change' => $this->db->platform()->booleanParameter($preferences->priceChangeAlerts),
+                'budget' => $this->db->platform()->booleanParameter($preferences->budgetAlerts),
                 'now' => $now,
                 'user' => $preferences->userId,
             ],
@@ -102,6 +105,7 @@ final class NotificationPreferenceRepository extends AbstractRepository
             'digest_mode' => $preferences->digestMode->value,
             'digest_day' => $preferences->digestDay,
             'price_change_alerts' => $this->db->platform()->booleanParameter($preferences->priceChangeAlerts),
+            'budget_alerts' => $this->db->platform()->booleanParameter($preferences->budgetAlerts),
             'created_at' => $now,
             'updated_at' => $now,
         ], 'user_id');

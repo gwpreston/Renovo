@@ -82,7 +82,10 @@ At its existing route, rebuilt:
 
 ## Data-model changes
 
-**None.**
+~~None.~~ **One column**, agreed before the build: `notification_preferences.
+budget_alerts` (boolean, default true), the budget switch's storage — the
+price-change switch already had its column and the budget one had none.
+Migration `20261201000001`, with a `down()` that drops it.
 
 ## Explicitly out of scope
 
@@ -98,18 +101,71 @@ At its existing route, rebuilt:
 - Tags get a section beside categories.
 - The "Last backup" line is not shown.
 
+Settled with the user before the build:
+
+- **One set of lead times, not one per alert type.** `lead_days` is one list, so
+  the chips (1, 3, 7, 14, 30) apply to renewals, trial conversions and cancel-by
+  deadlines alike — decision 12's "multiple lead times", without a migration.
+  A stored value outside the five (from the old free-text field) is drawn as a
+  chip of its own, so saving the page keeps it.
+- **Budget alerts get a column** (above). Off drops the alert and nothing else:
+  the budget's armed/breached state is still evaluated, so turning it back on
+  does not announce an old crossing as new.
+- **The base currency and the rate provider stay the instance's.** They are
+  drawn on General, where a reader looks for them, but only an instance
+  administrator can change them (`POST /settings/currency`, `POST
+  /settings/rates/refresh`, both `instance.manage`); everybody else is told what
+  they are and who sets them.
+
+Made during the build:
+
+- **Refresh now is refused only while a *failed* attempt is inside its retry
+  window** (`ExchangeRateService::retryAfter()`: the last attempt is newer than
+  the last table). A successful refresh does not hold the button back.
+  Changing the base or the provider drops the table *and* the attempt marker
+  (`invalidate()`), since a back-off belongs to the provider it was earned
+  against — otherwise the success just before the change would read as a
+  failure and lock the button out for an hour.
+- **The rate table lists the currencies the household's subscriptions are in**,
+  as "1 EUR → GBP", to four places; the rest of the provider's table is counted.
+- **Recent activity is the head of the log the "Full audit log" link opens** —
+  the same `AuditLogService::page()` read — so an instance administrator sees
+  the instance's latest, as `/audit` shows them.
+- **Export gained JSON** (`/subscriptions/export.json`): the CSV's rows under the
+  CSV's headings. Both files round-trip through the importer's automatic preset
+  (`ImportTest::testTheListExportIsReadBackByTheAutomaticPreset`).
+- **A new or reissued token lands on `#new-token`**, the callout holding its
+  one-time secret at the top of the tab, not on the tokens card below it.
+- **`InstanceAdminService::apply()` leaves a switch alone when it is not
+  posted.** The instance settings are on two tabs now, and each form posts only
+  its own; absent used to mean "off".
+- **A channel's switch is its own route** (`…/channels/{id}/active`) that
+  rewrites the stored label and configuration unchanged, so turning a channel
+  off never round-trips a secret through a form.
+- **Routing shows what is delivered.** The old grid drew a channel with no rows
+  as all-ticked even when routing was saved and delivery treated it as muted.
+  The grid now ticks exactly what `channelsFor()` delivers, and a channel added
+  after routing was saved is given every alert type, so adding one still works.
+  A channel that is off is drawn disabled; its choices ride in hidden fields.
+- **The old screens' paths redirect** (302) to their sections: `/categories` →
+  `/settings#categories`, `/payment-methods` → `/settings#payment-methods`,
+  `/settings/backup` → `/settings/data#backup`, `/settings/api-tokens` →
+  `/settings/data#api-tokens`. Every write kept its path and returns to its
+  section; a failed category, tag or payment-method form redraws General with
+  the error beside its row.
+
 ## Status
 
-- [ ] General: household, rates (existing providers, refresh), categories
+- [x] General: household, rates (existing providers, refresh), categories
       (inline rename), tags, payment methods
-- [ ] Data & integrations: import, backup/restore, export, API tokens, recent
+- [x] Data & integrations: import, backup/restore, export, API tokens, recent
       activity, feed link
-- [ ] Instance tab (admin only, 403 otherwise)
-- [ ] Notifications page: channels, multi lead times, delivery, budget and price
+- [x] Instance tab (admin only, 403 otherwise)
+- [x] Notifications page: channels, multi lead times, delivery, budget and price
       toggles, full routing matrix
-- [ ] Phase 19's interim Settings link row removed; every destination reachable
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check` green on both engines
+- [x] Phase 19's interim Settings link row removed; every destination reachable
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check` green on both engines
 
 ## Definition of done
 
@@ -131,3 +187,17 @@ complete — record in this file anything left for later, and update CLAUDE.md's
 - No channel secret appears in the rendered page.
 - Every route the Phase 19 link row pointed to is reachable from a tab.
 - `AccessibilityTest` passes on every tab and the Notifications page.
+
+## Left for later
+
+The re-skin is complete. Nothing on these screens is deferred beyond what the
+phase already ruled out (rounding, new rate providers, backup history, browser
+push). Two things noticed and left alone:
+
+- Lead times are one set for every dated alert. Per-type lead times would need
+  a column per type; the chips' markup (`lead_types`) already names the types,
+  so the seam is there if it is ever wanted.
+- Clearing every box in the routing grid still means "everything everywhere",
+  as it always has (no rows is the default). The hint says so. Silencing an
+  alert type entirely is done with its switch (budgets, price changes), with no
+  lead times (the dated alerts), or by turning channels off.

@@ -1569,22 +1569,6 @@ body.no-shell .footer {
     margin-top: 0.25rem;
 }
 
-.tag-manage {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.tag-manage li {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
 .swatch {
     display: inline-block;
     width: 0.8rem;

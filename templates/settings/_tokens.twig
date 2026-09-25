@@ -1,0 +1,118 @@
+{#
+    API tokens: the reader's own, and never anybody else's.
+
+    Each with its name, what it may do (Read only / Read & write), when it was
+    last used and its state; reissue and revoke beside it. A new token's
+    secret is shown once, in the callout at the top of the tab, from a
+    one-shot flash — a reload does not bring it back.
+
+    New token opens in place. How to use one — the bearer header and the API
+    reference — is a disclosure beneath, where a reader who needs it will look
+    and one who does not will not be made to scroll past it.
+#}
+<section class="card" id="api-tokens" aria-labelledby="api-tokens-heading">
+    <h2 id="api-tokens-heading">{{ t('tokens.title') }}</h2>
+    <p class="muted">{{ t('tokens.intro') }}</p>
+
+    {% if tokens is empty %}
+        <p class="muted empty">{{ t('tokens.none_yet') }}</p>
+    {% else %}
+        <ul class="account-rows">
+            {% for token in tokens %}
+                {% set is_expired = token.expiresAt and token.expiresAt < date() %}
+                <li class="account-row">
+                    <span class="account-row-icon" aria-hidden="true">{{ icon('key') }}</span>
+                    <div class="account-row-text">
+                        <span class="account-row-name">
+                            {{ token.name }}
+                            {% if token.isRevoked() %}
+                                <span class="badge badge-bad">{{ t('state.revoked') }}</span>
+                            {% elseif is_expired %}
+                                <span class="badge">{{ t('state.expired') }}</span>
+                            {% endif %}
+                        </span>
+                        <span class="account-row-meta">
+                            {{ t(token.abilities.labelKey()) }} ·
+                            {% if token.lastUsedAt -%}
+                                {{ t('settings.token_last_used', {'when': token.lastUsedAt|local_date('d MMM y, HH:mm')}) }}
+                            {%- else -%}
+                                {{ t('settings.token_never_used') }}
+                            {%- endif %}
+                            {%- if token.expiresAt and not is_expired and not token.isRevoked() %} · {{ t('tokens.expires_on', {'date': token.expiresAt|local_date('d MMM y')}) }}{% endif %}
+                            · <code>{{ token.publicId }}</code>
+                        </span>
+                    </div>
+                    <div class="account-row-actions token-actions">
+                        {#
+                            Reissue is offered only on a token that is neither
+                            revoked nor expired: a reissue carries the old
+                            token's expiry over, and issuing refuses a date
+                            already past. `ApiTokenService::reissue()`
+                            enforces this too — hiding the button is not the
+                            check.
+                        #}
+                        {% if not token.isRevoked() and not is_expired %}
+                            <form method="post" action="/settings/api-tokens/{{ token.id }}/reissue" class="inline"
+                                  onsubmit="return confirm('{{ t('confirm.reissue_token')|e('js') }}')">
+                                {{ csrf_field() }}
+                                <button type="submit" class="button button-quiet"
+                                        aria-label="{{ t('settings.reissue_named', {'name': token.name}) }}">{{ t('action.reissue') }}</button>
+                            </form>
+                        {% endif %}
+                        {% if not token.isRevoked() %}
+                            <form method="post" action="/settings/api-tokens/{{ token.id }}/revoke" class="inline"
+                                  onsubmit="return confirm('{{ t('confirm.revoke_token')|e('js') }}')">
+                                {{ csrf_field() }}
+                                <button type="submit" class="button button-danger"
+                                        aria-label="{{ t('settings.revoke_named', {'name': token.name}) }}">{{ t('action.revoke') }}</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <div class="account-footer">
+        <details class="account-row-more">
+            <summary class="button">{{ icon('add') }}{{ t('settings.new_token') }}</summary>
+
+            <form method="post" action="/settings/api-tokens" class="stack">
+                {{ csrf_field() }}
+
+                <label for="token-name">{{ t('tokens.what_it_is_for') }}</label>
+                <input type="text" id="token-name" name="name" maxlength="100" required
+                       placeholder="{{ t('tokens.name_placeholder') }}">
+
+                <label for="token-abilities">{{ t('tokens.what_it_may_do') }}</label>
+                <select id="token-abilities" name="abilities" aria-describedby="token-abilities-hint">
+                    {% for ability in abilities %}
+                        <option value="{{ ability.value }}">{{ t(ability.labelKey()) }}</option>
+                    {% endfor %}
+                </select>
+                <p class="hint" id="token-abilities-hint">{{ t('tokens.abilities_hint') }}</p>
+
+                <label for="token-expires">{{ t('tokens.expires_optional') }}</label>
+                <input type="date" id="token-expires" name="expires_at">
+
+                <div class="form-actions">
+                    <button type="submit" class="button">{{ t('tokens.create_token') }}</button>
+                </div>
+            </form>
+        </details>
+
+        <details class="account-row-more">
+            <summary class="button button-quiet">{{ t('tokens.using_them') }}</summary>
+
+            <p>{{ t('tokens.bearer_note') }}</p>
+            <pre class="code-block">curl -H "Authorization: Bearer rnv_..." \
+     {{ api_base }}/subscriptions</pre>
+
+            <p>
+                {{ t('tokens.reference_is_at') }}
+                <a href="/api/v1/openapi.yaml">/api/v1/openapi.yaml</a>
+                (<a href="/api/v1/openapi.json">{{ t('tokens.as_json') }}</a>)
+            </p>
+        </details>
+    </div>
+</section>

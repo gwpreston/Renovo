@@ -1,0 +1,109 @@
+{#
+    Exchange rates: where they come from, what they are, and how fresh.
+
+    The provider is one of the three the application has (decision 11), and
+    changing it — or its key — is an instance administrator's, like the base
+    currency. The key is a secret: the field is always drawn empty, a blank
+    one keeps what is stored, and the environment's key wins over both.
+
+    The table lists the currencies the household's subscriptions are priced
+    in, as "1 EUR → GBP": what one unit of each is worth in the base. The
+    rest of the provider's table is counted rather than listed.
+
+    Refresh now runs the scheduled refresh, through the same provider and the
+    shared HTTP client. While a failed attempt is inside its back-off the
+    button is not offered and the time it lifts is said instead; the route
+    refuses it too.
+#}
+<section class="card" id="exchange-rates" aria-labelledby="exchange-rates-heading">
+    <header class="card-header">
+        <h2 id="exchange-rates-heading">{{ t('settings.exchange_rates') }}</h2>
+        {% if can(scope, 'instance.manage') and not rates.retry_after %}
+            <form method="post" action="/settings/rates/refresh" class="card-header-actions">
+                {{ csrf_field() }}
+                <button type="submit" class="button button-quiet">{{ icon('refresh') }}{{ t('settings.refresh_now') }}</button>
+            </form>
+        {% endif %}
+    </header>
+    <p class="muted">{{ t('settings.rates_note') }}</p>
+
+    {% if can(scope, 'instance.manage') %}
+        <form method="post" action="/settings/currency" class="stack">
+            {{ csrf_field() }}
+
+            <fieldset class="stack">
+                <legend>{{ t('settings.rate_provider') }}</legend>
+                {% for provider in rate_providers %}
+                    <label class="choice">
+                        <input type="radio" name="rate_provider" value="{{ provider.key }}"
+                               {{ rates.provider == provider.key ? 'checked' : '' }}>
+                        <span>
+                            <strong>{{ provider.label }}</strong>
+                            <span class="muted block">{{ t(provider.descriptionKey) }}</span>
+                        </span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+
+            <label for="rate_provider_key">{{ t('settings.api_key') }}</label>
+            <input type="password" id="rate_provider_key" name="rate_provider_key" autocomplete="off"
+                   placeholder="{{ t('settings.rate_key_placeholder') }}" aria-describedby="rate_provider_key_hint">
+            <p class="hint" id="rate_provider_key_hint">
+                {{ t('settings.rate_key_env_wins', {'variable': 'EXCHANGE_RATE_API_KEY'}) }}
+            </p>
+            <label class="choice">
+                <input type="checkbox" name="clear_rate_provider_key" value="1">
+                <span>{{ t('settings.rate_key_clear') }}</span>
+            </label>
+
+            <div class="form-actions">
+                <button type="submit" class="button">{{ t('settings.save_provider') }}</button>
+            </div>
+        </form>
+    {% else %}
+        <p class="muted">{{ t('settings.rates_from', {'provider': rates.provider_label}) }}</p>
+    {% endif %}
+
+    {% if rates.is_misconfigured %}
+        <p class="field-error">{{ t('settings.rates_need_key', {'provider': rates.provider_label}) }}</p>
+    {% endif %}
+
+    {% if rates.rows is not empty %}
+        <div class="table-scroll settings-rates">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('settings.rate_pair') }}</th>
+                    <th scope="col" class="numeric">{{ t('settings.rate') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in rates.rows %}
+                    <tr>
+                        <td class="num">{{ t('settings.rate_pair_value', {'from': row.currency, 'to': base_currency}) }}</td>
+                        <td class="num numeric"><strong>{{ row.rate }}</strong></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% elseif rates.last_refreshed_at %}
+        <p class="muted">{{ t('settings.rates_none_in_use', {'base': base_currency}) }}</p>
+    {% endif %}
+
+    <p class="hint">
+        {% if rates.last_refreshed_at %}
+            {{ t('settings.rates_last_refreshed', {'when': rates.last_refreshed_at|local_date('d MMM y, HH:mm')}) }}
+            {%- if rates.others > 0 %} {{ t('settings.rates_others', {'count': rates.others}) }}{% endif %}
+            {%- if rates.is_stale %} {{ t('settings.rates_stale') }}{% endif %}
+        {% else %}
+            {{ t('settings.rates_never') }}
+        {% endif %}
+    </p>
+
+    {% if rates.retry_after %}
+        <p class="hint" data-rates-backoff>
+            {{ t('settings.rates_backing_off', {'time': rates.retry_after|local_date('HH:mm')}) }}
+        </p>
+    {% endif %}
+</section>

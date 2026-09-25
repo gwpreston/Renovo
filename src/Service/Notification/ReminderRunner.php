@@ -183,8 +183,13 @@ final class ReminderRunner
         // Budgets are a state, not a date, so they are evaluated on every run
         // regardless of lead times — and the evaluation is what advances the
         // armed/breached state machine, so it must happen exactly once per
-        // household per run.
-        return array_merge($alerts, $this->scanner->evaluateBudgets($scope));
+        // household per run. It still runs for a member who has turned budget
+        // alerts off — only what it reports is dropped — so a breach that
+        // happens while they are off is recorded as it happens, and turning
+        // them back on does not announce it later as though it were new.
+        $budgets = $this->scanner->evaluateBudgets($scope);
+
+        return $preferences->budgetAlerts ? array_merge($alerts, $budgets) : $alerts;
     }
 
     /**

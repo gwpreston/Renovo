@@ -256,6 +256,58 @@ final class ImportTest extends DatabaseTestCase
         );
     }
 
+    /**
+     * Settings' Export section (Phase 28) says the importer reads either of
+     * its files back. This is that claim, for each: the list's export, staged
+     * as it downloads, mapped by the automatic preset with no help, and
+     * committed into another household.
+     *
+     * @return array<string, array{string}>
+     */
+    public static function exportFormats(): array
+    {
+        return ['csv' => ['csv'], 'json' => ['json']];
+    }
+
+    /**
+     * @dataProvider exportFormats
+     */
+    public function testTheListExportIsReadBackByTheAutomaticPreset(string $format): void
+    {
+        $this->subscriptions->create($this->scope, [
+            'name' => 'Round trip',
+            'price' => '12.34',
+            'currency' => 'EUR',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'quarterly',
+            'next_payment_date' => '2026-09-30',
+            'tags' => 'alpha,beta',
+        ]);
+
+        $export = $this->container()->get(\App\Service\SubscriptionExportService::class);
+        $filter = \App\Domain\SubscriptionFilter::fromQueryParams([])->withIncludeInactive();
+        $contents = $format === 'csv' ? $export->csv($this->scope, $filter) : $export->json($this->scope, $filter);
+
+        $id = $this->imports->stage(FakeUpload::of($contents, 'subscriptions.' . $format));
+        $file = $this->imports->read($id);
+        $mapping = $this->imports->suggestMapping(ImportPreset::AUTOMATIC, $file->headers);
+
+        $target = $this->secondHousehold();
+        $result = $this->imports->commit($target, $this->user, $id, $mapping, 'GBP');
+        self::assertSame(['imported' => 1, 'skipped' => 0], $result);
+
+        $imported = $this->subscriptions->allForStats($target, activeOnly: false)[0];
+        self::assertSame('Round trip', $imported->name);
+        self::assertSame(1234, $imported->price->amountMinor);
+        self::assertSame('EUR', $imported->price->currency);
+        self::assertSame('quarterly', $imported->billingCycle?->value);
+        self::assertSame('2026-09-30', $imported->nextPaymentDate?->format('Y-m-d'));
+        self::assertEqualsCanonicalizing(
+            ['alpha', 'beta'],
+            array_map(static fn ($tag): string => $tag->name, $imported->tags),
+        );
+    }
+
     public function testAnInvalidRowIsReportedInThePreviewAndSkippedOnCommit(): void
     {
         $csv = <<<CSV

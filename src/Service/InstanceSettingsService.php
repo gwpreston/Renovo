@@ -131,6 +131,16 @@ final class InstanceSettingsService
         $this->set(self::KEY_RATES_LAST_ATTEMPT_AT, $at->format('Y-m-d H:i:s'));
     }
 
+    /**
+     * Forget the last attempt. An attempt belongs to the provider and the base
+     * it was made against; once either changes, its back-off says nothing
+     * about the new one.
+     */
+    public function clearRatesAttempted(): void
+    {
+        $this->set(self::KEY_RATES_LAST_ATTEMPT_AT, '');
+    }
+
     public function isSetupComplete(): bool
     {
         return $this->get(self::KEY_SETUP_COMPLETED_AT, '') !== '';

@@ -10,7 +10,7 @@ use App\Domain\SubscriptionFilter;
 use App\Security\Scope;
 
 /**
- * The list, as a CSV file.
+ * The list, as a CSV or a JSON file.
  *
  * Exactly the rows the viewer could page through with the same filter: the
  * query is the list's own, through the same value object and the same scoped
@@ -22,7 +22,12 @@ use App\Security\Scope;
  * The column headings are the names the importer's automatic preset already
  * recognises, so a file exported here and imported elsewhere needs no mapping
  * by hand. Money leaves as a decimal string made from its minor units, never
- * as a float.
+ * as a float — in the JSON file too, where a number would invite exactly the
+ * float a reader should not make of it.
+ *
+ * The JSON file is the same rows under the same headings, as a list of
+ * objects, which is the shape the importer reads. Its values are not guarded
+ * against formulas: nothing opens a JSON file as a spreadsheet.
  */
 final class SubscriptionExportService
 {
@@ -65,9 +70,24 @@ final class SubscriptionExportService
         return $csv;
     }
 
-    public function filename(\DateTimeImmutable $today): string
+    public function json(Scope $scope, SubscriptionFilter $filter): string
     {
-        return 'subscriptions-' . $today->format('Y-m-d') . '.csv';
+        $rows = [];
+        foreach ($this->subscriptions->list($scope, $filter->unpaged()) as $subscription) {
+            $rows[] = array_combine(self::COLUMNS, $this->row($subscription));
+        }
+
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR;
+
+        return json_encode($rows, $flags) . "\n";
+    }
+
+    /**
+     * @param 'csv'|'json' $format
+     */
+    public function filename(\DateTimeImmutable $today, string $format = 'csv'): string
+    {
+        return 'subscriptions-' . $today->format('Y-m-d') . '.' . $format;
     }
 
     /**

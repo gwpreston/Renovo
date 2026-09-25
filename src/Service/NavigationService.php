@@ -91,9 +91,10 @@ final class NavigationService
      * longer than Settings', which is what makes it win the active item — see
      * `NavItem::claim()`. Members & roles wins over Settings the same way.
      *
-     * Settings claims the screens that lost their rows — categories, payment
-     * methods, import, the audit log — because its page carries the links to
-     * them until the Settings rebuild gives them tabs.
+     * Settings claims its own tabs, which sit under `/settings`, and the two
+     * screens a tab links to that have paths of their own — the import wizard
+     * and the full audit log. Categories, tags, payment methods, API tokens
+     * and backups are sections of its tabs since Phase 28.
      *
      * @return list<NavItem>
      */
@@ -138,7 +139,7 @@ final class NavigationService
                 labelKey: 'nav.settings',
                 href: '/settings',
                 icon: 'settings',
-                matches: ['/settings', '/import', '/categories', '/tags', '/payment-methods', '/audit'],
+                matches: ['/settings', '/import', '/audit'],
             ),
         ];
     }

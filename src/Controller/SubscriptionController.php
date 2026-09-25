@@ -148,6 +148,25 @@ final class SubscriptionController extends Controller
     }
 
     /**
+     * The same rows as `export()`, as JSON.
+     */
+    public function exportJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $scope = $this->scope($request);
+        $filter = SubscriptionFilter::fromQueryParams($request->getQueryParams())->withIncludeInactive();
+
+        $response->getBody()->write($this->export->json($scope, $filter));
+
+        return $response
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
+            ->withHeader(
+                'Content-Disposition',
+                'attachment; filename="' . $this->export->filename($this->clock->today(), 'json') . '"',
+            )
+            ->withHeader('Cache-Control', 'no-store');
+    }
+
+    /**
      * The list's density toggle. The same preference the profile page sets,
      * written on its own, and back to the list with the filter the member was
      * looking at — re-parsed through the value object, like a saved view, so

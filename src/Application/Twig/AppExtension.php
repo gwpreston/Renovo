@@ -103,6 +103,8 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('alert_type_label', $this->alertTypeLabel(...)),
             new TwigFunction('channel_description', $this->channelDescription(...)),
             new TwigFunction('channel_fields', $this->channelFields(...)),
+            new TwigFunction('channel_icon', $this->channelIcon(...)),
+            new TwigFunction('channel_type_label', $this->channelTypeLabel(...)),
             new TwigFunction('percent_symbol', $this->numbers->percentSymbol(...)),
         ];
     }
@@ -240,6 +242,30 @@ final class AppExtension extends AbstractExtension
     public function channelFields(NotificationChannel $channel): array
     {
         return $this->notifiers->find($channel->type)?->fields() ?? [];
+    }
+
+    /**
+     * The icon a channel type is drawn with: a letter for email, a hook for a
+     * webhook, a speech bubble for the chat services and a bell for the push
+     * services. Only icons already in the sprite.
+     */
+    public function channelIcon(string $type): string
+    {
+        return match ($type) {
+            'email' => 'mail',
+            'webhook' => 'webhook',
+            'slack', 'discord', 'mattermost', 'telegram' => 'message',
+            default => 'bell',
+        };
+    }
+
+    /**
+     * A channel type's own name — "Slack", "Webhook" — as against the label
+     * its owner gave the channel.
+     */
+    public function channelTypeLabel(string $type): string
+    {
+        return $this->notifiers->find($type)?->label() ?? $type;
     }
 
     public function csrfField(): string

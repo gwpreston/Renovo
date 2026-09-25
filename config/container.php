@@ -73,6 +73,7 @@ use App\Service\HouseholdMemberService;
 use App\Service\BackupService;
 use App\Service\ImportService;
 use App\Service\LogoStorage;
+use App\Service\SettingsScreenService;
 use App\Service\SetupService;
 use App\Service\MailerService;
 use App\Service\PasswordResetService;
@@ -386,6 +387,31 @@ return static function (ContainerBuilder $builder, array $settings): void {
             ->constructorParameter(
                 'mailFrom',
                 factory(static fn (ContainerInterface $c): string => $c->get('settings')['mail']['from_address']),
+            ),
+
+        // The Instance tab reports the mail relay and the metrics endpoint as
+        // the environment configures them: read-only, and never the password
+        // or the token themselves.
+        SettingsScreenService::class => autowire()
+            ->constructorParameter(
+                'smtpHost',
+                factory(static fn (ContainerInterface $c): string => $c->get('settings')['mail']['host']),
+            )
+            ->constructorParameter(
+                'smtpPort',
+                factory(static fn (ContainerInterface $c): int => $c->get('settings')['mail']['port']),
+            )
+            ->constructorParameter(
+                'smtpEncryption',
+                factory(static fn (ContainerInterface $c): string => $c->get('settings')['mail']['encryption']),
+            )
+            ->constructorParameter(
+                'smtpAuthenticates',
+                factory(static fn (ContainerInterface $c): bool => $c->get('settings')['mail']['user'] !== ''),
+            )
+            ->constructorParameter(
+                'metricsEnabled',
+                factory(static fn (ContainerInterface $c): bool => $c->get('settings')['metrics']['token'] !== ''),
             ),
 
         LogoStorage::class => static function (ContainerInterface $c): LogoStorage {

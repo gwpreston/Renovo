@@ -41,6 +41,7 @@ final class InstanceAdminService
      *     rate_provider?: string,
      *     rate_provider_key?: string,
      *     clear_rate_provider_key?: bool,
+     *     demo_mode?: bool,
      * } $input
      * @return list<string> The settings that changed.
      */
@@ -70,8 +71,12 @@ final class InstanceAdminService
             $changes[] = 'isolation_mode';
         }
 
-        $allowRegistration = $input['allow_registration'] ?? false;
-        if ($allowRegistration !== $this->settings->registrationAllowed()) {
+        // The settings live on two tabs since Phase 28 — the currency and the
+        // rates on General, the rest on Instance — and each tab's form posts
+        // only its own. A switch that was not posted has not been asked
+        // about, so it is left as it is rather than read as "off".
+        $allowRegistration = $input['allow_registration'] ?? null;
+        if ($allowRegistration !== null && $allowRegistration !== $this->settings->registrationAllowed()) {
             $this->settings->setRegistrationAllowed($allowRegistration);
             $changes[] = 'allow_registration';
         }
@@ -79,8 +84,8 @@ final class InstanceAdminService
         // Turning demo mode on makes the instance read-only, including this
         // form. The middleware keeps this one route open to an instance
         // administrator so that the switch can be flipped back.
-        $demoMode = $input['demo_mode'] ?? false;
-        if ($demoMode !== $this->settings->isDemoMode()) {
+        $demoMode = $input['demo_mode'] ?? null;
+        if ($demoMode !== null && $demoMode !== $this->settings->isDemoMode()) {
             $this->settings->setDemoMode($demoMode);
             $changes[] = 'demo_mode';
         }

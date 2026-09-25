@@ -204,6 +204,10 @@ final class BudgetScreenService
      */
     private function alertChannels(int $ownerUserId): array
     {
+        if (!$this->notifications->preferences($ownerUserId)->budgetAlerts) {
+            return [];
+        }
+
         $labels = [];
         foreach ($this->notifications->channelsFor($ownerUserId, AlertType::BudgetExceeded) as $channel) {
             $labels[$channel->type] ??= $this->notifiers->find($channel->type)?->label() ?? $channel->type;

@@ -148,14 +148,12 @@ final class ShellTest extends DatabaseTestCase
             'a new budget' => ['/budgets/new', '/budgets'],
             'the forecast' => ['/forecast', '/stats'],
             'statistics' => ['/stats', '/stats'],
-            'categories' => ['/categories', '/settings'],
-            'payment methods' => ['/payment-methods', '/settings'],
             'members' => ['/settings/members', '/settings/members'],
             'settings' => ['/settings', '/settings'],
+            'settings: data & integrations' => ['/settings/data', '/settings'],
+            'settings: instance' => ['/settings/instance', '/settings'],
             'your own page' => ['/profile', '/profile'],
             'alerts' => ['/settings/notifications', '/settings/notifications'],
-            'api tokens' => ['/settings/api-tokens', '/settings'],
-            'backup' => ['/settings/backup', '/settings'],
             'import' => ['/import', '/settings'],
             'the audit log' => ['/audit', '/settings'],
         ];
@@ -179,7 +177,10 @@ final class ShellTest extends DatabaseTestCase
      */
     public function testEveryPageMarksExactlyOneNavigationItem(string $path, string $expectedActive): void
     {
-        $html = $this->get($path);
+        // The Settings tabs mark the tab being shown with the same attribute,
+        // and rightly: it is the current page. What this test is about is the
+        // shell, so the tabs are set aside before counting.
+        $html = (string) preg_replace('~<nav class="page-tabs".*?</nav>~s', '', $this->get($path));
 
         self::assertSame(
             [$expectedActive],
@@ -677,9 +678,12 @@ final class ShellTest extends DatabaseTestCase
      */
     public function testEveryPhase9DestinationIsStillReachable(): void
     {
+        // Categories and payment methods are sections of /settings since Phase
+        // 28, so it is the page that is reached; SettingsPageTest checks the
+        // sections are on it.
         $phase9 = [
-            '/', '/subscriptions', '/stats', '/calendar', '/budgets', '/cancellations', '/categories',
-            '/payment-methods', '/settings/members', '/settings/notifications', '/audit', '/settings',
+            '/', '/subscriptions', '/stats', '/calendar', '/budgets', '/cancellations',
+            '/settings/members', '/settings/notifications', '/audit', '/settings',
             '/profile', '/import',
         ];
 
@@ -689,6 +693,11 @@ final class ShellTest extends DatabaseTestCase
                 $reachable = [...$reachable, ...$this->linksOn($href)];
             }
         }
+
+        // Import and the audit log are reached from a Settings tab, which is
+        // itself reached from Settings: one hop further than the loop goes.
+        self::assertContains('/settings/data', $reachable);
+        $reachable = [...$reachable, ...$this->linksOn('/settings/data')];
 
         foreach ($phase9 as $destination) {
             self::assertContains($destination, $reachable, $destination . ' has lost its route.');

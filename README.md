@@ -312,13 +312,30 @@ Built in phases:
   address and last seen — no location), and appearance and preferences, which
   save as you change them. `/settings/security` and `/profile/account` redirect
   to their sections. No migrations. See [Signing in](#signing-in).
+- **Phase 28 — settings and notifications — complete.** Settings is three
+  tabs, each a page of its own. **General** holds the household's name, the
+  base currency and exchange rates (with **Refresh now**, which respects the
+  failure back-off), and the household's categories, tags and payment methods
+  as sections, with inline rename. **Data & integrations** holds import,
+  backup and restore, a CSV or JSON export, API tokens, the five latest audit
+  entries and a link to the calendar feed. **Instance**, for instance
+  administrators only, holds registration, isolation, trusted hosts, demo mode
+  and the server's mail, metrics and scheduler status. **Notifications** is
+  each person's own page: channels with an on/off switch, one set of lead
+  times chosen as chips, delivery, budget and price-change switches, and a
+  routing grid with a column for every channel. The interim link row is gone;
+  `/categories`, `/payment-methods`, `/settings/backup` and
+  `/settings/api-tokens` redirect to their sections. One migration (the
+  budget-alert switch). This completes the re-skin begun in Phase 18. See
+  [Notifications](#notifications).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-The current phase is **Phase 27 — profile**.
+The current phase is **Phase 28 — settings and notifications**, the last of
+the re-skin.
 `PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
 archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
@@ -1003,8 +1020,8 @@ content and nothing else.
 The rail has fewer rows than there are destinations, so the rest are
 **claimed**: Forecast lights Analytics, Cancel by lights Subscriptions (and is
 linked from that page), and Categories, Payment methods, Import, Backup, Audit
-log and API tokens light Settings, whose page carries a row of links to each
-until it is rebuilt with tabs. Members & roles is one screen for every member:
+log and API tokens light Settings, whose three tabs carry each of them as a
+section or a link. Members & roles is one screen for every member:
 an Owner/Admin manages the people from it and everybody else reads it.
 
 The top bar's pieces are reads, assembled by `ShellService` so no controller
@@ -1288,8 +1305,10 @@ cached instance-wide.
 | exchangerate.host  | Yes        | Wider currency list; free account required.    |
 | Fixer              | Yes        | Never the default. Free tier is EUR-based; other bases are derived. |
 
-The provider is chosen in the first-run wizard and can be changed in
-**Settings → Instance**. A key may be entered there, but `EXCHANGE_RATE_API_KEY`
+The provider is chosen in the first-run wizard and can be changed by an
+instance administrator in **Settings → General → Exchange rates**, which also
+lists the rates for the currencies in use and offers **Refresh now** — refused
+while a failed attempt is inside its one-hour back-off. A key may be entered there, but `EXCHANGE_RATE_API_KEY`
 in the environment takes precedence — an operator who keeps the key out of the
 database is not overridden by anything typed into the UI.
 
@@ -1392,8 +1411,12 @@ interruption and nothing else is:
 | **Budget projected to be exceeded** | A budget's projection crosses its limit. |
 | **Price change** | A price is edited or a future one is scheduled — once, when it is recorded, naming the old and new price, the date and the effect over a year. Not for a first price, a trial converting or a currency conversion. |
 
-Everything is configured per user under **Settings → Alerts**; each member of a
-household sets their own. You are notified about the subscriptions you own and
+Everything is configured per user on the **Notifications** page; each member of
+a household sets their own. One set of lead times (any of 1, 3, 7, 14 and 30
+days) applies to renewals, trial conversions and cancel-by deadlines alike;
+budget alerts and price changes each have a switch; and the routing grid has a
+column for every channel, with a channel that is switched off greyed out but
+keeping its choices. You are notified about the subscriptions you own and
 the ones you pay for, not about everything in the household — a household of
 four would otherwise quadruple everybody's notifications. Price changes are the
 exception: everybody who can see the subscription hears about one, and it can
@@ -1465,8 +1488,8 @@ service holding the machine's credentials. So:
   whoever asked for it.
 
 That default refuses the most common self-hosted setup there is: a Gotify on
-your LAN, or one reachable only over a Tailscale address. **Settings → Trusted
-hosts** is how you allow it, and it needs instance administration. Add a host
+your LAN, or one reachable only over a Tailscale address. **Settings → Instance →
+Trusted hosts** is how you allow it, and it needs instance administration. Add a host
 (`gotify.lan`), a suffix (`.lan`), an address, or a range (`100.64.0.0/10` for
 Tailscale), and that destination becomes reachable — over plain `http` as well,
 since a LAN service usually has no certificate. Each entry is an exception you
@@ -1554,7 +1577,7 @@ through.
 
 ### Tokens
 
-Issue one under **Settings → API tokens**. A token looks like
+Issue one under **Settings → Data & integrations → API tokens**. A token looks like
 `rnv_<public id>_<secret>`; only a hash of the secret is stored, so it is shown
 once and cannot be recovered. Choose **read-only** unless something genuinely
 needs to make changes.
@@ -1643,7 +1666,7 @@ you had typed them in.
 
 ## Backup and restore
 
-**Settings → Backup and restore** downloads a ZIP of everything the household
+**Settings → Data & integrations → Backup & restore** downloads a ZIP of everything the household
 has: subscriptions, categories, tags, budgets, logos and attached invoices, as
 JSON plus the original files. Nothing in it needs a database to read.
 
@@ -1693,7 +1716,7 @@ so the card afterwards says when the link was made and last fetched, and
 nothing more. **Create a new link** retires the old one immediately — every
 calendar subscribed to it stops updating — which is why it asks first. It
 replaces only the token that card issued; a read-only token you made yourself
-under **Settings → API tokens** works just as well and is left alone.
+under **Settings → Data & integrations** works just as well and is left alone.
 
 Every event is a whole-day event — a billing date is a date, not an instant —
 and its identifier is stable, so a client that refetches on a timer recognises
@@ -1811,7 +1834,7 @@ messages, reminder emails, the calendar feed, even the handful of messages its
 JavaScript can produce — comes from a catalogue keyed by name. `en` is the base
 and the only one that ships.
 
-Each account chooses its own language under **Settings → Appearance**, or
+Each account chooses its own language under **Profile → Appearance & preferences**, or
 follows the instance (`APP_LOCALE`). Somebody who is not signed in gets the best
 match for their browser's `Accept-Language`, and the instance default when there
 is no match. Dates and money follow the same choice: they are formatted by ICU,
@@ -1899,14 +1922,14 @@ month — this application tracks what is due, not a ledger of what was paid, so
 a calendar of last year would be an invention. Previous is disabled on this
 month, and an address for a month outside that range answers 404.
 
-Weeks start on Monday or Sunday, per account, under **Settings → Appearance**.
+Weeks start on Monday or Sunday, per account, under **Profile → Appearance & preferences**.
 It is a preference rather than a property of the locale on purpose: `en_GB` and
 `en_US` disagree, and plenty of people read a Monday-first calendar in an
 American locale because that is how their working week runs.
 
 ## Making it yours
 
-All of this is per account, under **Settings → Appearance**, and none of it
+All of this is per account, under **Profile → Appearance & preferences**, and none of it
 needs any permission: it changes what one person sees and nothing that anybody
 else does.
 

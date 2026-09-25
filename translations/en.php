@@ -240,8 +240,6 @@ return [
     'membership_status.active' => 'Active',
     'membership_status.pending' => 'Invite pending',
     'membership_status.revoked' => 'Login revoked',
-    'settings.more_pages' => 'More settings',
-    'settings.manage_members' => 'Manage members',
     'type.recurring' => 'Recurring',
     'type.one_off' => 'One-off',
     'type.lifetime' => 'Lifetime',
@@ -776,7 +774,6 @@ return [
     // backup
     'backup.archive_label' => 'Backup archive (format {version})',
     'backup.download_backup' => 'Download backup',
-    'backup.export' => 'Export',
     'backup.export_exclusions' =>
         'Not included: user accounts, passwords, API tokens, the audit log and instance-wide settings. '
         . 'Those belong to the server rather than to this household.',
@@ -797,7 +794,6 @@ return [
     'backup.restore_matching' =>
         'Members are matched by email address. A subscription whose owner is no longer in this household '
         . 'comes back owned by you, and every file in the archive is re-checked before it is stored.',
-    'backup.title' => 'Backup and restore',
 
     // budgets
     'budgets.alerts_off' => 'Alerts off',
@@ -906,15 +902,11 @@ return [
         '{days, plural, one {# day ago} other {# days ago}} — this renewal is already committed.',
 
     // categories
-    'categories.add_category' => 'Add category',
     'categories.category_colour' => 'Category colour',
-    'categories.category_name' => 'Category name',
     'categories.colour' => 'Colour',
     'categories.new_category' => 'New category',
     'categories.no_categories_yet' => 'No categories yet.',
     'categories.no_tags_yet' => 'No tags yet.',
-    'categories.tags_intro' => 'Tags are created as you type them on a subscription.',
-    'categories.title' => 'Categories and tags',
 
     // confirm — the questions a destructive control asks before it acts. They
     // are read out by the browser's own dialog, which is why they are short
@@ -1089,7 +1081,6 @@ return [
     'field.email' => 'Email address',
     'field.event' => 'Event',
     'field.file' => 'File',
-    'field.last_used' => 'Last used',
     'field.member' => 'Member',
     'field.month' => 'Month',
     'field.name' => 'Name',
@@ -1268,12 +1259,10 @@ return [
 
     // subtitle: the short line under each page's title in the top bar
     'subtitle.audit' => 'Who changed what, and when',
-    'subtitle.backup' => 'Export and restore the household\'s data',
     'subtitle.budget_form' => 'A limit, and when to warn you',
     'subtitle.budgets' => 'Limits against projected spend',
     'subtitle.calendar' => 'Renewals, trials & deadlines',
     'subtitle.cancellations' => 'Deadlines to cancel before the next charge',
-    'subtitle.categories' => 'How subscriptions are grouped and tagged',
     'subtitle.dashboard' => 'Your household at a glance',
     'subtitle.forecast' => 'What the coming year will cost',
     'subtitle.import' => 'Bring subscriptions in from a file',
@@ -1282,19 +1271,16 @@ return [
     'subtitle.member_remove' => 'What happens to what they own',
     'subtitle.money' => 'Price history, splits and usage',
     'subtitle.notifications' => 'How and when you are reminded',
-    'subtitle.payment_methods' => 'What each subscription is paid with',
     'subtitle.profile' => 'Your account, sign-in and appearance',
     'subtitle.settings' => 'Choices for the household and the instance',
     'subtitle.stats' => 'Spending, forecast and price history',
     'subtitle.subscription_form' => 'Price, renewal date, who pays and who can see it',
     'subtitle.subscriptions' => 'Everything the household pays for',
-    'subtitle.tokens' => 'Keys for the API',
     'subtitle.totp_setup' => 'Pair an authenticator app',
 
     // notifications
     'notifications.add_a_channel' => 'Add a channel',
     'notifications.add_channel_of_type' => 'Add {type}',
-    'notifications.channel_enabled' => 'Send notifications to this channel',
     'notifications.channels' => 'Channels',
     'notifications.channels_empty' => 'No channels yet. Add one below and send yourself a test message.',
     'notifications.delivery' => 'Delivery',
@@ -1310,24 +1296,19 @@ return [
         . 'same thing again.',
     'notifications.last_delivered' => 'Last delivered {when}.',
     'notifications.last_error' => 'Last attempt failed: {reason}',
-    'notifications.lead_days_hint' =>
-        'Separate with commas, for example {example}. Each one is a separate reminder. Leave blank for '
-        . 'no advance reminders. A single subscription can override this on its own page.',
-    'notifications.lead_days_label' => 'Remind me this many days before a charge',
     'notifications.price_change_hint' =>
         'When a price is edited or a future one is scheduled, on any subscription you can see. Routed '
         . 'like the other alerts below.',
     'notifications.price_change_toggle' => 'Tell me when a price changes',
     'notifications.recently_sent' => 'Recently sent',
     'notifications.routing_hint' =>
-        'Leave every box ticked — or every box clear — to send everything to every channel.',
+        'Which channel each alert goes to. Channels that are off are greyed out, and keep their choices '
+        . 'for when they are turned back on. Clearing every box sends everything everywhere.',
     'notifications.save_channel' => 'Save channel',
     'notifications.save_preferences' => 'Save preferences',
     'notifications.secret_placeholder' => 'Leave blank to keep the stored value',
     'notifications.summary_day' => 'Summary day',
     'notifications.title' => 'Notifications',
-    'notifications.when_to_tell_me' => 'When to tell me',
-    'notifications.where_each_alert_goes' => 'Where each alert goes',
 
     // period
     'period.per_daily' => 'Per day',
@@ -1394,9 +1375,6 @@ return [
     'settings.dashboard_cards_for' => '{view} dashboard cards',
     'settings.dashboard_cards_hint' =>
         'Lower numbers come first. Clear the box to hide a card without losing where you had put it.',
-    'settings.data_intro' =>
-        'Bring subscriptions in from a file, or take everything out again — including the attached '
-        . 'invoices — in a format that needs no database to read.',
     'settings.data_isolation' => 'Data isolation',
     'settings.demo_mode' => 'Read-only demonstration',
     'settings.demo_mode_hint' =>
@@ -1407,19 +1385,13 @@ return [
     'settings.host_or_range' => 'Host or range',
     'settings.household' => 'Household',
     'settings.household_permission_note' => 'Only an owner or admin of this household can change these.',
-    'settings.import_a_file' => 'Import a file',
     'settings.instance' => 'Instance',
     'settings.instance_note' => 'These apply to everybody on this instance.',
-    'settings.members' => 'Members',
     'settings.rate_key_clear' => 'Remove the stored API key',
     'settings.rate_key_env_wins' => '{variable} in the environment overrides whatever is stored here.',
     'settings.rate_key_placeholder' => 'Leave blank to keep the current key',
-    'settings.rates_cached' =>
-        '{count, plural, one {# currency} other {# currencies}} cached, last updated {when} UTC.',
     'settings.rates_need_key' =>
         '{provider} needs an API key and has not been given one, so no rates are being fetched.',
-    'settings.rates_none' =>
-        'No rates cached yet. They are fetched the first time a dashboard is viewed, or by running',
     'settings.rates_note' =>
         'Rates are cached and used only for display. Amounts stay in the currency they were entered in. '
         . 'When a rate is unavailable, totals are shown per currency instead of combined.',
@@ -1441,10 +1413,7 @@ return [
         . 'stops somebody using a webhook URL to make this server fetch something on your private network '
         . '— including, on a cloud host, the metadata service holding its credentials.',
     'settings.you' => '(you)',
-    'settings.your_data' => 'Your data',
 
-    'settings.lists' => 'Lists',
-    'settings.lists_intro' => 'The labels a subscription can carry: what it is for, and what it is paid with.',
     // setup_notifications
     'setup_notifications.configured' => 'Configured',
     'setup_notifications.finish' => 'Finish',
@@ -1828,19 +1797,13 @@ return [
     'tokens.as_json' => 'as JSON',
     'tokens.bearer_note' => 'Send the token as a bearer credential:',
     'tokens.calendar_feed' => 'Calendar feed',
-    'tokens.calendar_note' =>
-        'Subscribe to this URL in your calendar app, with a read-only token in place of the placeholder. '
-        . 'It shows renewals, trial conversions and the last day to cancel each subscription.',
-    'tokens.can' => 'Can',
     'tokens.create_token' => 'Create token',
     'tokens.expires_on' => 'Expires {date}',
     'tokens.expires_optional' => 'Expires (optional)',
-    'tokens.identifier' => 'Identifier',
     'tokens.intro' =>
         'A token lets a script, a calendar app or another machine reach this instance without a '
         . 'password. It can never do more than you can: a token issued by a Viewer reads what a Viewer '
         . 'reads and writes nothing.',
-    'tokens.issue_a_token' => 'Issue a token',
     'tokens.name_placeholder' => 'Home Assistant, my calendar, a backup script',
     'tokens.new_token_note' =>
         'Copy it now. Only a hash of it is stored, so this is the one and only time it can be shown.',
@@ -1851,7 +1814,6 @@ return [
     'tokens.what_it_is_for' => 'What it is for',
     'tokens.what_it_may_do' => 'What it may do',
     'tokens.your_new_token' => 'Your new token',
-    'tokens.your_tokens' => 'Your tokens',
 
     // type
     'type.one_off' => 'One-off',
@@ -2082,7 +2044,6 @@ return [
     'relative.minutes_ago' => '{count, plural, one {# minute ago} other {# minutes ago}}',
 
     // payment_methods
-    'payment_methods.title' => 'Payment methods',
     'payment_methods.intro' =>
         'What your subscriptions are paid with. A payment method is only a label: Renovo never stores a card '
         . 'number and never takes a payment.',
@@ -2136,4 +2097,100 @@ return [
     'profile.totp_on_since' => 'On since {date} · {remaining} of {total} recovery codes left',
     'profile.totp_set_up' => 'Set up',
     'profile.two_step_heading' => 'Two-step verification & passkeys',
+
+    // -----------------------------------------------------------------------
+    // Phase 28: settings and notifications
+    // -----------------------------------------------------------------------
+    'action.add' => 'Add',
+    'confirm.delete_channel' => 'Remove {name}? Nothing more will be sent to it.',
+    'confirm.delete_tag' => 'Delete {name}? It comes off every subscription that carries it.',
+    'error.tag.duplicate' => 'A tag with that name already exists.',
+    'error.tag.too_long' => 'A tag must be 50 characters or fewer.',
+    'flash.channel_turned_off' => 'Channel turned off.',
+    'flash.channel_turned_on' => 'Channel turned on.',
+    'flash.rates_backing_off' => 'The last refresh failed, so the next can be tried after {time}.',
+    'flash.rates_refresh_failed' => 'The rates could not be refreshed: {reason}',
+    'flash.rates_refreshed' => '{count, plural, one {# rate} other {# rates}} refreshed.',
+    'flash.tag_added' => 'Tag added.',
+    'flash.tag_renamed' => 'Tag renamed.',
+    'notifications.budget_alerts' => 'Budget alerts',
+    'notifications.budget_alerts_hint' => 'When a budget is projected over.',
+    'notifications.channel_manage' => 'Edit {name}',
+    'notifications.channel_switch' => 'Send to {name}',
+    'notifications.days_before' => '{count, plural, one {# day} other {# days}}',
+    'notifications.lead_times' => 'Remind me before',
+    'notifications.lead_times_hint' =>
+        'Before each {types}. Choose any number, or none; each is a reminder of its own. A single '
+        . 'subscription can override this on its own page.',
+    'notifications.route_label' => '{alert} to {channel}',
+    'notifications.routing' => 'Routing',
+    'notifications.when_to_remind' => 'When to remind you',
+    'settings.added_by' => 'by {name}',
+    'settings.allow_registration_hint' =>
+        'Off, and accounts are made only by invitation from a household’s Owner or Admin.',
+    'settings.backup_heading' => 'Backup & restore',
+    'settings.base_currency_hint' => 'Totals, budgets and forecasts are shown in this currency.',
+    'settings.base_currency_instance_note' => 'It applies to every household on this instance.',
+    'settings.categories_intro' => 'Shared by the whole household. Renaming one renames it everywhere.',
+    'settings.delete_named' => 'Delete {name}',
+    'settings.export_csv' => 'CSV',
+    'settings.export_heading' => 'Export',
+    'settings.export_intro' =>
+        'Every subscription you can see, paused and cancelled ones included, as a spreadsheet or as JSON. '
+        . 'The importer reads either back.',
+    'settings.export_json' => 'JSON',
+    'settings.feed_intro' =>
+        'Renewals, trial ends and cancel-by dates in your own calendar app, from a private address.',
+    'settings.feed_link' => 'Set up the calendar feed',
+    'settings.full_audit_log' => 'Full audit log',
+    'settings.household_name' => 'Household name',
+    'settings.import_note' => 'You map the columns and preview every row before anything is saved.',
+    'settings.import_title' => 'Import a CSV or JSON file',
+    'settings.instance_status' => 'This server',
+    'settings.instance_status_intro' => 'Set in the environment, and shown here as it is.',
+    'settings.new_tag' => 'New tag',
+    'settings.new_token' => 'New token',
+    'settings.rate' => 'Rate',
+    'settings.rate_pair' => 'Pair',
+    'settings.rate_pair_value' => '1 {from} → {to}',
+    'settings.rate_provider' => 'Provider',
+    'settings.rates_backing_off' => 'The last refresh failed. The next can be tried after {time}.',
+    'settings.rates_from' => 'Rates from {provider}.',
+    'settings.rates_last_refreshed' => 'Last refreshed {when}.',
+    'settings.rates_never' => 'Not refreshed yet.',
+    'settings.rates_none_in_use' => 'Every subscription is priced in {base}, so no rate is needed.',
+    'settings.rates_others' =>
+        '{count, plural, one {# other currency is} other {# other currencies are}} cached as well.',
+    'settings.recent_activity' => 'Recent activity',
+    'settings.refresh_now' => 'Refresh now',
+    'settings.reissue_named' => 'Reissue {name}',
+    'settings.remove_named' => 'Remove {name}',
+    'settings.rename_category' => 'Name of {name}',
+    'settings.rename_tag' => 'Name of {name}',
+    'settings.restore_from_file' => 'Restore from file',
+    'settings.revoke_named' => 'Revoke {name}',
+    'settings.save_currency' => 'Save currency',
+    'settings.save_provider' => 'Save provider',
+    'settings.set_by_instance_admin' => 'It is set by the instance administrator.',
+    'settings.status_mail' => 'Mail relay',
+    'settings.status_mail_encryption' => 'Encryption: {encryption}',
+    'settings.status_mail_no_sign_in' => 'no sign-in',
+    'settings.status_mail_signs_in' => 'signs in',
+    'settings.status_metrics' => 'Metrics',
+    'settings.status_metrics_off' => 'Off. Set {variable} to expose /metrics.',
+    'settings.status_metrics_on' => '/metrics answers a request that carries the token.',
+    'settings.status_scheduler' => 'Scheduler last ran',
+    'settings.status_scheduler_never' => 'Not yet',
+    'settings.subscriptions_count' => '{count, plural, one {subscription} other {subscriptions}}',
+    'settings.tab_data' => 'Data & integrations',
+    'settings.tab_general' => 'General',
+    'settings.tab_instance' => 'Instance',
+    'settings.tabs_label' => 'Settings sections',
+    'settings.tags_intro' =>
+        'Usually made by typing one on a subscription. Renaming one renames it everywhere; deleting one '
+        . 'takes it off every subscription and deletes none of them.',
+    'settings.token_last_used' => 'last used {when}',
+    'settings.token_never_used' => 'never used',
+    'state.off' => 'Off',
+    'state.on' => 'On',
 ];

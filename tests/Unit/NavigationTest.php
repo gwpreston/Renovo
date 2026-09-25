@@ -61,8 +61,8 @@ final class NavigationTest extends TestCase
             'settings' => ['/settings', 'nav.settings'],
             // The pages that lost their rows light Settings, whose page links
             // to each of them.
-            'categories are settings' => ['/categories', 'nav.settings'],
-            'payment methods are settings' => ['/payment-methods', 'nav.settings'],
+            'the data tab is settings' => ['/settings/data', 'nav.settings'],
+            'the instance tab is settings' => ['/settings/instance', 'nav.settings'],
             'import is settings' => ['/import', 'nav.settings'],
             'the import mapping step' => ['/import/map', 'nav.settings'],
             'the audit log is settings' => ['/audit', 'nav.settings'],

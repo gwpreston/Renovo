@@ -121,6 +121,21 @@ final class AccessibilityTest extends DatabaseTestCase
             'subject_user_id' => BudgetService::SUBJECT_HOUSEHOLD,
         ]);
 
+        // Phase 28's sections in their populated states: a category and a tag
+        // (the chips and their rename forms), two channels, one of them off
+        // (the switches and every column of the routing grid, disabled boxes
+        // included), a token (its row and its actions) and a trusted host.
+        (new \App\Repository\CategoryRepository($this->db))->create($scope, 'Streaming', '#112233');
+        (new \App\Repository\TagRepository($this->db))->create($scope, 'family');
+        $channels = $container->get(\App\Repository\NotificationChannelRepository::class);
+        $channels->create($this->userId, 'email', 'My email', ['address' => 'owner@example.test']);
+        $channels->create($this->userId, 'webhook', 'My webhook', ['url' => 'https://hooks.example.test/x'], false);
+        $user = $users->findById($this->userId);
+        self::assertNotNull($user);
+        $container->get(\App\Service\ApiTokenService::class)
+            ->issue($user, $this->householdId, 'Calendar', \App\Domain\TokenAbility::Read);
+        $container->get(\App\Service\TrustedHostService::class)->add('gotify.lan', 'The LAN one', $user);
+
         $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $this->userId);
         $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $this->householdId);
     }
@@ -144,17 +159,18 @@ final class AccessibilityTest extends DatabaseTestCase
             ['/forecast'],
             ['/cancellations'],
             ['/stats'],
-            ['/categories'],
-            ['/payment-methods'],
             ['/profile'],
+            // Settings' three tabs (Phase 28). General carries categories,
+            // tags and payment methods; Data & integrations the tokens and
+            // backups that were screens of their own.
             ['/settings'],
+            ['/settings/data'],
+            ['/settings/instance'],
             ['/settings/members'],
             // The invite dialog's form, as the page it is without script.
             ['/settings/members/invite'],
             ['/settings/members/{member}/remove'],
             ['/settings/notifications'],
-            ['/settings/api-tokens'],
-            ['/settings/backup'],
             ['/import'],
             ['/audit'],
         ];

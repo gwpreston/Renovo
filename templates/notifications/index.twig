@@ -3,130 +3,79 @@
 {% block heading %}{{ t('notifications.title') }}{% endblock %}
 {% block page_subtitle %}{{ t('subtitle.notifications') }}{% endblock %}
 
+{#
+    Notifications: one person's channels, and when and where they are told
+    things. Its own page, not a Settings tab (decision 13) — everything on it
+    belongs to the account reading it, so it needs no permission and a Viewer
+    has all of it.
+
+    Channels and when-to-remind are paired as the prototype pairs them;
+    routing runs the full width beneath. When-to-remind and routing are one
+    form (`#notification-preferences`), as they always were: the routing
+    grid's boxes name the form they belong to, so a typo in one part never
+    saves the other half. Each card carries its own Save for it.
+
+    Secrets are never rendered back (Phase 16): a channel is described by its
+    notifier's masked description, and a secret field in its edit form is
+    drawn empty, where blank means "keep".
+#}
 {% block content %}
+    {% set errors = errors|default({}) %}
+    {% set submitted = submitted|default({}) %}
 
-    <p class="muted note">
-        {{ t('notifications.intro') }}
-    </p>
+    <p class="muted note">{{ t('notifications.intro') }}</p>
 
-    <section class="card">
-        <h2>{{ t('notifications.when_to_tell_me') }}</h2>
+    <div class="profile-row">
+        <section class="card" id="channels" aria-labelledby="channels-heading">
+            <h2 id="channels-heading">{{ t('notifications.channels') }}</h2>
 
-        <form method="post" action="/settings/notifications/preferences" class="stack">
-            {{ csrf_field() }}
+            {% if channels is empty %}
+                <p class="muted empty">{{ t('notifications.channels_empty') }}</p>
+            {% else %}
+                <ul class="account-rows">
+                    {% for channel in channels %}
+                        <li class="account-row channel-row{{ channel.isActive ? '' : ' is-off' }}">
+                            <span class="account-row-icon" aria-hidden="true">{{ icon(channel_icon(channel.type)) }}</span>
+                            <div class="account-row-text">
+                                <span class="account-row-name">{{ channel.label }}</span>
+                                <span class="account-row-meta">{{ channel_description(channel) }}</span>
+                                {% if channel.lastError %}
+                                    <span class="field-error">{{ t('notifications.last_error', {'reason': channel.lastError}) }}</span>
+                                {% elseif channel.lastSuccessAt %}
+                                    <span class="account-row-meta">{{ t('notifications.last_delivered', {
+                                        'when': channel.lastSuccessAt|local_date('d MMM y, HH:mm'),
+                                    }) }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="account-row-actions">
+                                {#
+                                    The switch posts on change; the button is
+                                    for a browser with no script to do that.
+                                    It changes whether the channel is on and
+                                    nothing else about it.
+                                #}
+                                <form method="post" action="/settings/notifications/channels/{{ channel.id }}/active"
+                                      class="inline channel-switch"
+                                      hx-post="/settings/notifications/channels/{{ channel.id }}/active" hx-trigger="change">
+                                    {{ csrf_field() }}
+                                    <input type="hidden" name="is_active" value="0">
+                                    <input type="checkbox" class="toggle" role="switch" name="is_active" value="1"
+                                           aria-label="{{ t('notifications.channel_switch', {'name': channel.label}) }}"
+                                           {{ channel.isActive ? 'checked' : '' }}>
+                                    <noscript>
+                                        <button type="submit" class="button button-quiet">{{ t('action.save') }}</button>
+                                    </noscript>
+                                </form>
+                            </div>
 
-            <label for="lead_days">{{ t('notifications.lead_days_label') }}</label>
-            <input type="text" id="lead_days" name="lead_days"
-                   value="{{ submitted.lead_days is defined ? submitted.lead_days : preferences.leadDaysAsString }}"
-                   aria-describedby="lead_days_hint">
-            <p class="hint" id="lead_days_hint">
-                {{ t('notifications.lead_days_hint', {'example': '30, 7, 1'}) }}
-            </p>
-            {% if errors.lead_days is defined %}<p class="field-error">{{ error_message(errors.lead_days) }}</p>{% endif %}
+                            <details class="account-row-more">
+                                <summary class="button button-quiet">{{ icon('edit') }}{{ t('notifications.channel_manage', {'name': channel.label}) }}</summary>
 
-            <label for="digest_mode">{{ t('notifications.delivery') }}</label>
-            <select id="digest_mode" name="digest_mode">
-                {% for mode in digest_modes %}
-                    <option value="{{ mode.value }}"
-                            {{ preferences.digestMode.value == mode.value ? 'selected' : '' }}>
-                        {{ t(mode.labelKey()) }}
-                    </option>
-                {% endfor %}
-            </select>
-            <p class="hint">
-                {{ t('notifications.digest_hint') }}
-            </p>
-
-            <label for="digest_day">{{ t('notifications.summary_day') }}</label>
-            <input type="number" id="digest_day" name="digest_day" min="1" max="28"
-                   value="{{ preferences.digestDay }}">
-            <p class="hint">
-                {{ t('notifications.digest_day_hint') }}
-            </p>
-            {% if errors.digest_day is defined %}<p class="field-error">{{ error_message(errors.digest_day) }}</p>{% endif %}
-
-            {# The hidden field carries "off"; a ticked box overrides it with "on". #}
-            <input type="hidden" name="price_change_alerts" value="0">
-            <label class="choice">
-                <input type="checkbox" name="price_change_alerts" value="1"
-                       aria-describedby="price_change_alerts_hint"
-                       {{ preferences.priceChangeAlerts ? 'checked' : '' }}>
-                <span>{{ t('notifications.price_change_toggle') }}</span>
-            </label>
-            <p class="hint" id="price_change_alerts_hint">{{ t('notifications.price_change_hint') }}</p>
-
-            {% if channels is not empty %}
-                <h3>{{ t('notifications.where_each_alert_goes') }}</h3>
-                <p class="hint">
-                    {{ t('notifications.routing_hint') }}
-                </p>
-
-                <div class="table-scroll">
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th scope="col">{{ t('field.channel') }}</th>
-                            {% for type in alert_types %}
-                                <th scope="col">{{ t(type.labelKey()) }}</th>
-                            {% endfor %}
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for channel in channels %}
-                            {% set configured = routes[channel.id] is defined %}
-                            <tr>
-                                <th scope="row">{{ channel.label }}</th>
-                                {% for type in alert_types %}
-                                    <td>
-                                        <input type="checkbox"
-                                               name="routes[{{ channel.id }}][]"
-                                               value="{{ type.value }}"
-                                               aria-label="{{ channel.label }}: {{ t(type.labelKey()) }}"
-                                               {{ (not configured or type.value in routes[channel.id])
-                                                   ? 'checked' : '' }}>
-                                    </td>
-                                {% endfor %}
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% endif %}
-
-            <button type="submit" class="button button-primary">{{ t('notifications.save_preferences') }}</button>
-        </form>
-    </section>
-
-    <section class="card">
-        <h2>{{ t('notifications.channels') }}</h2>
-
-        {% if channels is empty %}
-            <p class="muted empty">{{ t('notifications.channels_empty') }}</p>
-        {% else %}
-            <ul class="channel-list">
-                {% for channel in channels %}
-                    <li class="channel">
-                        <div>
-                            <strong>{{ channel.label }}</strong>
-                            <span class="muted">{{ channel_description(channel) }}</span>
-                            {% if not channel.isActive %}<span class="badge">{{ t('state.paused') }}</span>{% endif %}
-                            {% if channel.lastError %}
-                                <p class="field-error">{{ t('notifications.last_error', {'reason': channel.lastError}) }}</p>
-                            {% elseif channel.lastSuccessAt %}
-                                <p class="hint">{{ t('notifications.last_delivered', {
-                                    'when': channel.lastSuccessAt|local_date('d MMM y, HH:mm'),
-                                }) }}</p>
-                            {% endif %}
-
-                            <details>
-                                <summary>{{ t('action.edit') }}</summary>
-                                <form method="post" action="/settings/notifications/channels/{{ channel.id }}"
-                                      class="stack">
+                                <form method="post" action="/settings/notifications/channels/{{ channel.id }}" class="stack">
                                     {{ csrf_field() }}
 
                                     <label for="edit_{{ channel.id }}_label">{{ t('field.name') }}</label>
-                                    <input type="text" id="edit_{{ channel.id }}_label" name="label"
-                                           value="{{ channel.label }}">
+                                    <input type="text" id="edit_{{ channel.id }}_label" name="label" value="{{ channel.label }}">
 
                                     {% for field in channel_fields(channel) %}
                                         <label for="edit_{{ channel.id }}_{{ field.name }}">{{ t(field.label) }}</label>
@@ -142,76 +91,226 @@
                                         {% if field.hint %}<p class="hint">{{ t(field.hint) }}</p>{% endif %}
                                     {% endfor %}
 
-                                    <input type="hidden" name="is_active" value="0">
-                                    <label class="choice">
-                                        <input type="checkbox" name="is_active" value="1"
-                                               {{ channel.isActive ? 'checked' : '' }}>
-                                        <span>{{ t('notifications.channel_enabled') }}</span>
-                                    </label>
+                                    <input type="hidden" name="is_active" value="{{ channel.isActive ? '1' : '0' }}">
 
-                                    <button type="submit" class="button">{{ t('notifications.save_channel') }}</button>
+                                    <div class="form-actions">
+                                        <button type="submit" class="button">{{ t('notifications.save_channel') }}</button>
+                                    </div>
                                 </form>
+
+                                <div class="form-actions">
+                                    <form method="post" action="/settings/notifications/channels/{{ channel.id }}/test" class="inline">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-quiet">{{ icon('send') }}{{ t('action.send_test') }}</button>
+                                    </form>
+                                    <form method="post" action="/settings/notifications/channels/{{ channel.id }}/delete" class="inline"
+                                          onsubmit="return confirm('{{ t('confirm.delete_channel', {'name': channel.label})|e('js') }}')">
+                                        {{ csrf_field() }}
+                                        <button type="submit" class="button button-danger">{{ t('action.remove') }}</button>
+                                    </form>
+                                </div>
                             </details>
-                        </div>
-
-                        <div class="channel-actions">
-                            <form method="post" action="/settings/notifications/channels/{{ channel.id }}/test"
-                                  class="inline">
-                                {{ csrf_field() }}
-                                <button type="submit" class="button button-quiet">{{ t('action.send_test') }}</button>
-                            </form>
-                            <form method="post" action="/settings/notifications/channels/{{ channel.id }}/delete"
-                                  class="inline">
-                                {{ csrf_field() }}
-                                <button type="submit" class="button button-quiet">{{ t('action.remove') }}</button>
-                            </form>
-                        </div>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    </section>
-
-    <section class="card">
-        <h2>{{ t('notifications.add_a_channel') }}</h2>
-
-        {% for notifier in notifiers %}
-            <details class="channel-form" {{ submitted.channel_type is defined
-                and submitted.channel_type == notifier.key ? 'open' : '' }}>
-                <summary>{{ notifier.label }}</summary>
-
-                <form method="post" action="/settings/notifications/channels" class="stack">
-                    {{ csrf_field() }}
-                    <input type="hidden" name="channel_type" value="{{ notifier.key }}">
-
-                    <label for="{{ notifier.key }}_label">{{ t('field.name') }}</label>
-                    <input type="text" id="{{ notifier.key }}_label" name="label"
-                           placeholder="{{ notifier.label }}">
-
-                    {% for field in notifier.fields %}
-                        <label for="{{ notifier.key }}_{{ field.name }}">{{ t(field.label) }}</label>
-                        <input type="{{ field.type }}"
-                               id="{{ notifier.key }}_{{ field.name }}"
-                               name="{{ field.name }}"
-                               {{ field.required ? 'required' : '' }}
-                               autocomplete="off">
-                        {% if field.hint %}<p class="hint">{{ t(field.hint) }}</p>{% endif %}
-                        {% if errors[field.name] is defined %}
-                            <p class="field-error">{{ errors[field.name] }}</p>
-                        {% endif %}
+                        </li>
                     {% endfor %}
+                </ul>
+            {% endif %}
 
-                    <button type="submit" class="button">
-                        {{ t('notifications.add_channel_of_type', {'type': notifier.label}) }}
-                    </button>
-                </form>
+            {#
+                Every one of the eleven types, each its own small form. A
+                failed add comes back open, with its errors, and what was
+                typed except the secrets.
+            #}
+            <details class="settings-disclosure" id="add-channel" {{ submitted.channel_type is defined ? 'open' : '' }}>
+                <summary class="button">{{ icon('add') }}{{ t('notifications.add_a_channel') }}</summary>
+
+                {% for notifier in notifiers %}
+                    {% set is_this = submitted.channel_type is defined and submitted.channel_type == notifier.key %}
+                    <details class="channel-form" {{ is_this ? 'open' : '' }}>
+                        <summary>{{ icon(channel_icon(notifier.key)) }}{{ notifier.label }}</summary>
+
+                        <form method="post" action="/settings/notifications/channels" class="stack">
+                            {{ csrf_field() }}
+                            <input type="hidden" name="channel_type" value="{{ notifier.key }}">
+
+                            <label for="{{ notifier.key }}_label">{{ t('field.name') }}</label>
+                            <input type="text" id="{{ notifier.key }}_label" name="label"
+                                   placeholder="{{ notifier.label }}"
+                                   value="{{ is_this ? submitted.label|default('') : '' }}">
+
+                            {% for field in notifier.fields %}
+                                <label for="{{ notifier.key }}_{{ field.name }}">{{ t(field.label) }}</label>
+                                <input type="{{ field.type }}"
+                                       id="{{ notifier.key }}_{{ field.name }}"
+                                       name="{{ field.name }}"
+                                       {{ field.required ? 'required' : '' }}
+                                       {% if is_this and not field.isSecret %}value="{{ submitted[field.name]|default('') }}"{% endif %}
+                                       autocomplete="off">
+                                {% if field.hint %}<p class="hint">{{ t(field.hint) }}</p>{% endif %}
+                                {% if is_this and errors[field.name] is defined %}
+                                    <p class="field-error">{{ error_message(errors[field.name]) }}</p>
+                                {% endif %}
+                            {% endfor %}
+
+                            <div class="form-actions">
+                                <button type="submit" class="button">
+                                    {{ t('notifications.add_channel_of_type', {'type': notifier.label}) }}
+                                </button>
+                            </div>
+                        </form>
+                    </details>
+                {% endfor %}
             </details>
-        {% endfor %}
-    </section>
+        </section>
+
+        <section class="card" id="when-to-remind" aria-labelledby="when-to-remind-heading">
+            <h2 id="when-to-remind-heading">{{ t('notifications.when_to_remind') }}</h2>
+
+            <form method="post" action="/settings/notifications/preferences" class="stack"
+                  id="notification-preferences">
+                {{ csrf_field() }}
+
+                {#
+                    One set of lead times for renewals, trial conversions and
+                    cancel-by deadlines alike — any number of the five, or
+                    none. A lead time stored before the chips existed, or
+                    through a subscription's own override, is drawn as a chip
+                    of its own so saving keeps it. The hidden empty entry
+                    names the setting when every chip is unticked.
+                #}
+                <fieldset class="preference">
+                    <legend>{{ t('notifications.lead_times') }}</legend>
+                    <p class="hint" id="lead_days_hint">
+                        {{ t('notifications.lead_times_hint', {'types': lead_types|map(type => t(type.labelKey())|lower)|join(', ')}) }}
+                    </p>
+                    <input type="hidden" name="lead_days[]" value="">
+                    <div class="chip-choices" aria-describedby="lead_days_hint">
+                        {% set chosen = submitted.lead_days is defined and submitted.lead_days is iterable
+                            ? submitted.lead_days
+                            : preferences.leadDays %}
+                        {% for days in lead_choices %}
+                            <label class="filter-chip">
+                                <input type="checkbox" name="lead_days[]" value="{{ days }}"
+                                       {{ days in chosen or (days ~ '') in chosen ? 'checked' : '' }}>
+                                {{ t('notifications.days_before', {'count': days}) }}
+                            </label>
+                        {% endfor %}
+                    </div>
+                    {% if errors.lead_days is defined %}<p class="field-error">{{ error_message(errors.lead_days) }}</p>{% endif %}
+                </fieldset>
+
+                <fieldset class="preference">
+                    <legend>{{ t('notifications.delivery') }}</legend>
+                    <div class="segmented">
+                        {% for mode in digest_modes %}
+                            <label class="segmented-option">
+                                <input type="radio" name="digest_mode" value="{{ mode.value }}"
+                                       {{ preferences.digestMode.value == mode.value ? 'checked' : '' }}>
+                                {{ t(mode.labelKey()) }}
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <p class="hint">{{ t('notifications.digest_hint') }}</p>
+
+                    <label for="digest_day">{{ t('notifications.summary_day') }}</label>
+                    <input type="number" id="digest_day" name="digest_day" min="1" max="28"
+                           value="{{ preferences.digestDay }}" aria-describedby="digest_day_hint" class="input-short">
+                    <p class="hint" id="digest_day_hint">{{ t('notifications.digest_day_hint') }}</p>
+                    {% if errors.digest_day is defined %}<p class="field-error">{{ error_message(errors.digest_day) }}</p>{% endif %}
+                </fieldset>
+
+                {# The hidden field carries "off"; a switched-on box overrides it with "on". #}
+                <input type="hidden" name="budget_alerts" value="0">
+                <label class="choice toggle-row">
+                    <span>
+                        <span class="choice-title">{{ t('notifications.budget_alerts') }}</span>
+                        <span class="choice-note">{{ t('notifications.budget_alerts_hint') }}</span>
+                    </span>
+                    <input type="checkbox" class="toggle" role="switch" name="budget_alerts" value="1"
+                           {{ preferences.budgetAlerts ? 'checked' : '' }}>
+                </label>
+
+                <input type="hidden" name="price_change_alerts" value="0">
+                <label class="choice toggle-row">
+                    <span>
+                        <span class="choice-title">{{ t('notifications.price_change_toggle') }}</span>
+                        <span class="choice-note">{{ t('notifications.price_change_hint') }}</span>
+                    </span>
+                    <input type="checkbox" class="toggle" role="switch" name="price_change_alerts" value="1"
+                           {{ preferences.priceChangeAlerts ? 'checked' : '' }}>
+                </label>
+
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">{{ t('notifications.save_preferences') }}</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    {#
+        Routing: every alert type against every configured channel, Webhook
+        included. A box is ticked when that alert is delivered on that
+        channel — with no routing saved at all, that is every box.
+
+        A channel that is off is drawn disabled; a disabled box is not
+        posted, so its current choices ride along in hidden fields and are
+        kept for when it is turned back on.
+    #}
+    {% if channels is not empty %}
+        {% set routing_saved = routes is not empty %}
+        <section class="card" id="routing" aria-labelledby="routing-heading">
+            <h2 id="routing-heading">{{ t('notifications.routing') }}</h2>
+            <p class="muted">{{ t('notifications.routing_hint') }}</p>
+
+            <div class="table-scroll">
+                <table class="table routing-table">
+                    <thead>
+                    <tr>
+                        <th scope="col">{{ t('field.alert') }}</th>
+                        {% for channel in channels %}
+                            <th scope="col" class="routing-channel{{ channel.isActive ? '' : ' is-off' }}">
+                                {{ channel.label }}
+                                <span class="muted block">
+                                    {{- channel_type_label(channel.type) -}}
+                                    {%- if not channel.isActive %} · {{ t('state.off') }}{% endif -%}
+                                </span>
+                            </th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for type in alert_types %}
+                        <tr>
+                            <th scope="row">{{ t(type.labelKey()) }}</th>
+                            {% for channel in channels %}
+                                {% set on = not routing_saved or type.value in routes[channel.id]|default([]) %}
+                                <td class="routing-cell">
+                                    <input type="checkbox" form="notification-preferences"
+                                           name="routes[{{ channel.id }}][]" value="{{ type.value }}"
+                                           aria-label="{{ t('notifications.route_label', {'alert': t(type.labelKey()), 'channel': channel.label}) }}"
+                                           {{ on ? 'checked' : '' }} {{ channel.isActive ? '' : 'disabled' }}>
+                                    {% if not channel.isActive and on %}
+                                        <input type="hidden" form="notification-preferences"
+                                               name="routes[{{ channel.id }}][]" value="{{ type.value }}">
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" form="notification-preferences" class="button">
+                    {{ t('notifications.save_preferences') }}
+                </button>
+            </div>
+        </section>
+    {% endif %}
 
     {% if recent is not empty %}
-        <section class="card">
-            <h2>{{ t('notifications.recently_sent') }}</h2>
+        <section class="card" id="recently-sent" aria-labelledby="recently-sent-heading">
+            <h2 id="recently-sent-heading">{{ t('notifications.recently_sent') }}</h2>
             <div class="table-scroll">
                 <table class="table">
                     <thead>

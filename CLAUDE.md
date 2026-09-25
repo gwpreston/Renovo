@@ -221,6 +221,11 @@ you may build right now. Do not build features from a later phase, even if they
 appear in SPEC.md — leave clean seams instead. If PHASE.md and this file seem to
 conflict about scope, stop and ask.
 
+The re-skin that ran from Phase 18 to Phase 28 is complete: every screen now
+follows the prototype. A new screen reuses what those phases built — the shell,
+cards with fixed section ids that redirects can land on, `account-rows`, chips,
+switches, and tabs as links (`settings/_tabs.twig`) — rather than a new idiom.
+
 ## Working style
 
 For any non-trivial change, **output a short plan first** — data-model changes,

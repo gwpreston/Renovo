@@ -1,0 +1,38 @@
+{% extends 'layout.twig' %}
+
+{% block heading %}{{ t('nav.settings') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.settings') }}{% endblock %}
+
+{#
+    Settings — General: the household, the currency its totals are shown in
+    and the rates that convert to it, and the lists a subscription is filed
+    under.
+
+    `SettingsController::general()` renders it, and so does any form on it
+    that fails validation — the category, tag and payment-method controllers
+    redraw the whole tab with `errors`, what was typed in `values`, and
+    `failed` naming the section and the row, so the error lands beside the
+    field that caused it. Every section carries a fixed id, which is where
+    each form's redirect returns to.
+
+    The household and the rates are paired as the prototype pairs them; the
+    lists run the full width beneath.
+#}
+{% block content %}
+    {% set errors = errors|default({}) %}
+    {% set values = values|default({}) %}
+    {% set failed = failed|default({'section': null, 'id': null}) %}
+
+    {% include 'settings/_tabs.twig' with {'tab': 'general'} %}
+
+    <div class="profile-row">
+        {% include 'settings/_household.twig' %}
+        {% include 'settings/_rates.twig' %}
+    </div>
+
+    {% if household and can(scope, 'subscription.view') %}
+        {% include 'settings/_categories.twig' %}
+        {% include 'settings/_tags.twig' %}
+        {% include 'settings/_payment_methods.twig' %}
+    {% endif %}
+{% endblock %}

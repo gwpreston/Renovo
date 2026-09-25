@@ -109,8 +109,7 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
         return [
             ['/profile'],
             ['/settings'],
-            ['/settings/api-tokens'],
-            ['/settings/backup'],
+            ['/settings/data'],
             ['/import'],
         ];
     }
@@ -145,7 +144,10 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
         // read-only calendar feed.
         $this->signIn($this->viewerId);
 
-        self::assertSame(200, $this->request('GET', '/settings/api-tokens')->getStatusCode());
+        $response = $this->request('GET', '/settings/data');
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('id="api-tokens"', (string) $response->getBody());
     }
 
     public function testReissuingATokenKillsTheOldSecretAndIssuesANewOne(): void
@@ -242,6 +244,7 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
         ]);
 
         self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/settings/data#new-token', $response->getHeaderLine('Location'));
 
         // Matched on the real shape, not the `rnv_...` placeholder the page's
         // own instructions contain.
@@ -249,14 +252,14 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
 
         self::assertMatchesRegularExpression(
             $pattern,
-            (string) $this->request('GET', '/settings/api-tokens')->getBody(),
+            (string) $this->request('GET', '/settings/data')->getBody(),
             'The full token must be shown once, immediately after it is issued.',
         );
 
         // And exactly once: a refresh must not redisplay it.
         self::assertDoesNotMatchRegularExpression(
             $pattern,
-            (string) $this->request('GET', '/settings/api-tokens')->getBody(),
+            (string) $this->request('GET', '/settings/data')->getBody(),
             'The full token must not survive a reload.',
         );
     }
@@ -266,7 +269,7 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
         $this->signIn($this->ownerId);
 
         $this->request('POST', '/settings/api-tokens', ['name' => 'Throwaway', 'abilities' => 'read']);
-        $this->request('GET', '/settings/api-tokens');
+        $this->request('GET', '/settings/data');
 
         $id = (int) $this->db->fetchValue(
             'SELECT ' . $this->db->platform()->quoteIdentifier('id')
@@ -280,7 +283,7 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
 
         self::assertStringContainsString(
             'Revoked',
-            (string) $this->request('GET', '/settings/api-tokens')->getBody(),
+            (string) $this->request('GET', '/settings/data')->getBody(),
         );
     }
 
@@ -288,13 +291,15 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
     {
         $this->signIn($this->viewerId);
 
-        foreach (['/import', '/settings/backup'] as $path) {
-            self::assertSame(
-                403,
-                $this->request('GET', $path)->getStatusCode(),
-                sprintf('%s must be refused for a viewer.', $path),
-            );
-        }
+        self::assertSame(403, $this->request('GET', '/import')->getStatusCode(), 'Import must be refused.');
+
+        // Backups are a section of the Data & integrations tab, which a
+        // Viewer may open for their tokens; the section is not drawn, and its
+        // routes answer 403 (see the mutating routes below).
+        $page = (string) $this->request('GET', '/settings/data')->getBody();
+        self::assertStringNotContainsString('id="backup"', $page);
+        self::assertStringNotContainsString('id="import"', $page);
+        self::assertStringNotContainsString('/settings/backup/export', $page);
     }
 
     public function testAnEditorMayImportButNotBackUp(): void
@@ -305,7 +310,11 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
         $this->signIn($this->editorId);
 
         self::assertSame(200, $this->request('GET', '/import')->getStatusCode());
-        self::assertSame(403, $this->request('GET', '/settings/backup')->getStatusCode());
+
+        $page = (string) $this->request('GET', '/settings/data')->getBody();
+        self::assertStringContainsString('id="import"', $page);
+        self::assertStringNotContainsString('id="backup"', $page);
+        self::assertSame(403, $this->request('POST', '/settings/backup/export')->getStatusCode());
     }
 
     /**

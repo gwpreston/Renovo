@@ -213,7 +213,7 @@ final class PhaseTwentyScreensTest extends DatabaseTestCase
         $this->request('POST', '/subscriptions', $this->form(['name' => 'Mine', 'visibility' => 'payer']));
 
         $this->signIn($this->ownerId);
-        $page = (string) $this->request('GET', '/settings/backup')->getBody();
+        $page = (string) $this->request('GET', '/settings/data')->getBody();
 
         self::assertStringContainsString('data-private-left-out="1"', $page);
         self::assertStringContainsString('1 subscription that another member keeps to themselves', $page);

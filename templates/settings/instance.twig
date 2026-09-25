@@ -1,0 +1,161 @@
+{% extends 'layout.twig' %}
+
+{% block heading %}{{ t('nav.settings') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.settings') }}{% endblock %}
+
+{#
+    Settings — Instance: what applies to every account on this server.
+    Instance administrators only; the route answers 403 to everybody else,
+    and the tab is not offered to them.
+
+    Registration, isolation (the one place it is changed — decision 3) and
+    demo mode are one form; the trusted hosts are a list of their own. The
+    rest is the server as its environment describes it — the mail relay, the
+    metrics endpoint, the scheduler's last run — read-only, since none of it
+    is set here. The relay is described, never revealed: no password.
+
+    `SettingsController::instance()` renders it.
+#}
+{% block content %}
+    {% include 'settings/_tabs.twig' with {'tab': 'instance'} %}
+
+    <div class="profile-row">
+        <section class="card" id="instance-settings" aria-labelledby="instance-settings-heading">
+            <h2 id="instance-settings-heading">{{ t('settings.instance') }}</h2>
+            <p class="muted">{{ t('settings.instance_note') }}</p>
+
+            <form method="post" action="/settings/instance" class="stack">
+                {{ csrf_field() }}
+
+                <input type="hidden" name="allow_registration" value="0">
+                <label class="choice toggle-row">
+                    <span>
+                        <span class="choice-title">{{ t('settings.allow_registration') }}</span>
+                        <span class="choice-note">{{ t('settings.allow_registration_hint') }}</span>
+                    </span>
+                    <input type="checkbox" class="toggle" role="switch" name="allow_registration" value="1"
+                           {{ allow_registration ? 'checked' : '' }}>
+                </label>
+
+                <fieldset class="stack" id="data-isolation">
+                    <legend>{{ t('settings.data_isolation') }}</legend>
+                    {% for mode in isolation_modes %}
+                        <label class="choice">
+                            <input type="radio" name="isolation_mode" value="{{ mode.value }}"
+                                   {{ isolation_mode == mode.value ? 'checked' : '' }}>
+                            <span>{{ isolation_label(mode.value) }}</span>
+                        </label>
+                    {% endfor %}
+                </fieldset>
+
+                <input type="hidden" name="demo_mode" value="0">
+                <label class="choice toggle-row">
+                    <span>
+                        <span class="choice-title">{{ t('settings.demo_mode') }}</span>
+                        <span class="choice-note">{{ t('settings.demo_mode_hint') }}</span>
+                    </span>
+                    <input type="checkbox" class="toggle" role="switch" name="demo_mode" value="1"
+                           {{ demo_mode ? 'checked' : '' }}>
+                </label>
+
+                <div class="form-actions">
+                    <button type="submit" class="button">{{ t('settings.save_instance_settings') }}</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="card" id="instance-status" aria-labelledby="instance-status-heading">
+            <h2 id="instance-status-heading">{{ t('settings.instance_status') }}</h2>
+            <p class="muted">{{ t('settings.instance_status_intro') }}</p>
+
+            <dl class="settings-facts">
+                <dt>{{ t('settings.status_mail') }}</dt>
+                <dd>
+                    <span class="num">{{ smtp.host }}:{{ smtp.port }}</span>
+                    <span class="muted block">
+                        {{ t('settings.status_mail_encryption', {'encryption': smtp.encryption}) }} ·
+                        {{ smtp.authenticates ? t('settings.status_mail_signs_in') : t('settings.status_mail_no_sign_in') }}
+                    </span>
+                </dd>
+
+                <dt>{{ t('settings.status_metrics') }}</dt>
+                <dd>
+                    {% if metrics_enabled %}
+                        <span class="badge badge-ok">{{ t('state.on') }}</span>
+                        <span class="muted block">{{ t('settings.status_metrics_on') }}</span>
+                    {% else %}
+                        <span class="badge">{{ t('state.off') }}</span>
+                        <span class="muted block">{{ t('settings.status_metrics_off', {'variable': 'METRICS_TOKEN'}) }}</span>
+                    {% endif %}
+                </dd>
+
+                <dt>{{ t('settings.status_scheduler') }}</dt>
+                <dd>
+                    {% if scheduler_last_run_at %}
+                        <span class="num">{{ scheduler_last_run_at|local_date('d MMM y, HH:mm') }}</span>
+                    {% else %}
+                        <span class="muted">{{ t('settings.status_scheduler_never') }}</span>
+                    {% endif %}
+                </dd>
+            </dl>
+        </section>
+    </div>
+
+    <section class="card" id="trusted-hosts" aria-labelledby="trusted-hosts-heading">
+        <h2 id="trusted-hosts-heading">{{ t('settings.trusted_hosts') }}</h2>
+
+        <p class="muted note">{{ t('settings.trusted_hosts_intro') }}</p>
+        <p class="muted note">{{ t('settings.trusted_hosts_exception') }} <code>http</code>.</p>
+
+        {% if trusted_hosts is empty %}
+            <p class="muted empty">{{ t('settings.trusted_hosts_empty') }}</p>
+        {% else %}
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th scope="col">{{ t('settings.host_or_range') }}</th>
+                        <th scope="col">{{ t('field.note') }}</th>
+                        <th scope="col">{{ t('field.added') }}</th>
+                        <th scope="col"><span class="visually-hidden">{{ t('field.actions') }}</span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for host in trusted_hosts %}
+                        <tr>
+                            <td><code>{{ host.pattern }}</code></td>
+                            <td>{{ host.note }}</td>
+                            <td class="num">
+                                {{ host.created_at|local_date('d MMM y') }}
+                                {% if host.created_by %}<span class="muted">{{ t('settings.added_by', {'name': host.created_by}) }}</span>{% endif %}
+                            </td>
+                            <td class="actions">
+                                <form method="post" action="/settings/trusted-hosts/{{ host.id }}/delete" class="inline">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="button button-quiet"
+                                            aria-label="{{ t('settings.remove_named', {'name': host.pattern}) }}">{{ t('action.remove') }}</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        <form method="post" action="/settings/trusted-hosts" class="stack">
+            {{ csrf_field() }}
+
+            <label for="trusted_pattern">{{ t('settings.host_address_or_range') }}</label>
+            <input type="text" id="trusted_pattern" name="pattern"
+                   placeholder="{{ t('settings.trusted_host_placeholder') }}" required>
+
+            <label for="trusted_note">{{ t('field.note') }}</label>
+            <input type="text" id="trusted_note" name="note" placeholder="{{ t('settings.trusted_host_note_placeholder') }}">
+
+            <div class="form-actions">
+                <button type="submit" class="button">{{ t('settings.trust_this_host') }}</button>
+            </div>
+        </form>
+    </section>
+{% endblock %}

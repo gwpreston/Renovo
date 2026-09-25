@@ -8,6 +8,7 @@ use App\I18n\Translator;
 use App\Security\ScopeViolationException;
 use App\Security\SessionInterface;
 use App\Service\PaymentMethodService;
+use App\Service\SettingsScreenService;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -15,24 +16,31 @@ use Psr\Http\Message\UploadedFileInterface;
 use Slim\Views\Twig;
 
 /**
- * The household's payment methods: the list, and the five things a manager can
- * do to it. Gated by the category permission at the route, because the list is
+ * The household's payment methods: the five things a manager can do to the
+ * list. Gated by the category permission at the route, because the list is
  * the same kind of household metadata and the same people look after it.
+ *
+ * The list is a section of the Settings page's General tab since Phase 28; the
+ * screen it had before redirects there, and a form that fails validation
+ * redraws the tab around its error.
  */
 final class PaymentMethodController extends Controller
 {
+    private const SECTION = SettingsController::GENERAL . '#payment-methods';
+
     public function __construct(
         Twig $view,
         SessionInterface $session,
         Translator $translator,
         private readonly PaymentMethodService $methods,
+        private readonly SettingsScreenService $screen,
     ) {
         parent::__construct($view, $session, $translator);
     }
 
-    public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    public function moved(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->page($request, $response);
+        return $this->redirect($response, self::SECTION);
     }
 
     public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -53,7 +61,7 @@ final class PaymentMethodController extends Controller
 
         $this->flash('success', 'flash.payment_method_added');
 
-        return $this->redirectAfterWrite($request, $response, '/payment-methods');
+        return $this->redirectAfterWrite($request, $response, self::SECTION);
     }
 
     public function update(ServerRequestInterface $request, ResponseInterface $response, string $id): ResponseInterface
@@ -77,7 +85,7 @@ final class PaymentMethodController extends Controller
 
         $this->flash('success', 'flash.payment_method_saved');
 
-        return $this->redirectAfterWrite($request, $response, '/payment-methods');
+        return $this->redirectAfterWrite($request, $response, self::SECTION);
     }
 
     public function clearLogo(
@@ -93,7 +101,7 @@ final class PaymentMethodController extends Controller
 
         $this->flash('success', 'flash.payment_method_logo_cleared');
 
-        return $this->redirectAfterWrite($request, $response, '/payment-methods');
+        return $this->redirectAfterWrite($request, $response, self::SECTION);
     }
 
     public function delete(ServerRequestInterface $request, ResponseInterface $response, string $id): ResponseInterface
@@ -106,7 +114,7 @@ final class PaymentMethodController extends Controller
 
         $this->flash('success', 'flash.payment_method_deleted');
 
-        return $this->redirectAfterWrite($request, $response, '/payment-methods');
+        return $this->redirectAfterWrite($request, $response, self::SECTION);
     }
 
     /**
@@ -124,7 +132,7 @@ final class PaymentMethodController extends Controller
             $this->flash('success', 'flash.payment_methods_defaults_added');
         }
 
-        return $this->redirectAfterWrite($request, $response, '/payment-methods');
+        return $this->redirectAfterWrite($request, $response, self::SECTION);
     }
 
     /**
@@ -138,11 +146,11 @@ final class PaymentMethodController extends Controller
         array $values = [],
         ?int $failedId = null,
     ): ResponseInterface {
-        return $this->render($request, $response, 'payment_methods/index.twig', [
-            'payment_methods' => $this->methods->all($this->scope($request)),
+        return $this->render($request, $response, 'settings/general.twig', [
+            ...$this->screen->general($this->scope($request)),
             'errors' => $errors,
             'values' => $values,
-            'failed_id' => $failedId,
+            'failed' => ['section' => 'payment_methods', 'id' => $failedId],
         ]);
     }
 

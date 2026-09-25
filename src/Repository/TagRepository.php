@@ -76,6 +76,25 @@ final class TagRepository extends AbstractScopedRepository
         return array_values(array_unique($ids));
     }
 
+    public function create(Scope $scope, string $name): int
+    {
+        $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
+
+        return $this->insertScoped($scope, [
+            'name' => $name,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    public function rename(Scope $scope, int $id, string $name): void
+    {
+        $this->updateScoped($scope, $id, [
+            'name' => $name,
+            'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+    }
+
     public function delete(Scope $scope, int $id): void
     {
         $this->deleteScoped($scope, $id);
