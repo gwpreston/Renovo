@@ -104,14 +104,48 @@ The feed respects private rows and excludes paused and cancelled ones.
 
 ## Status
 
-- [ ] Header with totals; previous disabled on the current month
-- [ ] Grid: week start, today, three chip kinds, +N more, day totals
-- [ ] Selected-day panel (htmx + `?day=`)
-- [ ] Month summary
-- [ ] Narrow list layout with weekday attributes
-- [ ] Feed card: copy, create a new link (revoke + issue)
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check` green on both engines
+- [x] Header with totals; previous disabled on the current month
+- [x] Grid: week start, today, three chip kinds, +N more, day totals
+- [x] Selected-day panel (htmx + `?day=`)
+- [x] Month summary
+- [x] Narrow list layout with weekday attributes
+- [x] Feed card: copy, create a new link (revoke + issue)
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check` green on both engines
+
+Notes from the build:
+
+- `CalendarService::month()` returns every cell of the grid (the neighbouring
+  months' days included, `in_month` false), each with its items — `charge`,
+  `trial` or `cancel_by` — its first three as chips, the "+N more" count and
+  its per-currency figures. The month's `days` (those with anything on them)
+  feed the phone list; `selected` is the open day; `heaviest` is compared with
+  `ExchangeRateService::combine()` into the base currency and is null when any
+  day cannot be combined. Totals use `StatsService::combine()`, the dashboard's
+  per-currency rule.
+- **A deadline is drawn, never counted.** Its amount is the charge it avoids
+  (the forecast's first charge for that subscription, so a member's share on
+  "Just mine"); it is in no day total, month total, count or heaviest day.
+  Within a day the kinds are drawn deadline, trial, charge.
+- `resolveMonth()` returns null for a real month outside the horizon and the
+  controller answers 404; a malformed `?month=` is this month. `?day=` alone
+  names its month; a day outside the month on screen is not selected.
+- Month paging, **Today** and choosing a day all swap `#calendar-month`, which
+  holds the grid card, the open-day panel and the summary and lays out through
+  the page grid (`display: contents`); the feed card sits outside the swap.
+- The feed token is the member's usable read token named
+  `ApiTokenService::FEED_TOKEN_NAME` for the current household.
+  `replaceFeedToken()` revokes those (audited, reason `feed_replaced`) and
+  issues one; the full token is a one-shot session flash read only on a full
+  page load. With a live link, **Create a new link** is a `<details>` warning
+  and a confirm button, so it asks without script. The Copy button is revealed
+  by `assets/js/copy-field.js`; without it the read-only input is selected and
+  copied by hand.
+- The rail's insight and "Next up" cards are gone with their strings; the
+  dashboard's Coming up card already answers "what is next".
+  `CalendarRailTest` became `CalendarMonthTest`.
+- `PersonalisationTest` no longer pins `?month=2026-09`, which would have
+  turned into a 404 once the real clock passed September.
 
 ## Definition of done
 

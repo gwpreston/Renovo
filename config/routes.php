@@ -264,6 +264,11 @@ return static function (App $app): void {
             ->setName('calendar')
             ->add($requires(Permission::ViewSubscriptions));
 
+        // Phase 25: the calendar feed's link. Like the API-token routes it acts
+        // only on the member's own read-only token, so it names no permission.
+        $group->post('/calendar/feed-link', [CalendarController::class, 'replaceFeed'])
+            ->setName('calendar-feed-link');
+
         // A saved view is one account's way of looking at the list. It names
         // no permission for the same reason a theme does not — but it is still
         // a list of subscriptions, so seeing the page it points at needs the

@@ -36,6 +36,15 @@ final class ApiTokenService
 {
     public const PREFIX = 'rnv';
 
+    /**
+     * The name the calendar screen issues its feed token under.
+     *
+     * Fixed rather than translated: it is how the screen finds its own token
+     * again, and a name that followed the member's language would stop
+     * matching the day they changed it.
+     */
+    public const FEED_TOKEN_NAME = 'Calendar feed';
+
     private const PUBLIC_ID_BYTES = 12;
     private const SECRET_BYTES = 32;
 
@@ -151,6 +160,64 @@ final class ApiTokenService
             $existing->abilities,
             $existing->expiresAt,
         );
+    }
+
+    /**
+     * The link the calendar screen hands out, if there is a live one.
+     *
+     * A feed token is an ordinary read-only token under a reserved name, for
+     * the household it reads. Nothing else marks it: the secret is a hash like
+     * every other, so this can say when the link was made and last fetched but
+     * never what it was — which is why the calendar shows the URL only once.
+     */
+    public function feedToken(User $user, ?int $householdId): ?ApiToken
+    {
+        foreach ($this->feedTokens($user, $householdId) as $token) {
+            return $token;
+        }
+
+        return null;
+    }
+
+    /**
+     * Replace the calendar feed link: every live feed token for this household
+     * is revoked, and a new one issued.
+     *
+     * Revoked first, for `reissue()`'s reason — a failure leaves no link rather
+     * than two. Read tokens the member issued themselves on the tokens page are
+     * left alone even if they paste one into a calendar; only the reserved name
+     * is this screen's to replace.
+     *
+     * @return string The full new token, shown once.
+     */
+    public function replaceFeedToken(User $user, ?int $householdId): string
+    {
+        foreach ($this->feedTokens($user, $householdId) as $token) {
+            if ($this->tokens->revoke($user->id, $token->id)) {
+                $this->audit->record(AuditAction::ApiTokenRevoked, $user, [
+                    'token_id' => $token->id,
+                    'reason' => 'feed_replaced',
+                ], $householdId);
+            }
+        }
+
+        return $this->issue($user, $householdId, self::FEED_TOKEN_NAME, TokenAbility::Read);
+    }
+
+    /**
+     * @return list<ApiToken> Newest first.
+     */
+    private function feedTokens(User $user, ?int $householdId): array
+    {
+        $now = $this->clock->now();
+
+        return array_values(array_filter(
+            $this->tokens->findAllForUser($user->id),
+            static fn (ApiToken $token): bool => $token->name === self::FEED_TOKEN_NAME
+                && $token->abilities === TokenAbility::Read
+                && $token->householdId === $householdId
+                && $token->isUsable($now),
+        ));
     }
 
     public function revoke(User $user, int $tokenId): bool

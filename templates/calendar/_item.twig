@@ -1,0 +1,54 @@
+{#
+    One thing on a day: a charge, a trial ending, or the last day to cancel.
+
+    The same row in the selected-day panel and in the phone list, so the two
+    cannot describe an item differently. The amount is in its own currency,
+    with roughly what that is in the base currency beside it when it differs
+    and there is a rate. A deadline's amount is the charge it avoids.
+
+    `item`  a CalendarService item
+#}
+{% import 'partials/logo.twig' as logo %}
+{% import 'partials/avatar.twig' as avatar %}
+{% import 'calendar/_kind.twig' as kind %}
+
+{% set subscription = item.subscription %}
+
+<li class="calendar-item is-{{ item.kind|replace({'_': '-'}) }}">
+    {{ logo.tile(subscription, 32) }}
+    <span class="calendar-item-body">
+        <a class="calendar-item-name"
+           href="/subscriptions/{{ subscription.id }}{{ can_edit_row(scope, subscription) ? '/edit' : '/money' }}">{{ subscription.name }}</a>
+        <span class="calendar-item-what hint">
+            {%- if item.kind == 'trial' -%}
+                {{ kind.icon(item.kind) }}{{ t('calendar.item_trial') }}
+            {%- elseif item.kind == 'cancel_by' -%}
+                {{ kind.icon(item.kind) }}{{ t('calendar.item_cancel_by', {
+                    'notice': t(subscription.noticePeriod.labelKey(), {'count': subscription.noticePeriod.amount}),
+                }) }}
+            {%- else -%}
+                {{ kind.icon(item.kind) }}<span class="visually-hidden">{{ kind.label(item.kind) }}: </span>
+                {%- set details = [subscription.plan, subscription.paymentMethodName]|filter(v => v) -%}
+                {%- if details is not empty -%}
+                    {{ details|join(' · ') }}
+                {%- elseif subscription.billingCycle -%}
+                    {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays) }}
+                {%- else -%}
+                    {{ kind.label(item.kind) }}
+                {%- endif -%}
+            {%- endif -%}
+        </span>
+    </span>
+    {% if subscription.ownerName %}
+        <span class="calendar-item-owner" title="{{ subscription.ownerName }}">
+            {{ avatar.face(subscription.ownerUserId, subscription.ownerName, subscription.ownerName|initials, subscription.ownerHasAvatar, 22) }}
+            <span class="visually-hidden">{{ subscription.ownerName }}</span>
+        </span>
+    {% endif %}
+    <span class="calendar-item-amount">
+        <span class="num">{{ item.amount.amountMinor|money(item.amount.currency) }}</span>
+        {% if item.approx_base %}
+            <span class="hint num">{{ t('dashboard.approx', {'amount': item.approx_base.amountMinor|money(item.approx_base.currency)}) }}</span>
+        {% endif %}
+    </span>
+</li>

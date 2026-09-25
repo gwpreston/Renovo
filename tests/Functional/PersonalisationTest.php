@@ -395,7 +395,7 @@ final class PersonalisationTest extends DatabaseTestCase
     {
         $this->savePreferences(['week_start' => '0']);
 
-        $body = (string) $this->request('GET', '/calendar?month=2026-09')->getBody();
+        $body = (string) $this->request('GET', '/calendar')->getBody();
         $heading = substr($body, (int) strpos($body, '<thead>'), 400);
 
         self::assertLessThan(
@@ -406,7 +406,7 @@ final class PersonalisationTest extends DatabaseTestCase
 
         $this->savePreferences(['week_start' => '1']);
 
-        $body = (string) $this->request('GET', '/calendar?month=2026-09')->getBody();
+        $body = (string) $this->request('GET', '/calendar')->getBody();
         $heading = substr($body, (int) strpos($body, '<thead>'), 400);
 
         self::assertLessThan(

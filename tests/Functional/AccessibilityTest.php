@@ -12,6 +12,7 @@ use App\Repository\MembershipRepository;
 use App\Repository\PaymentMethodRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
+use App\Security\CsrfTokenManager;
 use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Service\BudgetService;
@@ -268,6 +269,104 @@ final class AccessibilityTest extends DatabaseTestCase
         $page = $this->get('/budgets/' . $this->budgetId . '/edit');
         self::assertSame(1, preg_match_all('/<h1\b/', $page));
         self::assertSame([], $this->unnamedControls($page));
+    }
+
+    /**
+     * The calendar with all three kinds of chip on it, the open day, and the
+     * feed card showing its one-time address — the states `/calendar` on an
+     * empty month does not reach.
+     *
+     * Dates are next month's, from the real clock this test runs on: a trial
+     * ending on the 10th, a charge on the 12th, and thirty days' notice on a
+     * charge due the month after, whose last day to cancel falls in this one.
+     */
+    public function testTheCalendarsChipsPanelAndFeedAreNamed(): void
+    {
+        $next = new DateTimeImmutable('first day of next month');
+        $scope = Scope::forMember($this->userId, true, $this->householdId, Role::OwnerAdmin, IsolationMode::Shared);
+        $subscriptions = new SubscriptionRepository($this->db);
+
+        $subscriptions->create($scope, [
+            'name' => 'Trial service',
+            'price_minor' => 0,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'is_trial' => true,
+            'trial_end_date' => $next->modify('+9 days')->format('Y-m-d'),
+            'converts_to_price_minor' => 1299,
+            'is_active' => true,
+        ], []);
+        $subscriptions->create($scope, [
+            'name' => 'Gym',
+            'price_minor' => 4000,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => $next->modify('+1 month +19 days')->format('Y-m-d'),
+            'anchor_day' => 20,
+            'notice_period_amount' => 30,
+            'notice_period_unit' => 'days',
+            'is_active' => true,
+        ], []);
+        $subscriptions->create($scope, [
+            'name' => 'Streaming',
+            'price_minor' => 999,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => $next->modify('+11 days')->format('Y-m-d'),
+            'anchor_day' => 12,
+            'is_active' => true,
+        ], []);
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $created = $this->app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('POST', 'http://localhost/calendar/feed-link', ['REMOTE_ADDR' => '127.0.0.1'])
+                ->withParsedBody([])
+                ->withHeader(CsrfTokenManager::HEADER_NAME, $container->get(CsrfTokenManager::class)->token()),
+        );
+        self::assertSame(302, $created->getStatusCode());
+
+        $html = $this->get(
+            '/calendar?month=' . $next->format('Y-m') . '&day=' . $next->modify('+9 days')->format('Y-m-d'),
+        );
+
+        self::assertStringContainsString('id="calendar-feed-url"', $html, 'The new link was not shown.');
+        self::assertSame([], $this->unnamedControls($html), 'The calendar has controls a screen reader cannot name.');
+        self::assertSame(1, preg_match_all('/<h1\b/', $html));
+
+        // Every chip in the grid says what it is in a word and an icon, not by
+        // its colour alone.
+        preg_match_all(
+            '~<span class="calendar-chip is-([a-z-]+)">(.*?)</span>\s*</span>~s',
+            $html,
+            $chips,
+            PREG_SET_ORDER,
+        );
+        self::assertSame(['cancel-by', 'charge', 'trial'], $this->sorted(array_column($chips, 1)));
+        foreach ($chips as [, $kind, $inner]) {
+            self::assertStringContainsString('<svg', $inner, 'A ' . $kind . ' chip has no icon.');
+            self::assertMatchesRegularExpression(
+                '~class="visually-hidden">[^<]+:~',
+                $inner,
+                'A ' . $kind . ' chip has no word.',
+            );
+        }
+    }
+
+    /**
+     * @param list<string> $values
+     * @return list<string>
+     */
+    private function sorted(array $values): array
+    {
+        $values = array_values(array_unique($values));
+        sort($values);
+
+        return $values;
     }
 
     /**

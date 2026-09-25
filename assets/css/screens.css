@@ -773,17 +773,14 @@ tr.is-passed > td {
 /* --------------------------------------------------------------- calendar */
 
 /*
- * The screen's shape: the month grid, and the rail beside it on a wide screen
- * and below it on a narrow one.
+ * The screen's shape: the month's card on the left, and the open day, the
+ * summary and the feed stacked beside it on a wide screen; one column below
+ * that.
  *
- * The same breakpoint and the same column widths as `.subscriptions-layout`,
- * deliberately — two screens that are "a wide thing with a rail" should change
- * shape at the same width, or the interface appears to reflow at two arbitrary
- * points instead of one.
- *
- * The gap is horizontal only, because the cards space themselves vertically
- * with their own margin and a row gap on top of that is a double space on
- * every phone.
+ * `#calendar-month` is what htmx swaps, and it holds three of those four
+ * cards — so it lays out through this grid (`display: contents`) instead of
+ * being a box of its own, and the feed card outside it still lines up in the
+ * same column.
  */
 .calendar-layout {
     display: grid;
@@ -791,203 +788,401 @@ tr.is-passed > td {
     align-items: start;
 }
 
+.calendar-month {
+    display: contents;
+}
+
 @media (min-width: 1100px) {
     .calendar-layout {
         grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
     }
+
+    .calendar-layout .calendar {
+        grid-column: 1;
+        grid-row: 1 / span 4;
+    }
+
+    .calendar-layout .calendar-day-panel,
+    .calendar-layout .calendar-summary,
+    .calendar-layout .calendar-feed {
+        grid-column: 2;
+    }
 }
 
-/*
- * A seven-column table will happily refuse to be narrower than its content and
- * push the whole page sideways; `min-width: 0` is what makes it scroll inside
- * its own wrapper instead.
- */
-.calendar-layout > .calendar,
-.calendar-rail {
+/* A seven-column grid must scroll inside its card, never widen the page. */
+.calendar-layout > *,
+.calendar-month > * {
     min-width: 0;
-}
-
-/*
- * In a rail this narrow the three-across row the dashboard uses does not fit,
- * so the name takes the first line and the date and amount share the second.
- */
-.calendar-rail .renewals li {
-    flex-wrap: wrap;
-}
-
-.calendar-rail .renewal-name {
-    flex: 1 0 100%;
-}
-
-.calendar-rail .renewal-date {
-    flex: 1 1 auto;
-}
-
-/*
- * The month's figure, stated once and here. Several currencies are several
- * figures side by side and never a sum: this instance may hold no rate for one
- * of them, and adding them would invent one.
- */
-.calendar-insight-total {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.75rem;
-    margin: 0;
-}
-
-.calendar-insight-heading {
-    font-size: var(--size-heading);
-    margin: 1rem 0 0.25rem;
-}
-
-/*
- * A deadline is the one thing in the rail that expires, so it is not left to
- * the amber badge alone to say so — the row carries a border as well, which
- * survives greyscale and colour blindness.
- */
-.calendar-deadline {
-    border-left: 3px solid var(--warn);
-    padding-left: 0.5rem;
 }
 
 .calendar-header {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
+    margin-bottom: 1rem;
 }
 
 .calendar-header h2 {
     margin: 0;
 }
 
+.calendar-count {
+    margin: 0.15rem 0 0;
+    font-size: var(--size-label);
+}
+
 .calendar-nav {
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.calendar-today {
+    padding-block: 0.45rem;
 }
 
 .calendar-grid {
+    border-collapse: separate;
+    border-spacing: 0.375rem;
     width: 100%;
-    border-collapse: collapse;
     table-layout: fixed;
 }
 
 .calendar-grid th {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted);
-    font-weight: var(--weight-semibold);
-    padding: 0.35rem 0.25rem;
+    font-weight: var(--weight-bold);
+    padding: 0 0.375rem;
     text-align: left;
 }
 
 .calendar-day {
     vertical-align: top;
+    height: 6.5rem;
+    padding: 0;
     border: 1px solid var(--border);
-    padding: 0.35rem;
-    /*
-     * A month is five or six rows; a fixed minimum keeps the grid from
-     * collapsing into strips on a quiet month.
-     */
-    height: 5.5rem;
-    width: 14.28%;
+    border-radius: var(--radius-control);
+    background: var(--surface);
 }
 
-.calendar-day.is-empty {
+.calendar-day.is-outside {
     background: var(--surface-2);
     border-color: transparent;
+    padding: 0.375rem;
 }
 
-.calendar-day.is-today {
-    outline: 2px solid var(--accent-text);
-    outline-offset: -2px;
+.calendar-day.is-outside .calendar-date {
+    color: var(--faint);
 }
 
-.calendar-date {
-    font-size: var(--size-label);
-    color: var(--muted);
-    display: block;
+.calendar-day:not(.is-outside):hover,
+.calendar-day.is-selected {
+    border-color: var(--accent-text);
 }
 
-.calendar-day.is-today .calendar-date {
-    color: var(--accent-text);
-    font-weight: var(--weight-semibold);
-}
-
-.calendar-events {
-    list-style: none;
-    margin: 0.25rem 0 0;
-    padding: 0;
-    display: grid;
-    gap: 0.2rem;
-}
-
-.calendar-event {
-    font-size: 0.75rem;
-    line-height: 1.3;
-    padding: 0.2rem 0.3rem;
-    border-radius: var(--radius-small);
-    background: var(--surface-2);
-    border-left: 3px solid var(--accent);
-}
-
-.calendar-event.is-trial {
-    border-left-color: var(--warn);
-}
-
-.calendar-event a {
-    display: block;
-    color: inherit;
-    text-decoration: none;
-    font-weight: var(--weight-semibold);
-}
-
-.calendar-event a:hover {
-    text-decoration: underline;
-}
-
-.calendar-amount {
-    color: var(--muted);
+.calendar-day.is-selected {
+    box-shadow: inset 0 0 0 1px var(--accent-text);
 }
 
 /*
- * On a phone a seven-column grid is unreadable, so the same markup becomes a
- * list: each day that has something on it is a block, and every other cell —
- * the padding days of a neighbouring month and the days with nothing due — is
- * dropped, because a column of thirty bare numbers is not a calendar.
- *
- * With the headings gone, each remaining day carries its own weekday in
- * `data-weekday`, which the template fills from the reader's locale.
+ * The whole cell is the link, so a day is chosen by clicking anywhere on it
+ * as the prototype does — and it is still one focusable, named control.
  */
-@media (max-width: 720px) {
-    .calendar-grid,
-    .calendar-grid tbody,
-    .calendar-grid tr,
-    .calendar-grid td {
+.calendar-day-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    height: 100%;
+    min-height: 6.5rem;
+    padding: 0.375rem;
+    box-sizing: border-box;
+    color: inherit;
+    text-decoration: none;
+    border-radius: inherit;
+}
+
+.calendar-day-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+}
+
+.calendar-date {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.375rem;
+    height: 1.375rem;
+    padding: 0 0.3rem;
+    box-sizing: border-box;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: var(--weight-bold);
+    color: var(--text);
+}
+
+.calendar-day.is-today .calendar-date {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+
+.calendar-day-total {
+    font-size: 0.625rem;
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/*
+ * A chip: an icon, a word for screen readers, and the name. The fill says the
+ * kind at a glance; the icon says it in greyscale and in forced colours.
+ */
+.calendar-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 0.125rem 0.3rem;
+    border-radius: var(--radius-small);
+    font-size: 0.625rem;
+    font-weight: var(--weight-bold);
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
+.calendar-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar-chip.is-charge {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.calendar-chip.is-trial {
+    background: var(--info-bg);
+    color: var(--info);
+}
+
+.calendar-chip.is-cancel-by {
+    background: var(--warn-bg);
+    color: var(--warn);
+}
+
+.calendar-kind-icon {
+    flex: none;
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+.calendar-more {
+    font-size: 0.625rem;
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+    padding-left: 0.125rem;
+}
+
+.calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-top: 1rem;
+}
+
+.calendar-legend .calendar-chip {
+    font-size: 0.6875rem;
+}
+
+/* ---------------------------------------------------- the day's items */
+
+.calendar-day-panel-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.calendar-day-panel-header h2 {
+    margin: 0;
+    font-size: var(--size-heading);
+}
+
+.calendar-day-panel-total {
+    font-weight: var(--weight-bold);
+}
+
+.calendar-items {
+    display: grid;
+}
+
+.calendar-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.75rem;
+    padding: 0.625rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.calendar-item-body {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+}
+
+.calendar-item-name {
+    font-weight: var(--weight-bold);
+    color: inherit;
+    text-decoration: none;
+}
+
+.calendar-item-name:hover {
+    text-decoration: underline;
+}
+
+.calendar-item-what {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar-item.is-trial .calendar-kind-icon {
+    color: var(--info);
+}
+
+.calendar-item.is-cancel-by .calendar-kind-icon {
+    color: var(--warn);
+}
+
+.calendar-item.is-charge .calendar-kind-icon {
+    color: var(--accent-text);
+}
+
+.calendar-item-owner {
+    flex: none;
+}
+
+.calendar-item-amount {
+    display: grid;
+    justify-items: end;
+    font-weight: var(--weight-bold);
+}
+
+/* ------------------------------------------------------------ summary */
+
+.calendar-summary-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875rem;
+    margin: 0;
+}
+
+.calendar-summary-item dt {
+    font-size: 0.6875rem;
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.calendar-summary-item dd {
+    margin: 0.125rem 0 0;
+    font-size: 1.125rem;
+}
+
+.calendar-summary-item[data-summary='heaviest'] {
+    grid-column: 1 / -1;
+}
+
+/* --------------------------------------------------------------- feed */
+
+.calendar-feed-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--size-heading);
+}
+
+.copy-field {
+    display: flex;
+    gap: 0.375rem;
+}
+
+.copy-field-input {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.6875rem;
+    color: var(--muted);
+    background: var(--surface-2);
+}
+
+.calendar-feed-replace {
+    margin-top: 0.75rem;
+}
+
+.calendar-feed-replace > summary {
+    list-style: none;
+}
+
+.calendar-feed-replace > summary::-webkit-details-marker {
+    display: none;
+}
+
+.calendar-feed-warning {
+    color: var(--warn);
+}
+
+/*
+ * The phone form. Below 768px the grid gives way to a list of the days that
+ * have something on them — the prototype's mobile layout — and the open-day
+ * panel goes with it, because the list already shows every item of every day.
+ */
+.calendar-narrow {
+    display: none;
+}
+
+.calendar-list {
+    display: grid;
+    gap: 0.875rem;
+}
+
+.calendar-list-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-weight: var(--weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+}
+
+.calendar-list .calendar-item:first-child {
+    border-top: 0;
+}
+
+@media (max-width: 767px) {
+    .calendar-wide,
+    .calendar-layout .calendar-day-panel {
+        display: none;
+    }
+
+    .calendar-narrow {
         display: block;
-        width: auto;
-    }
-
-    .calendar-grid thead {
-        display: none;
-    }
-
-    .calendar-day {
-        height: auto;
-        border: 0;
-        border-bottom: 1px solid var(--border);
-        padding: 0.5rem 0;
-    }
-
-    .calendar-day.is-empty,
-    .calendar-day.is-quiet {
-        display: none;
-    }
-
-    .calendar-date::after {
-        content: ' ' attr(data-weekday);
     }
 }
 
@@ -3210,8 +3405,13 @@ a.segmented-option {
 /* ------------------------------------------------------- forced colours */
 
 @media (forced-colors: active) {
-    .calendar-day.is-today {
+    .calendar-day.is-today .calendar-date,
+    .calendar-day.is-selected {
         outline: 2px solid currentColor;
+    }
+
+    .calendar-chip {
+        border: 1px solid currentColor;
     }
 }
 

@@ -563,6 +563,7 @@ return [
         '{count, plural, =0 {No other sessions were signed in.} one {# other session signed out.}'
         . ' other {# other sessions signed out.}}',
 
+    'flash.feed_link_created' => 'A new calendar feed link was created. Copy it now — it is not shown again.',
     'flash.token_created' => 'Token created. Copy it now — it is not shown again.',
     'flash.token_reissued' =>
         'Token reissued. The previous one has stopped working — copy the new one now, it is not shown again.',
@@ -822,32 +823,45 @@ return [
     'budgets_form.whose_spending' => 'Whose spending',
 
     // calendar
-    'calendar.caption' => 'Renewals and trial conversions in {month}',
-    'calendar.cancel_by' => 'Cancel by {date}',
-    'calendar.deadlines_note' =>
-        'The last day notice can be given to avoid the charge shown. After it, the next charge is due '
-        . 'whether the subscription is cancelled or not.',
-    'calendar.deadlines_this_month' =>
-        '{count, plural, one {# cancellation deadline} other {# cancellation deadlines}} this month',
-    'calendar.due_this_month' =>
-        '{count, plural, one {# charge} other {# charges}} due this month',
-    'calendar.intro' =>
-        'Renewals and the day a free trial starts charging, on the dates they actually fall. '
-        . 'Scheduled price changes are applied from their own dates, so an amount here is what will '
-        . 'be taken rather than what is charged today.',
-    'calendar.insight' => 'Calendar insight',
+    'calendar.caption' => 'Charges, trial ends and cancel-by deadlines in {month}',
+    'calendar.charges' => 'Charges',
+    'calendar.charges_count' => '{count, plural, one {# charge} other {# charges}}',
+    'calendar.feed_copy' => 'Copy',
+    'calendar.feed_create' => 'Create a link',
+    'calendar.feed_created' => 'Your link was created on {date}.',
+    'calendar.feed_hidden' =>
+        'The link itself is shown only when it is created. To add it to another calendar, create a new one.',
+    'calendar.feed_intro' =>
+        'Subscribe in Google Calendar, Apple Calendar or Outlook to see renewals, trial conversions '
+        . 'and cancel-by deadlines.',
+    'calendar.feed_last_used' => 'A calendar last fetched it on {date}.',
+    'calendar.feed_never_used' => 'No calendar has fetched it yet.',
+    'calendar.feed_new_link' => 'Create a new link',
+    'calendar.feed_none' => 'You have no feed link yet.',
+    'calendar.feed_replace_confirm' => 'Stop the old link and create a new one',
+    'calendar.feed_replace_warning' =>
+        'The current link stops working at once, and every calendar subscribed to it stops updating '
+        . 'until it is given the new one.',
+    'calendar.feed_shown_once' => 'Copy it now: for your security the link is shown only this once.',
+    'calendar.feed_title' => 'Calendar feed',
+    'calendar.feed_url' => 'Calendar feed address',
+    'calendar.heaviest_day' => 'Heaviest day',
+    'calendar.item_cancel_by' => 'Cancel by — notice period {notice}',
+    'calendar.item_trial' => 'Trial ends — converts to paid',
     'calendar.just_mine' => 'Just mine',
+    'calendar.kind_cancel_by' => 'Cancel by',
+    'calendar.kind_charge' => 'Charge',
+    'calendar.kind_trial' => 'Trial ends',
+    'calendar.legend' => 'Key',
     'calendar.month_navigation' => 'Month navigation',
+    'calendar.month_total' => 'Month total',
+    'calendar.more' => '+{count} more',
     'calendar.next_month' => 'Next month',
-    'calendar.next_up' => 'Next up',
-    'calendar.next_up_note' => 'The next charges due, wherever in the year they fall.',
     'calendar.nothing_due' => 'Nothing due this month.',
-    'calendar.nothing_upcoming' => 'Nothing due in the next twelve months.',
+    'calendar.nothing_on_day' => 'Nothing due on this day.',
     'calendar.previous_month' => 'Previous month',
-    'calendar.rail' => 'Calendar summary',
-    'calendar.trials_ending' =>
-        '{count, plural, one {# free trial ends} other {# free trials end}} this month',
-    'calendar.trials_starting_note' => 'in new charges once they convert.',
+    'calendar.selected' => 'selected',
+    'calendar.summary' => 'Month summary',
 
     // cancellations
     'cancellations.days_left' => '{days, plural, one {# day left} other {# days left}}',
@@ -1183,6 +1197,8 @@ return [
     'js.dashboard.spend_committed' => 'Excluding trial conversions',
     'js.dashboard.spend_with_trials' => 'Including trial conversions',
     'js.dashboard.trial_gap' => 'Trials add {amount}',
+    'js.copied' => 'Copied.',
+    'js.copy_failed' => 'That could not be copied. Select the address and copy it yourself.',
     'js.dialog_loading' => 'Loading…',
     'js.percent' => '{percent}%',
     'js.quick_add_failed' => 'That form could not be loaded. Open the full page instead.',

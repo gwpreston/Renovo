@@ -25,6 +25,7 @@
 
 import { onThemeChange, renderChart } from './charts.js';
 import { drawCategoryDonuts } from './category-donut.js';
+import { enhanceCopyFields } from './copy-field.js';
 import { icon } from './icons.js';
 import { enhancePaymentMethodFields } from './payment-method-field.js';
 import { enhanceSubscriptionForms } from './subscription-form.js';
@@ -65,6 +66,7 @@ function hydrate() {
     enhancePaymentMethodFields(document);
     enhanceSubscriptionForms(document);
     enhanceSubscriptionLists(document);
+    enhanceCopyFields(document);
     drawCharts();
 }
 

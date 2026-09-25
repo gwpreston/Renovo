@@ -314,6 +314,17 @@ main.container {
     background: var(--surface-2);
 }
 
+/* Drawn rather than left out where there is nowhere to go — previous month
+ * on the current one — so the controls beside it do not move. */
+.icon-button:disabled {
+    color: var(--faint);
+    cursor: default;
+}
+
+.icon-button:disabled:hover {
+    background: var(--surface);
+}
+
 .icon-button-icon {
     display: block;
     width: 1.0625rem;

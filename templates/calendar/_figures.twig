@@ -1,0 +1,35 @@
+{#
+    A set of charges' figure, by the per-currency rule, in a line of running
+    text: one currency is its amount; several that all convert are the
+    combined figure with the subtotals after it; several where one has no rate
+    are the subtotals alone, because a total that silently left a currency out
+    would be a wrong number rather than an approximate one.
+
+    `figures`  {totals: [{currency, amount_minor}], combined: {currency, amount_minor, unconvertible}}
+#}
+{% macro inline(figures) %}
+    {%- if figures is null or figures.totals is empty -%}
+        {{ t('common.none_symbol') }}
+    {%- elseif figures.totals|length == 1 -%}
+        {{ figures.totals[0].amount_minor|money(figures.totals[0].currency) }}
+    {%- elseif figures.combined.amount_minor is not null -%}
+        {{ figures.combined.amount_minor|money(figures.combined.currency) }}
+        <span class="muted">({% for total in figures.totals %}{{ total.amount_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}{% endfor %})</span>
+    {%- else -%}
+        {% for total in figures.totals %}{{ total.amount_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}{% endfor %}
+    {%- endif -%}
+{% endmacro %}
+
+{#
+    The same rule in a day cell's corner, where there is room for one figure:
+    the amount, the combined figure, or the subtotals stacked.
+#}
+{% macro compact(figures) %}
+    {%- if figures.totals|length == 1 -%}
+        {{ figures.totals[0].amount_minor|money(figures.totals[0].currency) }}
+    {%- elseif figures.combined.amount_minor is not null -%}
+        {{ t('dashboard.approx', {'amount': figures.combined.amount_minor|money(figures.combined.currency)}) }}
+    {%- else -%}
+        {% for total in figures.totals %}{{ total.amount_minor|money(total.currency) }}{{ not loop.last ? ' ' : '' }}{% endfor %}
+    {%- endif -%}
+{% endmacro %}
