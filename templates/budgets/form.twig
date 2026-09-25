@@ -1,113 +1,141 @@
-{% extends 'layout.twig' %}
+{#
+    The budget form, whole. It is also what the Budgets screen's dialog loads,
+    which is why it renders without the surrounding page when htmx asks for
+    it: one definition of what a budget needs, New and Edit alike.
 
-{% block heading %}{{ budget_id ? t('budgets_form.edit_title') : t('budgets.new_budget') }}{% endblock %}
+    The limit is in the base currency for a new budget; an existing one set in
+    another currency keeps it, and the label says which. Whose spending lists
+    only what this viewer may choose (BudgetService::subjectOptions()) — the
+    server refuses anything else, so a forged value gets an error, not a budget.
+#}
+{% extends is_htmx ? 'partials/bare.twig' : 'layout.twig' %}
+
+{% set is_edit = budget_id is not null %}
+
+{% block heading %}{{ is_edit ? t('budgets_form.edit_title') : t('budgets.new_budget') }}{% endblock %}
 {% block page_subtitle %}{{ t('subtitle.budget_form') }}{% endblock %}
 
 {% block content %}
-
     {% include 'partials/errors.twig' %}
 
-    <section class="card narrow">
-        <form method="post" action="{{ budget_id ? '/budgets/' ~ budget_id : '/budgets' }}" class="stack">
+    <section class="card narrow budget-form">
+        <form method="post" action="{{ is_edit ? '/budgets/' ~ budget_id : '/budgets' }}" class="stack"
+              id="budget-form">
             {{ csrf_field() }}
 
-            <label for="name">{{ t('field.name') }}</label>
-            <input type="text" id="name" name="name" value="{{ values.name|default('') }}" required autofocus>
-            {% if errors.name is defined %}<p class="field-error">{{ error_message(errors.name) }}</p>{% endif %}
-
-            <label for="amount">{{ t('budgets_form.limit') }}</label>
-            <div class="field-row">
-                <input type="text" id="amount" name="amount" inputmode="decimal"
-                       value="{{ values.amount|default('') }}" placeholder="{{ 150|decimal(2) }}" required>
-                <select name="currency" aria-label="{{ t('field.currency') }}">
-                    {% for code in currencies %}
-                        <option value="{{ code }}"
-                                {{ values.currency|default('GBP') == code ? 'selected' : '' }}>{{ code }}</option>
-                    {% endfor %}
-                </select>
+            <div class="field">
+                <label for="budget-name">{{ t('field.name') }}</label>
+                <input type="text" id="budget-name" name="name" value="{{ values.name|default('') }}" required
+                       maxlength="100" placeholder="{{ t('budgets_form.name_placeholder') }}"
+                       {% if errors.name is defined %}aria-invalid="true" aria-describedby="budget-name-error"{% endif %}>
+                {% if errors.name is defined %}<p class="field-error" id="budget-name-error">{{ error_message(errors.name) }}</p>{% endif %}
             </div>
-            {% if errors.amount is defined %}<p class="field-error">{{ error_message(errors.amount) }}</p>{% endif %}
-            {% if errors.currency is defined %}<p class="field-error">{{ error_message(errors.currency) }}</p>{% endif %}
 
-            <label for="period">{{ t('field.period') }}</label>
-            <select id="period" name="period">
-                {% for period in periods %}
-                    <option value="{{ period.value }}"
-                            {{ values.period|default('monthly') == period.value ? 'selected' : '' }}>
-                        {{ budget_period_label(period.value) }}
-                    </option>
-                {% endfor %}
-            </select>
-            <p class="hint">{{ t('budgets_form.period_hint') }}</p>
-            {% if errors.period is defined %}<p class="field-error">{{ error_message(errors.period) }}</p>{% endif %}
+            <div class="field">
+                <label for="budget-amount">{{ t('budgets_form.limit_in', {'currency': currency}) }}</label>
+                <input type="text" id="budget-amount" name="amount" inputmode="decimal" class="num"
+                       value="{{ values.amount|default('') }}" placeholder="{{ 150|decimal(2) }}" required
+                       {% if errors.amount is defined or errors.currency is defined %}aria-invalid="true" aria-describedby="budget-amount-error"{% endif %}>
+                {% if errors.amount is defined %}<p class="field-error" id="budget-amount-error">{{ error_message(errors.amount) }}</p>{% endif %}
+                {% if errors.currency is defined %}<p class="field-error" id="budget-amount-error">{{ error_message(errors.currency) }}</p>{% endif %}
+            </div>
 
-            <label for="category_id">{{ t('field.category') }}</label>
-            <select id="category_id" name="category_id">
-                <option value="">{{ t('budgets_form.everything') }}</option>
-                {% for category in categories %}
-                    <option value="{{ category.id }}"
-                            {{ values.category_id|default('') == category.id ? 'selected' : '' }}>
-                        {{ category.name }}
-                    </option>
-                {% endfor %}
-            </select>
-            {% if errors.category_id is defined %}<p class="field-error">{{ error_message(errors.category_id) }}</p>{% endif %}
+            {% set period = values.period|default('monthly') %}
+            <div class="field" role="radiogroup" aria-labelledby="budget-period-label"
+                 {% if errors.period is defined %}aria-describedby="budget-period-error"{% endif %}>
+                <span class="group-label" id="budget-period-label">{{ t('field.period') }}</span>
+                <div class="segmented">
+                    {% for option in periods %}
+                        <label class="segmented-option">
+                            <input type="radio" name="period" value="{{ option.value }}"
+                                   {% if loop.first %}id="budget-period"{% endif %}
+                                   {{ period == option.value ? 'checked' : '' }}>
+                            <span>{{ budget_period_label(option.value) }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+                {% if errors.period is defined %}<p class="field-error" id="budget-period-error">{{ error_message(errors.period) }}</p>{% endif %}
+            </div>
 
-            {#
-                Whose spending: a member, or the whole household. Offered only
-                to somebody who may measure more than themselves — an Owner/Admin
-                or Editor in SHARED mode. Everybody else's budget measures them,
-                and the field is left out so an edit keeps what is there.
-            #}
-            {% if not scope.restrictsWritesToOwner %}
-                {% set subject = values.subject_user_id|default(values.owner_user_id|default(current_user.id)) %}
-                <label for="subject_user_id">{{ t('budgets_form.whose_spending') }}</label>
-                <select id="subject_user_id" name="subject_user_id">
-                    <option value="household" {{ subject == 'household' ? 'selected' : '' }}>
-                        {{ t('budgets.household') }}
-                    </option>
-                    {% for member in members %}
-                        <option value="{{ member.id }}" {{ subject == member.id ? 'selected' : '' }}>
-                            {{ member.display_name }}
+            <div class="field">
+                <label for="budget-category">{{ t('field.category') }}</label>
+                <select id="budget-category" name="category_id"
+                        {% if errors.category_id is defined %}aria-invalid="true" aria-describedby="budget-category-error"{% endif %}>
+                    <option value="">{{ t('budgets.all_categories') }}</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}"
+                                {{ values.category_id|default('') == category.id ? 'selected' : '' }}>
+                            {{ category.name }}
                         </option>
                     {% endfor %}
                 </select>
-                <p class="hint">{{ t('budgets_form.subject_hint') }}</p>
-                {% if errors.subject_user_id is defined %}
-                    <p class="field-error">{{ error_message(errors.subject_user_id) }}</p>
-                {% endif %}
-            {% endif %}
-
-            <label for="warn_threshold_percent">{{ t('budgets_form.warn_at_optional') }}</label>
-            <div class="field-row">
-                <input type="number" id="warn_threshold_percent" name="warn_threshold_percent" min="1" max="100"
-                       value="{{ values.warn_threshold_percent|default('') }}" placeholder="{{ 90|decimal }}">
-                <span class="field-suffix">{{ percent_symbol() }}</span>
+                {% if errors.category_id is defined %}<p class="field-error" id="budget-category-error">{{ error_message(errors.category_id) }}</p>{% endif %}
             </div>
-            <p class="hint">{{ t('budgets_form.threshold_hint') }}</p>
-            {% if errors.warn_threshold_percent is defined %}
-                <p class="field-error">{{ error_message(errors.warn_threshold_percent) }}</p>
+
+            {% set subject = values.subject_user_id|default(current_user.id) %}
+            {% if locked_subject %}
+                {# Not a choice this viewer has: shown, and not sent, so an edit keeps it. #}
+                <div class="field">
+                    <span class="group-label">{{ t('budgets_form.whose_spending') }}</span>
+                    <p class="budget-locked-subject" data-locked-subject>
+                        {{ locked_subject.household ? t('budgets.household') : locked_subject.name }}
+                    </p>
+                    <p class="hint">{{ t('budgets_form.subject_locked_hint') }}</p>
+                </div>
+            {% else %}
+                <div class="field">
+                    <label for="budget-subject">{{ t('budgets_form.whose_spending') }}</label>
+                    <select id="budget-subject" name="subject_user_id" aria-describedby="budget-subject-hint"
+                            {% if errors.subject_user_id is defined %}aria-invalid="true"{% endif %}>
+                        {% if subjects.household %}
+                            <option value="household" {{ subject == 'household' ? 'selected' : '' }}>
+                                {{ t('budgets.household') }}
+                            </option>
+                        {% endif %}
+                        {% for member in subjects.members %}
+                            <option value="{{ member.id }}" {{ subject == member.id ? 'selected' : '' }}>
+                                {{ member.display_name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <p class="hint" id="budget-subject-hint">{{ t('budgets_form.subject_hint') }}</p>
+                    {% if errors.subject_user_id is defined %}
+                        <p class="field-error">{{ error_message(errors.subject_user_id) }}</p>
+                    {% endif %}
+                </div>
             {% endif %}
 
-            <input type="hidden" name="is_active" value="0">
-            <label class="choice">
-                <input type="checkbox" name="is_active" value="1"
-                       {{ values.is_active|default('1') == '1' ? 'checked' : '' }}>
-                <span>{{ t('state.active') }}</span>
-            </label>
-
-            <div class="form-actions">
-                <button type="submit" class="button button-primary">{{ t('budgets_form.save_budget') }}</button>
-                <a class="button button-quiet" href="/budgets">{{ t('action.cancel') }}</a>
+            {% set threshold = values.warn_threshold_percent|default(85) %}
+            <div class="field">
+                <label for="budget-warn">{{ t('budgets_form.warn_at') }}</label>
+                <div class="range-field">
+                    <input type="range" id="budget-warn" name="warn_threshold_percent"
+                           min="1" max="100" step="1" value="{{ threshold }}"
+                           aria-describedby="budget-warn-hint" data-range-output="budget-warn-output">
+                    <output id="budget-warn-output" for="budget-warn" class="num">{{ t('budgets.percent', {'percent': threshold}) }}</output>
+                </div>
+                <p class="hint" id="budget-warn-hint">{{ t('budgets_form.threshold_hint') }}</p>
+                {% if errors.warn_threshold_percent is defined %}
+                    <p class="field-error">{{ error_message(errors.warn_threshold_percent) }}</p>
+                {% endif %}
             </div>
         </form>
 
-        {% if budget_id and can(scope, 'budget.manage') %}
-            <form method="post" action="/budgets/{{ budget_id }}/delete" class="stack"
+        {% if is_edit %}
+            <form method="post" action="/budgets/{{ budget_id }}/delete" id="budget-delete-form"
                   onsubmit="return confirm('{{ t('confirm.delete_budget')|e('js') }}')">
                 {{ csrf_field() }}
-                <button type="submit" class="button button-danger">{{ t('budgets_form.delete_budget') }}</button>
             </form>
         {% endif %}
+
+        <div class="form-actions budget-form-actions">
+            {% if is_edit %}
+                <button type="submit" form="budget-delete-form" class="button button-danger">
+                    {{ icon('delete') }}<span>{{ t('action.delete') }}</span>
+                </button>
+            {% endif %}
+            <a class="button button-quiet" href="/budgets" data-closes-dialog="budget-dialog">{{ t('action.cancel') }}</a>
+            <button type="submit" form="budget-form" class="button button-primary">{{ t('budgets_form.save_budget') }}</button>
+        </div>
     </section>
 {% endblock %}

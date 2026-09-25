@@ -1,5 +1,5 @@
 /**
- * Keyboard shortcuts, the quick-add dialog and the top bar's theme toggle.
+ * Keyboard shortcuts, the dialogs that load a form, and the top bar's theme toggle.
  *
  * Framework-free, and nothing here is load-bearing: every shortcut is a link
  * or a form that also works by clicking it, so a browser with this file blocked
@@ -61,23 +61,45 @@
     }
 
     /**
-     * The quick-add dialog loads the real subscription form rather than
-     * carrying a copy of it: one definition of what a subscription needs, and
-     * no chance of the short version drifting from the long one.
+     * A dialog that loads the real form rather than carrying a copy of it: one
+     * definition of what a subscription or a budget needs, and no chance of
+     * the short version drifting from the long one.
+     *
+     * The body names the page to load in `data-url`; an opener may name
+     * another in `data-dialog-url` — one dialog serves New and every Edit —
+     * and the body is reloaded whenever the page asked for changes. Its
+     * `data-dialog-title`, if any, becomes the dialog's heading.
      */
-    function openQuickAdd() {
-        var element = dialog('quick-add');
+    function openRemote(id, url, title) {
+        var element = dialog(id);
         if (!element) {
             return false;
         }
 
-        var body = element.querySelector('[data-quick-add-body]');
+        var heading = element.querySelector('[data-dialog-title]');
+        if (heading && title) {
+            heading.textContent = title;
+        }
 
-        if (body && !body.dataset.loaded) {
-            body.dataset.loaded = 'true';
+        var body = element.querySelector('[data-dialog-body]');
+        var target = url || (body && body.dataset.url);
 
-            fetch(body.dataset.url, {headers: {'HX-Request': 'true'}})
-                .then(function (response) { return response.text(); })
+        if (body && target && body.dataset.loaded !== target) {
+            body.dataset.loaded = target;
+            body.innerHTML = '';
+            var loading = document.createElement('p');
+            loading.className = 'muted';
+            loading.textContent = window.renovoI18n.t('dialog_loading');
+            body.appendChild(loading);
+
+            fetch(target, {headers: {'HX-Request': 'true'}})
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error(String(response.status));
+                    }
+
+                    return response.text();
+                })
                 .then(function (html) {
                     body.innerHTML = html;
 
@@ -91,7 +113,7 @@
                     }
                     body.dispatchEvent(new CustomEvent('renovo:content-loaded', {bubbles: true}));
 
-                    var first = body.querySelector('input, select, textarea');
+                    var first = body.querySelector('input:not([type="hidden"]), select, textarea');
                     if (first) {
                         first.focus();
                     }
@@ -102,9 +124,15 @@
                 });
         }
 
-        element.showModal();
+        if (!element.open) {
+            element.showModal();
+        }
 
         return true;
+    }
+
+    function openQuickAdd() {
+        return openRemote('quick-add');
     }
 
     /**
@@ -191,8 +219,8 @@
              * no <dialog> support follows it to the real form rather than
              * having its navigation cancelled by a handler that did nothing.
              */
-            var opened = opener.dataset.opensDialog === 'quick-add'
-                ? openQuickAdd()
+            var opened = opener.dataset.opensDialog === 'quick-add' || opener.dataset.dialogUrl
+                ? openRemote(opener.dataset.opensDialog, opener.dataset.dialogUrl, opener.dataset.dialogTitle)
                 : openDialog(opener.dataset.opensDialog);
 
             if (opened) {
@@ -202,15 +230,39 @@
             return;
         }
 
+        /*
+         * A closer that is a link — the budget form's Cancel — is also how the
+         * full page leaves, so it is only swallowed when there is a dialog
+         * open for it to close.
+         */
         var closer = event.target.closest ? event.target.closest('[data-closes-dialog]') : null;
         if (closer) {
-            event.preventDefault();
             var element = dialog(closer.dataset.closesDialog);
             if (element && element.open) {
+                event.preventDefault();
                 element.close();
+            } else if (closer.tagName !== 'A') {
+                event.preventDefault();
             }
         }
     });
+    /*
+     * A range input that names an <output> shows its value there as it moves:
+     * the budget form's "Warn me at". The output is rendered with the initial
+     * value, so without this file it is only stale while dragging.
+     */
+    document.addEventListener('input', function (event) {
+        var input = event.target;
+        if (!input || !input.dataset || !input.dataset.rangeOutput) {
+            return;
+        }
+
+        var output = document.getElementById(input.dataset.rangeOutput);
+        if (output) {
+            output.textContent = window.renovoI18n.t('percent', {percent: input.value});
+        }
+    });
+
     /*
      * The theme toggle. Without this file it is a plain form posting the
      * opposite of the account's setting, and the server sends the reader back.

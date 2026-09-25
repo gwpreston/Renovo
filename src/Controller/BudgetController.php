@@ -6,9 +6,8 @@ namespace App\Controller;
 
 use App\I18n\Translator;
 use App\Domain\BudgetPeriod;
-use App\Domain\Currency;
-use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
+use App\Service\BudgetScreenService;
 use App\Service\BudgetService;
 use App\Service\CategoryService;
 use App\Service\InstanceSettingsService;
@@ -29,8 +28,8 @@ final class BudgetController extends Controller
         SessionInterface $session,
         Translator $translator,
         private readonly BudgetService $budgets,
+        private readonly BudgetScreenService $screen,
         private readonly CategoryService $categories,
-        private readonly MembershipRepository $memberships,
         private readonly InstanceSettingsService $settings,
     ) {
         parent::__construct($view, $session, $translator);
@@ -38,19 +37,19 @@ final class BudgetController extends Controller
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $scope = $this->scope($request);
-
-        return $this->render($request, $response, 'budgets/index.twig', [
-            'progress' => $this->budgets->progress($scope),
-        ]);
+        return $this->render(
+            $request,
+            $response,
+            'budgets/index.twig',
+            $this->screen->screen($this->scope($request)),
+        );
     }
 
     public function createForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         return $this->render($request, $response, 'budgets/form.twig', $this->formData($request, [
             'period' => BudgetPeriod::Monthly->value,
-            'currency' => $this->settings->baseCurrency(),
-            'is_active' => '1',
+            'warn_threshold_percent' => BudgetService::DEFAULT_WARN_THRESHOLD,
         ]));
     }
 
@@ -79,8 +78,12 @@ final class BudgetController extends Controller
         ResponseInterface $response,
         string $id,
     ): ResponseInterface {
-        $budget = $this->budgets->find($this->scope($request), (int) $id);
-        if ($budget === null) {
+        $scope = $this->scope($request);
+        $budget = $this->budgets->find($scope, (int) $id);
+        // A budget the viewer may read but not write — a Contributor looking
+        // at the household's — has no form to offer: the save would be
+        // refused by the repository, so the form is not pretended either.
+        if ($budget === null || !$scope->mayWriteRow($budget->householdId, $budget->ownerUserId)) {
             throw $this->notFound($request);
         }
 
@@ -91,9 +94,8 @@ final class BudgetController extends Controller
             'period' => $budget->period->value,
             'amount' => $budget->amount->toDecimalString(),
             'currency' => $budget->amount->currency,
-            'warn_threshold_percent' => $budget->warnThresholdPercent,
+            'warn_threshold_percent' => $budget->warnThresholdPercent ?? BudgetService::DEFAULT_WARN_THRESHOLD,
             'subject_user_id' => $budget->subjectUserId ?? BudgetService::SUBJECT_HOUSEHOLD,
-            'is_active' => $budget->isActive ? '1' : '0',
         ], [], $budget->id));
     }
 
@@ -104,6 +106,8 @@ final class BudgetController extends Controller
         try {
             $this->budgets->update($this->scope($request), (int) $id, $body);
         } catch (ValidationException $exception) {
+            $body['currency'] ??= $this->budgets->find($this->scope($request), (int) $id)?->amount->currency;
+
             return $this->render(
                 $request,
                 $response->withStatus(422),
@@ -138,16 +142,26 @@ final class BudgetController extends Controller
     ): array {
         $scope = $this->scope($request);
 
+        // Whose spending an existing budget measures, when that is not a
+        // choice this viewer is offered: shown, and not sent, so the save
+        // leaves it as it is.
+        $budget = $id === null ? null : $this->budgets->find($scope, $id);
+        $lockedSubject = $budget !== null && !$this->budgets->offersSubject($scope, $budget->subjectUserId)
+            ? ['household' => $budget->isHousehold(), 'name' => $budget->subjectName]
+            : null;
+
         return [
             'values' => $values,
             'errors' => $errors,
             'budget_id' => $id,
             'categories' => $this->categories->all($scope),
             'periods' => BudgetPeriod::cases(),
-            'currencies' => Currency::common(),
-            'members' => $scope->hasHousehold()
-                ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
-                : [],
+            // The limit's currency: the budget's own on an edit, else the base.
+            'currency' => is_string($values['currency'] ?? null) && $values['currency'] !== ''
+                ? $values['currency']
+                : $this->settings->baseCurrency(),
+            'subjects' => $this->budgets->subjectOptions($scope),
+            'locked_subject' => $lockedSubject,
         ];
     }
 }

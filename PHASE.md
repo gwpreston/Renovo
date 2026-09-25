@@ -108,14 +108,40 @@ exists, in SHARED mode. Captioned as reconstructed, with the excluded count.
 
 ## Status
 
-- [ ] Page + intro + New budget (permission-gated)
-- [ ] Status tiles (scoped counts)
-- [ ] Budget cards: projected bar, warn tick, notes, real alerts line,
+- [x] Page + intro + New budget (permission-gated)
+- [x] Status tiles (scoped counts)
+- [x] Budget cards: projected bar, warn tick, notes, real alerts line,
       unavailable projection
-- [ ] Six-month reconstructed history (SHARED, household budget)
-- [ ] Form with subject rules
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check` green on both engines
+- [x] Six-month reconstructed history (SHARED, household budget)
+- [x] Form with subject rules
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check` green on both engines
+
+Notes from the build:
+
+- `BudgetMonthService::all()` reads every visible budget over its calendar
+  period; the dashboard's `thisMonth()` shares the same read, so a monthly
+  budget has one set of figures on both screens. `BudgetScreenService` turns
+  those reads into states, notes, bar widths, the alerts line and the tiles.
+- **The warning compares minor units**, not the rounded percentage, so 84.5%
+  is not past an 85% threshold. This changes the dashboard's budget card the
+  same way. The percentage on a card rounds down while under the limit and up
+  once over, so it never shows a line the state has not crossed.
+- The history is `SpendChartService::window(5, 0)`: five reconstructed months
+  plus this month (charged plus still due), as on the dashboard. "Over in N"
+  counts this month's total.
+- Edit is drawn only where `Scope::mayWriteRow()` allows, and the edit form
+  answers 404 for a budget the viewer may read but not write (a Contributor
+  and the household's budget).
+- The form is one dialog for New and Edit, loaded from the form's own page
+  (`openRemote()` in `public/assets/app.js`, generalised from quick-add);
+  without script the links go to the full page. The Active toggle and the
+  currency select are gone (see Decisions).
+- New budget is `button-quiet`: in this app `button-secondary` is the ink
+  fill the top bar's Add new wears. On a phone, a header action with an icon
+  shows only the icon (`.button-label`).
+- `budget_period.*` now reads Monthly / Yearly; the old strings (rolling
+  windows, "alerts arrive in a later version") are removed.
 
 ## Definition of done
 

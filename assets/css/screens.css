@@ -327,7 +327,7 @@
 
 .budget-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
     gap: 1rem;
 }
 
@@ -342,18 +342,194 @@
     margin: 0;
 }
 
-/*
- * Approaching and over, in the two hues PHASE.md separates. Amber is the
- * heads-up — money is about to move, nothing is wrong yet — and red is the
- * problem. Keeping them different hues is what lets a screen say "this is the
- * action" and "this needs attention" without the two competing.
- */
-.budget.is-warning {
-    border-left: 4px solid var(--warn);
+.budget-tiles {
+    margin-bottom: 1rem;
 }
 
-.budget.is-over {
-    border-left: 4px solid var(--bad);
+.kpi-icon-bad {
+    background: var(--bad-bg);
+    color: var(--bad);
+}
+
+.budget-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.budget-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.625rem;
+}
+
+.budget-card-title {
+    min-width: 0;
+}
+
+.budget-card-title h2 {
+    margin: 0;
+    font-size: var(--size-body);
+    font-weight: var(--weight-bold);
+}
+
+.budget-meta {
+    margin: 0.125rem 0 0;
+    font-size: var(--size-caption);
+    color: var(--muted);
+}
+
+.budget-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+
+.budget-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--size-caption);
+}
+
+.budget-projected {
+    font-size: var(--size-kpi);
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.02em;
+}
+
+/*
+ * The dashboard's budget track, taller, with the warning threshold as a tick
+ * across it: the projection as a wash, charged so far solid over it, on the
+ * limit's scale — so the gap between the two is what is still to come.
+ */
+.budget-bar {
+    position: relative;
+    height: 0.625rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+}
+
+.budget-bar > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-pill);
+}
+
+.budget-bar-projected {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.budget-bar-charged {
+    background: var(--accent);
+}
+
+.budget-bar > .budget-bar-warn {
+    top: -0.25rem;
+    bottom: -0.25rem;
+    width: 0;
+    border-left: 2px solid var(--text);
+    border-radius: 0;
+    opacity: 0.5;
+}
+
+.budget-card.is-warn .budget-bar-charged {
+    background: var(--warn);
+}
+
+.budget-card.is-warn .budget-bar-projected {
+    background: var(--warn-bg);
+    box-shadow: inset 0 0 0 1px var(--warn);
+}
+
+.budget-card.is-bad .budget-bar-charged {
+    background: var(--bad);
+}
+
+.budget-card.is-bad .budget-bar-projected {
+    background: var(--bad-bg);
+    box-shadow: inset 0 0 0 1px var(--bad);
+}
+
+.budget-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.625rem;
+    margin: 0;
+    font-size: var(--size-caption);
+}
+
+.budget-note {
+    margin: 0;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+}
+
+.budget-card.is-warn .budget-note {
+    color: var(--warn);
+}
+
+.budget-card.is-bad .budget-note {
+    color: var(--bad);
+}
+
+.budget-alerts {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: auto 0 0;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--border);
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.budget-alerts svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex-shrink: 0;
+}
+
+.budget-history {
+    margin-top: 1rem;
+}
+
+/* The budget form: the slider with its percentage beside it. */
+.range-field {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.range-field input[type='range'] {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--accent);
+}
+
+.range-field output {
+    min-width: 3rem;
+    text-align: right;
+    font-weight: var(--weight-semibold);
+}
+
+/* In the dialog the form takes the dialog's width, under its title. */
+.dialog .budget-form {
+    max-width: none;
+    margin: 0;
+}
+
+/* Delete to the left, away from Save. */
+.budget-form-actions .button-danger {
+    margin-right: auto;
 }
 
 /*
@@ -381,12 +557,10 @@
     background: var(--accent);
 }
 
-.budget.is-warning .meter-fill,
 .meter.is-warning .meter-fill {
     background: var(--warn);
 }
 
-.budget.is-over .meter-fill,
 .meter.is-over .meter-fill {
     background: var(--bad);
 }

@@ -25,6 +25,10 @@ use DateTimeImmutable;
  * a budget — charged and projected — are on one scale, and the projected one
  * is the charged one plus what is still to come.
  *
+ * The budget screen reads every budget the same way over its own calendar
+ * period — the month for a monthly budget, the calendar year for a yearly one
+ * — so a monthly budget shows the same figures there as on the dashboard.
+ *
  * Every figure goes through `BudgetService::progressFor()`, so the currency
  * rules, the warning threshold and the refusal to total an unconvertible
  * currency are the budget screen's own. A member budget counts that member's
@@ -46,6 +50,7 @@ use DateTimeImmutable;
  *     remaining: Money|null,
  *     unconvertible: list<string>
  * }
+ * @phpstan-type PeriodBudget array{budget: Budget, read: MonthBudget|null}
  */
 final class BudgetMonthService
 {
@@ -88,13 +93,62 @@ final class BudgetMonthService
         $rows = [];
         $cache = [];
         foreach (array_slice($monthly, 0, $limit) as $budget) {
-            $key = (string) ($budget->subjectUserId ?? 'household');
-            $cache[$key] ??= $this->monthCharges($scope, $budget->subjectUserId);
-
-            $rows[] = $this->read($budget, $cache[$key]['past'], $cache[$key]['ahead']);
+            $rows[] = $this->readCached($scope, $budget, $cache);
         }
 
         return $rows;
+    }
+
+    /**
+     * Every active budget in scope, each read over its own calendar period.
+     *
+     * Unlike `thisMonth()` this includes budgets another member set for
+     * themselves — the budget screen lists every budget the viewer can see.
+     * One this scope cannot measure whole (see
+     * `BudgetService::isMeasurableBy()`) comes back with a null `read`, never
+     * with a partial figure. Monthly before yearly, the overall ones first,
+     * the household's before a member's, then oldest first.
+     *
+     * @return list<PeriodBudget>
+     */
+    public function all(Scope $scope): array
+    {
+        $budgets = $this->budgets->all($scope);
+
+        usort($budgets, static function (Budget $a, Budget $b): int {
+            return ($a->period === BudgetPeriod::Monthly ? 0 : 1) <=> ($b->period === BudgetPeriod::Monthly ? 0 : 1)
+                ?: ($a->isOverall() ? 0 : 1) <=> ($b->isOverall() ? 0 : 1)
+                ?: ($a->isHousehold() ? 0 : 1) <=> ($b->isHousehold() ? 0 : 1)
+                ?: $a->id <=> $b->id;
+        });
+
+        $rows = [];
+        $cache = [];
+        foreach ($budgets as $budget) {
+            $rows[] = [
+                'budget' => $budget,
+                'read' => $this->budgets->isMeasurableBy($scope, $budget)
+                    ? $this->readCached($scope, $budget, $cache)
+                    : null,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * One budget over its period, walking the reconstruction and the forecast
+     * once per subject and period however many budgets share them.
+     *
+     * @param array<string, array{past: list<Charge>, ahead: list<Charge>}> $cache
+     * @return MonthBudget
+     */
+    private function readCached(Scope $scope, Budget $budget, array &$cache): array
+    {
+        $key = ($budget->subjectUserId ?? 'household') . ':' . $budget->period->value;
+        $cache[$key] ??= $this->periodCharges($scope, $budget->subjectUserId, $budget->period);
+
+        return $this->read($budget, $cache[$key]['past'], $cache[$key]['ahead']);
     }
 
     /**
@@ -123,26 +177,30 @@ final class BudgetMonthService
     }
 
     /**
-     * This month's charges for one subject: before today, and today to the end.
+     * One subject's charges in the calendar period that contains today —
+     * this month, or this year — split into before today (reconstructed) and
+     * today to the period's end (forecast). The forecast's horizon of the
+     * period's length in months always reaches the period's last day.
      *
      * @return array{past: list<Charge>, ahead: list<Charge>}
      */
-    private function monthCharges(Scope $scope, ?int $subjectUserId): array
+    private function periodCharges(Scope $scope, ?int $subjectUserId, BudgetPeriod $period): array
     {
         $today = $this->clock->today();
-        $firstOfMonth = $today->modify('first day of this month');
-        $endOfMonth = $today->modify('last day of this month');
+        [$first, $last] = $period === BudgetPeriod::Monthly
+            ? [$today->modify('first day of this month'), $today->modify('last day of this month')]
+            : [$today->setDate((int) $today->format('Y'), 1, 1), $today->setDate((int) $today->format('Y'), 12, 31)];
 
         $past = $this->history->charges(
             $scope,
-            $firstOfMonth->modify('-1 day'),
+            $first->modify('-1 day'),
             $today->modify('-1 day'),
             $subjectUserId,
         )['charges'];
 
         $ahead = array_values(array_filter(
-            $this->forecast->charges($scope, 1, $subjectUserId),
-            static fn (array $charge): bool => $charge['date'] <= $endOfMonth,
+            $this->forecast->charges($scope, $period->months(), $subjectUserId),
+            static fn (array $charge): bool => $charge['date'] <= $last,
         ));
 
         return ['past' => $past, 'ahead' => $ahead];

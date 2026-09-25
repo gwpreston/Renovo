@@ -142,6 +142,7 @@ final class BudgetProjectionTest extends DatabaseTestCase
             $memberships,
             $forecast,
             $rates,
+            $this->settings,
         );
 
         $this->streamingCategory = $this->categories->create($this->scope($this->alice), 'Streaming', null);

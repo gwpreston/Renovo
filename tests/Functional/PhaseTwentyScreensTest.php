@@ -180,14 +180,15 @@ final class PhaseTwentyScreensTest extends DatabaseTestCase
         self::assertStringContainsString('Editor', $index);
     }
 
-    public function testTheBudgetFormHasNoPickerInIsolatedMode(): void
+    public function testTheBudgetFormOffersOnlyYourselfInIsolatedMode(): void
     {
         $this->container()->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
 
-        self::assertStringNotContainsString(
-            'name="subject_user_id"',
-            (string) $this->request('GET', '/budgets/new')->getBody(),
-        );
+        $form = (string) $this->request('GET', '/budgets/new')->getBody();
+
+        self::assertStringContainsString('name="subject_user_id"', $form);
+        self::assertStringNotContainsString('value="household"', $form);
+        self::assertStringNotContainsString('value="' . $this->editorId . '"', $form);
     }
 
     public function testThePriceChangeToggleSavesFromTheNotificationsPage(): void

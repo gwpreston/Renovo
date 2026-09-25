@@ -255,6 +255,21 @@ main.container {
     white-space: nowrap;
 }
 
+/*
+ * On a phone an action that carries an icon keeps only the icon, so it does
+ * not run under the bar's own controls; its label stays for screen readers.
+ */
+@media (max-width: 599px) {
+    .topbar-page-actions .button-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+}
+
 .topbar-title {
     flex: 0 1 auto;
 }

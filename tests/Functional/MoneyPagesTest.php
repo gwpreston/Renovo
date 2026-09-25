@@ -179,7 +179,7 @@ final class MoneyPagesTest extends DatabaseTestCase
         // The period labels come from a Twig helper rather than a ternary in
         // the template, so this also catches the helper going missing. Not the
         // budget's name, which happens to be "Monthly" as well.
-        self::assertStringContainsString('Next 12 months', (string) $response->getBody());
+        self::assertStringContainsString('Yearly', (string) $response->getBody());
     }
 
     public function testASplitParticipantSeesTheWholeRowAndNotAHalfOfIt(): void
@@ -257,7 +257,7 @@ final class MoneyPagesTest extends DatabaseTestCase
         self::assertStringNotContainsString('Combined', $dashboard);
 
         $budgets = (string) $this->get('/budgets', $this->ownerId)->getBody();
-        self::assertStringContainsString('Cannot be calculated', $budgets);
+        self::assertStringContainsString('Projection unavailable — no rate for', $budgets);
     }
 
     public function testTheForecastShowsTheTrialConversion(): void

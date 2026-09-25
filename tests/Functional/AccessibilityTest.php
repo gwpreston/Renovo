@@ -14,6 +14,7 @@ use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
 use App\Security\Scope;
 use App\Security\SessionInterface;
+use App\Service\BudgetService;
 use App\Service\InstanceSettingsService;
 use App\Tests\Integration\DatabaseTestCase;
 use App\Tests\Support\ArraySession;
@@ -44,6 +45,7 @@ final class AccessibilityTest extends DatabaseTestCase
     private int $userId;
     private int $householdId;
     private int $subscriptionId;
+    private int $budgetId;
 
     protected function setUp(): void
     {
@@ -98,6 +100,19 @@ final class AccessibilityTest extends DatabaseTestCase
             ],
             [],
         );
+
+        // A household budget, so the budget screen is checked with its tiles,
+        // a card and the six-month history rather than its empty state, and
+        // its edit form is one of the pages below.
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $this->budgetId = $container->get(BudgetService::class)->create($scope, [
+            'name' => 'Household',
+            'period' => 'monthly',
+            'amount' => '50.00',
+            'warn_threshold_percent' => '85',
+            'subject_user_id' => BudgetService::SUBJECT_HOUSEHOLD,
+        ]);
 
         $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $this->userId);
         $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $this->householdId);
@@ -229,6 +244,30 @@ final class AccessibilityTest extends DatabaseTestCase
         foreach ($images[1] as $attributes) {
             self::assertStringContainsString('alt=', $attributes);
         }
+    }
+
+    /**
+     * The budget dialog's two forms, New and Edit, as the dialog loads them,
+     * and the edit form's full page — a URL the static list cannot name.
+     */
+    public function testTheBudgetFormsAreNamedAndDescribed(): void
+    {
+        foreach (['/budgets/new', '/budgets/' . $this->budgetId . '/edit'] as $path) {
+            $response = $this->app->handle(
+                (new ServerRequestFactory())
+                    ->createServerRequest('GET', 'http://localhost' . $path, ['REMOTE_ADDR' => '127.0.0.1'])
+                    ->withHeader('HX-Request', 'true'),
+            );
+            self::assertSame(200, $response->getStatusCode(), $path);
+            $html = (string) $response->getBody();
+
+            self::assertStringNotContainsString('<html', $html, $path);
+            self::assertSame([], $this->unnamedControls($html), $path . ' has controls a screen reader cannot name.');
+        }
+
+        $page = $this->get('/budgets/' . $this->budgetId . '/edit');
+        self::assertSame(1, preg_match_all('/<h1\b/', $page));
+        self::assertSame([], $this->unnamedControls($page));
     }
 
     /**

@@ -59,6 +59,9 @@ final class BudgetService
     /** The subject value that means "the whole household". */
     public const SUBJECT_HOUSEHOLD = 'household';
 
+    /** Where the form's warning slider starts. */
+    public const DEFAULT_WARN_THRESHOLD = 85;
+
     private const MAX_WARN_THRESHOLD = 100;
 
     public function __construct(
@@ -67,6 +70,7 @@ final class BudgetService
         private readonly MembershipRepository $memberships,
         private readonly ForecastService $forecast,
         private readonly ExchangeRateService $rates,
+        private readonly InstanceSettingsService $settings,
     ) {
     }
 
@@ -221,10 +225,12 @@ final class BudgetService
             'percent' => $percent,
             'is_over' => $projectedMinor > $limitMinor,
             // A warning is only a warning while it is not yet a breach —
-            // showing both at once would be noise.
+            // showing both at once would be noise. Compared in minor units,
+            // not on the rounded percentage, so 84.5% of the limit is not yet
+            // past an 85% threshold.
             'is_warning' => $threshold !== null
-                && $percent !== null
-                && $percent >= $threshold
+                && $limitMinor > 0
+                && $projectedMinor * 100 >= $threshold * $limitMinor
                 && $projectedMinor <= $limitMinor,
             'remaining' => Money::of($limitMinor - $projectedMinor, $target),
             'unconvertible' => [],
@@ -247,6 +253,16 @@ final class BudgetService
      */
     public function update(Scope $scope, int $id, array $input): void
     {
+        // The form offers no currency, so an edit keeps the budget's own —
+        // one set in another currency before budgets were base-currency only
+        // is not quietly relabelled.
+        if (!array_key_exists('currency', $input)) {
+            $existing = $this->find($scope, $id);
+            if ($existing !== null) {
+                $input['currency'] = $existing->amount->currency;
+            }
+        }
+
         $data = $this->validate($scope, $input);
 
         // Editing a budget does not take it over. The owner is whoever set it,
@@ -260,6 +276,12 @@ final class BudgetService
         // spending the budget measures.
         if (!array_key_exists('subject_user_id', $input)) {
             unset($data['subject_user_id']);
+        }
+
+        // The form has no Active toggle, so an edit leaves the flag alone
+        // rather than quietly switching a budget back on.
+        if (!array_key_exists('is_active', $input)) {
+            unset($data['is_active']);
         }
 
         $this->budgets->update($scope, $id, $data);
@@ -286,7 +308,12 @@ final class BudgetService
             $errors['name'] = 'error.name.too_long_100';
         }
 
+        // The form offers no currency: a new budget is in the base currency,
+        // and an edit keeps the one the budget has (the controller sends it).
         $currency = Currency::normalise($this->str($input, 'currency'));
+        if ($currency === '') {
+            $currency = $this->settings->baseCurrency();
+        }
         if (!Currency::isValidCode($currency)) {
             $errors['currency'] = 'error.currency.required';
             $currency = 'GBP';
@@ -387,6 +414,55 @@ final class BudgetService
         }
 
         return $requested;
+    }
+
+    /**
+     * Whose spending this scope may choose to budget, by the rules
+     * `resolveSubject()` enforces: the whole household only in SHARED mode and
+     * for a role not fenced to its own rows; every member for that same role;
+     * otherwise only the viewer.
+     *
+     * @return array{household: bool, members: list<array{id: int, display_name: string}>}
+     */
+    public function subjectOptions(Scope $scope): array
+    {
+        $members = $scope->hasHousehold()
+            ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
+            : [];
+
+        if ($scope->restrictsWritesToOwner()) {
+            $members = array_values(array_filter(
+                $members,
+                static fn (array $member): bool => $member['id'] === $scope->userId,
+            ));
+        }
+
+        return [
+            'household' => !$scope->restrictsReadsToOwner() && !$scope->restrictsWritesToOwner(),
+            'members' => array_map(
+                static fn (array $member): array => [
+                    'id' => (int) $member['id'],
+                    'display_name' => (string) $member['display_name'],
+                ],
+                $members,
+            ),
+        ];
+    }
+
+    /**
+     * Whether a subject — a member id, or null for the household — is one this
+     * scope may choose. An edit whose budget measures something else (one set
+     * for the household before the instance became ISOLATED, say) must not
+     * offer a picker at all: it would post one of the offered values and
+     * quietly change whose spending the budget measures.
+     */
+    public function offersSubject(Scope $scope, ?int $subjectUserId): bool
+    {
+        $options = $this->subjectOptions($scope);
+
+        return $subjectUserId === null
+            ? $options['household']
+            : in_array($subjectUserId, array_column($options['members'], 'id'), true);
     }
 
     /**

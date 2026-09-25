@@ -239,8 +239,8 @@ return [
     'split.equal' => 'Split equally',
     'split.custom' => 'Split by share',
 
-    'budget_period.monthly' => 'Next month',
-    'budget_period.annual' => 'Next 12 months',
+    'budget_period.monthly' => 'Monthly',
+    'budget_period.annual' => 'Yearly',
 
     'notice.none' => 'None',
     'notice.days' => '{count, plural, one {# day} other {# days}}',
@@ -772,45 +772,53 @@ return [
     'backup.title' => 'Backup and restore',
 
     // budgets
-    'budgets.alerts_note' =>
-        'Over-budget and approaching-budget states are shown here only. Sending an alert about them '
-        . 'arrives in a later version.',
+    'budgets.alerts_off' => 'Alerts off',
+    'budgets.alerts_on' => 'Alert when projected over · {channels}',
     'budgets.all_categories' => 'All categories',
+    'budgets.bar_label' => '{charged} charged so far and {projected} projected, of a {limit} limit',
+    'budgets.edit_named' => 'Edit {name}',
     'budgets.empty' => 'No budgets yet.',
-    'budgets.household' => 'Whole household',
+    'budgets.history_alt' => 'Household spend each month for the last six months, in {currency}',
+    'budgets.history_caption' => 'Spend each month against the {limit} limit · over in {count} of {months}',
+    'budgets.history_caption_uncounted' => 'Spend each month against the {limit} limit',
+    'budgets.history_title' => 'Household total, last six months',
+    'budgets.household' => 'Household',
     'budgets.intro' =>
-        'A budget measures projected spend, not spend so far: scheduled price rises and trials about to '
-        . 'convert are counted before they happen, which is while there is still something you can do '
-        . 'about them. Each budget covers its owner\'s own share — their subscriptions, plus their portion '
-        . 'of anything split.',
-    'budgets.meter_label' => '{percent} percent of the budget projected',
+        'Each budget compares a limit with what your subscriptions will cost in the period, including '
+        . 'trials about to convert. You are alerted when one is projected over.',
     'budgets.new_budget' => 'New budget',
-    'budgets.of_limit' => 'of {limit}',
-    'budgets.over' => '{percent}% — over by {amount}.',
-    'budgets.remaining' => '{percent}% · {remaining} left.',
+    'budgets.note_left' => '{amount} left',
+    'budgets.note_over' => 'Over by {amount}',
+    'budgets.note_over_if_trials' => 'Projected {projected} if trials convert — over by {amount}',
+    'budgets.note_warning' => '{percent}% used — past the {threshold}% warning',
+    'budgets.of_limit_projected' => 'of {limit} projected',
+    'budgets.percent' => '{percent}%',
     'budgets.set_one_up' => 'Set one up.',
+    'budgets.state_bad' => 'Over',
+    'budgets.state_ok' => 'On track',
+    'budgets.state_warn' => 'Warning',
+    'budgets.tile_household_limit' => 'Household limit',
+    'budgets.tile_over' => 'Projected over',
+    'budgets.tiles' => 'Budgets by state',
     'budgets.unavailable' =>
         'Not available to you: it measures spending you cannot see while members\' subscriptions are '
         . 'kept separate.',
-    'budgets.unconvertible' =>
-        'Cannot be calculated: no exchange rate is available for {currencies}. Rather than leave that '
-        . 'spending out and show a figure that looks comfortable, no figure is shown.',
-    'budgets.warning' => '{percent}% — past the {threshold}% warning mark. {remaining} left.',
+    'budgets.unconvertible' => 'Projection unavailable — no rate for {currencies}',
+    'budgets.warn_tick' => 'Warning at {percent}%',
 
     // budgets_form
-    'budgets_form.delete_budget' => 'Delete budget',
     'budgets_form.edit_title' => 'Edit budget',
-    'budgets_form.everything' => 'Everything',
-    'budgets_form.limit' => 'Limit',
-    'budgets_form.period_hint' =>
-        'Both are rolling windows measured from today, so the figure is always a complete one. This '
-        . 'application tracks what is due rather than what has been paid, so a calendar month would have '
-        . 'to leave out whatever was already charged earlier in it.',
+    'budgets_form.limit_in' => 'Limit ({currency})',
+    'budgets_form.name_placeholder' => 'e.g. Streaming',
     'budgets_form.save_budget' => 'Save budget',
     'budgets_form.subject_hint' =>
         'A member\'s budget counts only their share of what is spent. A household budget counts all of it.',
-    'budgets_form.threshold_hint' => 'Flag the budget once projected spend reaches this share of the limit.',
-    'budgets_form.warn_at_optional' => 'Warn at (optional)',
+    'budgets_form.subject_locked_hint' =>
+        'This budget measures spending you cannot choose here, and saving leaves that as it is.',
+    'budgets_form.threshold_hint' =>
+        'Shown as a warning once projected spend reaches this share of the limit. Alerts are sent only '
+        . 'when a budget is projected over.',
+    'budgets_form.warn_at' => 'Warn me at',
     'budgets_form.whose_spending' => 'Whose spending',
 
     // calendar
@@ -1175,6 +1183,8 @@ return [
     'js.dashboard.spend_committed' => 'Excluding trial conversions',
     'js.dashboard.spend_with_trials' => 'Including trial conversions',
     'js.dashboard.trial_gap' => 'Trials add {amount}',
+    'js.dialog_loading' => 'Loading…',
+    'js.percent' => '{percent}%',
     'js.quick_add_failed' => 'That form could not be loaded. Open the full page instead.',
     'js.passkey_generic_error' => 'That did not work. Try again.',
     'js.passkey_not_used' => 'No passkey was used.',
