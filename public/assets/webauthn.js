@@ -231,7 +231,19 @@
                 }
 
                 const result = await registerResponse.json();
-                window.location.assign(result.redirect || '/profile#two-step');
+                const target = new URL(result.redirect || '/profile#two-step', window.location.href);
+
+                // A target that differs from this page only by its fragment
+                // is a same-document navigation: assign() would scroll and
+                // load nothing, and the new passkey, its flash and any first
+                // recovery codes would wait unseen for some later page. So
+                // on this page it is the fragment and then a real reload.
+                if (target.pathname === window.location.pathname && target.search === window.location.search) {
+                    window.location.hash = target.hash;
+                    window.location.reload();
+                } else {
+                    window.location.assign(target.href);
+                }
             } catch (error) {
                 show(config.error, error.name === 'NotAllowedError'
                     ? message('register_cancelled')

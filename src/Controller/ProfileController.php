@@ -154,7 +154,15 @@ final class ProfileController extends Controller
         } catch (ValidationException $exception) {
             $this->flashErrors($exception);
 
-            return $this->redirectAfterWrite($request, $response, self::APPEARANCE);
+            // Not HX-Redirect: htmx follows it by assigning the address, and
+            // `/profile#appearance` from `/profile` differs only by its
+            // fragment, so the browser would scroll and never load the page
+            // the error is on. A refresh reloads it, fragment and all.
+            if ($this->isHtmx($request)) {
+                return $response->withHeader('HX-Refresh', 'true')->withStatus(204);
+            }
+
+            return $this->redirect($response, self::APPEARANCE);
         }
 
         if ($this->isHtmx($request)) {

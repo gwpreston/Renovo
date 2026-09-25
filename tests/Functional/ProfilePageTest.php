@@ -11,6 +11,7 @@ use App\Domain\Role;
 use App\Repository\HouseholdRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\UserRepository;
+use App\Repository\WebAuthnCredentialRepository;
 use App\Security\CsrfTokenManager;
 use App\Security\PasswordHasher;
 use App\Security\SessionInterface;
@@ -158,6 +159,65 @@ final class ProfilePageTest extends DatabaseTestCase
         self::assertSame('Hijacked', $this->users->findById($this->viewerId)?->displayName);
     }
 
+    /**
+     * The security half of the page, for the same Viewer: starting an
+     * authenticator, renaming and removing their own passkey, and signing out
+     * one of their own other sessions.
+     */
+    public function testAViewerCanManageTheirOwnSignIn(): void
+    {
+        $this->signIn($this->viewerId);
+
+        $setup = $this->request('POST', '/profile/two-step/totp');
+        self::assertSame(200, $setup->getStatusCode());
+        self::assertStringContainsString('action="/profile/two-step/totp/confirm"', (string) $setup->getBody());
+
+        $passkey = $this->passkeyFor($this->viewerId, 'Old name');
+        $this->assertLandsOn('/profile#two-step', $this->request(
+            'POST',
+            '/profile/two-step/passkeys/' . $passkey . '/rename',
+            ['name' => 'Laptop'],
+        ));
+        self::assertSame('Laptop', $this->passkeyName($passkey));
+
+        $this->assertLandsOn(
+            '/profile#two-step',
+            $this->request('POST', '/profile/two-step/passkeys/' . $passkey . '/delete'),
+        );
+        self::assertNull($this->passkeyName($passkey));
+
+        $this->db->insert('sessions', [
+            'id' => 'viewer-phone-session',
+            'user_id' => $this->viewerId,
+            'payload' => 'x',
+            'last_activity' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'expires_at' => (new DateTimeImmutable('+1 day'))->format('Y-m-d H:i:s'),
+        ], 'id');
+        $this->assertLandsOn('/profile#sessions', $this->request('POST', '/profile/sessions/revoke', [
+            'handle' => substr('viewer-phone-session', 0, 16),
+        ]));
+        self::assertNull($this->db->fetchOne(
+            'SELECT 1 FROM ' . $this->q('sessions') . ' WHERE ' . $this->q('id') . ' = :id',
+            ['id' => 'viewer-phone-session'],
+        ));
+    }
+
+    /**
+     * The passkey routes are the only ones on the page that take an id from
+     * the request, so they are where "only your own" is really decided: an id
+     * belonging to another account renames and removes nothing.
+     */
+    public function testAnotherAccountsPasskeyCannotBeRenamedOrRemoved(): void
+    {
+        $ownersPasskey = $this->passkeyFor($this->ownerId, 'Owner phone');
+        $this->signIn($this->viewerId);
+
+        $this->request('POST', '/profile/two-step/passkeys/' . $ownersPasskey . '/rename', ['name' => 'Mine now']);
+        $this->request('POST', '/profile/two-step/passkeys/' . $ownersPasskey . '/delete');
+
+        self::assertSame('Owner phone', $this->passkeyName($ownersPasskey));
+    }
+
     // ----------------------------------------------------------- appearance
 
     /**
@@ -222,7 +282,10 @@ final class ProfilePageTest extends DatabaseTestCase
 
         $response = $this->request('POST', '/profile/preferences', ['palette' => 'hotpink'], htmx: true);
 
-        self::assertSame('/profile#appearance', $response->getHeaderLine('HX-Redirect'));
+        // A refresh rather than HX-Redirect: from /profile, a redirect to
+        // /profile#appearance would only scroll, and the error would never load.
+        self::assertSame(204, $response->getStatusCode());
+        self::assertSame('true', $response->getHeaderLine('HX-Refresh'));
         self::assertStringContainsString(
             'Choose one of the palettes shown.',
             (string) $this->request('GET', '/profile')->getBody(),
@@ -358,6 +421,37 @@ final class ProfilePageTest extends DatabaseTestCase
     {
         self::assertSame(302, $response->getStatusCode());
         self::assertSame($location, $response->getHeaderLine('Location'));
+    }
+
+    private function passkeyFor(int $userId, string $name): int
+    {
+        return (new WebAuthnCredentialRepository($this->db))->create(
+            $userId,
+            'credential-' . bin2hex(random_bytes(8)),
+            '{}',
+            $name,
+            null,
+            ['internal'],
+            0,
+            true,
+            new DateTimeImmutable(),
+        );
+    }
+
+    private function passkeyName(int $id): ?string
+    {
+        $name = $this->db->fetchValue(
+            'SELECT ' . $this->q('name') . ' FROM ' . $this->q('webauthn_credentials')
+            . ' WHERE ' . $this->q('id') . ' = :id',
+            ['id' => $id],
+        );
+
+        return $name === null ? null : (string) $name;
+    }
+
+    private function q(string $identifier): string
+    {
+        return $this->db->platform()->quoteIdentifier($identifier);
     }
 
     private function signIn(int $userId): void
