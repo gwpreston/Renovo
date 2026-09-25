@@ -170,6 +170,12 @@
             return;
         }
 
+        // The control arrives hidden, because without script it is a button
+        // that does nothing. From here on it either works or says why not.
+        if (config.container) {
+            config.container.hidden = false;
+        }
+
         if (!supported()) {
             config.button.disabled = true;
             show(config.error, message('register_unsupported'));
@@ -225,7 +231,7 @@
                 }
 
                 const result = await registerResponse.json();
-                window.location.assign(result.redirect || '/settings/security');
+                window.location.assign(result.redirect || '/profile#two-step');
             } catch (error) {
                 show(config.error, error.name === 'NotAllowedError'
                     ? message('register_cancelled')

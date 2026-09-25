@@ -18,7 +18,7 @@
             {{ t('security_totp_setup.setup_key') }} <code>{{ secret }}</code>
         </p>
 
-        <form method="post" action="/settings/security/totp/confirm" class="stack">
+        <form method="post" action="/profile/two-step/totp/confirm" class="stack">
             {{ csrf_field() }}
 
             <label for="code">{{ t('security_totp_setup.six_digit_code') }}</label>
@@ -29,7 +29,7 @@
             <button type="submit" class="button button-primary">{{ t('security_totp_setup.confirm') }}</button>
         </form>
 
-        <form method="post" action="/settings/security/totp/cancel" class="inline">
+        <form method="post" action="/profile/two-step/totp/cancel" class="inline">
             {{ csrf_field() }}
             <button type="submit" class="button button-quiet">{{ t('action.cancel') }}</button>
         </form>

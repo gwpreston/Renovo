@@ -329,11 +329,14 @@ return static function (App $app): void {
         // everything that is needs somebody's authority.
         $group->get('/profile', [ProfileController::class, 'index'])->setName('profile');
         $group->post('/profile/theme', [ProfileController::class, 'updateTheme']);
-        $group->post('/profile/palette', [ProfileController::class, 'updatePalette']);
+        // Theme, palette, density, week start, language and landing page, as
+        // one form: with script it posts on each change and restyles the page
+        // in place, without it one button sends the lot.
         $group->post('/profile/preferences', [ProfileController::class, 'updatePreferences']);
+        $group->post('/profile/dashboard-cards', [ProfileController::class, 'updateDashboardCards']);
 
         // Phase 15: account self-service. No permission on any of them, by the
-        // same rule as the preferences above and the security screen below —
+        // same rule as the preferences above and the security routes below —
         // each acts on the id in the session and takes no argument that could
         // point it at another account.
         //
@@ -345,8 +348,9 @@ return static function (App $app): void {
         // browser for as long as it likes, which is a long time to commit to
         // for a layout decision.
         $group->get('/profile/account', [AccountController::class, 'moved'])->setName('account');
-        $group->post('/profile/name', [AccountController::class, 'updateName']);
-        $group->post('/profile/email', [AccountController::class, 'requestEmailChange']);
+        // Name and address together, as the page draws them (Phase 27).
+        $group->post('/profile/details', [AccountController::class, 'updateDetails']);
+        $group->post('/profile/email/resend', [AccountController::class, 'resendEmailChange']);
         $group->post('/profile/email/cancel', [AccountController::class, 'cancelEmailChange']);
         $group->post('/profile/password', [AccountController::class, 'updatePassword']);
         $group->post('/profile/avatar', [AccountController::class, 'uploadAvatar']);
@@ -454,30 +458,39 @@ return static function (App $app): void {
         );
 
         // ------------------------------------------------------------------
-        // Phase 4: account security
+        // Phase 4: account security, on /profile since Phase 27
         //
         // Every route here acts on the signed-in user's own account, so none of
         // them names a permission: the id comes from the session and cannot be
         // pointed at anybody else. A Viewer may harden their own sign-in for
         // the same reason they may configure their own reminders.
+        //
+        // None of these is in PasswordChangeRequiredMiddleware's allowlist,
+        // which names its /profile paths one at a time: a member still on a
+        // temporary password cannot enrol a factor before choosing their own.
+        //
+        // The screen these lived on was `/settings/security`; it redirects to
+        // the section of the profile that replaced it, for bookmarks. The
+        // posts moved outright — nothing outside this application's own forms
+        // submits to them, and a redirected POST is not a POST.
         // ------------------------------------------------------------------
-        $group->get('/settings/security', [SecurityController::class, 'index'])->setName('security');
+        $group->get('/settings/security', [SecurityController::class, 'moved'])->setName('security');
 
-        $group->post('/settings/security/totp', [SecurityController::class, 'startTotp']);
-        $group->post('/settings/security/totp/confirm', [SecurityController::class, 'confirmTotp']);
-        $group->post('/settings/security/totp/cancel', [SecurityController::class, 'cancelTotp']);
-        $group->post('/settings/security/totp/disable', [SecurityController::class, 'disableTotp']);
+        $group->post('/profile/two-step/totp', [SecurityController::class, 'startTotp']);
+        $group->post('/profile/two-step/totp/confirm', [SecurityController::class, 'confirmTotp']);
+        $group->post('/profile/two-step/totp/cancel', [SecurityController::class, 'cancelTotp']);
+        $group->post('/profile/two-step/totp/disable', [SecurityController::class, 'disableTotp']);
         // Not under /totp: recovery codes cover whichever second factor the
         // account has, including a passkey with no authenticator app.
-        $group->post('/settings/security/recovery-codes', [SecurityController::class, 'regenerateRecoveryCodes']);
+        $group->post('/profile/two-step/recovery-codes', [SecurityController::class, 'regenerateRecoveryCodes']);
 
-        $group->post('/settings/security/passkeys/options', [SecurityController::class, 'passkeyOptions']);
-        $group->post('/settings/security/passkeys', [SecurityController::class, 'registerPasskey']);
-        $group->post('/settings/security/passkeys/{id:[0-9]+}/rename', [SecurityController::class, 'renamePasskey']);
-        $group->post('/settings/security/passkeys/{id:[0-9]+}/delete', [SecurityController::class, 'revokePasskey']);
+        $group->post('/profile/two-step/passkeys/options', [SecurityController::class, 'passkeyOptions']);
+        $group->post('/profile/two-step/passkeys', [SecurityController::class, 'registerPasskey']);
+        $group->post('/profile/two-step/passkeys/{id:[0-9]+}/rename', [SecurityController::class, 'renamePasskey']);
+        $group->post('/profile/two-step/passkeys/{id:[0-9]+}/delete', [SecurityController::class, 'revokePasskey']);
 
-        $group->post('/settings/security/sessions/revoke', [SecurityController::class, 'revokeSession']);
-        $group->post('/settings/security/sessions/revoke-others', [SecurityController::class, 'revokeOtherSessions']);
+        $group->post('/profile/sessions/revoke', [SecurityController::class, 'revokeSession']);
+        $group->post('/profile/sessions/revoke-others', [SecurityController::class, 'revokeOtherSessions']);
 
         // The log is a read, but not one every member may make: an instance
         // administrator sees the instance, a household Owner sees their

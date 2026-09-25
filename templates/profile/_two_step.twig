@@ -1,0 +1,169 @@
+{#
+    Two-step verification & passkeys: every second factor on the account, one
+    row each, and the recovery codes that stand behind all of them.
+
+    The row is the same shape for the authenticator and for each passkey — an
+    icon, what it is, when it arrived, and what can be done to it — because a
+    reader comparing "what protects this account" should not have to read two
+    layouts to do it.
+
+    The controls that need a password first (turning the authenticator off,
+    issuing new recovery codes) and renaming a passkey open in place from a
+    disclosure, so each row stays one line until it is being acted on, and all
+    of it works without script. Adding a passkey is the exception: it is a
+    browser ceremony and cannot happen without script, so it arrives hidden
+    and webauthn.js shows it.
+
+    Freshly issued recovery codes are drawn at the top of the section, because
+    every action that issues them lands on `#two-step`.
+#}
+{% set totp_on = totp.enabled_since is not null %}
+<section class="card" id="two-step" aria-labelledby="two-step-heading">
+    <h2 id="two-step-heading">{{ t('profile.two_step_heading') }}</h2>
+
+    {% if recovery_codes is not empty %}
+        <div class="callout">
+            <h3>{{ t('security.your_recovery_codes') }}</h3>
+            <p>{{ t('security.recovery_codes_note') }}</p>
+            <ul class="code-list">
+                {% for code in recovery_codes %}
+                    <li><code>{{ code }}</code></li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <ul class="account-rows">
+        <li class="account-row">
+            <span class="account-row-icon" aria-hidden="true">{{ icon('security') }}</span>
+            <div class="account-row-text">
+                <span class="account-row-name">{{ t('security.authenticator_app') }}</span>
+                <span class="account-row-meta">
+                    {% if totp_on %}
+                        {{ t('profile.totp_on_since', {
+                            'date': totp.enabled_since|local_date('d MMM y'),
+                            'remaining': recovery.remaining,
+                            'total': recovery.total,
+                        }) }}
+                    {% else %}
+                        {{ t('security.totp_off') }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="account-row-actions">
+                {% if totp_on %}
+                    <span class="badge badge-ok">{{ t('profile.totp_on') }}</span>
+                {% else %}
+                    <form method="post" action="/profile/two-step/totp" class="inline">
+                        {{ csrf_field() }}
+                        <button type="submit" class="button">
+                            {{ t('profile.totp_set_up') }}
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+
+            {% if totp_on %}
+                <details class="account-row-more">
+                    <summary class="button button-quiet">{{ t('security.turn_off') }}</summary>
+                    <form method="post" action="/profile/two-step/totp/disable" class="stack">
+                        {{ csrf_field() }}
+                        <div class="field">
+                            <label for="disable-password">{{ t('security.totp_off_password_label') }}</label>
+                            <input type="password" id="disable-password" name="password"
+                                   autocomplete="current-password" required>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="button button-danger">{{ t('security.turn_off') }}</button>
+                        </div>
+                    </form>
+                </details>
+            {% endif %}
+        </li>
+
+        {% for passkey in passkeys %}
+            <li class="account-row">
+                <span class="account-row-icon" aria-hidden="true">{{ icon('passkey') }}</span>
+                <div class="account-row-text">
+                    <span class="account-row-name">{{ passkey.name }}</span>
+                    <span class="account-row-meta">
+                        {{ t('profile.passkey_added', { 'date': passkey.createdAt|local_date('d MMM y') }) }}
+                    </span>
+                </div>
+                <div class="account-row-actions">
+                    <form method="post" action="/profile/two-step/passkeys/{{ passkey.id }}/delete" class="inline">
+                        {{ csrf_field() }}
+                        <button type="submit" class="button-icon" title="{{ t('action.remove') }}"
+                                aria-label="{{ t('profile.passkey_remove', { 'name': passkey.name }) }}">
+                            {{ icon('delete') }}
+                        </button>
+                    </form>
+                </div>
+
+                <details class="account-row-more">
+                    <summary class="button button-quiet">{{ t('action.rename') }}</summary>
+                    <form method="post" action="/profile/two-step/passkeys/{{ passkey.id }}/rename" class="field-row">
+                        {{ csrf_field() }}
+                        <input type="text" name="name" value="{{ passkey.name }}" maxlength="100" required
+                               aria-label="{{ t('security.passkey_name') }}">
+                        <button type="submit" class="button">{{ t('action.save') }}</button>
+                    </form>
+                </details>
+            </li>
+        {% endfor %}
+    </ul>
+
+    <div class="account-footer">
+        <div class="stack" id="passkey-add" hidden>
+            <div class="field">
+                <label for="passkey-name">{{ t('security.passkey_name_label') }}</label>
+                <input type="text" id="passkey-name" maxlength="100"
+                       placeholder="{{ t('security.phone_yubikey_laptop') }}">
+            </div>
+            <div class="form-actions">
+                <button type="button" class="button" id="passkey-register">
+                    {{ icon('add') }}{{ t('security.add_a_passkey') }}
+                </button>
+            </div>
+            <p class="field-error" id="passkey-register-error" hidden></p>
+        </div>
+
+        {#
+            Recovery codes cover whichever factor the account has, including a
+            passkey with no authenticator app, so they are offered whenever
+            there is a second factor at all.
+        #}
+        {% if recovery.applicable %}
+            <details class="account-row-more">
+                <summary class="button">{{ t('profile.new_recovery_codes') }}</summary>
+                <form method="post" action="/profile/two-step/recovery-codes" class="stack">
+                    {{ csrf_field() }}
+                    <p class="hint">
+                        {{ t('security.recovery_remaining', { 'count': recovery.remaining }) }}
+                    </p>
+                    <div class="field">
+                        <label for="recovery-password">{{ t('security.recovery_password_label') }}</label>
+                        <input type="password" id="recovery-password" name="password"
+                               autocomplete="current-password" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="button">{{ t('security.regenerate_recovery_codes') }}</button>
+                    </div>
+                </form>
+            </details>
+        {% endif %}
+    </div>
+
+    <script src="{{ asset('/assets/webauthn.js') }}" defer></script>
+    <script type="module">
+        window.renovoWebAuthn.bindRegistration({
+            container: document.getElementById('passkey-add'),
+            button: document.getElementById('passkey-register'),
+            error: document.getElementById('passkey-register-error'),
+            nameInput: document.getElementById('passkey-name'),
+            optionsUrl: '/profile/two-step/passkeys/options',
+            registerUrl: '/profile/two-step/passkeys',
+            csrf: '{{ csrf_token() }}',
+        });
+    </script>
+</section>

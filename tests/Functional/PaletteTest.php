@@ -91,7 +91,7 @@ final class PaletteTest extends DatabaseTestCase
     {
         $this->signIn($this->ownerId);
 
-        $response = $this->request('POST', '/profile/palette', ['palette' => 'forest']);
+        $response = $this->request('POST', '/profile/preferences', ['palette' => 'forest']);
 
         self::assertSame(302, $response->getStatusCode());
         self::assertSame('forest', $this->storedPalette($this->ownerId));
@@ -113,10 +113,10 @@ final class PaletteTest extends DatabaseTestCase
     public function testAnUnknownPaletteIsRejectedAndNothingIsWritten(): void
     {
         $this->signIn($this->ownerId);
-        $this->request('POST', '/profile/palette', ['palette' => 'ocean']);
+        $this->request('POST', '/profile/preferences', ['palette' => 'ocean']);
 
         $tampered = 'hotpink"><script>alert(1)</script>';
-        $response = $this->request('POST', '/profile/palette', ['palette' => $tampered]);
+        $response = $this->request('POST', '/profile/preferences', ['palette' => $tampered]);
 
         self::assertSame(302, $response->getStatusCode());
         self::assertSame('ocean', $this->storedPalette($this->ownerId), 'A refused palette overwrote the choice.');
@@ -127,11 +127,26 @@ final class PaletteTest extends DatabaseTestCase
         self::assertStringNotContainsString('hotpink', $page);
     }
 
+    /**
+     * The palette shares a form with the other preferences, and a refused
+     * palette must not take them down with it: the theme sent beside it saves.
+     */
+    public function testARefusedPaletteStillSavesTheRestOfTheForm(): void
+    {
+        $this->signIn($this->ownerId);
+        $this->request('POST', '/profile/preferences', ['palette' => 'ocean']);
+
+        $this->request('POST', '/profile/preferences', ['palette' => 'hotpink', 'theme' => 'dark']);
+
+        self::assertSame('ocean', $this->storedPalette($this->ownerId));
+        self::assertSame('dark', $this->users->findById($this->ownerId)?->theme);
+    }
+
     public function testAnEmptyPaletteIsRejectedToo(): void
     {
         $this->signIn($this->ownerId);
 
-        $this->request('POST', '/profile/palette', []);
+        $this->request('POST', '/profile/preferences', ['palette' => '']);
 
         self::assertNull($this->storedPalette($this->ownerId));
     }
@@ -144,7 +159,7 @@ final class PaletteTest extends DatabaseTestCase
     {
         $this->signIn($this->viewerId);
 
-        $response = $this->request('POST', '/profile/palette', ['palette' => 'midnight']);
+        $response = $this->request('POST', '/profile/preferences', ['palette' => 'midnight']);
 
         self::assertSame(302, $response->getStatusCode());
         self::assertSame('midnight', $this->storedPalette($this->viewerId));
@@ -160,7 +175,7 @@ final class PaletteTest extends DatabaseTestCase
     {
         $this->signIn($this->ownerId);
 
-        $response = $this->request('POST', '/profile/palette', ['palette' => 'forest'], withCsrf: false);
+        $response = $this->request('POST', '/profile/preferences', ['palette' => 'forest'], withCsrf: false);
 
         self::assertSame(400, $response->getStatusCode());
         self::assertNull($this->storedPalette($this->ownerId));
@@ -168,7 +183,7 @@ final class PaletteTest extends DatabaseTestCase
 
     public function testThePaletteEndpointRequiresAnAccount(): void
     {
-        $response = $this->request('POST', '/profile/palette', ['palette' => 'forest']);
+        $response = $this->request('POST', '/profile/preferences', ['palette' => 'forest']);
 
         self::assertSame(302, $response->getStatusCode());
         self::assertStringStartsWith('/login', $response->getHeaderLine('Location'));
@@ -199,8 +214,8 @@ final class PaletteTest extends DatabaseTestCase
     }
 
     /**
-     * The picker offers all five, marks the current one, and posts to its own
-     * CSRF-protected form.
+     * The picker offers every palette, marks the current one, and posts with
+     * the rest of the appearance preferences on one CSRF-protected form.
      */
     public function testThePickerOffersEveryPaletteAndMarksTheCurrentOne(): void
     {
@@ -210,7 +225,7 @@ final class PaletteTest extends DatabaseTestCase
         $page = (string) preg_replace('/\s+/', ' ', $this->page('/profile'));
 
         self::assertMatchesRegularExpression(
-            '~<form method="post" action="/profile/palette"[^>]*> <input type="hidden" name="_csrf"~',
+            '~<form method="post" action="/profile/preferences"[^>]*> <input type="hidden" name="_csrf"~',
             $page,
         );
 

@@ -32,6 +32,8 @@
         "dark": "moon",
         "dashboard": "layout-dashboard",
         "delete": "trash-2",
+        "device-desktop": "monitor",
+        "device-phone": "smartphone",
         "download": "download",
         "edit": "pencil",
         "external": "external-link",

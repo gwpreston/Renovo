@@ -1,0 +1,110 @@
+{#
+    Who you are: the face, the name and the address.
+
+    The name and the address are one form with one button, as the prototype
+    draws them. The address field holds the current address, so saving with it
+    untouched changes only the name; typing a new one sends a confirmation link
+    to it and leaves the current one as the sign-in until the link is followed.
+
+    The picture is a form of its own — it is a file, sent as multipart — and so
+    are resend and cancel on a pending change. Those two sit inside the
+    details form visually but belong to forms of their own through the `form`
+    attribute, which keeps them working without script and keeps Enter in a
+    text field meaning Save.
+#}
+{% import 'partials/avatar.twig' as avatar %}
+<section class="card" id="details" aria-labelledby="details-heading">
+    <h2 id="details-heading">{{ t('account.who_you_are') }}</h2>
+
+    <div class="avatar-editor">
+        {{ avatar.face(
+            current_user.id,
+            current_user.displayName,
+            current_user.initials(),
+            current_user.avatarPath is not null,
+            72
+        ) }}
+
+        <form method="post" action="/profile/avatar" class="stack avatar-upload" enctype="multipart/form-data">
+            {{ csrf_field() }}
+
+            <div class="field">
+                <label for="avatar">{{ t('account.choose_picture') }}</label>
+                <input type="file" id="avatar" name="avatar" required
+                       accept="image/png,image/jpeg,image/webp,image/gif" aria-describedby="avatar-hint">
+                <p class="hint" id="avatar-hint">
+                    {{ t('account.picture_hint', { 'kilobytes': avatar_max_kilobytes }) }}
+                </p>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="button">
+                    {{ icon('upload') }}{{ t('account.upload_picture') }}
+                </button>
+                {% if current_user.avatarPath %}
+                    <button type="submit" form="avatar-remove" class="button button-quiet">
+                        {{ t('account.remove_picture') }}
+                    </button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    {% if current_user.avatarPath %}
+        <form method="post" action="/profile/avatar/delete" id="avatar-remove">
+            {{ csrf_field() }}
+        </form>
+    {% endif %}
+
+    <form method="post" action="/profile/details" class="stack">
+        {{ csrf_field() }}
+
+        <div class="field">
+            <label for="display_name">{{ t('field.name') }}</label>
+            <input type="text" id="display_name" name="display_name" maxlength="100" required
+                   value="{{ current_user.displayName }}" autocomplete="name">
+        </div>
+
+        {#
+            A member added without an address of their own has a placeholder
+            one, which is nobody's to show or change here: the Owner who set
+            the account up changes it.
+        #}
+        {% if current_user.canReceiveMail() %}
+            <div class="field">
+                <label for="email">{{ t('field.email') }}</label>
+                <input type="email" id="email" name="email" required autocomplete="email"
+                       value="{{ current_user.email }}" aria-describedby="email-hint">
+                <p class="hint" id="email-hint">{{ t('account.email_hint') }}</p>
+
+                {% if current_user.pendingEmail %}
+                    <p class="pending-email">
+                        {{ t('account.email_pending', { 'email': current_user.pendingEmail }) }}
+                        <button type="submit" form="email-resend" class="button-link">
+                            {{ t('account.email_resend') }}
+                        </button>
+                        <span aria-hidden="true">·</span>
+                        <button type="submit" form="email-cancel" class="button-link">
+                            {{ t('account.email_cancel') }}
+                        </button>
+                    </p>
+                {% endif %}
+            </div>
+        {% else %}
+            <p class="muted">{{ t('account.email_none') }}</p>
+        {% endif %}
+
+        <div class="form-actions">
+            <button type="submit" class="button">{{ t('account.save_details') }}</button>
+        </div>
+    </form>
+
+    {% if current_user.canReceiveMail() and current_user.pendingEmail %}
+        <form method="post" action="/profile/email/resend" id="email-resend">
+            {{ csrf_field() }}
+        </form>
+        <form method="post" action="/profile/email/cancel" id="email-cancel">
+            {{ csrf_field() }}
+        </form>
+    {% endif %}
+</section>

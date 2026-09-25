@@ -77,42 +77,72 @@ final class UserPreferencesService
     }
 
     /**
-     * The palette, on its own form.
+     * The profile's appearance form, which saves on each change with script
+     * and all at once without it.
      *
-     * The one preference that is *rejected* rather than coerced. Every other
-     * preference here quietly becomes its default when the value is not one it
-     * knows; this one ends up in an attribute on every page's root element, so
-     * an unknown value is a tampered form, and the answer to a tampered form
-     * is an error and no write — not a silent reset of a choice the member
-     * really did make.
+     * A field that was not submitted is left as it is. With script the form
+     * posts on every change, and the language control is not drawn at all
+     * while one catalogue exists; if absence meant "the default", either would
+     * quietly reset a choice the member made.
+     *
+     * The palette is the one value *rejected* rather than coerced. Every other
+     * preference here becomes its default when the value is not one it knows;
+     * this one ends up in an attribute on every page's root element, so an
+     * unknown value is a tampered form, and the answer to that is an error —
+     * not a silent reset. It is refused after the rest are written, so a bad
+     * palette does not throw away the theme or week start sent beside it.
+     *
+     * Returns what is now stored for the three values the page wears, so the
+     * caller can restyle the page in place without a second read.
+     *
+     * @param array<string, mixed> $input
+     * @return array{theme: ?string, palette: ?string, density: ?string}
+     * @throws ValidationException
      */
-    public function updatePalette(int $userId, ?string $palette): Palette
+    public function update(int $userId, array $input): array
     {
-        $resolved = Palette::tryFrom($palette ?? '');
+        $changes = [];
 
-        if ($resolved === null) {
+        if (array_key_exists('theme', $input)) {
+            $changes['theme'] = Theme::fromString($this->string($input, 'theme'))->value;
+        }
+        if (array_key_exists('locale', $input)) {
+            $changes['locale'] = $this->locale($this->string($input, 'locale'));
+        }
+        if (array_key_exists('week_start', $input)) {
+            $changes['week_start'] = WeekStart::fromInt($this->int($input, 'week_start'))->value;
+        }
+        if (array_key_exists('density', $input)) {
+            $changes['density'] = Density::fromString($this->string($input, 'density'))->value;
+        }
+        if (array_key_exists('landing_view', $input)) {
+            $changes['landing_view'] = LandingView::fromString($this->string($input, 'landing_view'))->value;
+        }
+
+        $palette = null;
+        $paletteRefused = false;
+        if (array_key_exists('palette', $input)) {
+            $palette = Palette::tryFrom($this->string($input, 'palette') ?? '');
+            if ($palette === null) {
+                $paletteRefused = true;
+            } else {
+                $changes['palette'] = $palette->value;
+            }
+        }
+
+        if ($changes !== []) {
+            $this->users->updatePreferences($userId, $changes);
+        }
+
+        if ($paletteRefused) {
             throw ValidationException::field('palette', 'error.palette.unknown');
         }
 
-        $this->users->updatePreferences($userId, ['palette' => $resolved->value]);
-
-        return $resolved;
-    }
-
-    /**
-     * The settings form, which submits all of them at once.
-     *
-     * @param array<string, mixed> $input
-     */
-    public function update(int $userId, array $input): void
-    {
-        $this->users->updatePreferences($userId, [
-            'theme' => Theme::fromString($this->string($input, 'theme'))->value,
-            'locale' => $this->locale($this->string($input, 'locale')),
-            'week_start' => WeekStart::fromInt($this->int($input, 'week_start'))->value,
-            'density' => Density::fromString($this->string($input, 'density'))->value,
-            'landing_view' => LandingView::fromString($this->string($input, 'landing_view'))->value,
-        ]);
+        return [
+            'theme' => $changes['theme'] ?? null,
+            'palette' => $palette?->value,
+            'density' => $changes['density'] ?? null,
+        ];
     }
 
     /**

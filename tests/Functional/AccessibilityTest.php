@@ -153,7 +153,6 @@ final class AccessibilityTest extends DatabaseTestCase
             ['/settings/members/invite'],
             ['/settings/members/{member}/remove'],
             ['/settings/notifications'],
-            ['/settings/security'],
             ['/settings/api-tokens'],
             ['/settings/backup'],
             ['/import'],

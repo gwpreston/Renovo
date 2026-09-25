@@ -1,31 +1,27 @@
 {% extends 'layout.twig' %}
-{% import 'partials/avatar.twig' as avatar %}
 
 {% block heading %}{{ t('nav.profile') }}{% endblock %}
 {% block page_subtitle %}{{ t('subtitle.profile') }}{% endblock %}
 
 {#
-    One page for one account: who you are, how you get in, and how Renovo looks
-    to you.
+    One page for one account: who you are, how you get in, where you are
+    signed in, and how Renovo looks to you.
 
-    These were two screens — the sidebar's Profile and the avatar menu's Your
-    account — and the split was never a distinction a reader had to make. Both
-    were reached from the same corner of the shell, both acted on the id in the
-    session, neither needed a permission, and both already lived under
-    `/profile` in the URL. Two pages only meant guessing which one held the
-    thing you came for.
+    These were three screens — Profile, Your account and Account security —
+    and the split was never a distinction a reader had to make. Each acted on
+    the id in the session and none needed a permission, so a Viewer can use
+    all of it. Two old paths still redirect here, each to its own section,
+    which is why every section carries a fixed id.
 
-    The cards are paired into rows rather than run down one column: a name
-    beside the face that goes with it, an address beside the password it signs
-    in with, and the two links that lead off this page beside each other. A
-    paired card stretches to its neighbour's height, so a row reads as a row —
-    unlike the dashboard's grid, where the cards differ too much in height for
-    that to be anything but a stretch.
+    The cards are paired into rows as the prototype pairs them: who you are
+    beside the password, the second factors beside the sessions they protect.
+    A paired card stretches to its neighbour's height, so a row reads as a
+    row. Appearance runs the full width beneath, then the dashboard's cards,
+    then the way out.
 
-    `ProfileController` renders it and `AccountController` still answers the
-    name, address, password and picture forms. That is deliberate rather than a
-    leftover: how this looks and who is looking are different subjects, however
-    they are laid out.
+    `ProfileController` renders it; `AccountController` answers the details,
+    password and picture forms and `SecurityController` the second factors
+    and sessions. Each section is a partial of its own.
 #}
 {% block content %}
     {#
@@ -48,284 +44,28 @@
         {% include 'profile/_password.twig' %}
     {% else %}
         <div class="profile-row">
-            <section class="card">
-                <h2>{{ t('account.who_you_are') }}</h2>
-
-                <form method="post" action="/profile/name" class="stack">
-                    {{ csrf_field() }}
-
-                    <div class="field">
-                        <label for="display_name">{{ t('field.name') }}</label>
-                        <input type="text" id="display_name" name="display_name" maxlength="100" required
-                               value="{{ current_user.displayName }}" autocomplete="name">
-                    </div>
-
-                    <button type="submit" class="button">{{ t('account.save_name') }}</button>
-                </form>
-            </section>
-
-            <section class="card">
-                <h2>{{ t('account.your_picture') }}</h2>
-
-                <div class="avatar-editor">
-                    {{ avatar.face(
-                        current_user.id,
-                        current_user.displayName,
-                        current_user.initials(),
-                        current_user.avatarPath is not null,
-                        96
-                    ) }}
-
-                    <div class="stack">
-                        <form method="post" action="/profile/avatar" class="stack" enctype="multipart/form-data">
-                            {{ csrf_field() }}
-
-                            <div class="field">
-                                <label for="avatar">{{ t('account.choose_picture') }}</label>
-                                <input type="file" id="avatar" name="avatar" accept="image/*" required>
-                                <p class="hint">
-                                    {{ t('account.picture_hint', { 'kilobytes': avatar_max_kilobytes }) }}
-                                </p>
-                            </div>
-
-                            <button type="submit" class="button">{{ t('account.save_picture') }}</button>
-                        </form>
-
-                        {% if current_user.avatarPath %}
-                            <form method="post" action="/profile/avatar/delete" class="inline">
-                                {{ csrf_field() }}
-                                <button type="submit" class="button button-quiet">
-                                    {{ t('account.remove_picture') }}
-                                </button>
-                            </form>
-                        {% endif %}
-                    </div>
-                </div>
-            </section>
-        </div>
-
-        <div class="profile-row">
-            <section class="card">
-                <h2>{{ t('account.your_email') }}</h2>
-
-                {% if current_user.canReceiveMail() %}
-                    <p>{{ t('account.email_current', { 'email': current_user.email }) }}</p>
-
-                    {% if current_user.pendingEmail %}
-                        <p class="muted">
-                            {{ t('account.email_pending', { 'email': current_user.pendingEmail }) }}
-                        </p>
-
-                        <form method="post" action="/profile/email/cancel" class="inline">
-                            {{ csrf_field() }}
-                            <button type="submit" class="button button-quiet">
-                                {{ t('account.email_cancel') }}
-                            </button>
-                        </form>
-                    {% endif %}
-
-                    <form method="post" action="/profile/email" class="stack">
-                        {{ csrf_field() }}
-
-                        <div class="field">
-                            <label for="email">{{ t('account.email_new') }}</label>
-                            <input type="email" id="email" name="email" required autocomplete="email">
-                            <p class="hint">{{ t('account.email_hint') }}</p>
-                        </div>
-
-                        <button type="submit" class="button">{{ t('account.email_request') }}</button>
-                    </form>
-                {% else %}
-                    <p class="muted">{{ t('account.email_none') }}</p>
-                {% endif %}
-            </section>
-
+            {% include 'profile/_details.twig' %}
             {% include 'profile/_password.twig' %}
         </div>
 
-        {#
-            Full width, and not divided into a card of selects beside a card of
-            dashboard rows however neatly that would split: the preferences and
-            the card layout are one form posting to one endpoint, and a tidier
-            grid is not a reason to make it two.
-        #}
-        <section class="card">
-            <h2>{{ t('settings.appearance') }}</h2>
-
-            {#
-                The palette, on a form of its own beside the preferences below.
-
-                Its own form because it is the one preference that is refused
-                rather than coerced when the value is not one it knows — see
-                `UserPreferencesService::updatePalette` — and a refusal should
-                not also throw away the theme, language and dashboard layout
-                somebody changed in the same submission.
-
-                Each option is drawn in its own colours: `data-swatch` scopes
-                the palette's rail and accent to the card, so the five can be
-                compared while the page wears one of them. The name is the
-                label; the colours are decoration beside it.
-            #}
-            <form method="post" action="/profile/palette" class="palette-form">
-                {{ csrf_field() }}
-
-                <fieldset class="palette-picker">
-                    <legend>{{ t('settings.palette') }}</legend>
-                    <p class="hint">{{ t('settings.palette_hint') }}</p>
-
-                    <div class="palette-options">
-                        {% for palette in palettes %}
-                            <label class="palette-option" data-swatch="{{ palette.value }}">
-                                <input type="radio" name="palette" value="{{ palette.value }}"
-                                       {{ current_user.palettePreference() == palette ? 'checked' : '' }}>
-                                <span class="palette-swatch" aria-hidden="true">
-                                    <span class="palette-swatch-accent"></span>
-                                </span>
-                                <span class="palette-name">{{ t(palette.labelKey()) }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </fieldset>
-
-                <div class="form-actions">
-                    <button type="submit" class="button">{{ t('settings.palette_save') }}</button>
-                </div>
-            </form>
-
-            <hr class="divider">
-
-            <form method="post" action="/profile/preferences" class="stack">
-                {{ csrf_field() }}
-
-                <div class="field">
-                    <label for="theme">{{ t('settings.theme') }}</label>
-                    <select id="theme" name="theme">
-                        {% for theme in themes %}
-                            <option value="{{ theme.value }}"
-                                    {{ current_user.theme == theme.value ? 'selected' : '' }}>
-                                {{ t(theme.labelKey()) }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label for="locale">{{ t('settings.language') }}</label>
-                    <select id="locale" name="locale">
-                        {# An empty value is a real choice: follow whatever the instance is set to. #}
-                        <option value="" {{ current_user.locale == '' ? 'selected' : '' }}>
-                            {{ t('settings.language_instance_default') }}
-                        </option>
-                        {% for code, name in locale_choices %}
-                            <option value="{{ code }}"
-                                    {{ current_user.locale == code ? 'selected' : '' }}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label for="week_start">{{ t('settings.week_start') }}</label>
-                    <select id="week_start" name="week_start">
-                        {% for day in week_starts %}
-                            <option value="{{ day.value }}"
-                                    {{ current_user.weekStart == day.value ? 'selected' : '' }}>
-                                {{ t(day.labelKey()) }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                    <p class="hint">{{ t('settings.week_start_hint') }}</p>
-                </div>
-
-                <div class="field">
-                    <label for="density">{{ t('settings.density') }}</label>
-                    <select id="density" name="density">
-                        {% for option in densities %}
-                            <option value="{{ option.value }}"
-                                    {{ current_user.density == option.value ? 'selected' : '' }}>
-                                {{ t(option.labelKey()) }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="field">
-                    <label for="landing_view">{{ t('settings.landing_view') }}</label>
-                    <select id="landing_view" name="landing_view">
-                        {% for view in landing_views %}
-                            <option value="{{ view.value }}"
-                                    {{ current_user.landingView == view.value ? 'selected' : '' }}>
-                                {{ t(view.labelKey()) }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                    <p class="hint">{{ t('settings.landing_view_hint') }}</p>
-                </div>
-
-                {#
-                    One fieldset per dashboard view: each has its own cards,
-                    order and hiding, so the same card key can be arranged
-                    differently on each. The fields are keyed by view, and a
-                    view whose positions are not submitted is left as it was.
-                #}
-                {% for layout in dashboard_layouts %}
-                    {% set view = layout.view.value %}
-                    <fieldset class="stack">
-                        <legend>{{ t('settings.dashboard_cards_for', {'view': t(layout.view.labelKey())}) }}</legend>
-                        {% if loop.first %}
-                            <p class="hint">{{ t('settings.dashboard_cards_hint') }}</p>
-                        {% endif %}
-
-                        <ul class="card-layout">
-                            {% for entry in layout.cards %}
-                                <li class="card-layout-row">
-                                    <label for="card-position-{{ view }}-{{ entry.card.value }}" class="card-layout-name">
-                                        {{ t(entry.card.labelKey()) }}
-                                    </label>
-                                    <input type="number" min="1" max="{{ layout.cards|length }}"
-                                           id="card-position-{{ view }}-{{ entry.card.value }}"
-                                           name="card_position[{{ view }}][{{ entry.card.value }}]"
-                                           value="{{ loop.index }}"
-                                           aria-label="{{ t('settings.card_position', {
-                                               'card': t(entry.card.labelKey()),
-                                           }) }}">
-                                    <label class="choice">
-                                        <input type="checkbox"
-                                               name="card_visible[{{ view }}][{{ entry.card.value }}]" value="1"
-                                               {{ entry.visible ? 'checked' : '' }}>
-                                        <span>{{ t('settings.card_visible') }}</span>
-                                    </label>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    </fieldset>
-                {% endfor %}
-
-                <button type="submit" class="button">{{ t('action.save') }}</button>
-            </form>
-        </section>
-
-        {#
-            Signing in and API tokens live under /settings in the URL, but they
-            are this account's and nobody else's, so this is where they are
-            offered. A row of two, because each is a heading, a sentence and a
-            way out — the one shape on this page that is genuinely a pair.
-        #}
         <div class="profile-row">
-            <section class="card">
-                <h2>{{ t('settings.signing_in') }}</h2>
-                <p class="muted">
-                    {{ t('settings.security_intro') }}
-                </p>
-                <a class="button" href="/settings/security">{{ t('security.title') }}</a>
-            </section>
-
-            <section class="card">
-                <h2>{{ t('settings.api_and_calendar') }}</h2>
-                <p class="muted">
-                    {{ t('settings.api_intro') }}
-                </p>
-                <a class="button" href="/settings/api-tokens">{{ t('tokens.title') }}</a>
-            </section>
+            {% include 'profile/_two_step.twig' %}
+            {% include 'profile/_sessions.twig' %}
         </div>
+
+        {% include 'profile/_appearance.twig' %}
+        {% include 'profile/_dashboard_cards.twig' %}
+
+        {#
+            The way out, at the foot of the page as well as in the rail's user
+            card: the end of a page about your account is where a reader who
+            came to leave it looks.
+        #}
+        <form method="post" action="/logout" class="profile-signout">
+            {{ csrf_field() }}
+            <button type="submit" class="button button-quiet">
+                {{ icon('sign-out') }}{{ t('nav.sign_out') }}
+            </button>
+        </form>
     {% endif %}
 {% endblock %}

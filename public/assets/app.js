@@ -324,4 +324,33 @@
             readyToggles();
         }
     });
+
+    /*
+     * The profile's appearance form, saved on change: the server names what
+     * it stored and the root takes it, so the page is wearing the choice the
+     * moment it is made. Only values of the expected shape are copied — the
+     * attributes are selectors for the whole stylesheet. The sentence goes to
+     * the form's status line, which is a live region, so a screen reader
+     * hears that it saved without the focus moving.
+     */
+    document.body.addEventListener('renovo:preferences', function (event) {
+        var detail = event.detail || {};
+        var root = document.documentElement;
+
+        if (detail.theme === 'light' || detail.theme === 'dark' || detail.theme === 'system') {
+            root.dataset.theme = detail.theme;
+            readyToggles();
+        }
+        if (typeof detail.palette === 'string' && /^[a-z]+$/.test(detail.palette)) {
+            root.dataset.palette = detail.palette;
+        }
+        if (detail.density === 'comfortable' || detail.density === 'compact') {
+            root.dataset.density = detail.density;
+        }
+
+        var status = document.querySelector('[data-preferences-status]');
+        if (status && typeof detail.message === 'string') {
+            status.textContent = detail.message;
+        }
+    });
 }());

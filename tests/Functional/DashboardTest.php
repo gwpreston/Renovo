@@ -485,13 +485,13 @@ final class DashboardTest extends DatabaseTestCase
     }
 
     /**
-     * Saving the profile form with only one view's fields leaves the other
+     * Saving the dashboard cards form with only one view's fields leaves the other
      * view's layout exactly as it was — an absent section is not a section
      * with every card unticked.
      */
     public function testSavingOneViewsLayoutDoesNotHideTheOthersCards(): void
     {
-        $this->post('/profile/preferences', $this->ownerId, [
+        $this->post('/profile/dashboard-cards', $this->ownerId, [
             'card_position' => ['overview' => ['totals' => '1', 'coming_up' => '2']],
             'card_visible' => ['overview' => ['totals' => '1']],
         ]);

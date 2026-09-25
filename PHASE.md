@@ -87,14 +87,14 @@ At the foot of the page, as well as in the rail's user card.
 
 ## Status
 
-- [ ] Who you are (avatar rules, pending email state)
-- [ ] Password with sign-out-others
-- [ ] TOTP, passkeys, recovery codes
-- [ ] Sessions (no location), sign out one / everywhere else
-- [ ] Appearance & preferences, including the palette picker
-- [ ] Redirects from the old routes; rail user card active on `/profile`
-- [ ] New strings in `translations/en.php`
-- [ ] `composer check`, `i18n:check` green on both engines
+- [x] Who you are (avatar rules, pending email state)
+- [x] Password with sign-out-others
+- [x] TOTP, passkeys, recovery codes
+- [x] Sessions (no location), sign out one / everywhere else
+- [x] Appearance & preferences, including the palette picker
+- [x] Redirects from the old routes; rail user card active on `/profile`
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check` green on both engines
 
 ## Definition of done
 

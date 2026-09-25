@@ -745,6 +745,122 @@ tr.is-passed > td {
     }
 }
 
+/*
+ * A row about something attached to the account — a second factor, a passkey,
+ * a signed-in browser: an icon in a tile, what it is with a line of detail
+ * under it, and what can be done to it at the end. A disclosure belonging to
+ * the row (rename, turn off) opens on a line of its own beneath.
+ */
+.account-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.account-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.account-row:first-child {
+    border-top: 0;
+}
+
+.account-row-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.account-row-text {
+    display: grid;
+    min-width: 0;
+}
+
+.account-row-name {
+    font-weight: var(--weight-semibold);
+    overflow-wrap: anywhere;
+}
+
+.account-row-meta {
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+.account-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.account-row-more {
+    grid-column: 2 / -1;
+}
+
+.account-row-more > summary {
+    list-style: none;
+    display: inline-flex;
+}
+
+.account-row-more > summary::-webkit-details-marker {
+    display: none;
+}
+
+.account-row-more[open] > summary {
+    margin-bottom: 0.75rem;
+}
+
+.account-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.account-footer > .account-row-more {
+    flex-basis: 100%;
+}
+
+.pending-email {
+    margin: 0.5rem 0 0;
+    font-size: var(--size-label);
+}
+
+/* The appearance controls, as many to a line as fit. */
+.preference-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 1rem;
+}
+
+.preference {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.preference > legend {
+    margin-bottom: 0.4rem;
+    font-weight: var(--weight-medium);
+}
+
+.profile-signout {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+}
+
 /* --------------------------------------------------- dashboard card layout */
 
 .card-layout {

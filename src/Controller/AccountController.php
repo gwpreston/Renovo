@@ -32,6 +32,8 @@ use Slim\Views\Twig;
  */
 final class AccountController extends Controller
 {
+    private const DETAILS = '/profile#details';
+
     public function __construct(
         Twig $view,
         SessionInterface $session,
@@ -58,19 +60,27 @@ final class AccountController extends Controller
      */
     public function moved(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->redirect($response, '/profile');
+        return $this->redirect($response, self::DETAILS);
     }
 
-    public function updateName(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    /**
+     * "Who you are": the name and the address, one form and one button.
+     *
+     * The address field is absent for an account with no mailbox of its own,
+     * which the service reads as "leave it", and holds the current address
+     * otherwise, which it reads the same way.
+     */
+    public function updateDetails(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $body = $this->body($request);
 
         try {
-            $this->account->changeName(
+            $requested = $this->account->updateDetails(
                 $this->user($request),
                 is_scalar($body['display_name'] ?? null) ? (string) $body['display_name'] : '',
+                is_scalar($body['email'] ?? null) ? (string) $body['email'] : null,
             );
-            $this->flash('success', 'flash.name_saved');
+            $this->flash('success', $requested ? 'flash.email_change_requested' : 'flash.details_saved');
         } catch (ValidationException $exception) {
             $this->flashErrors($exception);
         }
@@ -78,18 +88,13 @@ final class AccountController extends Controller
         return $this->done($request, $response);
     }
 
-    public function requestEmailChange(
+    public function resendEmailChange(
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $body = $this->body($request);
-
         try {
-            $this->account->requestEmailChange(
-                $this->user($request),
-                is_scalar($body['email'] ?? null) ? (string) $body['email'] : '',
-            );
-            $this->flash('success', 'flash.email_change_requested');
+            $this->account->resendEmailChange($this->user($request));
+            $this->flash('success', 'flash.email_change_resent');
         } catch (ValidationException $exception) {
             $this->flashErrors($exception);
         }

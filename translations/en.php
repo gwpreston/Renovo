@@ -25,16 +25,12 @@ return [
     'account.choose_picture' => 'Choose a picture',
     'account.confirm_password' => 'Confirm new password',
     'account.current_password' => 'Current password',
-    'account.email_cancel' => 'Cancel that change',
-    'account.email_current' => 'You sign in as {email}.',
-    'account.email_hint' =>
-        'We will send a link to the new address. Nothing changes until you follow it, so a typo '
-        . 'cannot lock you out.',
-    'account.email_new' => 'New email address',
+    'account.email_cancel' => 'cancel',
+    'account.email_hint' => 'Changing it sends a confirmation link to the new address.',
     'account.email_none' =>
         'This account has no mailbox of its own. An Owner of your household can give it an address.',
-    'account.email_pending' => 'Waiting for {email} to be confirmed.',
-    'account.email_request' => 'Send confirmation link',
+    'account.email_pending' => 'Waiting for confirmation of {email} —',
+    'account.email_resend' => 'resend',
     'account.must_change_heading' => 'Choose a password of your own',
     'account.must_change_note' =>
         'You are signed in with a password somebody else chose for you. Set one of your own below '
@@ -43,21 +39,20 @@ return [
     'account.picture_hint' =>
         'PNG, JPEG, WebP or GIF, up to {kilobytes} KB. It is cropped square and resized, and the '
         . 'original is not kept.',
-    'account.remove_picture' => 'Remove picture',
-    'account.save_name' => 'Save name',
-    'account.save_password' => 'Change password',
-    'account.save_picture' => 'Save picture',
-    'account.sign_out_others' => 'Sign out my other devices',
+    'account.remove_picture' => 'Remove',
+    'account.upload_picture' => 'Upload picture',
+    'account.save_details' => 'Save changes',
+    'account.save_password' => 'Update password',
+    'account.sign_out_others' => 'Sign out my other sessions',
     'account.sign_out_others_hint' =>
         'Leave this on unless you meant somebody else to stay signed in. This device stays signed '
         . 'in either way.',
     'account.who_you_are' => 'Who you are',
-    'account.your_email' => 'Your email address',
     'account.your_password' => 'Your password',
-    'account.your_picture' => 'Your picture',
     'audit_action.account.avatar_changed' => 'Picture changed',
     'audit_action.account.avatar_removed' => 'Picture removed',
     'audit_action.account.email_change_requested' => 'Email change requested',
+    'audit_action.account.email_change_resent' => 'Email change link sent again',
     'audit_action.account.email_changed' => 'Email address changed',
     'audit_action.account.name_changed' => 'Name changed',
     'audit_action.member.added' => 'Member added',
@@ -108,6 +103,7 @@ return [
     'error.email.no_mailbox' =>
         'This account has no mailbox of its own, so it cannot confirm a new address. An Owner of your '
         . 'household can change it for you.',
+    'error.email.nothing_pending' => 'There is no change of address waiting to be confirmed.',
     'error.email.unchanged' => 'That is already your email address.',
     'error.email_change.invalid_token' =>
         'That confirmation link has expired or has already been used.',
@@ -145,7 +141,6 @@ return [
     'flash.member_revoked' =>
         'Their login has been revoked and they have been signed out everywhere.',
     'flash.member_role_changed' => 'Their role has been changed.',
-    'flash.name_saved' => 'Your name has been saved.',
     'flash.password_changed_sessions' =>
         'Your password has been changed, and {count, plural, one {# other session was} other {# other '
         . 'sessions were}} signed out.',
@@ -291,7 +286,6 @@ return [
     // -----------------------------------------------------------------------
     // Display preferences
     // -----------------------------------------------------------------------
-    'settings.appearance' => 'Appearance',
     'settings.theme' => 'Theme',
     'settings.language' => 'Language',
     'settings.language_instance_default' => 'Whatever this instance is set to',
@@ -303,7 +297,6 @@ return [
 
     'settings.palette' => 'Colour palette',
     'settings.palette_hint' => 'The colours of the sidebar and of the buttons and highlights. Only you see your choice.',
-    'settings.palette_save' => 'Use this palette',
 
     'palette.navy' => 'Navy & emerald',
     'palette.paper' => 'Light & emerald',
@@ -547,7 +540,10 @@ return [
     'flash.password_changed' => 'Your password has been changed. Sign in with it now.',
     'flash.two_factor_expired' => 'That sign-in attempt expired. Start again.',
     'flash.preferences_saved' => 'Your preferences have been saved.',
-    'flash.palette_saved' => 'Your palette has been saved.',
+    'flash.dashboard_cards_saved' => 'Your dashboard cards have been saved.',
+    'flash.details_saved' => 'Your details have been saved.',
+    'flash.email_change_resent' =>
+        'A new confirmation link is on its way to the new address. The earlier link no longer works.',
 
     'flash.subscription_added' => 'Subscription added.',
     'flash.subscription_saved' => 'Subscription saved.',
@@ -1089,12 +1085,10 @@ return [
     'field.currency' => 'Currency',
     'field.cycle' => 'Cycle',
     'field.detail' => 'Detail',
-    'field.device' => 'Device',
     'field.due' => 'Due',
     'field.email' => 'Email address',
     'field.event' => 'Event',
     'field.file' => 'File',
-    'field.last_seen' => 'Last seen',
     'field.last_used' => 'Last used',
     'field.member' => 'Member',
     'field.month' => 'Month',
@@ -1114,7 +1108,6 @@ return [
     'field.role' => 'Role',
     'field.share' => 'Share',
     'field.size' => 'Size',
-    'field.started' => 'Started',
     'field.status' => 'Status',
     'field.subscription' => 'Subscription',
     'field.subscriptions' => 'Subscriptions',
@@ -1291,7 +1284,6 @@ return [
     'subtitle.notifications' => 'How and when you are reminded',
     'subtitle.payment_methods' => 'What each subscription is paid with',
     'subtitle.profile' => 'Your account, sign-in and appearance',
-    'subtitle.security' => 'Two-step sign-in, passkeys and sessions',
     'subtitle.settings' => 'Choices for the household and the instance',
     'subtitle.stats' => 'Spending, forecast and price history',
     'subtitle.subscription_form' => 'Price, renewal date, who pays and who can see it',
@@ -1363,19 +1355,11 @@ return [
     'saved_views.save_current' => 'Save this view',
 
     // security
-    'security.active_sessions' => 'Active sessions',
     'security.add_a_passkey' => 'Add a passkey',
     'security.authenticator_app' => 'Authenticator app',
-    'security.none_registered' => 'None registered.',
     'security.passkey_name' => 'Passkey name',
     'security.passkey_name_label' => 'Name for the new passkey',
-    'security.passkeys_and_security_keys' => 'Passkeys and security keys',
-    'security.passkeys_intro' =>
-        'A passkey signs you in without a password, and counts as your second factor when you do use '
-        . 'one. You can register more than one — a phone and a hardware key, say — so losing one device is '
-        . 'not losing access.',
     'security.phone_yubikey_laptop' => 'Phone, YubiKey, laptop…',
-    'security.recovery_codes' => 'Recovery codes',
     'security.recovery_codes_note' =>
         'Save these now — they are shown once and each works a single time. They are the way back in if '
         . 'you lose your authenticator.',
@@ -1384,16 +1368,10 @@ return [
         '{count, plural, one {# unused code} other {# unused codes}}. Each works once, and they are the '
         . 'way back in if you lose your authenticator or every passkey you have registered.',
     'security.regenerate_recovery_codes' => 'Regenerate recovery codes',
-    'security.sessions_intro' =>
-        'Every browser currently signed in as you. Revoking one signs it out on its next request.',
     'security.sign_out_everywhere_else' => 'Sign out everywhere else',
     'security.this_device' => 'This device',
-    'security.title' => 'Account security',
     'security.totp_off' => 'Off. Add an authenticator app to require a six-digit code as well as your password.',
     'security.totp_off_password_label' => 'Confirm your password to turn two-step verification off',
-    'security.totp_on' => 'On. Codes from your authenticator app are required when you sign in.',
-    'security.totp_setup_action' => 'Set up an authenticator app',
-    'security.transports' => 'Transports',
     'security.turn_off' => 'Turn off',
     'security.your_recovery_codes' => 'Your recovery codes',
 
@@ -1408,9 +1386,6 @@ return [
 
     // settings
     'settings.allow_registration' => 'Allow anyone to create an account',
-    'settings.api_and_calendar' => 'API and calendar',
-    'settings.api_intro' =>
-        'Tokens for scripts, other machines and calendar apps. A token can never do more than you can.',
     'settings.api_key' => 'API key',
     'settings.base_currency' => 'Base currency',
     'settings.card_position' => 'Position of the {card} card',
@@ -1452,8 +1427,6 @@ return [
     'settings.role_for' => 'Role for {name}',
     'settings.save_household' => 'Save household',
     'settings.save_instance_settings' => 'Save instance settings',
-    'settings.security_intro' => 'Two-step verification, passkeys and the browsers currently signed in as you.',
-    'settings.signing_in' => 'Signing in',
     'settings.trust_this_host' => 'Trust this host',
     'settings.trusted_host_note_placeholder' => 'What this is, for later',
     'settings.trusted_host_placeholder' => 'gotify.lan, .lan, 192.168.1.10 or 100.64.0.0/10',
@@ -2145,4 +2118,22 @@ return [
     'token_ability.write' => 'Read and write',
     'visibility.household' => 'Household',
     'visibility.payer' => 'Only me',
+
+    // -----------------------------------------------------------------------
+    // Phase 27: the profile
+    // -----------------------------------------------------------------------
+    'profile.appearance_heading' => 'Appearance & preferences',
+    'profile.dashboard_cards_heading' => 'Dashboard cards',
+    'profile.dashboard_cards_save' => 'Save dashboard cards',
+    'profile.new_recovery_codes' => 'New recovery codes',
+    'profile.passkey_added' => 'Passkey · added {date}',
+    'profile.passkey_remove' => 'Remove {name}',
+    'profile.session_address_unknown' => 'Unknown address',
+    'profile.session_meta' => '{address} · last seen {seen}',
+    'profile.session_sign_out' => 'Sign out {device}',
+    'profile.sessions_heading' => 'Where you’re signed in',
+    'profile.totp_on' => 'On',
+    'profile.totp_on_since' => 'On since {date} · {remaining} of {total} recovery codes left',
+    'profile.totp_set_up' => 'Set up',
+    'profile.two_step_heading' => 'Two-step verification & passkeys',
 ];

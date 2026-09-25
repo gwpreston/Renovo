@@ -305,13 +305,20 @@ Built in phases:
   read-only statement of the instance's isolation mode. Nobody can be invited
   as an Owner, and a removal that would dispose of rows nobody else has seen
   must say how. No migrations. See [Households and people](#households-and-people).
+- **Phase 27 — profile — complete.** Every account setting on one page,
+  `/profile`, for every role: name, email (with the pending change's resend and
+  cancel), picture, password with "sign out my other sessions", the
+  authenticator app, passkeys and recovery codes, where you're signed in (device,
+  address and last seen — no location), and appearance and preferences, which
+  save as you change them. `/settings/security` and `/profile/account` redirect
+  to their sections. No migrations. See [Signing in](#signing-in).
 
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-The current phase is **Phase 26 — members & roles**.
+The current phase is **Phase 27 — profile**.
 `PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
 archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
@@ -1474,7 +1481,7 @@ Three ways in, and they interlock rather than sitting side by side.
 **Password.** Always available, argon2id-hashed, throttled per account and per
 IP.
 
-**Authenticator app (TOTP).** Turn it on from **Settings → Account security**:
+**Authenticator app (TOTP).** Turn it on from **Profile → Two-step verification & passkeys**:
 scan the QR code and type the six-digit code it shows, to prove the app received
 the key. Turning two-step verification off requires your password, so a stolen
 but still-signed-in session cannot quietly remove it.
@@ -1498,7 +1505,7 @@ working, not a fault.
 **Recovery codes.** Ten of them, issued the first time you set up *either*
 factor — an authenticator app or a passkey — and shown once. Each works once.
 They are hashed like passwords, so nobody can read them back to you; regenerate
-a set from **Settings → Account security** (it invalidates the old one) and
+a set from **Profile → New recovery codes** (it invalidates the old one) and
 store them somewhere other than the device they are protecting. Removing your
 last second factor clears them, because there is then nothing to recover into.
 
@@ -1529,9 +1536,8 @@ history. `maintenance:prune` removes entries older than
 
 ### Active sessions
 
-**Settings → Account security** lists every browser signed in as you — device,
-address, when it started and when it was last seen — with the current one
-marked. Revoking one deletes its session row, so that browser is anonymous on
+**Profile → Where you're signed in** lists every browser signed in as you —
+device, address and when it was last seen — with the current one marked. Revoking one deletes its session row, so that browser is anonymous on
 its very next request; there is no window in which a revoked session still
 works. A completed password reset revokes every session on the account, since
 the reset may well have been prompted by somebody else having one.

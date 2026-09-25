@@ -12,6 +12,11 @@ use App\Domain\WeekStart;
 use App\I18n\Locales;
 use App\I18n\Translator;
 use App\Security\SessionInterface;
+use App\Service\Auth\RecoveryCodeService;
+use App\Service\Auth\SessionDirectoryService;
+use App\Service\Auth\TotpService;
+use App\Service\Auth\TwoFactorService;
+use App\Service\Auth\WebAuthnService;
 use App\Service\AvatarStorage;
 use App\Service\DashboardLayoutService;
 use App\Service\UserPreferencesService;
@@ -29,16 +34,19 @@ use Slim\Views\Twig;
  * nothing that anybody else does — whereas most of Settings is a household or
  * an instance deciding something on everybody's behalf.
  *
- * `/profile` and `/profile/account` used to be two screens, reached from two
- * corners of the same shell, and the line between them was not one a reader
- * had to draw: both acted on the id in the session and neither needed a
- * permission. They are one page now. This controller renders it and
- * `AccountController` still answers the name, address, password and picture
- * forms on it — one page, two controllers, because "how this looks" and "who
- * is looking" remain different subjects however they are laid out.
+ * `/profile`, `/profile/account` and `/settings/security` used to be three
+ * screens, and the lines between them were not ones a reader had to draw:
+ * each acted on the id in the session and none needed a permission. They are
+ * one page now. This controller renders it; `AccountController` answers the
+ * name, address, password and picture forms on it and `SecurityController`
+ * the second factors and sessions — one page, three controllers, because
+ * "how this looks", "who is looking" and "how they get in" remain different
+ * subjects however they are laid out.
  */
 final class ProfileController extends Controller
 {
+    private const APPEARANCE = '/profile#appearance';
+
     public function __construct(
         Twig $view,
         SessionInterface $session,
@@ -50,21 +58,50 @@ final class ProfileController extends Controller
         // AccountController's, and so is every other write this page's forms
         // make; what this controller owns is the page they are drawn on.
         private readonly AvatarStorage $avatarStorage,
+        // Read-only here, for the two-step and sessions sections. Their
+        // writes are SecurityController's.
+        private readonly TotpService $totp,
+        private readonly TwoFactorService $twoFactor,
+        private readonly WebAuthnService $webAuthn,
+        private readonly SessionDirectoryService $sessions,
     ) {
         parent::__construct($view, $session, $translator);
     }
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        $user = $this->user($request);
+
+        // Shown once: read and forgotten in the same breath, so a refresh
+        // cannot bring them back. See SecurityController::RECOVERY_CODES_KEY.
+        $codes = $this->session->get(SecurityController::RECOVERY_CODES_KEY);
+        $this->session->remove(SecurityController::RECOVERY_CODES_KEY);
+
+        $locales = $this->locales->choices();
+
         return $this->render($request, $response, 'profile/index.twig', [
             'themes' => Theme::cases(),
             'palettes' => Palette::cases(),
             'densities' => Density::cases(),
             'week_starts' => WeekStart::cases(),
             'landing_views' => LandingView::cases(),
-            'locale_choices' => $this->locales->choices(),
-            'dashboard_layouts' => $this->dashboard->allFor($this->user($request)->id),
+            // A choice between one catalogue and the instance default — which
+            // is that same catalogue — is not a choice, so the control is not
+            // drawn until a second language exists.
+            'locale_choices' => count($locales) > 1 ? $locales : [],
+            'dashboard_layouts' => $this->dashboard->allFor($user->id),
             'avatar_max_kilobytes' => max(1, intdiv($this->avatarStorage->maxBytes(), 1024)),
+            'totp' => [
+                'enabled_since' => $this->totp->enabledSince($user->id),
+            ],
+            'recovery' => [
+                'remaining' => $this->twoFactor->unusedRecoveryCodeCount($user->id),
+                'total' => RecoveryCodeService::CODE_COUNT,
+                'applicable' => $this->twoFactor->isRequiredFor($user->id),
+            ],
+            'recovery_codes' => is_array($codes) ? $codes : [],
+            'passkeys' => $this->webAuthn->credentialsFor($user->id),
+            'sessions' => $this->sessions->listFor($user, $this->session->id()),
         ]);
     }
 
@@ -100,41 +137,60 @@ final class ProfileController extends Controller
     }
 
     /**
-     * The palette picker. Self-service like the rest of this page: it changes
-     * how one account's pages look and nothing anybody else sees, so it needs
-     * no permission beyond being signed in — a Viewer chooses their own.
+     * Appearance & preferences.
+     *
+     * With script the form posts on every change, and the answer is a 204
+     * carrying what was saved, which app.js puts on the root element so the
+     * page restyles under the reader without a reload. Without script it is
+     * one button and a redirect back to the section.
+     *
+     * A refusal is never a silent 204: it becomes a flash and a full load of
+     * the section, with or without script, so the error is on screen.
      */
-    public function updatePalette(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
-    {
-        $body = $this->body($request);
-        $palette = is_scalar($body['palette'] ?? null) ? (string) $body['palette'] : null;
-
-        try {
-            $this->preferences->updatePalette($this->user($request)->id, $palette);
-            $this->flash('success', 'flash.palette_saved');
-        } catch (ValidationException $exception) {
-            $this->flashErrors($exception);
-        }
-
-        return $this->redirectAfterWrite($request, $response, '/profile');
-    }
-
     public function updatePreferences(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $body = $this->body($request);
-        $userId = $this->user($request)->id;
+        try {
+            $saved = $this->preferences->update($this->user($request)->id, $this->body($request));
+        } catch (ValidationException $exception) {
+            $this->flashErrors($exception);
 
-        $this->preferences->update($userId, $body);
+            return $this->redirectAfterWrite($request, $response, self::APPEARANCE);
+        }
+
+        if ($this->isHtmx($request)) {
+            $detail = array_filter($saved, static fn (?string $value): bool => $value !== null)
+                + ['message' => $this->translator->trans('flash.preferences_saved')];
+
+            return $response
+                ->withHeader('HX-Trigger', (string) json_encode(['renovo:preferences' => $detail]))
+                ->withStatus(204);
+        }
+
+        $this->flash('success', 'flash.preferences_saved');
+
+        return $this->redirectAfterWrite($request, $response, self::APPEARANCE);
+    }
+
+    /**
+     * Which cards each dashboard view shows, and in what order. A form of its
+     * own: it is a set of numbers typed one after another, which saving on
+     * every change would save half-way through.
+     */
+    public function updateDashboardCards(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $body = $this->body($request);
 
         $this->dashboard->updateSubmitted(
-            $userId,
+            $this->user($request)->id,
             is_array($body['card_position'] ?? null) ? $body['card_position'] : [],
             is_array($body['card_visible'] ?? null) ? $body['card_visible'] : [],
         );
 
-        $this->flash('success', 'flash.preferences_saved');
+        $this->flash('success', 'flash.dashboard_cards_saved');
 
-        return $this->redirectAfterWrite($request, $response, '/profile');
+        return $this->redirectAfterWrite($request, $response, '/profile#dashboard-cards');
     }
 
     /**

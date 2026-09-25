@@ -57,4 +57,15 @@ final class ActiveSession
 
         return $browser . ' on ' . $platform;
     }
+
+    /**
+     * Whether the user agent names a phone or tablet, which chooses the icon
+     * drawn beside the session. Presentation only, like the label.
+     */
+    public function isHandheld(): bool
+    {
+        $agent = $this->userAgent ?? '';
+
+        return preg_match('/iPhone|iPad|Android|Mobile/', $agent) === 1;
+    }
 }

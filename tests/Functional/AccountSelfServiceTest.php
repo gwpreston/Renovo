@@ -125,11 +125,13 @@ final class AccountSelfServiceTest extends DatabaseTestCase
         $body = (string) $this->request('GET', '/profile')->getBody();
 
         $actions = [
-            '/profile/name',
-            '/profile/email',
+            '/profile/details',
             '/profile/password',
             '/profile/avatar',
+            '/profile/two-step/totp',
             '/profile/preferences',
+            '/profile/dashboard-cards',
+            '/logout',
         ];
 
         foreach ($actions as $action) {
@@ -156,7 +158,7 @@ final class AccountSelfServiceTest extends DatabaseTestCase
         $response = $this->request('GET', '/profile/account');
 
         self::assertSame(302, $response->getStatusCode());
-        self::assertSame('/profile', $response->getHeaderLine('Location'));
+        self::assertSame('/profile#details', $response->getHeaderLine('Location'));
     }
 
     // -------------------------------------------------------------- the name
@@ -165,7 +167,7 @@ final class AccountSelfServiceTest extends DatabaseTestCase
     {
         $this->signIn($this->memberId);
 
-        $this->request('POST', '/profile/name', ['display_name' => 'Mary Renamed']);
+        $this->details('member@example.test', 'Mary Renamed');
 
         self::assertSame('Mary Renamed', $this->reload($this->memberId)->displayName);
         self::assertTrue($this->hasAudit(AuditAction::NameChanged));
@@ -175,7 +177,7 @@ final class AccountSelfServiceTest extends DatabaseTestCase
     {
         $this->signIn($this->memberId);
 
-        $this->request('POST', '/profile/name', ['display_name' => '   ']);
+        $this->details('member@example.test', '   ');
 
         self::assertSame('Mary Member', $this->reload($this->memberId)->displayName);
     }
@@ -186,7 +188,7 @@ final class AccountSelfServiceTest extends DatabaseTestCase
     {
         $this->signIn($this->memberId);
 
-        $this->request('POST', '/profile/email', ['email' => 'new@example.test']);
+        $this->details('new@example.test');
 
         $member = $this->reload($this->memberId);
         self::assertSame('member@example.test', $member->email, 'The login must not move yet.');
@@ -216,7 +218,7 @@ final class AccountSelfServiceTest extends DatabaseTestCase
     {
         $this->signIn($this->memberId);
 
-        $this->request('POST', '/profile/email', ['email' => 'house@example.test']);
+        $this->details('house@example.test');
 
         self::assertNull($this->reload($this->memberId)->pendingEmail);
         self::assertSame([], $this->mailer->messages);
@@ -225,7 +227,7 @@ final class AccountSelfServiceTest extends DatabaseTestCase
     public function testAnAddressTakenAfterTheRequestIsRefusedAtConfirmationToo(): void
     {
         $this->signIn($this->memberId);
-        $this->request('POST', '/profile/email', ['email' => 'later@example.test']);
+        $this->details('later@example.test');
 
         $token = $this->mailer->lastTokenFromMessage(0);
         self::assertNotNull($token);
@@ -244,15 +246,95 @@ final class AccountSelfServiceTest extends DatabaseTestCase
     {
         $this->signIn($this->memberId);
 
-        $this->request('POST', '/profile/email', ['email' => 'first@example.test']);
+        $this->details('first@example.test');
         $firstToken = $this->mailer->lastTokenFromMessage(0);
         self::assertNotNull($firstToken);
 
-        $this->request('POST', '/profile/email', ['email' => 'second@example.test']);
+        $this->details('second@example.test');
 
         self::assertSame('second@example.test', $this->reload($this->memberId)->pendingEmail);
         self::assertSame(410, $this->request('GET', '/confirm-email-change?token=' . $firstToken)->getStatusCode());
         self::assertSame('member@example.test', $this->reload($this->memberId)->email);
+    }
+
+    /**
+     * The address field arrives on every save holding the current address, so
+     * saving the name must not read that as a request to move to it.
+     */
+    public function testSavingWithTheAddressUntouchedChangesOnlyTheName(): void
+    {
+        $this->signIn($this->memberId);
+
+        $this->details('member@example.test', 'Mary Renamed');
+
+        $member = $this->reload($this->memberId);
+        self::assertSame('Mary Renamed', $member->displayName);
+        self::assertNull($member->pendingEmail);
+        self::assertSame([], $this->mailer->messages);
+        self::assertSame([], $this->errorFlashes());
+    }
+
+    /**
+     * Both fields are checked before either is written: a refused address
+     * does not leave a half-saved name behind it.
+     */
+    public function testARefusedAddressSavesNeitherField(): void
+    {
+        $this->signIn($this->memberId);
+
+        $this->details('house@example.test', 'Mary Renamed');
+
+        $member = $this->reload($this->memberId);
+        self::assertSame('Mary Member', $member->displayName);
+        self::assertNull($member->pendingEmail);
+    }
+
+    public function testThePendingChangeIsShownWithResendAndCancel(): void
+    {
+        $this->signIn($this->memberId);
+        $this->details('new@example.test');
+
+        $body = (string) $this->request('GET', '/profile')->getBody();
+
+        self::assertStringContainsString('Waiting for confirmation of new@example.test', $body);
+        self::assertStringContainsString('action="/profile/email/resend"', $body);
+        self::assertStringContainsString('action="/profile/email/cancel"', $body);
+    }
+
+    /**
+     * A resend is a new link to the new address, and only that: the old
+     * address was warned once, and the earlier link stops working.
+     */
+    public function testResendingSendsANewLinkToTheNewAddressOnly(): void
+    {
+        $this->signIn($this->memberId);
+        $this->details('new@example.test');
+        $firstToken = $this->mailer->lastTokenFromMessage(0);
+        self::assertNotNull($firstToken);
+
+        $this->request('POST', '/profile/email/resend');
+
+        self::assertCount(3, $this->mailer->messages);
+        self::assertStringContainsString('new@example.test', $this->recipientsOf(2));
+        self::assertTrue($this->hasAudit(AuditAction::EmailChangeResent));
+
+        $secondToken = $this->mailer->lastTokenFromMessage(2);
+        self::assertNotNull($secondToken);
+        self::assertSame(410, $this->request('GET', '/confirm-email-change?token=' . $firstToken)->getStatusCode());
+        self::assertSame('member@example.test', $this->reload($this->memberId)->email);
+
+        $this->request('GET', '/confirm-email-change?token=' . $secondToken);
+        self::assertSame('new@example.test', $this->reload($this->memberId)->email);
+    }
+
+    public function testResendingWithNothingPendingSendsNothing(): void
+    {
+        $this->signIn($this->memberId);
+
+        $this->request('POST', '/profile/email/resend');
+
+        self::assertSame([], $this->mailer->messages);
+        self::assertNotSame([], $this->errorFlashes());
     }
 
     // ---------------------------------------------------------- the password
@@ -431,6 +513,33 @@ final class AccountSelfServiceTest extends DatabaseTestCase
         $settings['uploads'] = $uploads;
 
         return $settings;
+    }
+
+    /**
+     * The "Who you are" form as the page submits it: both fields, every time.
+     */
+    private function details(string $email, string $name = 'Mary Member'): ResponseInterface
+    {
+        return $this->request('POST', '/profile/details', ['display_name' => $name, 'email' => $email]);
+    }
+
+    /**
+     * The error flashes waiting for the next page, without consuming them.
+     *
+     * @return list<string>
+     */
+    private function errorFlashes(): array
+    {
+        $flashes = $this->session->get('_flashes');
+
+        $messages = [];
+        foreach (is_array($flashes) ? $flashes : [] as $flash) {
+            if (is_array($flash) && ($flash['type'] ?? '') === 'error') {
+                $messages[] = (string) $flash['message'];
+            }
+        }
+
+        return $messages;
     }
 
     private function reload(int $userId): \App\Domain\Entity\User

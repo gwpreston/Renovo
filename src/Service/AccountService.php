@@ -60,6 +60,75 @@ final class AccountService
      */
     public function changeName(User $user, string $displayName): void
     {
+        $this->writeName($user, $this->validName($displayName));
+    }
+
+    /**
+     * The profile's "Who you are" form: a name and an address, saved together.
+     *
+     * Both are checked before either is written, so a refused address does not
+     * leave the name half-saved behind it, and the errors for both fields come
+     * back at once. The address field arrives on every save holding the
+     * current address, so an unchanged one is not a request — it is the field
+     * as it was drawn — and an account with no mailbox of its own is not
+     * offered the field at all, so a missing one is left alone too.
+     *
+     * Returns whether a confirmation link went out, which is what the reader
+     * needs to be told.
+     *
+     * @throws ValidationException
+     */
+    public function updateDetails(User $user, string $displayName, ?string $email): bool
+    {
+        $errors = [];
+        $name = '';
+        $newEmail = null;
+
+        try {
+            $name = $this->validName($displayName);
+        } catch (ValidationException $exception) {
+            $errors += $exception->errors();
+        }
+
+        if ($email !== null && trim($email) !== '') {
+            $normalised = $this->users->normaliseEmail($email);
+
+            if ($normalised !== $user->email) {
+                try {
+                    $newEmail = $this->validNewEmail($user, $normalised);
+                } catch (ValidationException $exception) {
+                    $errors += $exception->errors();
+                }
+            }
+        }
+
+        if ($errors !== []) {
+            throw new ValidationException($errors);
+        }
+
+        $this->writeName($user, $name);
+
+        if ($newEmail === null) {
+            return false;
+        }
+
+        // Asking for the address the account is already waiting on is a
+        // resend, not a second request: the same link replaces the old one,
+        // and the old address has already been told once.
+        if ($newEmail === $user->pendingEmail) {
+            $this->resendEmailChange($user);
+        } else {
+            $this->startEmailChange($user, $newEmail);
+        }
+
+        return true;
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function validName(string $displayName): string
+    {
         $displayName = trim($displayName);
 
         if ($displayName === '') {
@@ -70,6 +139,11 @@ final class AccountService
             throw ValidationException::field('display_name', 'error.name.too_long_100');
         }
 
+        return $displayName;
+    }
+
+    private function writeName(User $user, string $displayName): void
+    {
         if ($displayName === $user->displayName) {
             return;
         }
@@ -95,8 +169,44 @@ final class AccountService
      */
     public function requestEmailChange(User $user, string $email): void
     {
-        $email = $this->users->normaliseEmail($email);
+        $this->startEmailChange($user, $this->validNewEmail($user, $this->users->normaliseEmail($email)));
+    }
 
+    /**
+     * Send the confirmation link for the address already waiting, again.
+     *
+     * A fresh token rather than the old one mailed twice — the old one is not
+     * stored anywhere readable, and issuing replaces it, so only the newest
+     * link works. Only the new address is written to: the old one was told
+     * about the change when it was asked for, and telling it again on every
+     * resend would read like a second, separate request.
+     *
+     * @throws ValidationException
+     */
+    public function resendEmailChange(User $user): void
+    {
+        $pending = $user->pendingEmail;
+
+        if ($pending === null || $pending === '') {
+            throw ValidationException::field('email', 'error.email.nothing_pending');
+        }
+
+        if ($this->users->emailExists($pending)) {
+            // Taken since it was asked for. Resending a link that is bound to
+            // be refused at the last step helps nobody.
+            throw ValidationException::field('email', 'error.email.taken');
+        }
+
+        $this->mailConfirmation($user, $pending);
+
+        $this->audit->record(AuditAction::EmailChangeResent, $user, ['to' => $pending]);
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    private function validNewEmail(User $user, string $email): string
+    {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw ValidationException::field('email', 'error.email.invalid');
         }
@@ -120,11 +230,42 @@ final class AccountService
             throw ValidationException::field('email', 'error.email.no_mailbox');
         }
 
+        return $email;
+    }
+
+    private function startEmailChange(User $user, string $email): void
+    {
         // Replaces any previous request: `TokenRepository::issue()` drops the
         // earlier token for the same purpose, and the column holds one value,
         // so a second request cannot leave a first one live.
         $this->users->setPendingEmail($user->id, $email);
 
+        $this->mailConfirmation($user, $email);
+
+        $locale = $this->locales->resolve($user->locale);
+
+        $this->mailer->send(
+            $user->email,
+            $user->displayName,
+            $this->translator->trans(
+                'mail.email_change_notice.subject',
+                ['instance' => $this->settings->instanceName()],
+                $locale,
+            ),
+            $this->translator->trans('mail.email_change_notice.body', [
+                'name' => $user->displayName,
+                'new_email' => $email,
+            ], $locale),
+        );
+
+        $this->audit->record(AuditAction::EmailChangeRequested, $user, ['to' => $email]);
+    }
+
+    /**
+     * Issue a link and send it to the address it would move the account to.
+     */
+    private function mailConfirmation(User $user, string $email): void
+    {
         $token = $this->tokens->issue(
             $user->id,
             TokenRepository::PURPOSE_CONFIRM_EMAIL_CHANGE,
@@ -147,22 +288,6 @@ final class AccountService
                 'link' => $link,
             ], $locale),
         );
-
-        $this->mailer->send(
-            $user->email,
-            $user->displayName,
-            $this->translator->trans(
-                'mail.email_change_notice.subject',
-                ['instance' => $this->settings->instanceName()],
-                $locale,
-            ),
-            $this->translator->trans('mail.email_change_notice.body', [
-                'name' => $user->displayName,
-                'new_email' => $email,
-            ], $locale),
-        );
-
-        $this->audit->record(AuditAction::EmailChangeRequested, $user, ['to' => $email]);
     }
 
     public function cancelEmailChange(User $user): void

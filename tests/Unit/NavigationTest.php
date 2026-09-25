@@ -68,7 +68,6 @@ final class NavigationTest extends TestCase
             'the audit log is settings' => ['/audit', 'nav.settings'],
             'api tokens are settings' => ['/settings/api-tokens', 'nav.settings'],
             'backup is settings' => ['/settings/backup', 'nav.settings'],
-            'security is settings' => ['/settings/security', 'nav.settings'],
             // Starts with "/settings" and is not Settings: per-person, and its
             // own row.
             'alerts, which are not settings' => ['/settings/notifications', 'nav.notifications'],

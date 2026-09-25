@@ -1,0 +1,54 @@
+{#
+    Where you're signed in: every live session on the account.
+
+    Device (a guess from the user agent), address and last seen. No location:
+    turning an address into a place needs a lookup service or a database this
+    application does not ship, and a wrong town is worse than none.
+
+    The current session cannot be signed out from here — that is what the
+    Sign out at the foot of the page and in the rail is for — so it carries a
+    badge where the others carry a button.
+#}
+<section class="card" id="sessions" aria-labelledby="sessions-heading">
+    <h2 id="sessions-heading">{{ t('profile.sessions_heading') }}</h2>
+
+    <ul class="account-rows">
+        {% for item in sessions %}
+            <li class="account-row">
+                <span class="account-row-icon" aria-hidden="true">
+                    {{ icon(item.isHandheld() ? 'device-phone' : 'device-desktop') }}
+                </span>
+                <div class="account-row-text">
+                    <span class="account-row-name">{{ item.deviceLabel }}</span>
+                    <span class="account-row-meta">
+                        {{ t('profile.session_meta', {
+                            'address': item.ipAddress|default(t('profile.session_address_unknown')),
+                            'seen': item.lastActivity|local_date('d MMM y HH:mm'),
+                        }) }}
+                    </span>
+                </div>
+                <div class="account-row-actions">
+                    {% if item.isCurrent %}
+                        <span class="badge badge-info">{{ t('security.this_device') }}</span>
+                    {% else %}
+                        <form method="post" action="/profile/sessions/revoke" class="inline">
+                            {{ csrf_field() }}
+                            <input type="hidden" name="handle" value="{{ item.handle }}">
+                            <button type="submit" class="button button-quiet"
+                                    aria-label="{{ t('profile.session_sign_out', { 'device': item.deviceLabel }) }}">
+                                {{ t('nav.sign_out') }}
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+
+    {% if sessions|length > 1 %}
+        <form method="post" action="/profile/sessions/revoke-others" class="account-footer">
+            {{ csrf_field() }}
+            <button type="submit" class="button button-danger">{{ t('security.sign_out_everywhere_else') }}</button>
+        </form>
+    {% endif %}
+</section>

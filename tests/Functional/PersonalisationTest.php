@@ -339,7 +339,7 @@ final class PersonalisationTest extends DatabaseTestCase
         $withCard = (string) $this->request('GET', '/')->getBody();
         self::assertStringContainsString('Where it goes', $withCard, 'The card is there to begin with.');
 
-        $this->savePreferences([
+        $this->saveDashboardCards([
             'card_position' => ['overview' => ['where_it_goes' => '5', 'totals' => '1']],
             // where_it_goes is absent from card_visible, which is how an
             // unticked checkbox arrives.
@@ -351,7 +351,7 @@ final class PersonalisationTest extends DatabaseTestCase
 
     public function testReorderingCardsChangesTheirOrderOnThePage(): void
     {
-        $this->savePreferences([
+        $this->saveDashboardCards([
             'card_position' => [
                 'overview' => [
                     'where_it_goes' => '1',
@@ -428,6 +428,7 @@ final class PersonalisationTest extends DatabaseTestCase
         $profile = (string) $this->request('GET', '/profile')->getBody();
 
         self::assertStringContainsString('action="/profile/preferences"', $profile);
+        self::assertStringContainsString('action="/profile/dashboard-cards"', $profile);
         self::assertStringContainsString('name="landing_view"', $profile);
         self::assertStringContainsString(
             'name="card_position[overview][totals]"',
@@ -513,6 +514,16 @@ final class PersonalisationTest extends DatabaseTestCase
         $response = $this->request('POST', '/profile/preferences', $values);
 
         self::assertSame(302, $response->getStatusCode(), 'The preferences form must have accepted this.');
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function saveDashboardCards(array $values): void
+    {
+        $response = $this->request('POST', '/profile/dashboard-cards', $values);
+
+        self::assertSame(302, $response->getStatusCode(), 'The dashboard cards form must have accepted this.');
     }
 
     private function scope(): Scope
