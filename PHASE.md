@@ -4,136 +4,113 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 26 — members & roles
+# Phase 27 — profile
 
-The household's people, their roles and what each role may do, rebuilt to the
-prototype. The **behaviour** — adding a member, invites, resets, revoking login,
-removal, the last-Owner guard, auditing — is Phase 15's. This phase is its screen,
-plus two things the prototype adds: a permission matrix generated from the rules
-the server enforces, and a read-only statement of the instance's isolation mode.
-
-**Phase 15 must be built first.** Its status list in the repository is still
-unticked; if it has not been built, build it before this phase (its behaviour and
-tests are the foundation here), and add the "Members & roles" rail item Phase 19
-left out.
+One page for everything a person sets for their own account: who they are, their
+password, two-step verification and passkeys, where they are signed in, and how
+the application looks and behaves for them. Today these are spread across
+`/profile`, the appearance section of Settings and the security pages; the
+prototype gathers them, and this phase moves them onto `/profile` with the old
+routes redirecting. It is self-service throughout — it acts on the signed-in
+account only and needs no household permission, so a Viewer can use all of it.
 
 ## Depends on
 
-- **Phase 15** — membership status, invites, `disabled_at`, removal with
-  reassign-or-delete, the last-Owner guard, avatars, audit entries.
-- **The Contributor role** — already built.
-- **Phase 20** — private rows (their handling on removal, their exclusion from
-  shares).
-- **`PermissionService`** — the single source for what a role may do.
+- **Phase 15** — name, email change with re-verification, password change with
+  "sign out other sessions", avatars.
+- **Phase 4** — TOTP, passkeys, recovery codes, the session list and revocation.
+- **Phase 18** — the palette preference; **Phase 6** — density, week start,
+  language, landing view; theme (Phase 1).
 
 ## In scope this phase (build ONLY these)
 
-### A. The page
+### A. Who you are
 
-Intro: "Everyone in the {household} household and what their role lets them do.
-Only Owners can change roles, invite people or remove them." **Invite member**
-as a secondary header button, Owner/Admin only.
+Avatar with **Upload picture** / **Remove** — PNG, JPEG, WebP or GIF, re-encoded,
+with the size cap Phase 15 set (the prototype's "JPG or PNG, up to 512 KB" is
+replaced by the real rule). Name. Email, with the hint "Changing it sends a
+confirmation link to the new address" and, while a change is pending, "Waiting
+for confirmation of {new address} — resend / cancel". **Save changes**.
 
-### B. Members table
+### B. Password
 
-| Column | Content |
-| --- | --- |
-| Member | avatar (initials fallback), name, email; "· you" on your own row |
-| Role | a select for an Owner/Admin on others' rows (Owner/Admin, Editor, Contributor, Viewer); plain text otherwise and on your own row |
-| Status | Active (ok) / Invite pending (warn) / Login revoked (bad) — each with text |
-| Last seen | ICU relative date from the latest session, "never" for pending |
-| Monthly share | the member's monthly share after splits and subscription count — as the viewer is entitled to see it: a non-payer never sees private rows counted, and in ISOLATED a member sees only their own share (others show "—") |
-| Actions | Resend invite (pending) · Send reset · Revoke login / Restore login · Remove — Owner/Admin only, not on your own row |
+Current password, new password, confirm, a **Sign out my other sessions**
+checkbox (ticked by default), **Update password**.
 
-A role change submits on change (htmx; a Save button without script), passes the
-last-Owner guard and writes an audit entry. **Remove** opens a confirmation that,
-where the member owns private rows or the mode is ISOLATED, asks to reassign them
-to an Owner/Admin or delete them — Phase 15's prompt, now also for private rows
-(Phase 20).
+### C. Two-step verification & passkeys
 
-Below 768px the table becomes cards with the same controls.
+- **Authenticator app**: "On since {date} · {N} of 10 recovery codes left", with
+  Turn off (re-authenticated) — or Set up when off.
+- **Passkeys**: each with its name and date added, rename and remove; **Add a
+  passkey**.
+- **New recovery codes** (shown once, replacing the old set).
 
-### C. Invite modal
+### D. Where you're signed in
 
-"Invite to {household}", "They'll get an email link that expires in {N} days"
-(N from the existing token lifetime, not a fixed 7). Name, Email, Role as cards
-with a one-line description each — **Editor, Contributor, Viewer**; a new member
-is never invited as Owner (promote afterwards). **This member has no email**
-toggle for Phase 15's temporary-credential path, if that path was built.
+Each session: device from the user agent, **IP address** and last seen — no
+location (decision 17). "This device" badge on the current one; **Sign out** on
+each other session; **Sign out everywhere else**.
 
-### D. What each role can do
+### E. Appearance & preferences
 
-The prototype's matrix — rows by capability, columns by role, cells Yes / Own
-only / No, each with text and an icon — **generated from `PermissionService`**
-and the scoping rules, never hand-written, so the page cannot claim a permission
-the server does not enforce. Rows:
+- Theme — System / Light / Dark
+- Colour scheme — the five palette swatches (moved here from Phase 18's
+  interim place)
+- List density — Comfortable / Compact
+- Week starts on — Monday / Sunday
+- Language — only the catalogues that exist (today: English); the control is
+  hidden while there is one
+- Open on — Dashboard / Subscriptions / Calendar
 
-- View subscriptions & totals
-- Add subscriptions
-- Edit prices, splits & invoices
-- Manage budgets
-- Categories, tags & payment methods
-- Import & bulk edit
-- Members, backups & settings
+Each saves on change (htmx; one Save button without script).
 
-Caption: "'Own only' means only rows that member pays for."
+### F. Sign out
 
-### E. Data visibility
-
-A read-only card: the instance's mode (**Shared** or **Isolated**) with a
-one-paragraph explanation of what it means for this household, and — for an
-instance administrator only — a link to the instance setting where it is changed
-(decision 3). The "Only me" note, corrected to match Phase 20: "A subscription
-set to 'Only me' is hidden from everyone else in either mode, and its cost is
-left out of their totals."
+At the foot of the page, as well as in the rail's user card.
 
 ## Data-model changes
 
-**None** beyond Phase 15's.
+**None.**
 
 ## Explicitly out of scope
 
-- Changing isolation from this page (decision 3).
-- A household switcher (decision 16).
-- Instance-wide user administration.
+- Session locations (decision 17).
+- OIDC-linked identities (OIDC is not built).
+- New preferences.
 
 ## Decisions & assumptions (confirm or correct before build)
 
-- Phase 15 is built first if it is not already.
-- The matrix is generated from `PermissionService`, and its rows are the ones
-  above.
-- New members cannot be invited as Owner.
-- Monthly share is shown only as far as the viewer may see it.
+- Old appearance/security routes **redirect** to the matching `/profile`
+  section rather than being removed outright, so bookmarks keep working.
+- "Sign out my other sessions" is ticked by default on password change.
+- The language control is hidden while only English exists.
 
 ## Status
 
-- [x] Phase 15 confirmed built (or built first)
-- [x] Members table + mobile cards; inline role change with guard and audit
-- [x] Actions: resend, reset, revoke/restore, remove (private-row prompt)
-- [x] Invite modal (role cards; no-email path if built)
-- [x] Generated permission matrix
-- [x] Read-only data visibility card
-- [x] New strings in `translations/en.php`
-- [x] `composer check`, `i18n:check` green on both engines
+- [ ] Who you are (avatar rules, pending email state)
+- [ ] Password with sign-out-others
+- [ ] TOTP, passkeys, recovery codes
+- [ ] Sessions (no location), sign out one / everywhere else
+- [ ] Appearance & preferences, including the palette picker
+- [ ] Redirects from the old routes; rail user card active on `/profile`
+- [ ] New strings in `translations/en.php`
+- [ ] `composer check`, `i18n:check` green on both engines
 
 ## Definition of done
 
-An Owner/Admin can manage every member from this page; everyone else sees it
-read-only; the matrix matches what the server enforces; shares reveal nothing the
-viewer may not see; all palettes × themes, wide and narrow; gates green on both
-engines. Then update `PHASE.md` to the next phase.
+Every account setting is on `/profile`, works for every role, with and without
+script, and the old routes land on the right section; all palettes × themes,
+wide and narrow; gates green on both engines. Then update `PHASE.md` to the next
+phase.
 
 ## Tests
 
-- Matrix cells equal `PermissionService` answers (and scoping's "own only") for
-  every role and row — a change to either fails the test.
-- Editor, Contributor and Viewer: no management controls rendered, and 403 on
-  every management endpoint.
-- The last Owner cannot be demoted through the inline select.
-- Removing a member who owns private rows requires a reassign-or-delete choice
-  in SHARED as well as ISOLATED, and leaves no orphaned `owner_user_id`.
-- Monthly share excludes private rows for non-payers; ISOLATED shows "—" for
-  others.
-- Invite cannot create an Owner; the expiry text matches the token lifetime.
-- Every action writes its audit entry.
-- `AccessibilityTest` passes on the page and the modal.
+- A Viewer can change every setting on the page; nobody can change another
+  account's.
+- Password: a wrong current password leaves the hash unchanged; the checkbox
+  revokes other sessions and keeps the current one.
+- Email change keeps the old address live until confirmation.
+- Avatar: disguised and oversized files rejected; remove restores initials.
+- Sessions: revoking one invalidates it immediately; no location is rendered.
+- Every old route redirects to its `/profile` section.
+- `AccessibilityTest` passes.
