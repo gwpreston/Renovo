@@ -240,6 +240,11 @@ final class MemberAdministrationTest extends DatabaseTestCase
         $token = $this->inviteLinkToken();
         $this->session->clear();
 
+        // Every placeholder in the subject filled, the inviter's name above all.
+        $message = end($this->mailer->messages);
+        self::assertInstanceOf(\Symfony\Component\Mime\Email::class, $message);
+        self::assertSame('Olive Owner has invited you to Renovo', $message->getSubject());
+
         $form = $this->request('GET', '/accept-invite?token=' . $token);
         self::assertSame(200, $form->getStatusCode(), (string) $form->getBody());
         self::assertStringContainsString('name="password"', (string) $form->getBody());

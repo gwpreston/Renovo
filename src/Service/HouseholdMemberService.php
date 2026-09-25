@@ -587,7 +587,7 @@ final class HouseholdMemberService
             $member->displayName,
             $this->translator->trans(
                 'mail.invite.subject',
-                ['instance' => $this->settings->instanceName()],
+                ['inviter' => $actor->displayName, 'instance' => $this->settings->instanceName()],
                 $locale,
             ),
             $this->translator->trans('mail.invite.body', [
