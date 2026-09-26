@@ -303,7 +303,7 @@
                                        {% if loop.first or member.id == current_user.id and confined %}id="owner_user_id"{% endif %}
                                        {% if confined %}disabled aria-describedby="owner_user_id-hint"{% endif %}
                                        {{ owner == member.id ? 'checked' : '' }}>
-                                <span class="member-initials" aria-hidden="true">{{ member.display_name|initials }}</span>
+                                {% set tone = avatar_tone(member.id) %}<span class="member-initials{{ tone ? ' avatar-tone-' ~ tone : '' }}" aria-hidden="true">{{ member.display_name|first_initial }}</span>
                                 <span>{{ member.display_name }}</span>
                             </label>
                         {% endif %}
@@ -360,7 +360,7 @@
                             <label class="filter-chip member-chip">
                                 <input type="checkbox" name="split_with[]" value="{{ member.id }}"
                                        {{ member.id in split_with ? 'checked' : '' }}>
-                                <span class="member-initials" aria-hidden="true">{{ member.display_name|initials }}</span>
+                                {% set tone = avatar_tone(member.id) %}<span class="member-initials{{ tone ? ' avatar-tone-' ~ tone : '' }}" aria-hidden="true">{{ member.display_name|first_initial }}</span>
                                 <span>{{ member.display_name }}</span>
                             </label>
                         {% endfor %}

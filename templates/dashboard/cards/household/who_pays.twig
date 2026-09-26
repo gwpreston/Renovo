@@ -1,6 +1,7 @@
 {#
     Who pays what: each member's monthly share after splits, how many
     subscriptions that is, and the part of the household's spend it makes up.
+    Each bar is in the member's own tone, the one their avatar is drawn in.
 
     In ISOLATED mode the viewer cannot see the household, so the card says
     only what they can: their own share, retitled "Your share", with no
@@ -25,7 +26,7 @@
                 {% set member = row.member %}
                 {% set percent = who_pays.percents[member.userId] ?? null %}
                 <li class="who-pays-row">
-                    {{ avatar.face(member.userId, member.displayName, member.initials(), member.hasAvatar, 32) }}
+                    {{ avatar.face(member.userId, member.displayName, member.hasAvatar, 32) }}
                     <div class="who-pays-body">
                         <p class="who-pays-head">
                             <strong>{{ member.displayName }}</strong>
@@ -38,9 +39,10 @@
                             </span>
                         </p>
                         {% if percent is not null %}
-                            <div class="meter meter-slim" role="img"
+                            <div class="meter" role="img"
                                  aria-label="{{ t('dashboard.share_of_spend', {'name': member.displayName, 'percent': percent}) }}">
-                                <span class="meter-fill" style="width: {{ min(percent, 100) }}%"></span>
+                                {% set tone = avatar_tone(member.userId) %}
+                                <span class="meter-fill{{ tone ? ' avatar-tone-' ~ tone : '' }}" style="width: {{ min(percent, 100) }}%"></span>
                             </div>
                         {% endif %}
                         <p class="hint">

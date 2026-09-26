@@ -132,6 +132,12 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
             'colour_auto' => '1',
         ]);
         $renamed = $this->methods()[0];
+
+        // Listed as a chip that opens to edit it, above the form that adds one.
+        $page = $this->body($this->request('GET', '/settings'));
+        $chip = strpos($page, '<details class="setting-chip"');
+        self::assertNotFalse($chip);
+        self::assertGreaterThan($chip, strpos($page, 'action="/payment-methods" enctype'));
         self::assertSame('Joint account', $renamed->name);
         self::assertNull($renamed->colour);
         self::assertSame($method->logoPath, $renamed->logoPath);
@@ -169,6 +175,7 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
         self::assertSame(200, $response->getStatusCode());
         $page = $this->body($response);
         self::assertStringContainsString('Joint card', $page);
+        self::assertStringContainsString('<span class="setting-chip is-static">', $page);
         self::assertStringNotContainsString('<form method="post" action="/payment-methods', $page);
 
         self::assertSame(403, $this->request('POST', '/payment-methods', ['name' => 'Nope'])->getStatusCode());

@@ -28,7 +28,7 @@
             </div>
 
             <nav class="calendar-nav" aria-label="{{ t('calendar.month_navigation') }}">
-                <a class="button button-quiet calendar-today"
+                <a class="button button-outline calendar-today"
                    href="/calendar{{ mine_only ? '?mine=1' : '' }}"
                    hx-get="/calendar{{ mine_only ? '?mine=1' : '' }}"
                    hx-target="#calendar-month" hx-swap="outerHTML" hx-push-url="true">{{ t('state.today') }}</a>

@@ -91,6 +91,11 @@ final class Subscription
         public readonly ?DateTimeImmutable $cancelledAt = null,
         /** The tier it is on — "Standard", "Family" — as the provider names it. */
         public readonly ?string $plan = null,
+        /**
+         * The category's colour, joined with its name, so a breakdown can draw
+         * each category's bar in it without a query per category.
+         */
+        public readonly ?string $categoryColour = null,
     ) {
     }
 

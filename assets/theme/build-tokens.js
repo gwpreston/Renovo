@@ -103,14 +103,14 @@ export function generateThemeCss(tokens) {
     const system = ordered.map((key) => block(scoped(":root:not([data-theme='light'])", key), resolve(tokens, key, 'dark')));
     const dark = ordered.map((key) => block(scoped(":root[data-theme='dark']", key), resolve(tokens, key, 'dark')));
 
-    // What the palette picker draws each option with: the rail and the accent
-    // the option would give, as the light theme shows them. Scoped to the
-    // swatch rather than the page, so every option can show its own colours
-    // while the page wears one.
+    // What the palette picker draws each option with: the rail, the page
+    // beside it and the accent the option would give, as the light theme
+    // shows them. Scoped to the swatch rather than the page, so every option
+    // can show its own colours while the page wears one.
     const swatches = ordered.map((key) => {
         const values = resolve(tokens, key, 'light');
 
-        return `[data-swatch='${key}'] {\n    --swatch-rail: ${values.rail};\n    --swatch-accent: ${values.accent};\n    --swatch-border: ${values['rail-border'] === 'transparent' ? values.rail : values['rail-border']};\n}`;
+        return `[data-swatch='${key}'] {\n    --swatch-rail: ${values.rail};\n    --swatch-accent: ${values.accent};\n    --swatch-border: ${values['rail-border'] === 'transparent' ? values.rail : values['rail-border']};\n    --swatch-canvas: ${values.bg};\n    --swatch-line: ${values.border};\n}`;
     });
 
     return [

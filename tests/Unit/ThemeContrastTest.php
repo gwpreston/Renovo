@@ -87,6 +87,16 @@ final class ThemeContrastTest extends TestCase
         'rail-accent' => ['rail', 'rail-active:rail'],
         'rail-bad' => ['rail'],
         'rail-info' => ['rail'],
+
+        // A member's placeholder: each tone's letter on its own disc.
+        'avatar-1-ink' => ['avatar-1'],
+        'avatar-2-ink' => ['avatar-2'],
+        'avatar-3-ink' => ['avatar-3'],
+        'avatar-4-ink' => ['avatar-4'],
+        'avatar-5-ink' => ['avatar-5'],
+        'avatar-6-ink' => ['avatar-6'],
+        'avatar-7-ink' => ['avatar-7'],
+        'avatar-8-ink' => ['avatar-8'],
     ];
 
     /** Graphic => the grounds it has to be found on, at AA_NON_TEXT. */
@@ -95,9 +105,11 @@ final class ThemeContrastTest extends TestCase
         // The ring and the active item's icon on the rail; the signed-out
         // brand panel's feature icons on their tile.
         'rail-accent' => ['rail', 'rail-active:rail', 'rail-tint:rail'],
-        // The edge of a field, of a filter chip, of the toggle's track. A
-        // field is filled with surface-2, so its edge is found against that too.
+        // The edge of a filter chip and of the toggle's track, found on each
+        // ground they are set on.
         'border-control' => ['bg', 'surface', 'surface-2'],
+        // Not `border-field`: a text field's edge is deliberately lighter than
+        // this bound, and the field is found by its fill and label instead.
         // Chart series, on the card a chart is drawn on.
         's1' => ['surface'],
         's2' => ['surface'],
@@ -106,6 +118,15 @@ final class ThemeContrastTest extends TestCase
         's5' => ['surface'],
         's6' => ['surface'],
         's-other' => ['surface'],
+        // A member's bar on Who pays what, on the meter's track.
+        'avatar-1-ink' => ['surface-2'],
+        'avatar-2-ink' => ['surface-2'],
+        'avatar-3-ink' => ['surface-2'],
+        'avatar-4-ink' => ['surface-2'],
+        'avatar-5-ink' => ['surface-2'],
+        'avatar-6-ink' => ['surface-2'],
+        'avatar-7-ink' => ['surface-2'],
+        'avatar-8-ink' => ['surface-2'],
     ];
 
     private const SERIES = ['s1', 's2', 's3', 's4', 's5', 's6', 's-other'];

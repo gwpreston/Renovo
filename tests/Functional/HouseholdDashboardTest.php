@@ -16,10 +16,12 @@ use App\Repository\UserRepository;
 use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Service\BudgetService;
+use App\Service\CategoryService;
 use App\Service\ForecastService;
 use App\Service\HouseholdDashboardService;
 use App\Service\InstanceSettingsService;
 use App\Service\SplitService;
+use App\Support\AvatarTone;
 use App\Support\Clock;
 use App\Support\FrozenClock;
 use App\Tests\Integration\DatabaseTestCase;
@@ -213,6 +215,54 @@ final class HouseholdDashboardTest extends DatabaseTestCase
         self::assertStringContainsString('5 charges', $this->page($this->adaId));
     }
 
+    /**
+     * The ticks past today are the dates a week, two, three and thirty days
+     * on, not a count of days; the trial's marker colour has a key, and the
+     * list beneath names the conversion in words.
+     */
+    public function testTheTimelineIsTickedWithDatesAndKeysTheTrialColour(): void
+    {
+        $card = $this->card($this->page($this->adaId), 'aria-labelledby="timeline-heading"');
+
+        foreach (['Today', '22 Jun', '29 Jun', '6 Jul', '15 Jul'] as $tick) {
+            self::assertMatchesRegularExpression('/class="timeline-tick[^"]*"[^>]*>\s*' . $tick . '\s*</', $card);
+        }
+        self::assertStringNotContainsString('+7', $card);
+
+        self::assertStringContainsString('class="plain timeline-legend"', $card);
+        self::assertStringContainsString('<span class="timeline-key is-trial"></span>Trial ends', $card);
+        self::assertMatchesRegularExpression(
+            '/<li class="timeline-item is-trial">.*?Trial ends: <\/span>Trial plan/s',
+            $card,
+        );
+        self::assertSame(1, substr_count($card, 'timeline-item is-trial'), 'Only the conversion is a trial.');
+    }
+
+    public function testByCategoryDrawsEachBarInItsCategorysColour(): void
+    {
+        $category = $this->container()->get(CategoryService::class)
+            ->create($this->scopeFor($this->adaId), 'Streaming', '#AA3366');
+        $this->monthly($this->adaId, 'Films', 900, '2026-06-22', '2025-01-22', ['category_id' => $category]);
+
+        $card = $this->card($this->page($this->adaId), 'aria-labelledby="by-category-heading"');
+
+        self::assertMatchesRegularExpression(
+            '/Streaming.*?class="meter-fill" style="width: \d+%; background: #aa3366"/s',
+            $card,
+        );
+        // Uncategorised has no colour of its own, so it keeps the accent.
+        self::assertMatchesRegularExpression('/Uncategorised.*?class="meter-fill" style="width: \d+%"/s', $card);
+    }
+
+    public function testWhoPaysDrawsEachMembersBarInTheirTone(): void
+    {
+        $card = $this->card($this->page($this->adaId), 'class="card who-pays-card"');
+
+        foreach ([$this->adaId, $this->bramId] as $userId) {
+            self::assertStringContainsString('meter-fill avatar-tone-' . AvatarTone::of($userId) . '"', $card);
+        }
+    }
+
     public function testThePaceCardAppearsOnlyWithAHouseholdBudget(): void
     {
         self::assertNull($this->household($this->adaId)['pace']);
@@ -271,6 +321,15 @@ final class HouseholdDashboardTest extends DatabaseTestCase
 
         self::assertStringContainsString('June so far', $body);
         self::assertStringNotContainsString('who-pays-card', $body);
+    }
+
+    /** The card whose opening tag carries `$marker`, up to its close. */
+    private function card(string $html, string $marker): string
+    {
+        $start = strpos($html, $marker);
+        self::assertNotFalse($start, 'The card was drawn.');
+
+        return substr($html, $start, (int) strpos($html, '</section>', $start) - $start);
     }
 
     private function container(): ContainerInterface

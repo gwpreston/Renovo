@@ -19,18 +19,21 @@
 {% block heading %}{{ t('nav.members') }}{% endblock %}
 {% block page_subtitle %}{{ t('members.subtitle', {'household': household_name, 'count': rows|length}) }}{% endblock %}
 
-{% block page_actions %}
-    {% if may_manage %}
-        <a class="button button-quiet" href="/settings/members/invite"
-           data-opens-dialog="member-dialog" data-dialog-url="/settings/members/invite"
-           data-dialog-title="{{ t('members.invite_title', {'household': household_name}) }}">
-            {{ icon('user-add') }}<span class="button-label">{{ t('members.invite') }}</span>
-        </a>
-    {% endif %}
-{% endblock %}
-
 {% block content %}
-    <p class="muted note">{{ t('members.intro', {'household': household_name}) }}</p>
+    {#
+        Inviting is what an Owner/Admin comes here to do, so it wears the
+        accent at the head of the content, as New budget does on Budgets.
+    #}
+    <div class="page-header">
+        <p class="muted note">{{ t('members.intro', {'household': household_name}) }}</p>
+        {% if may_manage %}
+            <a class="button button-primary" href="/settings/members/invite"
+               data-opens-dialog="member-dialog" data-dialog-url="/settings/members/invite"
+               data-dialog-title="{{ t('members.invite_title', {'household': household_name}) }}">
+                {{ icon('user-add') }}<span>{{ t('members.invite') }}</span>
+            </a>
+        {% endif %}
+    </div>
 
     {#
         The one-time password, shown here and nowhere else.
@@ -74,7 +77,7 @@
                     <tr class="member-row" data-member="{{ member.userId }}">
                         <td class="member-cell-identity">
                             <span class="member-identity">
-                                {{ avatar.face(member.userId, member.displayName, member.initials(), member.hasAvatar, 34) }}
+                                {{ avatar.face(member.userId, member.displayName, member.hasAvatar, 34) }}
                                 <span class="member-names">
                                     <strong>
                                         {{- member.displayName -}}
@@ -159,7 +162,7 @@
                                     {% if member.canReceiveMail %}
                                         <form method="post" action="/settings/members/{{ member.userId }}/reset-password" class="inline">
                                             {{ csrf_field() }}
-                                            <button type="submit" class="button button-quiet member-action">
+                                            <button type="submit" class="button button-outline member-action">
                                                 {{ t('members.send_reset') }}
                                             </button>
                                         </form>
@@ -175,7 +178,7 @@
                                     {% else %}
                                         <form method="post" action="/settings/members/{{ member.userId }}/revoke" class="inline">
                                             {{ csrf_field() }}
-                                            <button type="submit" class="button button-quiet member-action">
+                                            <button type="submit" class="button button-outline member-action">
                                                 {{ t('members.revoke_login') }}
                                             </button>
                                         </form>

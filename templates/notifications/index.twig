@@ -121,7 +121,7 @@
                 typed except the secrets.
             #}
             <details class="settings-disclosure" id="add-channel" {{ submitted.channel_type is defined ? 'open' : '' }}>
-                <summary class="button">{{ icon('add') }}{{ t('notifications.add_a_channel') }}</summary>
+                <summary class="button button-outline">{{ icon('add') }}{{ t('notifications.add_a_channel') }}</summary>
 
                 {% for notifier in notifiers %}
                     {% set is_this = submitted.channel_type is defined and submitted.channel_type == notifier.key %}
@@ -240,7 +240,7 @@
                 </label>
 
                 <div class="form-actions">
-                    <button type="submit" class="button button-primary">{{ t('notifications.save_preferences') }}</button>
+                    <button type="submit" class="button button-outline">{{ t('notifications.save_preferences') }}</button>
                 </div>
             </form>
         </section>

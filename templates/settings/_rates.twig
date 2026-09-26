@@ -1,7 +1,8 @@
 {#
     Exchange rates: where they come from, what they are, and how fresh.
 
-    The provider is one of the three the application has (decision 11), and
+    The provider is one of the three the application has (decision 11),
+    offered as the same option cards as the invite dialog's roles, and
     changing it — or its key — is an instance administrator's, like the base
     currency. The key is a secret: the field is always drawn empty, a blank
     one keeps what is stored, and the environment's key wins over both.
@@ -21,7 +22,7 @@
         {% if can(scope, 'instance.manage') and not rates.retry_after %}
             <form method="post" action="/settings/rates/refresh" class="card-header-actions">
                 {{ csrf_field() }}
-                <button type="submit" class="button button-quiet">{{ icon('refresh') }}{{ t('settings.refresh_now') }}</button>
+                <button type="submit" class="button button-outline">{{ icon('refresh') }}{{ t('settings.refresh_now') }}</button>
             </form>
         {% endif %}
     </header>
@@ -31,15 +32,15 @@
         <form method="post" action="/settings/currency" class="stack">
             {{ csrf_field() }}
 
-            <fieldset class="stack">
+            <fieldset class="role-options">
                 <legend>{{ t('settings.rate_provider') }}</legend>
                 {% for provider in rate_providers %}
-                    <label class="choice">
+                    <label class="role-option">
                         <input type="radio" name="rate_provider" value="{{ provider.key }}"
                                {{ rates.provider == provider.key ? 'checked' : '' }}>
-                        <span>
-                            <strong>{{ provider.label }}</strong>
-                            <span class="muted block">{{ t(provider.descriptionKey) }}</span>
+                        <span class="role-option-text">
+                            <span class="role-option-name">{{ provider.label }}</span>
+                            <span class="hint">{{ t(provider.descriptionKey) }}</span>
                         </span>
                     </label>
                 {% endfor %}
@@ -57,7 +58,7 @@
             </label>
 
             <div class="form-actions">
-                <button type="submit" class="button">{{ t('settings.save_provider') }}</button>
+                <button type="submit" class="button button-outline">{{ t('settings.save_provider') }}</button>
             </div>
         </form>
     {% else %}

@@ -249,7 +249,7 @@ final class ShellTest extends DatabaseTestCase
         $html = $this->get('/calendar');
 
         self::assertSame(1, preg_match_all('/<h1\b/', $html));
-        self::assertMatchesRegularExpression('~<h1 class="topbar-title">\s*Billing Calendar\s*</h1>~', $html);
+        self::assertMatchesRegularExpression('~<h1 class="topbar-title">\s*Calendar\s*</h1>~', $html);
     }
 
     /**

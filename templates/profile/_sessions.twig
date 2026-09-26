@@ -34,7 +34,7 @@
                         <form method="post" action="/profile/sessions/revoke" class="inline">
                             {{ csrf_field() }}
                             <input type="hidden" name="handle" value="{{ item.handle }}">
-                            <button type="submit" class="button button-quiet"
+                            <button type="submit" class="button button-outline"
                                     aria-label="{{ t('profile.session_sign_out', { 'device': item.deviceLabel }) }}">
                                 {{ t('nav.sign_out') }}
                             </button>

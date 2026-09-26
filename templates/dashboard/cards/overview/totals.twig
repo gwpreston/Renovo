@@ -69,7 +69,7 @@
     monthly number mean nothing.
 #}
 {% if kpis.one_off is not empty %}
-    <p class="muted note">
+    <p class="muted note one-off-note">
         {% for total in kpis.one_off %}
             {{ t('dashboard.one_off_in', {'currency': total.currency}) }}
             {{ total.total_minor|money(total.currency) }}

@@ -151,11 +151,17 @@ final class DesignTokensTest extends TestCase
         );
     }
 
-    /** The picker's swatches are scoped to each option, one per palette. */
+    /**
+     * The picker's swatches are scoped to each option, one per palette, and
+     * each carries what its little picture of the app is drawn with.
+     */
     public function testEveryPaletteHasASwatch(): void
     {
         foreach (Palette::cases() as $palette) {
-            self::assertStringContainsString(sprintf('[data-swatch=%s]{', $palette->value), $this->css);
+            self::assertMatchesRegularExpression(
+                sprintf('/\[data-swatch=%s\]\{[^}]*--swatch-canvas:[^}]*--swatch-line:/', $palette->value),
+                $this->css,
+            );
         }
     }
 

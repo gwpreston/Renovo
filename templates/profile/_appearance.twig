@@ -10,8 +10,9 @@
 
     Theme, density and week start are few enough to show every option at once,
     so they are segmented controls — radios, which is what the reader is told
-    they are. The palettes are drawn in their own colours: `data-swatch` scopes
-    each one's rail and accent to its card, so the five can be compared while
+    they are. The palettes are drawn in their own colours, as a small picture of
+    the app — rail, page, an accent button: `data-swatch` scopes each one's
+    colours to its card, so the five can be compared while
     the page wears one of them.
 
     Language is drawn only once a second catalogue exists; a field that is not
@@ -75,7 +76,11 @@
                         <input type="radio" name="palette" value="{{ palette.value }}"
                                {{ current_user.palettePreference() == palette ? 'checked' : '' }}>
                         <span class="palette-swatch" aria-hidden="true">
-                            <span class="palette-swatch-accent"></span>
+                            <span class="palette-swatch-rail"></span>
+                            <span class="palette-swatch-page">
+                                <span class="palette-swatch-accent"></span>
+                                <span class="palette-swatch-muted"></span>
+                            </span>
                         </span>
                         <span class="palette-name">{{ t(palette.labelKey()) }}</span>
                     </label>

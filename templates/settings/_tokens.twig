@@ -75,7 +75,7 @@
 
     <div class="account-footer">
         <details class="account-row-more">
-            <summary class="button">{{ icon('add') }}{{ t('settings.new_token') }}</summary>
+            <summary class="button button-outline">{{ icon('add') }}{{ t('settings.new_token') }}</summary>
 
             <form method="post" action="/settings/api-tokens" class="stack">
                 {{ csrf_field() }}
@@ -102,7 +102,7 @@
         </details>
 
         <details class="account-row-more">
-            <summary class="button button-quiet">{{ t('tokens.using_them') }}</summary>
+            <summary class="button button-outline">{{ t('tokens.using_them') }}</summary>
 
             <p>{{ t('tokens.bearer_note') }}</p>
             <pre class="code-block">curl -H "Authorization: Bearer rnv_..." \

@@ -32,8 +32,8 @@ use App\Support\MoneyFormatter;
  * **It breaks down more than categories.** Payment methods have the same shape
  * and the same currency problem, so the statistics carry `by_payment_method`
  * beside `by_category` and this takes the key to read. A row may carry a
- * `colour` — payment methods store one for their segment — which rides through
- * to the group untouched; a row without one is coloured by the palette.
+ * `colour` — categories and payment methods each store one — which rides
+ * through to the group untouched; a row without one is coloured by the palette.
  *
  * @phpstan-import-type Bars from Distribution
  * @phpstan-type Source list<array{name: string, currency: string, monthly_minor: int, colour?: string|null}>
@@ -129,9 +129,8 @@ final class CategoryBreakdownService
                 'display' => $this->money->formatMinor($row['amount_minor'], $currency),
                 'percent' => $row['percent'],
                 'is_other' => false,
-                // A payment method's own colour when it has one; null takes
-                // the palette. Categories carry none, so their donut is as it
-                // was.
+                // The category's or payment method's own colour when it has
+                // one; null takes the palette.
                 'colour' => $row['colour'],
                 // The subscriptions with no payment method, which the
                 // statistics name with the empty string. Its label is the

@@ -20,23 +20,35 @@
             pushes the query string, so the view is bookmarkable and the back
             button works. The rest of the filter rides along in the hidden
             fields `_toolbar.twig` keeps current.
+
+            The add button sits beside it but outside the form: it is a link to
+            the quick-add dialog, not part of the search.
         #}
-        <form id="list-search" class="list-search" role="search" method="get" action="/subscriptions"
-              hx-get="/subscriptions"
-              hx-target="#subscription-list"
-              hx-select="#subscription-list"
-              hx-swap="outerHTML"
-              hx-push-url="true"
-              hx-trigger="keyup changed delay:300ms from:#q, search from:#q, submit">
-            <label for="q" class="visually-hidden">{{ t('subscriptions.search') }}</label>
-            <span class="list-search-field">
-                {{ icon('search') }}
-                <input type="search" id="q" name="q" value="{{ filter.search }}"
-                       placeholder="{{ t('subscriptions.filter_placeholder') }}">
-            </span>
-            {% include 'subscriptions/_toolbar_search_state.twig' %}
-            <noscript><button type="submit" class="button">{{ t('subscriptions.apply_filters') }}</button></noscript>
-        </form>
+        <div class="list-search-bar">
+            <form id="list-search" class="list-search" role="search" method="get" action="/subscriptions"
+                  hx-get="/subscriptions"
+                  hx-target="#subscription-list"
+                  hx-select="#subscription-list"
+                  hx-swap="outerHTML"
+                  hx-push-url="true"
+                  hx-trigger="keyup changed delay:300ms from:#q, search from:#q, submit">
+                <label for="q" class="visually-hidden">{{ t('subscriptions.search') }}</label>
+                <span class="list-search-field">
+                    {{ icon('search') }}
+                    <input type="search" id="q" name="q" value="{{ filter.search }}"
+                           placeholder="{{ t('subscriptions.filter_placeholder') }}">
+                </span>
+                {% include 'subscriptions/_toolbar_search_state.twig' %}
+                <noscript><button type="submit" class="button">{{ t('subscriptions.apply_filters') }}</button></noscript>
+            </form>
+
+            {% if can(scope, 'subscription.create') %}
+                <a class="button button-primary list-search-add" href="/subscriptions/new"
+                   data-opens-dialog="quick-add">
+                    {{ icon('add') }}<span>{{ t('subscriptions.add_subscription') }}</span>
+                </a>
+            {% endif %}
+        </div>
 
         {% include 'subscriptions/_toolbar.twig' with {'oob': false} %}
     </section>

@@ -17,7 +17,7 @@
 <div class="user-card">
     <a class="user-card-link{{ account.active ? ' is-active' : '' }}" href="{{ account.href }}"
        {{ account.active ? 'aria-current="page"' : '' }}>
-        {{ avatar.face(user.id, user.displayName, user.initials(), user.avatarPath is not null, 36) }}
+        {{ avatar.face(user.id, user.displayName, user.avatarPath is not null, 36) }}
         <span class="user-card-text">
             <span class="user-card-name">{{ user.displayName }}</span>
             {# A member added without an address of their own has a placeholder one; it is nobody's to show. #}

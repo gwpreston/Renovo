@@ -142,6 +142,11 @@
     line-height: 1.1;
 }
 
+/* The one-off and lifetime line under the tiles is set apart from them. */
+.one-off-note {
+    margin-top: 1rem;
+}
+
 /* "/ year" is one label: on a narrow tile it wraps as a unit or not at all. */
 .stat-unit {
     white-space: nowrap;
@@ -344,6 +349,32 @@
 
 .budget-tiles {
     margin-bottom: 1rem;
+}
+
+/* A tile led by its icon: a large tinted square, the eyebrow and figure beside it. */
+.kpi.kpi-side {
+    flex-direction: row;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.kpi-side .kpi-icon {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: var(--radius);
+}
+
+.kpi-side .kpi-icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.kpi-body {
+    min-width: 0;
+}
+
+.kpi-body .stat-value {
+    margin: 0;
 }
 
 .kpi-icon-bad {
@@ -568,8 +599,10 @@
     margin: 0.5rem 0;
 }
 
-.meter-slim {
-    height: 0.4rem;
+/* A meter inside a row or a table cell sits flush against its figures. */
+.distribution-row .meter,
+.who-pays-row .meter,
+.table .meter {
     margin: 0;
 }
 
@@ -1046,7 +1079,7 @@ tr.is-passed > td {
 
 @media (min-width: 1100px) {
     .calendar-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
+        grid-template-columns: minmax(0, 1fr) clamp(20rem, 34%, 36rem);
     }
 
     .calendar-layout .calendar {
@@ -1470,11 +1503,25 @@ tr.is-passed > td {
     align-items: center;
 }
 
-.list-search {
+/* The search and the add button beside it. The button is outside the
+   search form, so the pair is laid out by this wrapper rather than the form. */
+.list-search-bar {
     grid-column: 2;
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.75rem;
     padding-left: 1rem;
+}
+
+.list-search {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 0.5rem;
+}
+
+.list-search-add {
+    flex: none;
+    white-space: nowrap;
 }
 
 .list-search-field {
@@ -1538,14 +1585,14 @@ tr.is-passed > td {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .list-search,
+    .list-search-bar,
     .list-filters .chip-row,
     .list-segments,
     .list-tools {
         grid-column: 1;
     }
 
-    .list-search,
+    .list-search-bar,
     .list-tools {
         padding-left: 0;
     }
@@ -2249,7 +2296,9 @@ a.segmented-option {
     }
 }
 
-@media (min-width: 900px) {
+/* The two donuts sit side by side while the review is one column, and stack
+   in its narrower left column once it splits at 1100px. */
+@media (min-width: 900px) and (max-width: 1099px) {
     .analytics-breakdown {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -2445,6 +2494,12 @@ a.segmented-option {
     white-space: nowrap;
 }
 
+/* The header row on the rates table's tint (`.settings-rates`). */
+.price-history-table thead th,
+.subscription-table .table thead th {
+    background: var(--surface-2);
+}
+
 .top-figure .stat-unit {
     margin-left: 0.2rem;
 }
@@ -2544,8 +2599,8 @@ a.segmented-option {
 }
 
 /*
- * The review: the same cost by period in one column, and the cost-per-use table
- * beside it.
+ * The review: the two breakdown donuts stacked in one column, and the
+ * cost-per-use table beside it.
  *
  * The table takes the wider share because it is the only six-column thing on
  * the page, and it breaks at the same 1100px the charts above it do, so the
@@ -2565,7 +2620,7 @@ a.segmented-option {
     }
 }
 
-/* The same reason `.analytics-main` needs it: a grid item refuses to be
+/* The same reason `.analytics-pair` needs it: a grid item refuses to be
    narrower than its content by default, which is how the wide table would push
    the page sideways instead of scrolling inside `.table-scroll`. */
 .analytics-review > * {
@@ -2573,38 +2628,16 @@ a.segmented-option {
 }
 
 /*
- * The figures in the review column are quieter than the ones at the top.
+ * The same cost by period, across the full width above the review, is quieter
+ * than the KPI row at the top.
  *
- * The KPI row states three numbers the page is about; these nine restate parts
- * of them, sliced by year, by extreme and by period. At the full KPI size they
- * shout as loudly as the row they are derived from, and in a column this
- * narrow they also stack into a very tall wall of digits beside a table. One
- * step down the scale settles both: the hierarchy reads correctly and the
- * column ends up roughly the height of the thing it sits next to.
+ * The KPI row states the numbers the page is about; these four restate one of
+ * them, sliced by period. At the full KPI size they shout as loudly as the row
+ * they are derived from. One step down the scale keeps the hierarchy reading
+ * correctly.
  */
-.analytics-review-figures {
+.analytics-per-period {
     --size-kpi: 1.75rem;
-}
-
-/*
- * How many of those figures stand abreast, decided per card.
- *
- * `.columns` and `.stat-grid` both key off the viewport, not the container, so
- * the moment the review splits they size themselves for a page they are no
- * longer as wide as. These two minimums are layout thresholds rather than text
- * measurements: year over year has three figures and looks wrong as two and an
- * orphan, so its minimum is set high enough to keep it a clean stack until the
- * column can take all three; the four per-period figures pair up happily, so
- * theirs is set to let two stand side by side at a laptop width.
- */
-@media (min-width: 1100px) {
-    .analytics-review-figures .columns {
-        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-    }
-
-    .analytics-review-figures .stat-grid {
-        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    }
 }
 
 /*
@@ -2709,8 +2742,13 @@ a.segmented-option {
     font-weight: var(--weight-semibold);
 }
 
-.members-actions-heading {
+.members-table .members-actions-heading {
     text-align: right;
+}
+
+/* Rows to manage, not to pick: no hover band behind a member. */
+.members-table tbody tr:hover td {
+    background: none;
 }
 
 .member-cell-actions .row-actions {
@@ -3686,6 +3724,45 @@ a.segmented-option {
     top: -0.5rem;
 }
 
+/*
+ * The first and last tick are dates now, wider than the line's margin: each
+ * is anchored at its end rather than centred, so neither hangs off the card.
+ */
+.timeline-tick.is-start {
+    transform: none;
+}
+
+.timeline-tick.is-end {
+    transform: translateX(-100%);
+}
+
+/* The key to the markers' colours: the same fill, the same corner. */
+.timeline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin: 0 0 0.75rem;
+    font-size: var(--size-caption);
+    color: var(--muted);
+}
+
+.timeline-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.timeline-key {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 3px;
+    background: var(--s1);
+}
+
+.timeline-key.is-trial {
+    background: var(--warn);
+}
+
 .timeline-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
@@ -3701,6 +3778,17 @@ a.segmented-option {
     border-radius: var(--radius-small);
     font-size: var(--size-label);
     font-weight: var(--weight-bold);
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.timeline-item:hover {
+    background: var(--surface-2);
+    border-color: var(--border-control);
+}
+
+/* A trial's conversion, edged in the colour its marker is drawn in. */
+.timeline-item.is-trial {
+    border-left: 3px solid var(--warn);
 }
 
 .timeline-date {
@@ -3739,6 +3827,15 @@ a.segmented-option {
     justify-content: space-between;
     gap: 0.5rem;
     margin: 0 0 0.3rem;
+}
+
+/*
+ * A member's bar in their tone's ink: the stronger half of the pair their
+ * avatar is drawn in, which holds its own against the meter's track where the
+ * disc's soft fill would not.
+ */
+.who-pays-row .meter-fill[class*='avatar-tone-'] {
+    background: var(--avatar-ink);
 }
 
 .who-pays-figure {
@@ -3910,16 +4007,16 @@ a.segmented-option {
 
 .palette-options {
     display: grid;
-    gap: 0.5rem;
-    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
 }
 
 .palette-option {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.5rem;
+    gap: 0.5rem;
+    padding: 0.6rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-button);
     background: var(--surface);
@@ -3948,23 +4045,47 @@ a.segmented-option {
     outline-offset: 2px;
 }
 
-/* The rail, as a strip, with the accent as a dot on it. */
+/*
+ * A small picture of the app in that palette: the rail down the left third,
+ * the page beside it with an accent button and a quiet one on it.
+ */
 .palette-swatch {
     display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    height: 2.25rem;
-    padding: 0 0.6rem;
-    border: 1px solid var(--swatch-border);
+    height: 2.75rem;
+    overflow: hidden;
+    border: 1px solid var(--swatch-line);
     border-radius: var(--radius-control);
+    background: var(--swatch-canvas);
+}
+
+.palette-swatch-rail {
+    flex: 0 0 36%;
     background: var(--swatch-rail);
+    border-right: 1px solid var(--swatch-border);
+}
+
+.palette-swatch-page {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0 0.5rem;
+}
+
+.palette-swatch-accent,
+.palette-swatch-muted {
+    height: 0.5rem;
+    border-radius: var(--radius-pill);
 }
 
 .palette-swatch-accent {
-    width: 0.875rem;
-    height: 0.875rem;
-    border-radius: var(--radius-pill);
+    width: 1.75rem;
     background: var(--swatch-accent);
+}
+
+.palette-swatch-muted {
+    width: 1rem;
+    background: var(--swatch-line);
 }
 
 .palette-name {
@@ -4052,8 +4173,28 @@ a.segmented-option {
     overflow-wrap: anywhere;
 }
 
+/*
+ * The rates table, framed: a rounded border round the whole table and the
+ * header row on the same tint as the members table's. The table collapses its borders, and
+ * a collapsed table ignores a radius, so the frame is the scroll wrapper's and
+ * it clips the header's corners — `auto` rather than `hidden`, so a narrow
+ * screen still scrolls it sideways.
+ */
 .settings-rates {
     margin: 0.75rem 0 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    overflow: auto;
+}
+
+.settings-rates .table th {
+    background: var(--surface-2);
+    border-bottom-color: var(--border);
+}
+
+.settings-rates .table th,
+.settings-rates .table td {
+    padding-inline: 0.9rem;
 }
 
 /* A disclosure whose summary is a button, and whose body is a form. */
@@ -4145,7 +4286,13 @@ a.segmented-option {
     border-radius: var(--radius-control);
 }
 
-/* New category, new tag: a field and its button on one line, wrapping if not. */
+/* A payment method's chip: its badge is the chip's name, in the chip's ink. */
+.setting-chip .payment-badge {
+    color: var(--text);
+    font-size: inherit;
+}
+
+/* New category, tag or payment method: a field and its button on one line, wrapping if not. */
 .setting-add {
     display: flex;
     flex-wrap: wrap;

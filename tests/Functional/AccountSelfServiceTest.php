@@ -15,6 +15,7 @@ use App\Security\CsrfTokenManager;
 use App\Security\PasswordHasher;
 use App\Security\SessionInterface;
 use App\Service\InstanceSettingsService;
+use App\Support\AvatarTone;
 use App\Tests\Integration\DatabaseTestCase;
 use App\Tests\Support\ArraySession;
 use App\Tests\Support\FakeUpload;
@@ -493,6 +494,13 @@ final class AccountSelfServiceTest extends DatabaseTestCase
         self::assertSame('MM', $member->initials());
         self::assertFileDoesNotExist($this->avatarDirectory . '/' . $path);
         self::assertSame(404, $this->request('GET', '/avatars/' . $this->memberId)->getStatusCode());
+
+        // The placeholder is the first name's initial on the member's own tone.
+        $tone = AvatarTone::of($this->memberId);
+        self::assertMatchesRegularExpression(
+            '~<span class="avatar avatar-initials avatar-tone-' . $tone . '"[^>]*>M</span>~',
+            (string) $this->request('GET', '/profile')->getBody(),
+        );
 
         self::assertTrue($this->hasAudit(AuditAction::AvatarRemoved));
     }

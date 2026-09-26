@@ -1,10 +1,13 @@
 {#
     The next thirty days as a line: each charge at its distance from today,
-    ticked at today, a week, two, three and thirty days, with the count and
-    total above and the charges listed beneath.
+    ticked at today and at the dates a week, two, three and thirty days on,
+    with the count and total above, a key to the markers' colours, and the
+    charges listed beneath.
 
-    The markers are a picture of the list below them, so they are hidden from
-    assistive technology and the list says everything they do.
+    The markers and their key are a picture of the list below them, so they
+    are hidden from assistive technology and the list says everything they
+    do — a trial's conversion included, which it names in words as well as
+    marking in the trial colour.
 #}
 {% import 'partials/logo.twig' as logo %}
 
@@ -27,8 +30,8 @@
         <div class="timeline" aria-hidden="true">
             <div class="timeline-line"></div>
             {% for tick in timeline.ticks %}
-                <span class="timeline-tick" style="left: {{ tick.position }}">
-                    {{ tick.days == 0 ? t('dashboard.today') : t('dashboard.plus_days', {'days': tick.days}) }}
+                <span class="timeline-tick{{ loop.first ? ' is-start' : '' }}{{ loop.last ? ' is-end' : '' }}" style="left: {{ tick.position }}">
+                    {{ tick.days == 0 ? t('dashboard.today') : tick.date|local_date('d MMM') }}
                 </span>
             {% endfor %}
             {% for marker in timeline.markers %}
@@ -40,11 +43,20 @@
             {% endfor %}
         </div>
 
+        <ul class="plain timeline-legend" aria-hidden="true">
+            <li><span class="timeline-key"></span>{{ t('calendar.kind_charge') }}</li>
+            <li><span class="timeline-key is-trial"></span>{{ t('calendar.kind_trial') }}</li>
+        </ul>
+
         <ul class="plain timeline-list">
             {% for marker in timeline.markers %}
-                <li class="timeline-item">
+                {% set is_trial = marker.reason == 'trial_conversion' %}
+                <li class="timeline-item{{ is_trial ? ' is-trial' : '' }}">
                     <span class="timeline-date num">{{ marker.date|local_date('d MMM') }}</span>
-                    <span class="timeline-name">{{ marker.subscription.name }}</span>
+                    <span class="timeline-name">
+                        {%- if is_trial %}<span class="visually-hidden">{{ t('calendar.kind_trial') }}: </span>{% endif -%}
+                        {{ marker.subscription.name }}
+                    </span>
                     <span class="num">{{ marker.amount.amountMinor|money(marker.amount.currency) }}</span>
                 </li>
             {% endfor %}

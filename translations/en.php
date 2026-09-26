@@ -1213,7 +1213,6 @@ return [
     'dashboard.per_month_unit' => '/ month',
     'dashboard.per_year_unit' => '/ year',
     'dashboard.percent_of_budget' => '{percent}% of {budget} budget',
-    'dashboard.plus_days' => '+{days}',
     'dashboard.price_change' => 'Price change',
     'dashboard.price_rise_difference' =>
         '{monthly} a month, {yearly} a year. Already included in the forecast.',
@@ -1432,7 +1431,7 @@ return [
     'nav.analytics' => 'Analytics',
     'nav.audit' => 'Audit',
     'nav.budgets' => 'Budgets',
-    'nav.calendar' => 'Billing Calendar',
+    'nav.calendar' => 'Calendar',
     'nav.cancellations' => 'Cancel by',
     'nav.categories' => 'Categories',
     'nav.payment_methods' => 'Payment methods',

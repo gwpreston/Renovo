@@ -814,23 +814,23 @@ a.rates-chip:hover {
         justify-content: center;
         gap: 0.5rem;
         padding: 0.6875rem 1rem;
-        border: 1px solid var(--rail-line);
+        border: 1px solid transparent;
         border-radius: var(--radius-card);
-        background: var(--rail-tint);
-        color: var(--rail-ink);
+        background: var(--accent);
+        color: var(--accent-ink);
         font-size: var(--size-body);
         font-weight: var(--weight-bold);
         text-decoration: none;
     }
 
     .sidebar-add:hover {
-        background: var(--rail-active);
+        background: var(--accent-hover);
     }
 
     .sidebar-add .nav-icon {
         width: 1rem;
         height: 1rem;
-        color: var(--rail-accent);
+        color: currentColor;
     }
 
     .sidebar .user-card {
@@ -1545,28 +1545,40 @@ textarea {
     color: var(--text);
     background: var(--surface-2);
     /*
-     * The control border is a heavier token than the hairline that separates
-     * cards. The edge of an input is a user-interface component boundary, and
-     * WCAG holds one to 3:1 against its surroundings the way it holds text to
-     * 4.5:1 — a 8%-white hairline would be about 1.2:1 and effectively
-     * borderless for anyone who needs the edge to find the field.
+     * A light edge, `--border-field`, rather than the heavier `--border-control`
+     * a filter chip or a switch's track keeps. It is a deliberate choice for a
+     * quieter form and falls below the 3:1 a component boundary is held to, so
+     * the contrast test does not check it; the field's fill and its label are
+     * what find it.
      */
-    border: 1px solid var(--border-control);
+    border: 1px solid var(--border-field);
     border-radius: var(--radius-control);
 }
 
 /*
- * Focus: the control's own edge takes the rail accent inside the global
- * outline, so a field that is being typed into is unmistakable. The edge is
- * decoration, not the indicator: the light palettes' rail accents fall short
- * of 3:1 on a white surface, and it is the outline, in `--focus-ring`, that
- * the contrast test holds to it.
+ * Focus: the field's own edge takes the rail accent in place of the global
+ * offset outline. The outline is made transparent rather than removed, so
+ * forced-colours mode — which paints a transparent outline in the system
+ * colour — still draws one. The selectors are the field list above, not every
+ * `input`: a checkbox or radio has no edge to recolour and keeps the ring.
+ *
+ * The light palettes' rail accents fall short of 3:1 on a white surface, so in
+ * those the edge is a weaker indicator than the ring it replaces. That is the
+ * trade made for this look.
  */
-input:focus-visible,
+input[type='text']:focus-visible,
+input[type='email']:focus-visible,
+input[type='password']:focus-visible,
+input[type='search']:focus-visible,
+input[type='number']:focus-visible,
+input[type='date']:focus-visible,
+input[type='file']:focus-visible,
+input[type='url']:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
     border-color: var(--rail-accent);
-    outline-offset: 1px;
+    outline: 2px solid transparent;
+    outline-offset: 0;
 }
 
 /*
@@ -1895,6 +1907,8 @@ legend {
  *     subscription from the top bar, running a backup.
  *   - quiet: a surface tint. Everything else, and what a bare `.button` is.
  *   - danger: the bad colour on its tint. Deleting, removing, revoking.
+ *
+ * And an outline, below, for a card's own actions.
  */
 .button {
     display: inline-flex;
@@ -1964,6 +1978,20 @@ legend {
 .button-danger:hover {
     background: var(--bad-bg);
     border-color: var(--bad);
+}
+
+/*
+ * Outline: no fill, the text field's edge. A card's own action — saving the
+ * card's form, adding to its list — so it sits with the fields it acts on
+ * rather than competing with the screen's primary.
+ */
+.button-outline {
+    border-color: var(--border-field);
+    background-color: transparent;
+}
+
+.button-outline:hover {
+    background-color: var(--surface-2);
 }
 
 /* An icon-only control. It carries a catalogued `aria-label` in the markup. */
@@ -2286,6 +2314,30 @@ kbd {
     line-height: 1;
     letter-spacing: 0.02em;
     user-select: none;
+}
+
+/*
+ * A member's own tone: one of the `--avatar-N` pairs, picked by AvatarTone
+ * from their id. The class sets the pair, and whichever placeholder carries
+ * it — the avatar disc here, the payer chip's letter on the subscription
+ * form — draws with it. Without one (an owner who has gone) the disc stays
+ * the neutral tint above.
+ */
+.avatar-tone-1 { --avatar-bg: var(--avatar-1); --avatar-ink: var(--avatar-1-ink); }
+.avatar-tone-2 { --avatar-bg: var(--avatar-2); --avatar-ink: var(--avatar-2-ink); }
+.avatar-tone-3 { --avatar-bg: var(--avatar-3); --avatar-ink: var(--avatar-3-ink); }
+.avatar-tone-4 { --avatar-bg: var(--avatar-4); --avatar-ink: var(--avatar-4-ink); }
+.avatar-tone-5 { --avatar-bg: var(--avatar-5); --avatar-ink: var(--avatar-5-ink); }
+.avatar-tone-6 { --avatar-bg: var(--avatar-6); --avatar-ink: var(--avatar-6-ink); }
+.avatar-tone-7 { --avatar-bg: var(--avatar-7); --avatar-ink: var(--avatar-7-ink); }
+.avatar-tone-8 { --avatar-bg: var(--avatar-8); --avatar-ink: var(--avatar-8-ink); }
+
+.avatar-initials[class*='avatar-tone-'],
+.member-initials[class*='avatar-tone-'] {
+    background: var(--avatar-bg);
+    border-color: transparent;
+    color: var(--avatar-ink);
+    font-weight: var(--weight-bold);
 }
 
 /* A face and a name, wherever the two appear together. */

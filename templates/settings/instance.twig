@@ -37,13 +37,13 @@
                            {{ allow_registration ? 'checked' : '' }}>
                 </label>
 
-                <fieldset class="stack" id="data-isolation">
+                <fieldset class="role-options" id="data-isolation">
                     <legend>{{ t('settings.data_isolation') }}</legend>
                     {% for mode in isolation_modes %}
-                        <label class="choice">
+                        <label class="role-option">
                             <input type="radio" name="isolation_mode" value="{{ mode.value }}"
                                    {{ isolation_mode == mode.value ? 'checked' : '' }}>
-                            <span>{{ isolation_label(mode.value) }}</span>
+                            <span class="role-option-text">{{ isolation_label(mode.value) }}</span>
                         </label>
                     {% endfor %}
                 </fieldset>
@@ -59,7 +59,7 @@
                 </label>
 
                 <div class="form-actions">
-                    <button type="submit" class="button">{{ t('settings.save_instance_settings') }}</button>
+                    <button type="submit" class="button button-outline">{{ t('settings.save_instance_settings') }}</button>
                 </div>
             </form>
         </section>
@@ -154,7 +154,7 @@
             <input type="text" id="trusted_note" name="note" placeholder="{{ t('settings.trusted_host_note_placeholder') }}">
 
             <div class="form-actions">
-                <button type="submit" class="button">{{ t('settings.trust_this_host') }}</button>
+                <button type="submit" class="button button-outline">{{ t('settings.trust_this_host') }}</button>
             </div>
         </form>
     </section>

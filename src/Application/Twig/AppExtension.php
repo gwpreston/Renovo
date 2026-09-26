@@ -28,6 +28,7 @@ use App\Service\NavigationService;
 use App\Service\ShellService;
 use App\Service\ValidationError;
 use App\Support\AssetVersion;
+use App\Support\AvatarTone;
 use App\Support\BuildManifest;
 use App\Support\DateFormatter;
 use App\Support\IconSprite;
@@ -106,6 +107,7 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('channel_fields', $this->channelFields(...)),
             new TwigFunction('channel_icon', $this->channelIcon(...)),
             new TwigFunction('channel_type_label', $this->channelTypeLabel(...)),
+            new TwigFunction('avatar_tone', AvatarTone::of(...)),
             new TwigFunction('percent_symbol', $this->numbers->percentSymbol(...)),
             // The password meter's thresholds, from the validator that applies
             // the rule — see AuthService::passwordMeterRules().
@@ -124,6 +126,7 @@ final class AppExtension extends AbstractExtension
             // For the places that have a name and no entity to ask — the owner
             // of a subscription is a display name on the row, not a User.
             new TwigFilter('initials', Initials::of(...)),
+            new TwigFilter('first_initial', Initials::first(...)),
         ];
     }
 

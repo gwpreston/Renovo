@@ -34,7 +34,7 @@
                                     <input type="text" name="name" maxlength="50" required
                                            value="{{ is_failed ? values.name|default(tag.name) : tag.name }}"
                                            aria-label="{{ t('settings.rename_tag', {'name': tag.name}) }}">
-                                    <button type="submit" class="button button-quiet">{{ t('action.save') }}</button>
+                                    <button type="submit" class="button button-outline">{{ t('action.save') }}</button>
                                 </form>
                                 {% if is_failed and errors.name is defined %}<p class="field-error">{{ error_message(errors.name) }}</p>{% endif %}
 
@@ -66,7 +66,7 @@
             <input type="text" id="new_tag" name="name" maxlength="50" required
                    placeholder="{{ t('settings.new_tag') }}"
                    value="{{ new_failed ? values.name|default('') : '' }}">
-            <button type="submit" class="button">{{ icon('add') }}{{ t('action.add') }}</button>
+            <button type="submit" class="button button-outline">{{ icon('add') }}{{ t('action.add') }}</button>
         </form>
         {% if new_failed and errors.name is defined %}<p class="field-error">{{ error_message(errors.name) }}</p>{% endif %}
     {% endif %}

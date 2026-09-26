@@ -245,6 +245,16 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
         self::assertSame(['6', '1', '2'], array_slice($this->figures($strip), 0, 3));
     }
 
+    /** The Budgets screen's tile: the icon leading, the label and figure beside it. */
+    public function testTheStripsTilesAreLedByTheirIcons(): void
+    {
+        $strip = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-strip');
+
+        self::assertSame(4, substr_count($strip, 'class="card stat metric kpi kpi-side"'));
+        self::assertSame(4, substr_count($strip, '<div class="kpi-body">'));
+        self::assertStringNotContainsString('kpi-head', $strip);
+    }
+
     public function testPerMonthIsTheStatisticsServicesCombinedMonthlyFigure(): void
     {
         $container = $this->container();
@@ -344,6 +354,23 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
         $toolbar = $this->section($this->body($this->get('/subscriptions', $this->editorId)), 'list-filters');
 
         self::assertStringNotContainsString('scope=mine', $toolbar);
+    }
+
+    public function testTheAddButtonBesideTheSearchIsOnlyForThoseWhoMayCreate(): void
+    {
+        $editor = $this->body($this->get('/subscriptions', $this->editorId));
+        self::assertMatchesRegularExpression(
+            '/<a class="button button-primary list-search-add" href="\/subscriptions\/new"\s+data-opens-dialog="quick-add">/',
+            $editor,
+        );
+        self::assertStringNotContainsString(
+            'list-search-add',
+            $this->section($editor, 'list-search'),
+            'the add button is part of the search form',
+        );
+
+        $viewer = $this->body($this->get('/subscriptions', $this->viewerId));
+        self::assertStringNotContainsString('list-search-add', $viewer);
     }
 
     public function testTheSearchFormOffersNeitherCurrencyTypeNorPaused(): void

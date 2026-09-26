@@ -31,4 +31,17 @@ final class Initials
 
         return $first . mb_strtoupper(mb_substr($words[count($words) - 1], 0, 1));
     }
+
+    /**
+     * The first name's initial alone: what an avatar placeholder draws. One
+     * letter reads at 22 pixels where two do not, and the colour behind it
+     * (see AvatarTone) does the work a second letter did of telling two
+     * members apart.
+     */
+    public static function first(?string $name): string
+    {
+        $name = trim($name ?? '');
+
+        return $name === '' ? '?' : mb_strtoupper(mb_substr($name, 0, 1));
+    }
 }

@@ -62,7 +62,7 @@
                 </form>
 
                 <details class="settings-disclosure">
-                    <summary class="button">{{ t('settings.restore_from_file') }}</summary>
+                    <summary class="button button-outline">{{ t('settings.restore_from_file') }}</summary>
 
                     <p class="hint">{{ t('backup.restore_is_additive') }} {{ t('backup.restore_matching') }}</p>
 
@@ -86,8 +86,8 @@
                 <h2 id="export-heading">{{ t('settings.export_heading') }}</h2>
                 <p class="muted">{{ t('settings.export_intro') }}</p>
                 <div class="form-actions">
-                    <a class="button" href="/subscriptions/export.csv" download>{{ icon('download') }}{{ t('settings.export_csv') }}</a>
-                    <a class="button" href="/subscriptions/export.json" download>{{ icon('download') }}{{ t('settings.export_json') }}</a>
+                    <a class="button button-outline" href="/subscriptions/export.csv" download>{{ icon('download') }}{{ t('settings.export_csv') }}</a>
+                    <a class="button button-outline" href="/subscriptions/export.json" download>{{ icon('download') }}{{ t('settings.export_json') }}</a>
                 </div>
             </section>
         {% endif %}

@@ -27,7 +27,13 @@ use DateTimeImmutable;
  *
  * @phpstan-type CurrencyTotals array{currency: string, monthly_minor: int, yearly_minor: int, count: int}
  * @phpstan-type OneOffTotals array{currency: string, total_minor: int, count: int}
- * @phpstan-type CategoryTotals array{name: string, currency: string, monthly_minor: int, count: int}
+ * @phpstan-type CategoryTotals array{
+ *     name: string,
+ *     colour: string|null,
+ *     currency: string,
+ *     monthly_minor: int,
+ *     count: int
+ * }
  * @phpstan-type PaymentMethodTotals array{
  *     name: string,
  *     colour: string|null,
@@ -143,6 +149,7 @@ final class StatsService
             $key = $categoryName . '|' . $currency;
             $byCategory[$key] ??= [
                 'name' => $categoryName,
+                'colour' => $subscription->categoryColour,
                 'currency' => $currency,
                 'monthly_minor' => 0,
                 'count' => 0,

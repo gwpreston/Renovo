@@ -58,7 +58,7 @@
                             {% if month.combined_minor is not null %}
                                 {{ month.combined_minor|money(base_currency) }}
                                 {% if peak_minor > 0 and month.combined_minor > 0 %}
-                                    <div class="meter meter-slim" role="presentation">
+                                    <div class="meter" role="presentation">
                                         <span class="meter-fill"
                                               style="width: {{ (month.combined_minor * 100) // peak_minor }}%"></span>
                                     </div>

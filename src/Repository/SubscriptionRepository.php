@@ -812,6 +812,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
 
         return 'SELECT ' . $subscriptions . '.*,'
             . ' c.' . $this->quote('name') . ' AS category_name,'
+            . ' c.' . $this->quote('colour') . ' AS category_colour,'
             . ' pm.' . $this->quote('name') . ' AS payment_method_name,'
             . ' pm.' . $this->quote('icon') . ' AS payment_method_icon,'
             . ' pm.' . $this->quote('logo_path') . ' AS payment_method_logo_path,'
@@ -1000,6 +1001,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
                 ?? Visibility::Household,
             cancelledAt: $this->nullableDate($row['cancelled_at'] ?? null),
             plan: $this->nullableString($row['plan'] ?? null),
+            categoryColour: $this->nullableString($row['category_colour'] ?? null),
         );
     }
 

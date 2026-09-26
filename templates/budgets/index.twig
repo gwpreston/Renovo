@@ -31,40 +31,40 @@
     </div>
 
     <section class="metric-grid budget-tiles" aria-label="{{ t('budgets.tiles') }}">
-        <article class="card stat metric kpi">
-            <header class="kpi-head">
+        <article class="card stat metric kpi kpi-side">
+            <span class="kpi-icon kpi-icon-ok">{{ icon('ok') }}</span>
+            <div class="kpi-body">
                 <h2 class="stat-label">{{ t('budgets.state_ok') }}</h2>
-                <span class="kpi-icon kpi-icon-ok">{{ icon('ok') }}</span>
-            </header>
-            <p class="stat-value num" data-tile="on-track">{{ tiles.on_track|decimal(0) }}</p>
+                <p class="stat-value num" data-tile="on-track">{{ tiles.on_track|decimal(0) }}</p>
+            </div>
         </article>
 
-        <article class="card stat metric kpi">
-            <header class="kpi-head">
+        <article class="card stat metric kpi kpi-side">
+            <span class="kpi-icon kpi-icon-warn">{{ icon('warn') }}</span>
+            <div class="kpi-body">
                 <h2 class="stat-label">{{ t('budgets.state_warn') }}</h2>
-                <span class="kpi-icon kpi-icon-warn">{{ icon('warn') }}</span>
-            </header>
-            <p class="stat-value num" data-tile="warning">{{ tiles.warning|decimal(0) }}</p>
+                <p class="stat-value num" data-tile="warning">{{ tiles.warning|decimal(0) }}</p>
+            </div>
         </article>
 
-        <article class="card stat metric kpi">
-            <header class="kpi-head">
+        <article class="card stat metric kpi kpi-side">
+            <span class="kpi-icon kpi-icon-bad">{{ icon('alert') }}</span>
+            <div class="kpi-body">
                 <h2 class="stat-label">{{ t('budgets.tile_over') }}</h2>
-                <span class="kpi-icon kpi-icon-bad">{{ icon('alert') }}</span>
-            </header>
-            <p class="stat-value num" data-tile="over">{{ tiles.over|decimal(0) }}</p>
+                <p class="stat-value num" data-tile="over">{{ tiles.over|decimal(0) }}</p>
+            </div>
         </article>
 
         {% if tiles.household_limit is not null %}
-            <article class="card stat metric kpi">
-                <header class="kpi-head">
+            <article class="card stat metric kpi kpi-side">
+                <span class="kpi-icon kpi-icon-neutral">{{ icon('budget') }}</span>
+                <div class="kpi-body">
                     <h2 class="stat-label">{{ t('budgets.tile_household_limit') }}</h2>
-                    <span class="kpi-icon kpi-icon-neutral">{{ icon('budget') }}</span>
-                </header>
-                <p class="stat-value num" data-tile="household-limit">
-                    {{ tiles.household_limit.amountMinor|money(tiles.household_limit.currency) }}<span
-                        class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
-                </p>
+                    <p class="stat-value num" data-tile="household-limit">
+                        {{ tiles.household_limit.amountMinor|money(tiles.household_limit.currency) }}<span
+                            class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
+                    </p>
+                </div>
             </article>
         {% endif %}
     </section>

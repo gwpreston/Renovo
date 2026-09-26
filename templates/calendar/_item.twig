@@ -41,7 +41,7 @@
     </span>
     {% if subscription.ownerName %}
         <span class="calendar-item-owner" title="{{ subscription.ownerName }}">
-            {{ avatar.face(subscription.ownerUserId, subscription.ownerName, subscription.ownerName|initials, subscription.ownerHasAvatar, 22) }}
+            {{ avatar.face(subscription.ownerUserId, subscription.ownerName, subscription.ownerHasAvatar, 22) }}
             <span class="visually-hidden">{{ subscription.ownerName }}</span>
         </span>
     {% endif %}

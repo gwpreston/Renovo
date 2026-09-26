@@ -20,7 +20,6 @@
         {{ avatar.face(
             current_user.id,
             current_user.displayName,
-            current_user.initials(),
             current_user.avatarPath is not null,
             72
         ) }}
@@ -95,7 +94,7 @@
         {% endif %}
 
         <div class="form-actions">
-            <button type="submit" class="button">{{ t('account.save_details') }}</button>
+            <button type="submit" class="button button-outline">{{ t('account.save_details') }}</button>
         </div>
     </form>
 

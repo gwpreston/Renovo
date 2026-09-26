@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Domain\Permission;
 use App\Domain\TokenAbility;
 use App\I18n\Translator;
+use App\Security\PermissionService;
 use App\Security\SessionInterface;
 use App\Service\ExchangeRate\RateProviderException;
 use App\Service\ExchangeRateService;
@@ -43,8 +45,9 @@ use Slim\Views\Twig;
  *
  * The currency and the rates sit on General because that is where a reader
  * looks for them, but they are the instance's, not the household's: only an
- * instance administrator may change them, through a form of their own. Every
- * other reader sees them as facts.
+ * instance administrator may change them. The currency shares the household
+ * name's form when its reader may change both; every other reader sees them
+ * as facts.
  */
 final class SettingsController extends Controller
 {
@@ -62,6 +65,7 @@ final class SettingsController extends Controller
         private readonly HouseholdSettingsService $householdSettings,
         private readonly InstanceAdminService $instanceAdmin,
         private readonly DateFormatter $dates,
+        private readonly PermissionService $permissions,
     ) {
         parent::__construct($view, $session, $translator);
     }
@@ -102,12 +106,25 @@ final class SettingsController extends Controller
         $scope = $this->scope($request);
         $body = $this->body($request);
 
+        // The card's one form carries the base currency too when its reader
+        // may set it. The currency is the instance's, so posting one asks for
+        // instance administration as well — before anything is written, so a
+        // refused post changes neither.
+        $currency = is_scalar($body['base_currency'] ?? null) ? (string) $body['base_currency'] : null;
+        if ($currency !== null) {
+            $this->permissions->assert($request, $scope, Permission::ManageInstance);
+        }
+
         if ($scope->hasHousehold()) {
             $this->householdSettings->rename(
                 $this->user($request),
                 (int) $scope->householdId,
                 is_scalar($body['name'] ?? null) ? (string) $body['name'] : '',
             );
+        }
+
+        if ($currency !== null) {
+            $this->instanceAdmin->apply($this->user($request), ['base_currency' => $currency]);
         }
 
         $this->flash('success', 'flash.household_saved');

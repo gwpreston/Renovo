@@ -231,6 +231,53 @@ final class SettingsPageTest extends DatabaseTestCase
         self::assertSame('GBP', $this->instance->baseCurrency());
     }
 
+    /**
+     * An Owner who is also the instance administrator changes the name and the
+     * currency together: one form, one button, one post.
+     */
+    public function testAnOwnerWhoAdministersTheInstanceSavesTheNameAndCurrencyTogether(): void
+    {
+        $adminOwnerId = (new UserRepository($this->db))
+            ->create('admin-owner@example.test', 'Admin Owner', 'hash', true, new DateTimeImmutable());
+        (new MembershipRepository($this->db))->create($this->householdId, $adminOwnerId, Role::OwnerAdmin);
+        $this->signIn($adminOwnerId);
+
+        $page = $this->body($this->request('GET', '/settings'));
+        $card = substr($page, (int) strpos($page, 'id="household"'));
+        $card = substr($card, 0, (int) strpos($card, '</section>'));
+
+        self::assertSame(1, substr_count($card, '<form'));
+        self::assertSame(1, substr_count($card, 'type="submit"'));
+        self::assertMatchesRegularExpression(
+            '~action="/settings/household".*name="name".*name="base_currency"~s',
+            $card,
+        );
+        self::assertStringContainsString('Save household', $card);
+        self::assertStringNotContainsString('Save currency', $card);
+
+        $response = $this->request('POST', '/settings/household', ['name' => 'Flat', 'base_currency' => 'EUR']);
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/settings#household', $response->getHeaderLine('Location'));
+        self::assertSame('Flat', (new HouseholdRepository($this->db))->findById($this->householdId)?->name);
+        self::assertSame('EUR', $this->instance->baseCurrency());
+    }
+
+    /**
+     * The household route takes a currency only from an instance
+     * administrator, and a refused post renames nothing either.
+     */
+    public function testAnOwnerCannotSetTheCurrencyThroughTheHouseholdForm(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $response = $this->request('POST', '/settings/household', ['name' => 'Flat', 'base_currency' => 'EUR']);
+
+        self::assertSame(403, $response->getStatusCode());
+        self::assertSame('Home', (new HouseholdRepository($this->db))->findById($this->householdId)?->name);
+        self::assertSame('GBP', $this->instance->baseCurrency());
+    }
+
     public function testTheRateProviderKeyIsNeverRenderedBack(): void
     {
         $this->instance->setRateProviderKey('stored-secret-key-123');
@@ -240,6 +287,33 @@ final class SettingsPageTest extends DatabaseTestCase
 
         self::assertStringContainsString('name="rate_provider_key"', $page);
         self::assertStringNotContainsString('stored-secret-key-123', $page);
+    }
+
+    public function testTheRateProvidersAreOfferedAsOptionCards(): void
+    {
+        $this->signIn($this->adminId);
+
+        $page = (string) preg_replace('/\s+/', ' ', $this->body($this->request('GET', '/settings')));
+
+        self::assertMatchesRegularExpression(
+            '~<label class="role-option"> <input type="radio" name="rate_provider" value="frankfurter"~',
+            $page,
+        );
+    }
+
+    public function testTheIsolationModesAreOfferedAsTheSameOptionCards(): void
+    {
+        $this->signIn($this->adminId);
+
+        $page = (string) preg_replace('/\s+/', ' ', $this->body($this->request('GET', '/settings/instance')));
+
+        self::assertStringContainsString('<fieldset class="role-options" id="data-isolation">', $page);
+        foreach (['shared', 'isolated'] as $mode) {
+            self::assertMatchesRegularExpression(
+                '~<label class="role-option"> <input type="radio" name="isolation_mode" value="' . $mode . '"~',
+                $page,
+            );
+        }
     }
 
     public function testAViewerSeesTheListsButNoFormsForThem(): void

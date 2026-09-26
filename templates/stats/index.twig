@@ -19,8 +19,9 @@
         The prototype's arrangement: the KPI row; twelve months back and twelve
         ahead; this year against last beside who pays and the most expensive;
         the price history beside the insights. Then what this page has always
-        carried: the two breakdown donuts, and the review — the same cost by
-        period, and the cost-per-use table with its usage form.
+        carried: the same cost by period across the full width, and below it
+        the two breakdown donuts stacked beside the cost-per-use table with its
+        usage form.
 
         Not one figure here is computed for this screen. See
         `AnalyticsScreenService` for which service each one binds to.
@@ -51,51 +52,52 @@
     </div>
 
     <h2 class="section-heading">{{ t('stats.breakdown') }}</h2>
-    <div class="analytics-breakdown">
-        {% include 'stats/_categories.twig' %}
-        {% include 'stats/_payment_methods.twig' %}
+
+    <div class="analytics-per-period">
+        <section class="card">
+            <h2>{{ t('stats.per_period') }}</h2>
+
+            <div class="stat-grid stat-grid-inline">
+                {% for label, amount in per_period %}
+                    <div class="stat">
+                        <h3 class="stat-label">{{ t('period.per_' ~ label) }}</h3>
+                        <p class="stat-value num">
+                            {{ amount is not null ? amount|money(combined_yearly.currency) : '—' }}
+                        </p>
+                    </div>
+                {% endfor %}
+            </div>
+
+            {% if combined_yearly.amount_minor is null %}
+                <p class="muted note">
+                    {{ t('stats.unconvertible', {
+                        'currency': base_currency,
+                        'currencies': combined_yearly.unconvertible|join(', '),
+                    }) }}
+                </p>
+                <h3 class="stat-label">{{ t('stats.per_year_heading') }}</h3>
+                <ul class="plain">
+                    {% for total in yearly_by_currency %}
+                        <li>{{ total.amount_minor|money(total.currency) }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="hint">{{ t('stats.per_year_note') }}</p>
+            {% endif %}
+        </section>
     </div>
 
     <div class="analytics-review">
-        <div class="analytics-review-figures">
-            <section class="card">
-                <h2>{{ t('stats.per_period') }}</h2>
-
-                <div class="stat-grid stat-grid-inline">
-                    {% for label, amount in per_period %}
-                        <div class="stat">
-                            <h3 class="stat-label">{{ t('period.per_' ~ label) }}</h3>
-                            <p class="stat-value num">
-                                {{ amount is not null ? amount|money(combined_yearly.currency) : '—' }}
-                            </p>
-                        </div>
-                    {% endfor %}
-                </div>
-
-                {% if combined_yearly.amount_minor is null %}
-                    <p class="muted note">
-                        {{ t('stats.unconvertible', {
-                            'currency': base_currency,
-                            'currencies': combined_yearly.unconvertible|join(', '),
-                        }) }}
-                    </p>
-                    <h3 class="stat-label">{{ t('stats.per_year_heading') }}</h3>
-                    <ul class="plain">
-                        {% for total in yearly_by_currency %}
-                            <li>{{ total.amount_minor|money(total.currency) }}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="hint">{{ t('stats.per_year_note') }}</p>
-                {% endif %}
-            </section>
+        <div class="analytics-breakdown">
+            {% include 'stats/_categories.twig' %}
+            {% include 'stats/_payment_methods.twig' %}
         </div>
 
         {#
             "Worth it?" is a column of its own, not a card at the foot of the
             page: it is a row per subscription and the only thing here with an
             action attached, so it keeps the wider share and reads at full
-            height beside the figures rather than after them.
+            height beside the two donuts rather than after them.
         #}
         <section class="card">
             <h2>{{ t('stats.worth_it') }}</h2>

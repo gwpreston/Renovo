@@ -58,7 +58,7 @@
     {% else %}
         <form method="post" action="/calendar/feed-link">
             {{ csrf_field() }}
-            <button type="submit" class="button button-quiet">{{ icon('link', 'icon') }}{{ t('calendar.feed_create') }}</button>
+            <button type="submit" class="button button-outline">{{ icon('link', 'icon') }}{{ t('calendar.feed_create') }}</button>
         </form>
     {% endif %}
 </section>

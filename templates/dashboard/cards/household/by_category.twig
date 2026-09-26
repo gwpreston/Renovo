@@ -2,6 +2,9 @@
     Where it goes, as proportion bars: the same breakdown the Overview's donut
     draws, from the same service. When a currency has no rate the bars are per
     currency, each against its own total, and the currency is named.
+
+    Each bar is drawn in its category's colour, the one set on the Categories
+    screen; a category with none, and the tail, keep the accent.
 #}
 <section class="card" aria-labelledby="by-category-heading">
     <header class="card-header">
@@ -27,9 +30,9 @@
                     <li class="distribution-row">
                         <span class="distribution-name">{{ row.name }}</span>
                         <span class="distribution-amount num">{{ row.amount_minor|money(group.currency) }}</span>
-                        <div class="meter meter-slim" role="img"
+                        <div class="meter" role="img"
                              aria-label="{{ t('dashboard.share_of_spend', {'name': row.name, 'percent': row.percent}) }}">
-                            <span class="meter-fill" style="width: {{ min(row.percent, 100) }}%"></span>
+                            <span class="meter-fill" style="width: {{ min(row.percent, 100) }}%{{ row.colour ? '; background: ' ~ row.colour : '' }}"></span>
                         </div>
                     </li>
                 {% endfor %}
@@ -38,7 +41,7 @@
                     <li class="distribution-row">
                         <span class="distribution-name muted">{{ other_name }}</span>
                         <span class="distribution-amount num">{{ group.other.amount_minor|money(group.currency) }}</span>
-                        <div class="meter meter-slim" role="img"
+                        <div class="meter" role="img"
                              aria-label="{{ t('dashboard.share_of_spend', {'name': other_name, 'percent': group.other.percent}) }}">
                             <span class="meter-fill" style="width: {{ min(group.other.percent, 100) }}%"></span>
                         </div>

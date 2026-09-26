@@ -55,10 +55,11 @@
 
     <div class="sidebar-foot">
         {#
-            Secondary on purpose. The top bar's "Add new" is the same action on
-            every screen, and the one accent-filled button a screen has belongs
-            to what that screen is about — so this wears the rail's own quiet
-            fill. It is a link to the real form before it is a dialog.
+            Accent-filled: adding a subscription is the application's main
+            action, and the rail is where it is found on every screen. The
+            accent carries its own ink (`--accent-ink`) in every palette, so it
+            reads on a dark rail and a light one alike. It is a link to the real
+            form before it is a dialog.
         #}
         {% if can(scope, 'subscription.create') %}
             <a class="sidebar-add" href="/subscriptions/new" data-opens-dialog="quick-add">

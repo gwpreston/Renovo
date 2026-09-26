@@ -56,7 +56,7 @@
                 {% else %}
                     <form method="post" action="/profile/two-step/totp" class="inline">
                         {{ csrf_field() }}
-                        <button type="submit" class="button">
+                        <button type="submit" class="button button-outline">
                             {{ t('profile.totp_set_up') }}
                         </button>
                     </form>
@@ -121,7 +121,7 @@
                        placeholder="{{ t('security.phone_yubikey_laptop') }}">
             </div>
             <div class="form-actions">
-                <button type="button" class="button" id="passkey-register">
+                <button type="button" class="button button-outline" id="passkey-register">
                     {{ icon('add') }}{{ t('security.add_a_passkey') }}
                 </button>
             </div>
