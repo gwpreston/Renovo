@@ -1,0 +1,97 @@
+{#
+    Every recorded price change across the household, newest first.
+
+    `PriceHistoryService::householdChanges()`, over the subscriptions this
+    reader can see — so a private row's history is its payer's alone. Each
+    amount is in the subscription's own currency; nothing here is converted.
+    A trial converting is not a change and is not listed; a currency change is
+    listed as "Converted", with no percentage, because the price did not move.
+
+    Twenty rows a page. The pager is plain links, swapped in place by htmx when
+    there is script and a full reload when there is not.
+#}
+{% set history = price_history %}
+
+<section class="card analytics-price-history" id="analytics-price-history"
+         aria-labelledby="analytics-price-history-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="analytics-price-history-heading">{{ t('stats.price_history') }}</h2>
+            <p class="muted">{{ t('stats.price_history_note') }}</p>
+        </div>
+    </header>
+
+    {% if history.rows is empty %}
+        <p class="muted empty">{{ t('stats.price_history_empty') }}</p>
+    {% else %}
+        <div class="table-scroll">
+            <table class="table price-history-table">
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.date') }}</th>
+                    <th scope="col">{{ t('field.subscription') }}</th>
+                    <th scope="col">{{ t('stats.old_new') }}</th>
+                    <th scope="col" class="numeric">{{ t('field.change') }}</th>
+                    <th scope="col" class="numeric">{{ t('stats.per_year') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in history.rows %}
+                    {% set currency = row.to.currency %}
+                    <tr>
+                        <td class="num nowrap">
+                            {{ row.change.effectiveFrom|local_date }}
+                            {% if row.is_scheduled %}
+                                <br><span class="badge badge-info">{{ t('subscriptions_money.scheduled') }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/subscriptions/{{ row.subscription.id }}/money">{{ row.subscription.name }}</a>
+                        </td>
+                        <td class="num nowrap">
+                            {{ row.from.amountMinor|money(row.from.currency) }} → {{ row.to.amountMinor|money(currency) }}
+                        </td>
+                        <td class="numeric num nowrap">
+                            {% if row.kind == 'converted' %}
+                                <span class="muted">{{ t('stats.converted') }}</span>
+                            {% else %}
+                                <span class="{{ row.kind == 'rise' ? 'is-increase' : (row.kind == 'cut' ? 'is-decrease' : '') }}">
+                                    {{ row.difference_minor|money(currency, true) }}
+                                    {% if row.percent_tenths is not null %}
+                                        ({{ (row.percent_tenths / 10)|percent(true, 1) }})
+                                    {% endif %}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="numeric num nowrap muted">
+                            {{ row.annual_minor is not null ? row.annual_minor|money(currency, true) : t('common.none_symbol') }}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if history.pages > 1 %}
+            <nav class="pager" aria-label="{{ t('stats.price_history_pages') }}">
+                {% for step in [{'page': history.page - 1, 'label': t('action.previous'), 'show': history.page > 1},
+                                {'page': history.page + 1, 'label': t('action.next'), 'show': history.page < history.pages}] %}
+                    {% if step.show %}
+                        <a class="button button-quiet"
+                           href="/stats?history_page={{ step.page }}#analytics-price-history"
+                           hx-get="/stats?history_page={{ step.page }}"
+                           hx-target="#analytics-price-history" hx-select="#analytics-price-history"
+                           hx-swap="outerHTML">{{ step.label }}</a>
+                    {% endif %}
+                    {% if loop.first %}
+                        <span class="muted">{{ t('subscriptions_list.pager', {
+                            'page': history.page,
+                            'pages': history.pages,
+                            'total': history.total,
+                        }) }}</span>
+                    {% endif %}
+                {% endfor %}
+            </nav>
+        {% endif %}
+    {% endif %}
+</section>

@@ -25,7 +25,13 @@ use App\Support\Clock;
  */
 final class PasswordResetService
 {
-    private const TOKEN_TTL = '+1 hour';
+    /**
+     * How long a reset link works. One number, used both to issue the token
+     * and — through tokenLifetimeMinutes() — by every page that tells the
+     * reader how long they have, so the page cannot promise a lifetime the
+     * token does not have.
+     */
+    private const TOKEN_LIFETIME_MINUTES = 60;
 
     public function __construct(
         private readonly UserRepository $users,
@@ -107,7 +113,7 @@ final class PasswordResetService
         $token = $this->tokens->issue(
             $user->id,
             TokenRepository::PURPOSE_RESET_PASSWORD,
-            $this->clock->now()->modify(self::TOKEN_TTL),
+            $this->clock->now()->modify(sprintf('+%d minutes', self::TOKEN_LIFETIME_MINUTES)),
         );
 
         $link = rtrim($this->appUrl, '/') . '/reset-password?token=' . urlencode($token);
@@ -120,6 +126,11 @@ final class PasswordResetService
             $this->translator->trans('mail.reset.subject', ['instance' => $this->settings->instanceName()], $locale),
             $this->translator->trans('mail.reset.body', ['name' => $user->displayName, 'link' => $link], $locale),
         );
+    }
+
+    public function tokenLifetimeMinutes(): int
+    {
+        return self::TOKEN_LIFETIME_MINUTES;
     }
 
     public function isTokenValid(string $token): bool

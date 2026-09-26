@@ -1,6 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.dashboard') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.dashboard') }}{% endblock %}
 
 {% block content %}
     {% if not scope.hasHousehold %}
@@ -9,22 +10,55 @@
             <p class="muted">{{ t('dashboard.no_household_note') }}</p>
         </section>
     {% else %}
+        {% set shell_context = shell(scope) %}
         {#
-            One template per card, included in the order this user chose. The
-            order and the hiding are decided by DashboardLayoutService; this
-            walks the list it produced and nothing else, so adding a card is
-            adding a file and an enum case.
+            The greeting says who and when, and never "good afternoon": dates
+            here are UTC, and a time-of-day greeting would be wrong for anyone
+            who is not.
+        #}
+        <div class="dashboard-head">
+            <div>
+                <p class="dashboard-greeting">{{ t('dashboard.greeting', {'name': first_name}) }}</p>
+                <p class="muted dashboard-date">
+                    {{ t('dashboard.stands_on', {
+                        'household': shell_context.household ? shell_context.household.name : '',
+                        'date': today|local_date('EEEE d MMMM'),
+                    }) }}
+                </p>
+            </div>
 
-            The grid is six columns wide and each card says how many it wants
-            — which is what puts each chart beside the narrow card whose
-            subject it shares, and Coming soon beside By category, without
-            fixing any of them in place. On a narrow screen every card takes
-            the full width, so the same list becomes a stack.
+            {#
+                Two views of one dashboard. A form of two submit buttons rather
+                than two links, because choosing one is remembered on the
+                account — a write, so it is a POST with its token — and it works
+                with no script at all.
+            #}
+            <form method="post" action="/dashboard/view" class="segmented dashboard-views"
+                  aria-label="{{ t('dashboard.view_choice') }}">
+                {{ csrf_field() }}
+                {% for choice in dashboard_views %}
+                    <button type="submit" name="view" value="{{ choice.value }}" class="segmented-option"
+                            aria-pressed="{{ choice == dashboard_view ? 'true' : 'false' }}">
+                        {{ t(choice.labelKey) }}
+                    </button>
+                {% endfor %}
+            </form>
+        </div>
+
+        {#
+            One template per card, included in the order this user chose for
+            this view. The order and the hiding are DashboardLayoutService's;
+            this walks the list it produced and nothing else, so adding a card
+            is adding a file and an enum case.
+
+            Each card says how many of the six columns and how many rows it
+            wants. On a narrow screen every card takes the full width, so the
+            same list becomes a stack.
         #}
         <div class="bento">
             {% for card in dashboard_cards %}
-                <div class="bento-item bento-span-{{ card.columnSpan }}">
-                    {% include 'dashboard/cards/' ~ card.value ~ '.twig' %}
+                <div class="bento-item bento-span-{{ card.columnSpan }}{{ card.rowSpan > 1 ? ' bento-rows-' ~ card.rowSpan : '' }}">
+                    {% include card.template %}
                 </div>
             {% endfor %}
         </div>

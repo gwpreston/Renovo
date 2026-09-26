@@ -81,6 +81,8 @@ enum AuditAction: string
     // these say nothing about who else was involved because nobody was.
     case NameChanged = 'account.name_changed';
     case EmailChangeRequested = 'account.email_change_requested';
+    // Phase 27: the confirmation link sent again from the profile.
+    case EmailChangeResent = 'account.email_change_resent';
     case EmailChanged = 'account.email_changed';
     case AvatarChanged = 'account.avatar_changed';
     case AvatarRemoved = 'account.avatar_removed';

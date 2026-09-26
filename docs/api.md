@@ -119,6 +119,8 @@ the same values `GET /me` returns in its `permissions` array.
 | `GET` | `/subscriptions/{id}` | `subscription.view` |
 | `PUT` | `/subscriptions/{id}` | `subscription.update` |
 | `DELETE` | `/subscriptions/{id}` | `subscription.delete` |
+| `POST` | `/subscriptions/{id}/cancel` | `subscription.update` |
+| `POST` | `/subscriptions/{id}/uncancel` | `subscription.update` |
 | `POST` | `/subscriptions/{id}/logo` | `subscription.update` |
 | `DELETE` | `/subscriptions/{id}/logo` | `subscription.update` |
 | `GET` | `/subscriptions/{id}/attachments` | `subscription.view` |
@@ -226,7 +228,24 @@ easiest mistake to make:
 **Read-only fields** are returned but ignored on write: `id`, `anchor_day`,
 `category_name`, `payment_method_name`, `split_mode`, `usage_count`, `usage_rating`, `logo_path`,
 `monthly_minor`, `yearly_minor`, `next_charge_date`, `cancellation_deadline`,
-`days_until_next_payment`, `created_at`, `updated_at`.
+`days_until_next_payment`, `cancelled_at`, `status`, `created_at`, `updated_at`.
+
+**Three fields keep their value when omitted**, unlike the rest of a `PUT`:
+`payment_method_id`, `plan` and `visibility`. Each arrived after the API did,
+and a client written before it must not clear it — or, for `visibility`, make a
+private subscription visible to the household — by putting back a
+representation it never knew had the field. Send `null` (or, for `plan`, an
+empty string) to clear one.
+
+**A private subscription is invisible to everybody but its owner.** With
+`visibility: "payer"`, no other member's token — Owner/Admin included, in
+SHARED or ISOLATED mode — can list, read, total, update or delete it; to them
+it is a `404` exactly like a row that does not exist.
+
+**Paused and cancelled are different states.** `is_active: false` with no
+`cancelled_at` is *paused*: it may resume. A *cancelled* subscription is
+finished; `cancelled_at` is moved only by the cancel and uncancel endpoints,
+and while it is set `is_active` stays false whatever a `PUT` sends.
 
 ---
 
@@ -344,7 +363,8 @@ interface.
 | `owner` | integer | Owner user id. |
 | `currency` | string | ISO 4217 code. |
 | `type` | enum | `recurring`, `one_off`, `lifetime`. |
-| `inactive` | `"1"` | Include inactive subscriptions. |
+| `inactive` | `"1"` | Include inactive subscriptions — paused and cancelled. |
+| `status` | enum | `active`, `trial`, `paused`, `cancelled`. Only that state; takes precedence over `inactive`. |
 | `sort` | enum | `name`, `next_payment`, `price`, `created`. |
 | `dir` | enum | `asc`, `desc`. |
 | `page` | integer | Minimum 1. |
@@ -406,6 +426,27 @@ Responses: `200`, `401`, `403`, `404`, `422`.
 #### `DELETE /api/v1/subscriptions/{id}`
 
 Delete a subscription. Responses: `204`, `401`, `403`, `404`.
+
+#### `POST /api/v1/subscriptions/{id}/cancel`
+
+Cancel a subscription: finished, as of today. Sets `cancelled_at` and makes it
+inactive, so it leaves every total, the forecast, budgets, reminders and the
+calendar feed. On a trial this is what stops the conversion — a cancelled trial
+never becomes a paid subscription. Cancelling twice keeps the first date. No
+body; returns the updated [Subscription](#subscription).
+
+```bash
+curl -X POST -H "Authorization: Bearer rnv_..." \
+     https://your-instance.example/api/v1/subscriptions/12/cancel
+```
+
+Responses: `200`, `401`, `403`, `404`.
+
+#### `POST /api/v1/subscriptions/{id}/uncancel`
+
+Undo a cancellation. The subscription returns to **paused**, not active, so a
+mistake corrected cannot silently restart charges; resume it by `PUT`ting it
+back with `is_active: true`. Responses: `200`, `401`, `403`, `404`.
 
 ---
 
@@ -590,7 +631,9 @@ The writable half of a subscription. Required: `name`, `price_minor`,
 | `converts_to_price_minor` | integer, null | |
 | `converts_to_billing_cycle` | enum, null | As `billing_cycle`. |
 | `converts_to_cycle_days` | integer, null | |
-| `is_active` | boolean | Default `true`. |
+| `is_active` | boolean | Default `true`. `false` pauses it. Stays `false` while the subscription is cancelled. |
+| `plan` | string, null | Max 60 — "Standard", "Family". An absent key keeps the current value. |
+| `visibility` | enum | `household` (default) or `payer`. `payer` keeps it to its owner: hidden from every other member in either isolation mode, and out of their totals. Only the owner may set it, only when `payer_user_id` is the owner or null, and never on a split subscription. An absent key keeps the current setting. |
 | `category_id` | integer, null | |
 | `payment_method_id` | integer, null | An absent key leaves the current assignment alone — unlike the other fields, so a client written before it existed does not clear it. Send `null` to clear it. |
 | `owner_user_id` | integer, null | Must be a household member. Ignored in ISOLATED mode, where a user may own only their own rows. |
@@ -616,6 +659,8 @@ Everything in `SubscriptionInput`, plus these read-only fields:
 | `next_charge_date` | date, null | The trial's conversion date while a trial runs; the next payment date otherwise. |
 | `cancellation_deadline` | date, null | The last day to cancel and avoid the next charge. |
 | `days_until_next_payment` | integer, null | |
+| `cancelled_at` | date, null | The day it was cancelled. Moved by the cancel and uncancel endpoints only. |
+| `status` | enum | `active`, `trial`, `paused`, `cancelled` — derived in the order cancelled, paused, trial, active. |
 | `created_at` | date-time | |
 | `updated_at` | date-time | |
 

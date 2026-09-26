@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Handler;
 
+use App\Application\Middleware\AuthenticationMiddleware;
+use App\Security\SessionInterface;
 use App\Application\Api\ApiPath;
 use App\Security\ScopeViolationException;
 use App\I18n\Translator;
@@ -44,6 +46,7 @@ final class HttpErrorHandler extends ErrorHandler
         private readonly Translator $translator,
         private readonly bool $debug,
         ?LoggerInterface $logger = null,
+        private readonly ?SessionInterface $session = null,
     ) {
         parent::__construct($callableResolver, $responseFactory, $logger);
     }
@@ -137,8 +140,24 @@ final class HttpErrorHandler extends ErrorHandler
              * says no.
              */
             'auth_chrome' => false,
+            /*
+             * Which way back to offer. Not the account — see above — but
+             * whether the session names one, which is a read of data already
+             * in hand: "Back to sign in" to a stranger, "Back to the
+             * dashboard" to somebody who is signed in and would otherwise be
+             * sent to a sign-in form that bounces them straight home.
+             */
+            'signed_in' => $this->hasSignedInSession(),
             'current_path' => $this->request->getUri()->getPath(),
         ]);
+    }
+
+    private function hasSignedInSession(): bool
+    {
+        // Not gated on the session being open: SessionMiddleware writes and
+        // closes it before this runs, and the data it read stays readable.
+        return $this->session !== null
+            && is_int($this->session->get(AuthenticationMiddleware::SESSION_USER_ID));
     }
 
     /**

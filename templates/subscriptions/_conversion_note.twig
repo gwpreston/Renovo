@@ -1,0 +1,19 @@
+{#
+    "≈ £12.34 at today's rate", beneath the form's price. Rendered in place by
+    the form and again, on its own, by /subscriptions/conversion-note when htmx
+    asks as the price or currency changes — so the conversion is always the
+    server's, with the exchange-rate service's own rate. Empty (but present, so
+    the next swap has a target and the price's description resolves) when the
+    price is already in the base currency or is not a price yet.
+#}
+<p class="conversion-note" id="price-conversion" aria-live="polite">
+    {%- if note -%}
+        {%- if note.converted -%}
+            <span class="num">{{ t('subscriptions_form.at_todays_rate', {
+                'amount': note.converted.amountMinor|money(note.converted.currency),
+            }) }}</span>
+        {%- else -%}
+            {{ t('subscriptions_form.no_rate_yet', {'currency': note.currency, 'base': note.base}) }}
+        {%- endif -%}
+    {%- endif -%}
+</p>

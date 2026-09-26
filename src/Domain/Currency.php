@@ -56,11 +56,45 @@ final class Currency
      *
      * @var list<string>
      */
+    /**
+     * Every ISO 4217 currency in circulation, for the form's currency select.
+     *
+     * A list rather than a lookup, because ICU's own currency table also
+     * carries every currency that has ever existed (Deutsche Marks, French
+     * francs) and PHP exposes no way to ask it which are still tendered.
+     * `isValidCode()` stays deliberately looser than this: a stored row in a
+     * code that has since been withdrawn is still a valid row.
+     */
+    private const ALL = [
+        'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN',
+        'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BRL',
+        'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHF', 'CLP', 'CNY',
+        'COP', 'CRC', 'CUP', 'CVE', 'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP',
+        'ERN', 'ETB', 'EUR', 'FJD', 'FKP', 'GBP', 'GEL', 'GHS', 'GIP', 'GMD',
+        'GNF', 'GTQ', 'GYD', 'HKD', 'HNL', 'HTG', 'HUF', 'IDR', 'ILS', 'INR',
+        'IQD', 'IRR', 'ISK', 'JMD', 'JOD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF',
+        'KPW', 'KRW', 'KWD', 'KYD', 'KZT', 'LAK', 'LBP', 'LKR', 'LRD', 'LSL',
+        'LYD', 'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRU', 'MUR',
+        'MVR', 'MWK', 'MXN', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR',
+        'NZD', 'OMR', 'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'PYG', 'QAR',
+        'RON', 'RSD', 'RUB', 'RWF', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD',
+        'SHP', 'SLE', 'SOS', 'SRD', 'SSP', 'STN', 'SVC', 'SYP', 'SZL', 'THB',
+        'TJS', 'TMT', 'TND', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH', 'UGX',
+        'USD', 'UYU', 'UZS', 'VED', 'VES', 'VND', 'VUV', 'WST', 'XAF', 'XCD',
+        'XCG', 'XOF', 'XPF', 'YER', 'ZAR', 'ZMW', 'ZWG',
+    ];
+
     private const COMMON = [
         'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD',
         'HUF', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'NOK', 'NZD', 'PLN',
         'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR',
     ];
+
+    /**
+     * The currencies a base-currency select leads with, in this order, ahead
+     * of the alphabetical rest.
+     */
+    private const PREFERRED = ['GBP', 'EUR', 'USD'];
 
     private function __construct()
     {
@@ -98,5 +132,23 @@ final class Currency
     public static function common(): array
     {
         return self::COMMON;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function all(): array
+    {
+        return self::ALL;
+    }
+
+    /**
+     * Every currency, the preferred ones first and the rest alphabetical.
+     *
+     * @return list<string>
+     */
+    public static function preferredFirst(): array
+    {
+        return [...self::PREFERRED, ...array_values(array_diff(self::ALL, self::PREFERRED))];
     }
 }

@@ -1,34 +1,37 @@
-{% extends 'layout.twig' %}
+{% extends 'auth/_layout.twig' %}
 
-{% block title %}{{ t('auth_invite.title') }} — {{ instance_name }}{% endblock %}
+{#
+    The one signed-out page that names a household. The link was sent to this
+    person, and the email that carried it named the household already, so the
+    name tells them nothing they were not told; anywhere else before sign-in
+    it would be a disclosure.
 
-{% block content %}
-    <section class="card narrow">
-        <h1>{{ t('auth_invite.title') }}</h1>
-        <p class="muted">{{ t('auth_invite.intro') }}</p>
+    No email field. The person reading this followed a link that was sent to
+    their address, which proves they can read mail there far better than
+    typing it would.
+#}
 
-        {#
-            No email field. The person reading this followed a link that was
-            sent to their address, which proves they can read mail there far
-            better than typing it would.
-        #}
-        <form method="post" action="/accept-invite" class="stack">
-            {{ csrf_field() }}
-            <input type="hidden" name="token" value="{{ token }}">
+{% set card_icon = 'household' %}
 
-            <label for="password">{{ t('auth_invite.choose_password') }}</label>
-            <input type="password" id="password" name="password" autocomplete="new-password" required autofocus>
-            <p class="hint">{{ t('hint.password_length') }}</p>
-            {% if errors.password is defined %}<p class="field-error">{{ error_message(errors.password) }}</p>{% endif %}
+{% block card_title %}{{ t('auth_invite.title') }}{% endblock %}
+{% block card_intro %}
+    {{- household ? t('auth_invite.intro_named', {'household': household}) : t('auth_invite.intro') -}}
+{% endblock %}
 
-            <label for="password_confirm">{{ t('auth_invite.confirm_password') }}</label>
-            <input type="password" id="password_confirm" name="password_confirm"
-                   autocomplete="new-password" required>
-            {% if errors.password_confirm is defined %}
-                <p class="field-error">{{ error_message(errors.password_confirm) }}</p>
-            {% endif %}
+{% block card_body %}
+    {% include 'partials/errors.twig' %}
 
-            <button type="submit" class="button button-primary">{{ t('auth_invite.join') }}</button>
-        </form>
-    </section>
+    <form method="post" action="/accept-invite" class="auth-form">
+        {{ csrf_field() }}
+        <input type="hidden" name="token" value="{{ token }}">
+
+        {% include 'auth/_new_password.twig' with {
+            'label': t('auth_invite.choose_password'),
+            'confirm_label': t('auth_invite.confirm_password'),
+            'errors': errors,
+            'autofocus': true,
+        } only %}
+
+        <button type="submit" class="button button-primary auth-submit">{{ t('auth_invite.join') }}</button>
+    </form>
 {% endblock %}

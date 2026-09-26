@@ -59,6 +59,9 @@ return [
         'key' => $env('SESSION_KEY'),
         'name' => $env('SESSION_NAME', 'renovo_session'),
         'lifetime' => (int) $env('SESSION_LIFETIME_SECONDS', '1209600'),
+        // A session whose owner unticked "Keep me signed in": its cookie ends
+        // with the browser, and the server forgets it after this long unused.
+        'browser_lifetime' => (int) $env('SESSION_BROWSER_LIFETIME_SECONDS', '43200'),
         'secure' => $bool($env('SESSION_COOKIE_SECURE', 'true')),
         'samesite' => $env('SESSION_COOKIE_SAMESITE', 'Lax'),
         'path' => '/',

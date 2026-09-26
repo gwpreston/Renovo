@@ -93,6 +93,15 @@
 
     /**
      * Sign in, or present a second factor, with an existing credential.
+     *
+     * `config.reveal`, when given, is an element the page renders hidden and
+     * this unhides only where a passkey can actually be used — it needs both
+     * this script and a secure context, so without either the offer is never
+     * made. Without it, the button is disabled and says why, as before.
+     *
+     * `config.verifyUrl` may be a function, read at the moment of the click,
+     * for a URL that carries something the visitor can still change — the
+     * sign-in form's "Keep me signed in".
      */
     function bindAuthentication(config) {
         if (!config.button) {
@@ -100,10 +109,18 @@
         }
 
         if (!supported()) {
+            if (config.reveal) {
+                return;
+            }
+
             config.button.disabled = true;
             show(config.error, message('unsupported'));
 
             return;
+        }
+
+        if (config.reveal) {
+            config.reveal.hidden = false;
         }
 
         config.button.addEventListener('click', async () => {
@@ -127,7 +144,8 @@
 
                 const assertion = await navigator.credentials.get({ publicKey: options });
 
-                const verifyResponse = await post(config.verifyUrl, config.csrf, {
+                const verifyUrl = typeof config.verifyUrl === 'function' ? config.verifyUrl() : config.verifyUrl;
+                const verifyResponse = await post(verifyUrl, config.csrf, {
                     id: assertion.id,
                     rawId: bufferToBase64Url(assertion.rawId),
                     type: assertion.type,
@@ -168,6 +186,12 @@
     function bindRegistration(config) {
         if (!config.button) {
             return;
+        }
+
+        // The control arrives hidden, because without script it is a button
+        // that does nothing. From here on it either works or says why not.
+        if (config.container) {
+            config.container.hidden = false;
         }
 
         if (!supported()) {
@@ -225,7 +249,19 @@
                 }
 
                 const result = await registerResponse.json();
-                window.location.assign(result.redirect || '/settings/security');
+                const target = new URL(result.redirect || '/profile#two-step', window.location.href);
+
+                // A target that differs from this page only by its fragment
+                // is a same-document navigation: assign() would scroll and
+                // load nothing, and the new passkey, its flash and any first
+                // recovery codes would wait unseen for some later page. So
+                // on this page it is the fragment and then a real reload.
+                if (target.pathname === window.location.pathname && target.search === window.location.search) {
+                    window.location.hash = target.hash;
+                    window.location.reload();
+                } else {
+                    window.location.assign(target.href);
+                }
             } catch (error) {
                 show(config.error, error.name === 'NotAllowedError'
                     ? message('register_cancelled')

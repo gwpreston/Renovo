@@ -73,6 +73,7 @@ final class SubscriptionApiController extends ApiController
             direction: $filter->direction,
             page: $filter->page,
             perPage: $perPage,
+            status: $filter->status,
         );
 
         $today = $this->clock->today();
@@ -172,6 +173,54 @@ final class SubscriptionApiController extends ApiController
         $this->subscriptions->delete($scope, $id);
 
         return $this->noContent($response);
+    }
+
+    /**
+     * Cancel: finished, as of today. `cancelled_at` is read-only in the
+     * payload, so this and `uncancel` are the only ways to move it.
+     */
+    public function cancel(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        return $this->changeCancellation($request, $response, (int) $id, true);
+    }
+
+    /**
+     * Undo a cancel. The subscription returns to paused, not active.
+     */
+    public function uncancel(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        return $this->changeCancellation($request, $response, (int) $id, false);
+    }
+
+    private function changeCancellation(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        int $id,
+        bool $cancel,
+    ): ResponseInterface {
+        $scope = $this->scope($request);
+
+        if ($this->subscriptions->find($scope, $id) === null) {
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
+        }
+
+        // A row the caller can see but not change — a split participant's, a
+        // Contributor looking at somebody else's — throws a scope violation
+        // here, which the error handler answers as 404 like every other write.
+        $cancel ? $this->subscriptions->cancel($scope, $id) : $this->subscriptions->uncancel($scope, $id);
+
+        $updated = $this->subscriptions->find($scope, $id);
+        if ($updated === null) {
+            throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
+        }
+
+        return $this->json($response, ['data' => Resource::subscription($updated, $this->clock->today())]);
     }
 
     /**

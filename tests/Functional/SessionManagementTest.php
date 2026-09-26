@@ -96,7 +96,7 @@ final class SessionManagementTest extends DatabaseTestCase
 
     public function testThePageListsThisUsersSessionsOnly(): void
     {
-        $response = $this->request('GET', '/settings/security');
+        $response = $this->request('GET', '/profile');
         $body = (string) $response->getBody();
 
         self::assertSame(200, $response->getStatusCode());
@@ -111,13 +111,36 @@ final class SessionManagementTest extends DatabaseTestCase
         self::assertStringNotContainsString(self::OTHER_SESSION_ID, $body);
     }
 
+    /**
+     * Device, address and last seen — and nothing that places the address.
+     * The line under each device is the address and the time, in that order,
+     * with nothing between them where a town would go.
+     */
+    public function testEachSessionShowsItsAddressAndLastSeenButNoLocation(): void
+    {
+        $body = (string) $this->request('GET', '/profile')->getBody();
+
+        self::assertStringContainsString('Safari on iOS', $body);
+        self::assertMatchesRegularExpression('~192\.0\.2\.20 · last seen \d~', $body);
+        self::assertStringNotContainsString('Location', $body);
+    }
+
+    public function testTheOldSecurityAddressLandsOnItsSection(): void
+    {
+        $response = $this->request('GET', '/settings/security');
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/profile#two-step', $response->getHeaderLine('Location'));
+    }
+
     public function testRevokingOneSessionRemovesItAndLeavesTheRest(): void
     {
-        $response = $this->request('POST', '/settings/security/sessions/revoke', [
+        $response = $this->request('POST', '/profile/sessions/revoke', [
             'handle' => substr(self::OTHER_SESSION_ID, 0, 16),
         ]);
 
         self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/profile#sessions', $response->getHeaderLine('Location'));
         self::assertSame(2, $this->sessions->countActiveForUser($this->userId, new DateTimeImmutable()));
         self::assertNull($this->rowFor(self::OTHER_SESSION_ID));
         self::assertNotNull($this->rowFor(self::THIRD_SESSION_ID));
@@ -126,7 +149,7 @@ final class SessionManagementTest extends DatabaseTestCase
 
     public function testTheCurrentSessionCannotBeRevokedFromTheList(): void
     {
-        $this->request('POST', '/settings/security/sessions/revoke', [
+        $this->request('POST', '/profile/sessions/revoke', [
             'handle' => substr(self::CURRENT_SESSION_ID, 0, 16),
         ]);
 
@@ -135,7 +158,7 @@ final class SessionManagementTest extends DatabaseTestCase
 
     public function testAHandleFromAnotherAccountRevokesNothing(): void
     {
-        $this->request('POST', '/settings/security/sessions/revoke', [
+        $this->request('POST', '/profile/sessions/revoke', [
             'handle' => substr('someone-elses-session-id', 0, 16),
         ]);
 
@@ -144,7 +167,7 @@ final class SessionManagementTest extends DatabaseTestCase
 
     public function testRevokingEverythingElseKeepsOnlyTheCurrentSession(): void
     {
-        $response = $this->request('POST', '/settings/security/sessions/revoke-others');
+        $response = $this->request('POST', '/profile/sessions/revoke-others');
 
         self::assertSame(302, $response->getStatusCode());
         self::assertSame(1, $this->sessions->countActiveForUser($this->userId, new DateTimeImmutable()));
@@ -164,7 +187,7 @@ final class SessionManagementTest extends DatabaseTestCase
 
         self::assertNotSame('', $handler->read(self::OTHER_SESSION_ID));
 
-        $this->request('POST', '/settings/security/sessions/revoke', [
+        $this->request('POST', '/profile/sessions/revoke', [
             'handle' => substr(self::OTHER_SESSION_ID, 0, 16),
         ]);
 
@@ -186,7 +209,7 @@ final class SessionManagementTest extends DatabaseTestCase
 
         self::assertStringNotContainsString(
             '192.0.2.44',
-            (string) $this->request('GET', '/settings/security')->getBody(),
+            (string) $this->request('GET', '/profile')->getBody(),
         );
     }
 

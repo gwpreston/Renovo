@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Application\Middleware\AuthenticationMiddleware;
-use App\Domain\HouseholdCapability;
 use App\Domain\IsolationMode;
 use App\Domain\Money;
 use App\Domain\Role;
@@ -30,7 +29,8 @@ use Slim\Psr7\Factory\ServerRequestFactory;
 use Symfony\Component\Mailer\MailerInterface;
 
 /**
- * The household screen: who is in it, and what each of them carries.
+ * Each member's share of the household, as the members screen and the
+ * dashboard's Who pays show it.
  *
  * Three things are worth a test here and the rest is layout.
  *
@@ -41,9 +41,9 @@ use Symfony\Component\Mailer\MailerInterface;
  * be checked for the money it happens to have been formatted into and the
  * question here is whether the division is right.
  *
- * **Who may look.** The screen shows what other people spend, which is why it
- * is the one read in the application a Viewer is refused. The refusal is
- * asserted against the route, not against the absence of a link.
+ * **Who may look.** Every member reads the members screen, but what other
+ * people spend is not a Viewer's to see: a Viewer is given their own figures
+ * and a dash for everybody else, and the dashboard's comparison not at all.
  *
  * **What isolation does to it.** In ISOLATED mode the scoped query returns the
  * caller's own rows, so every other member's total would be a fraction of the
@@ -271,37 +271,27 @@ final class HouseholdScreenTest extends DatabaseTestCase
     }
 
     /**
-     * A Viewer is refused the route itself, not merely denied a link to it.
+     * The household's overview is the members screen since Phase 26, and
+     * every member of the household may read it.
      */
-    public function testAViewerIsRefusedTheScreen(): void
+    public function testEveryMemberReadsTheMembersScreen(): void
     {
-        $this->signIn($this->viewerId);
+        foreach ([$this->ownerId, $this->editorId, $this->viewerId] as $userId) {
+            $this->signIn($userId);
 
-        self::assertSame(403, $this->statusOf('/household'));
-    }
+            $html = $this->get('/settings/members');
 
-    public function testAnEditorMaySeeIt(): void
-    {
-        $this->signIn($this->editorId);
-
-        $html = $this->get('/household');
-
-        self::assertStringContainsString('Ada', $html);
-        self::assertStringContainsString('Bram', $html);
-        self::assertStringContainsString('Cleo', $html);
+            self::assertStringContainsString('Ada', $html);
+            self::assertStringContainsString('Bram', $html);
+            self::assertStringContainsString('Cleo', $html);
+        }
     }
 
     /**
-     * It reads and does not write.
-     *
-     * Asserted against the route table rather than against the markup: the
-     * shell itself carries forms — signing out, searching — on every page, so
-     * "no form on the screen" would be a claim about the frame rather than
-     * about this screen. And asserted against the table rather than by posting
-     * at the path, because a POST is turned away by the CSRF guard whether a
-     * route is there to reach or not, which would pass either way.
+     * `/household` was bookmarked when it was a screen of its own. It reads
+     * and writes nothing now: a GET, and a redirect.
      */
-    public function testTheScreenChangesNothing(): void
+    public function testTheOldHouseholdPathRedirectsToTheMembersScreen(): void
     {
         $methods = [];
         foreach ($this->app->getRouteCollector()->getRoutes() as $route) {
@@ -312,83 +302,78 @@ final class HouseholdScreenTest extends DatabaseTestCase
 
         self::assertSame(['GET'], $methods, 'Something other than a read is registered at /household.');
 
+        $this->signIn($this->viewerId);
+
+        $response = $this->app->handle(
+            (new ServerRequestFactory())->createServerRequest(
+                'GET',
+                'http://localhost/household',
+                ['REMOTE_ADDR' => '127.0.0.1'],
+            ),
+        );
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/settings/members', $response->getHeaderLine('Location'));
+    }
+
+    /**
+     * A Viewer's own figures, and nobody else's.
+     *
+     * Their own share is not somebody else's spending, so it is shown; Ada's
+     * and Bram's are what `ViewHousehold` exists to keep from an onlooker, so
+     * they are withheld — the flag, not an empty figure, is what says so.
+     */
+    public function testAViewerIsShownTheirOwnShareAndNobodyElses(): void
+    {
+        // £6 a month of Ada's, split evenly with Cleo: £3 is Cleo's own.
+        $ownerScope = $this->scopeFor($this->ownerId, Role::OwnerAdmin, IsolationMode::Shared);
+        $withCleo = (new SubscriptionRepository($this->db))->create($ownerScope, [
+            'name' => 'Shared with Cleo',
+            'price_minor' => 600,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-12-01',
+            'is_active' => true,
+        ], []);
+        $this->container->get(PriceHistoryService::class)->recordInitialPrice(
+            $ownerScope,
+            $withCleo,
+            Money::of(600, 'GBP'),
+            new DateTimeImmutable('2026-01-01'),
+            $this->ownerId,
+        );
+        $this->container->get(SplitService::class)->update($ownerScope, $withCleo, [
+            'split_mode' => SplitMode::Equal->value,
+            'shares' => [$this->ownerId => 1, $this->viewerId => 1],
+        ]);
+
+        $rows = $this->overviewFor($this->viewerId, Role::Viewer, IsolationMode::Shared);
+
+        self::assertTrue($rows[0]['figures_withheld']);
+        self::assertTrue($rows[1]['figures_withheld']);
+        self::assertFalse($rows[2]['figures_withheld']);
+        self::assertTrue($rows[2]['is_self']);
+        self::assertSame(300, $this->monthlyMinor($rows[2]));
+
+        $this->signIn($this->viewerId);
+        $html = $this->get('/settings/members');
+
+        self::assertStringContainsString('£3.00', $html, 'The Viewer\'s own share was not shown.');
+        self::assertStringNotContainsString('£20.50', $html, 'Ada\'s share was shown to a Viewer.');
+        self::assertStringNotContainsString('£11.50', $html, 'Bram\'s share was shown to a Viewer.');
+    }
+
+    /**
+     * An Editor sees everybody's share, in full.
+     */
+    public function testAnEditorIsShownEverybodysShare(): void
+    {
         $this->signIn($this->editorId);
+        $html = $this->get('/settings/members');
 
-        $editorHtml = $this->get('/household');
-
-        self::assertStringNotContainsString('action="/household', $editorHtml);
-        // The way through to the screen that *does* change things is an
-        // Owner's alone, and is not rendered for anybody else.
-        self::assertStringNotContainsString('/settings/members', $editorHtml);
-
-        $this->signIn($this->ownerId);
-
-        self::assertStringContainsString('href="/settings/members"', $this->get('/household'));
-    }
-
-    /**
-     * The ladder is answered by `PermissionService`, so what a card says a
-     * member can do is what the routes will actually let them do.
-     *
-     * Asserted as the whole ladder rather than as the rungs that happen to be
-     * lit: every card lists all five, and "Cleo may not set budgets" is a claim
-     * the screen makes out loud, not an absence.
-     */
-    public function testACardListsEveryRungAndMarksTheOnesTheRoleReallyHas(): void
-    {
-        $rows = $this->overviewFor($this->ownerId, Role::OwnerAdmin, IsolationMode::Shared);
-
-        // The Owner: everything.
-        self::assertSame([
-            'see_everything' => true,
-            'edit_own' => true,
-            'edit_anything' => true,
-            'set_budgets' => true,
-            'manage_members' => true,
-        ], $this->ladderOf($rows[0]));
-
-        // The Editor: everything except the people.
-        self::assertSame([
-            'see_everything' => true,
-            'edit_own' => true,
-            'edit_anything' => true,
-            'set_budgets' => true,
-            'manage_members' => false,
-        ], $this->ladderOf($rows[1]));
-
-        // The Viewer: sight of the household, and nothing else.
-        self::assertSame([
-            'see_everything' => true,
-            'edit_own' => false,
-            'edit_anything' => false,
-            'set_budgets' => false,
-            'manage_members' => false,
-        ], $this->ladderOf($rows[2]));
-    }
-
-    /**
-     * A Contributor is the reason the ladder has two editing rungs.
-     *
-     * They read the whole household and write only their own part of it, which
-     * is a sentence no other role can say and the pair of rungs exists to draw:
-     * "See every line" lit, "Add and edit their own" lit, "Add and edit
-     * anything" greyed. If the two ever collapsed into one, this is where it
-     * would show.
-     */
-    public function testAContributorSeesEverythingAndEditsOnlyTheirOwn(): void
-    {
-        (new MembershipRepository($this->db))
-            ->updateRole($this->householdId, $this->editorId, Role::Contributor);
-
-        $rows = $this->overviewFor($this->ownerId, Role::OwnerAdmin, IsolationMode::Shared);
-
-        self::assertSame([
-            'see_everything' => true,
-            'edit_own' => true,
-            'edit_anything' => false,
-            'set_budgets' => true,
-            'manage_members' => false,
-        ], $this->ladderOf($rows[1]));
+        self::assertStringContainsString('£17.50', $html);
+        self::assertStringContainsString('£11.50', $html);
     }
 
     /**
@@ -432,41 +417,6 @@ final class HouseholdScreenTest extends DatabaseTestCase
     }
 
     /**
-     * Isolation reaches the ladder too, and it reaches an Owner's.
-     *
-     * The scoping layer restricts reads and writes to a member's own rows for
-     * every role, so in ISOLATED nobody sees every line and nobody edits
-     * anybody else's. A card that still claimed an Owner could would be
-     * describing a power the repository refuses — the same lie the withheld
-     * figures exist to avoid, told about permissions instead of money.
-     */
-    public function testIsolationGreysTheTwoRungsThatReachOtherPeoplesRows(): void
-    {
-        $rows = $this->overviewFor($this->ownerId, Role::OwnerAdmin, IsolationMode::Isolated);
-
-        self::assertSame([
-            'see_everything' => false,
-            'edit_own' => true,
-            'edit_anything' => false,
-            'set_budgets' => true,
-            'manage_members' => true,
-        ], $this->ladderOf($rows[0]));
-    }
-
-    /**
-     * The greying is not carried by colour alone.
-     */
-    public function testAnAbsentRungSaysSoInWordsAsWellAsInGrey(): void
-    {
-        $html = $this->get('/household');
-
-        self::assertStringContainsString('Add and edit anything', $html);
-        self::assertStringContainsString('capability is-absent', $html);
-        // The word a screen reader gets where a sighted reader gets the grey.
-        self::assertStringContainsString('visually-hidden', $html);
-    }
-
-    /**
      * ISOLATED mode: your own figures, and an honest silence about everybody
      * else's.
      *
@@ -495,31 +445,68 @@ final class HouseholdScreenTest extends DatabaseTestCase
         self::assertTrue($rows[1]['figures_withheld']);
         self::assertTrue($rows[2]['figures_withheld']);
 
-        $html = $this->get('/household');
+        $html = $this->get('/settings/members');
 
         self::assertStringContainsString('Not shown', $html);
+        self::assertStringNotContainsString('£11.50', $html);
+        self::assertStringNotContainsString('£7.50', $html, 'A fraction of Bram\'s share was shown as all of it.');
         self::assertStringContainsString('Bram', $html, 'The roster is still the roster.');
     }
 
     /**
-     * The dashboard card is a comparison, and it is drawn only when there is
-     * one to make.
+     * The Household dashboard's Who pays, from the same figures as this screen.
+     *
+     * Ada carries £17.50 of the £29.00 the household spends a month and Bram
+     * £11.50, so the card puts 60% and 40% against them — shares of the
+     * members' shares added together. A Viewer is not shown on the dashboard
+     * what they are refused on this screen; the rows are never built.
      */
-    public function testTheDashboardCardComparesMembersOnlyWhenItHonestlyCan(): void
+    public function testTheDashboardsWhoPaysDividesTheHouseholdByItsMembers(): void
     {
-        self::assertStringContainsString('Who pays for what', $this->get('/'));
+        $this->openHouseholdView($this->ownerId);
+        $card = $this->whoPaysCard($this->get('/'));
 
-        // A Viewer is not shown on the dashboard what they are refused on its
-        // own screen. The rows are never built, so there is nothing for the
-        // template to forget to hide.
+        self::assertStringContainsString('Who pays what', $card);
+        self::assertStringContainsString('60% of household spend', $card);
+        self::assertStringContainsString('40% of household spend', $card);
+
+        $this->openHouseholdView($this->viewerId);
         $this->signIn($this->viewerId);
-        self::assertStringNotContainsString('Who pays for what', $this->get('/'));
+        self::assertSame('', $this->whoPaysCard($this->get('/')), 'A Viewer is shown no member figures.');
+    }
 
-        // And in ISOLATED mode there is one member with figures — the reader —
-        // which is not a comparison.
+    /**
+     * In ISOLATED mode the card is the reader's own share and nothing else: no
+     * other member's name, and no percentage of a household total the reader
+     * cannot see.
+     */
+    public function testUnderIsolationWhoPaysIsYourShareAlone(): void
+    {
         $this->container->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
-        $this->signIn($this->ownerId);
-        self::assertStringNotContainsString('Who pays for what', $this->get('/'));
+        $this->openHouseholdView($this->ownerId);
+
+        $card = $this->whoPaysCard($this->get('/'));
+
+        self::assertStringContainsString('Your share', $card);
+        self::assertStringContainsString('Ada', $card);
+        self::assertStringNotContainsString('Bram', $card);
+        self::assertStringNotContainsString('of household spend', $card);
+    }
+
+    private function openHouseholdView(int $userId): void
+    {
+        (new UserRepository($this->db))->updatePreferences($userId, ['dashboard_view' => 'household']);
+    }
+
+    /** The Who pays card's markup, or '' when it was not drawn. */
+    private function whoPaysCard(string $html): string
+    {
+        $start = strpos($html, 'class="who-pays-group"');
+        if ($start === false) {
+            return '';
+        }
+
+        return substr($html, $start, (int) strpos($html, '</section>', $start) - $start);
     }
 
     private function adasOwnRow(): int
@@ -545,25 +532,6 @@ final class HouseholdScreenTest extends DatabaseTestCase
         }
 
         self::fail('No subscription named ' . $name);
-    }
-
-    /**
-     * One member's ladder as capability key => whether they are on that rung.
-     *
-     * @param array<string, mixed> $row
-     * @return array<string, bool>
-     */
-    private function ladderOf(array $row): array
-    {
-        /** @var list<array{capability: HouseholdCapability, held: bool}> $rungs */
-        $rungs = $row['capabilities'];
-
-        $ladder = [];
-        foreach ($rungs as $rung) {
-            $ladder[$rung['capability']->value] = $rung['held'];
-        }
-
-        return $ladder;
     }
 
     /**

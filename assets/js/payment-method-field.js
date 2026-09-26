@@ -10,7 +10,7 @@
  * the household's free text and goes in as text.
  */
 
-import { hydrateIcons } from './icons.js';
+import { icon } from './icons.js';
 
 const SELECT = 'select[data-payment-method-select]';
 
@@ -28,11 +28,11 @@ function badgeFor(option) {
         image.height = 16;
         badge.append(image);
     } else {
-        const slot = document.createElement('span');
-        slot.className = 'payment-badge-icon';
-        slot.dataset.icon = option.dataset.iconName || 'payment-card';
-        slot.setAttribute('aria-hidden', 'true');
-        badge.append(slot);
+        const drawing = icon(option.dataset.iconName || 'payment-card', 'payment-badge-icon');
+
+        if (drawing !== null) {
+            badge.append(drawing);
+        }
     }
 
     const name = document.createElement('span');
@@ -64,7 +64,6 @@ export function enhancePaymentMethodFields(root = document) {
 
             if (option !== undefined && option.value !== '') {
                 preview.append(badgeFor(option));
-                hydrateIcons(preview);
             }
         });
     });

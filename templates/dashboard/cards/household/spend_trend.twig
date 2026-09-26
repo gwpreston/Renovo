@@ -1,0 +1,122 @@
+{#
+    Spend over time: the last twelve complete months as lines, one per
+    category or one per member, chosen with the two links in the header.
+
+    The links are a choice of view, not a setting, so they are GETs and work
+    with no script; htmx swaps the card alone when it is there. The card's id
+    is fixed so the plain link lands back on it.
+
+    Drawn on the server, like the pace chart: every point is worked out on
+    minor units, and the SVG is a picture of the table beneath it, which holds
+    the same figures for a screen reader. When a month cannot be totalled in
+    one currency there are no lines at all — one would dip where the missing
+    currency was.
+
+    Lines by category take the category's own colour, the one its bar has on
+    By category beside this card; a category without one takes the palette.
+    Lines by member take the member's avatar tone.
+#}
+{% macro series_name(series) %}
+    {%- if series.is_other -%}
+        {{ t('dashboard.other_categories', {'count': series.other_count}) }}
+    {%- elseif series.name is null -%}
+        {{ t('dashboard.spend_trend_uncategorised') }}
+    {%- else -%}
+        {{ series.name }}
+    {%- endif -%}
+{% endmacro %}
+{% import _self as trend_card %}
+
+<section class="card trend-card" id="spend-trend" aria-labelledby="spend-trend-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="spend-trend-heading">{{ t('dashboard.spend_trend') }}</h2>
+            <p class="muted">{{ t('dashboard.spend_trend_note', {'count': 12, 'currency': trend.currency}) }}</p>
+        </div>
+
+        {% if trend.is_member_available %}
+            <nav class="segmented" aria-label="{{ t('dashboard.spend_trend_choice') }}">
+                {% for choice in ['category', 'member'] %}
+                    <a class="segmented-option" href="/?trend={{ choice }}#spend-trend"
+                       hx-get="/?trend={{ choice }}" hx-target="#spend-trend" hx-swap="outerHTML"
+                       hx-push-url="/?trend={{ choice }}"
+                       aria-current="{{ trend.by == choice ? 'true' : 'false' }}">
+                        {{ t('dashboard.spend_trend_by_' ~ choice) }}
+                    </a>
+                {% endfor %}
+            </nav>
+        {% endif %}
+    </header>
+
+    {% if not trend.is_drawable %}
+        <p class="muted empty">{{ t('dashboard.spend_trend_unconvertible', {'currencies': trend.unconvertible|join(', ')}) }}</p>
+    {% elseif trend.series is empty %}
+        <p class="muted empty">{{ t('dashboard.spend_trend_empty', {'count': 12}) }}</p>
+    {% else %}
+        <div class="trend-chart" aria-hidden="true">
+            <svg viewBox="0 0 {{ trend.width }} {{ trend.height }}" preserveAspectRatio="none" focusable="false">
+                {% for tick in trend.ticks %}
+                    <line class="trend-grid" x1="0" x2="{{ trend.width }}" y1="{{ tick.y }}" y2="{{ tick.y }}"></line>
+                {% endfor %}
+                {% for series in trend.series %}
+                    <path class="trend-line{{ series.tone ? ' avatar-tone-' ~ series.tone : '' }}"
+                          d="{{ series.path }}"{% if series.colour %} style="stroke: {{ series.colour }}"{% endif %}></path>
+                {% endfor %}
+            </svg>
+            <ul class="plain trend-axis">
+                {# The floor's label would sit on the lines running along it. #}
+                {% for tick in trend.ticks|filter(tick => tick.value > 0) %}
+                    <li class="num" style="top: {{ (tick.y * 100 / trend.height)|round(2) }}%">{{ tick.label }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="trend-labels" aria-hidden="true">
+            {% for month in trend.months %}
+                <span>{{ month|local_date('MMM') }}</span>
+            {% endfor %}
+        </div>
+
+        <ul class="plain trend-legend" aria-hidden="true">
+            {% for series in trend.series %}
+                <li>
+                    <span class="trend-key{{ series.tone ? ' avatar-tone-' ~ series.tone : '' }}"{% if series.colour %} style="background: {{ series.colour }}"{% endif %}></span>
+                    <span class="trend-legend-name">{{ trend_card.series_name(series) }}</span>
+                    <span class="num">{{ series.latest_minor|money(trend.currency) }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+
+        <div class="table-scroll visually-hidden">
+            <table class="table">
+                <caption>{{ t('dashboard.spend_trend') }} · {{ t('dashboard.spend_trend_by_' ~ trend.by) }}</caption>
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.month') }}</th>
+                    {% for series in trend.series %}
+                        <th scope="col" class="numeric">{{ trend_card.series_name(series) }}</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for month in trend.months %}
+                    {% set index = loop.index0 %}
+                    <tr>
+                        <th scope="row">{{ month|local_date('MMMM y') }}</th>
+                        {% for series in trend.series %}
+                            <td class="numeric num">{{ series.points[index]|money(trend.currency) }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="hint">
+            {{ t('dashboard.spend_trend_latest') }}
+            {{ t('dashboard.reconstructed_note') }}
+            {% if trend.excluded_count > 0 %}
+                {{ t('dashboard.excluded_note', {'count': trend.excluded_count}) }}
+            {% endif %}
+        </p>
+    {% endif %}
+</section>

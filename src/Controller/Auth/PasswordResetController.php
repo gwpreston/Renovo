@@ -29,6 +29,7 @@ final class PasswordResetController extends Controller
         return $this->render($request, $response, 'auth/forgot_password.twig', [
             'values' => [],
             'errors' => [],
+            'minutes' => $this->resets->tokenLifetimeMinutes(),
         ]);
     }
 
@@ -43,11 +44,17 @@ final class PasswordResetController extends Controller
             return $this->render($request, $response->withStatus(429), 'auth/forgot_password.twig', [
                 'values' => ['email' => $email],
                 'errors' => $exception->errors(),
+                'minutes' => $this->resets->tokenLifetimeMinutes(),
             ]);
         }
 
-        // The same page is shown whether or not the address exists.
-        return $this->render($request, $response, 'auth/forgot_password_sent.twig');
+        // The same page is shown whether or not the address exists. It
+        // repeats the address as typed — the reader's own input, which tells
+        // them nothing new — so "Send again" can post it back.
+        return $this->render($request, $response, 'auth/forgot_password_sent.twig', [
+            'email' => trim($email),
+            'minutes' => $this->resets->tokenLifetimeMinutes(),
+        ]);
     }
 
     public function showResetForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -56,7 +63,7 @@ final class PasswordResetController extends Controller
         $token = is_string($token) ? $token : '';
 
         if ($token === '' || !$this->resets->isTokenValid($token)) {
-            return $this->render($request, $response->withStatus(410), 'auth/reset_expired.twig');
+            return $this->renderExpired($request, $response);
         }
 
         return $this->render($request, $response, 'auth/reset_password.twig', [
@@ -79,7 +86,7 @@ final class PasswordResetController extends Controller
         } catch (ValidationException $exception) {
             $errors = $exception->errors();
             if (isset($errors['token'])) {
-                return $this->render($request, $response->withStatus(410), 'auth/reset_expired.twig');
+                return $this->renderExpired($request, $response);
             }
 
             return $this->render($request, $response->withStatus(422), 'auth/reset_password.twig', [
@@ -88,8 +95,16 @@ final class PasswordResetController extends Controller
             ]);
         }
 
-        $this->flash('success', 'flash.password_changed');
+        // A page of its own rather than a flash over the sign-in form: the
+        // reset is finished, and the one thing left to do is sign in with the
+        // new password.
+        return $this->render($request, $response, 'auth/reset_done.twig');
+    }
 
-        return $this->redirect($response, '/login');
+    private function renderExpired(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        return $this->render($request, $response->withStatus(410), 'auth/reset_expired.twig', [
+            'minutes' => $this->resets->tokenLifetimeMinutes(),
+        ]);
     }
 }

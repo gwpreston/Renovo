@@ -61,10 +61,12 @@ final class CsrfMiddleware implements MiddlewareInterface
         $fromHeader = $request->getHeaderLine(CsrfTokenManager::HEADER_NAME);
 
         if (!$this->csrf->isValid($fromBody) && !$this->csrf->isValid($fromHeader === '' ? null : $fromHeader)) {
-            throw new HttpBadRequestException(
+            // Titled for what it almost always is: a form left open until the
+            // session behind it ended, rather than "400 Bad Request".
+            throw (new HttpBadRequestException(
                 $request,
                 $this->translator->trans('error.csrf.expired'),
-            );
+            ))->setTitle($this->translator->trans('error.page.session_expired_title'));
         }
 
         return $handler->handle($request);

@@ -1,6 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.calendar') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.calendar') }}{% endblock %}
 
 {% block page_actions %}
     <form method="get" action="/calendar" class="inline-form">
@@ -14,7 +15,8 @@
 {% endblock %}
 
 {% block content %}
-    <p class="muted note">{{ t('calendar.intro') }}</p>
-
-    {% include 'calendar/_month.twig' %}
+    <div class="calendar-layout">
+        {% include 'calendar/_month.twig' %}
+        {% include 'calendar/_feed.twig' %}
+    </div>
 {% endblock %}

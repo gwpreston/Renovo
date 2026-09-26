@@ -18,7 +18,8 @@ use DateTimeImmutable;
  * decides its own visibility, which is the thing the scoping layer exists to
  * prevent.
  *
- * @phpstan-type AlertState array{is_breached: bool, projected_minor: int|null}
+ * @phpstan-type AlertState array{is_breached: bool, projected_minor: int|null,
+ *     last_alert_at: DateTimeImmutable|null}
  */
 final class BudgetAlertStateRepository extends AbstractScopedRepository
 {
@@ -46,6 +47,11 @@ final class BudgetAlertStateRepository extends AbstractScopedRepository
         return [
             'is_breached' => $this->db->platform()->toBoolean($row['is_breached']),
             'projected_minor' => $row['projected_minor'] === null ? null : (int) $row['projected_minor'],
+            // When the current breach began — the crossing a subject who is not
+            // the owner is told about, keyed on this date so they hear it once.
+            'last_alert_at' => ($row['last_alert_at'] ?? null) === null
+                ? null
+                : new DateTimeImmutable((string) $row['last_alert_at']),
         ];
     }
 

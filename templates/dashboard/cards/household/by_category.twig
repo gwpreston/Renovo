@@ -1,0 +1,53 @@
+{#
+    Where it goes, as proportion bars: the same breakdown the Overview's donut
+    draws, from the same service. When a currency has no rate the bars are per
+    currency, each against its own total, and the currency is named.
+
+    Each bar is drawn in its category's colour, the one set on the Categories
+    screen; a category with none, and the tail, keep the accent.
+#}
+<section class="card" aria-labelledby="by-category-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="by-category-heading">{{ t('dashboard_card.by_category') }}</h2>
+            <p class="muted">{{ t('dashboard.monthly_equivalent') }}</p>
+        </div>
+    </header>
+
+    {% if by_category.groups is empty %}
+        <p class="muted empty">{{ t('subscriptions.categories_empty') }}</p>
+    {% else %}
+        {% if not by_category.is_combined %}
+            <p class="hint">{{ t('stats.donut_per_currency', {'currencies': by_category.unconvertible|join(', ')}) }}</p>
+        {% endif %}
+
+        {% for group in by_category.groups %}
+            {% if not by_category.is_combined %}
+                <h3 class="stat-label">{{ group.currency }}</h3>
+            {% endif %}
+            <ul class="plain distribution">
+                {% for row in group.rows %}
+                    <li class="distribution-row">
+                        <span class="distribution-name">{{ row.name }}</span>
+                        <span class="distribution-amount num">{{ row.amount_minor|money(group.currency) }}</span>
+                        <div class="meter" role="img"
+                             aria-label="{{ t('dashboard.share_of_spend', {'name': row.name, 'percent': row.percent}) }}">
+                            <span class="meter-fill" style="width: {{ min(row.percent, 100) }}%{{ row.colour ? '; background: ' ~ row.colour : '' }}"></span>
+                        </div>
+                    </li>
+                {% endfor %}
+                {% if group.other %}
+                    {% set other_name = t('dashboard.other_categories', {'count': group.other.count}) %}
+                    <li class="distribution-row">
+                        <span class="distribution-name muted">{{ other_name }}</span>
+                        <span class="distribution-amount num">{{ group.other.amount_minor|money(group.currency) }}</span>
+                        <div class="meter" role="img"
+                             aria-label="{{ t('dashboard.share_of_spend', {'name': other_name, 'percent': group.other.percent}) }}">
+                            <span class="meter-fill" style="width: {{ min(group.other.percent, 100) }}%"></span>
+                        </div>
+                    </li>
+                {% endif %}
+            </ul>
+        {% endfor %}
+    {% endif %}
+</section>

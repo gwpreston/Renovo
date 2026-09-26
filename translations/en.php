@@ -25,16 +25,13 @@ return [
     'account.choose_picture' => 'Choose a picture',
     'account.confirm_password' => 'Confirm new password',
     'account.current_password' => 'Current password',
-    'account.email_cancel' => 'Cancel that change',
-    'account.email_current' => 'You sign in as {email}.',
-    'account.email_hint' =>
-        'We will send a link to the new address. Nothing changes until you follow it, so a typo '
-        . 'cannot lock you out.',
-    'account.email_new' => 'New email address',
+    'account.email_cancel' => 'cancel',
+    'account.email_hint' => 'Changing it sends a confirmation link to the new address.',
     'account.email_none' =>
         'This account has no mailbox of its own. An Owner of your household can give it an address.',
-    'account.email_pending' => 'Waiting for {email} to be confirmed.',
-    'account.email_request' => 'Send confirmation link',
+    'account.email_pending' => 'Waiting for confirmation of {email} —',
+    'account.email_resend' => 'resend',
+    'account.temporary_password' => 'Temporary password',
     'account.must_change_heading' => 'Choose a password of your own',
     'account.must_change_note' =>
         'You are signed in with a password somebody else chose for you. Set one of your own below '
@@ -43,21 +40,20 @@ return [
     'account.picture_hint' =>
         'PNG, JPEG, WebP or GIF, up to {kilobytes} KB. It is cropped square and resized, and the '
         . 'original is not kept.',
-    'account.remove_picture' => 'Remove picture',
-    'account.save_name' => 'Save name',
-    'account.save_password' => 'Change password',
-    'account.save_picture' => 'Save picture',
-    'account.sign_out_others' => 'Sign out my other devices',
+    'account.remove_picture' => 'Remove',
+    'account.upload_picture' => 'Upload picture',
+    'account.save_details' => 'Save changes',
+    'account.save_password' => 'Update password',
+    'account.sign_out_others' => 'Sign out my other sessions',
     'account.sign_out_others_hint' =>
         'Leave this on unless you meant somebody else to stay signed in. This device stays signed '
         . 'in either way.',
     'account.who_you_are' => 'Who you are',
-    'account.your_email' => 'Your email address',
     'account.your_password' => 'Your password',
-    'account.your_picture' => 'Your picture',
     'audit_action.account.avatar_changed' => 'Picture changed',
     'audit_action.account.avatar_removed' => 'Picture removed',
     'audit_action.account.email_change_requested' => 'Email change requested',
+    'audit_action.account.email_change_resent' => 'Email change link sent again',
     'audit_action.account.email_changed' => 'Email address changed',
     'audit_action.account.name_changed' => 'Name changed',
     'audit_action.member.added' => 'Member added',
@@ -68,6 +64,29 @@ return [
     'audit_action.member.removed' => 'Member removed from household',
     'audit_action.member.temporary_password_issued' => 'Temporary password issued',
     'auth.back_to_sign_in' => 'Back to sign in',
+    'auth.demo_banner' => 'This instance is a read-only demonstration. You can look around; nothing you change is saved.',
+    'auth.email_placeholder' => 'you@example.com',
+    'auth.hide_password' => 'Hide password',
+    'auth.meter.fair' => 'Fair',
+    'auth.meter.good' => 'Good',
+    'auth.meter.minimum' => 'At least {count, plural, one {# character} other {# characters}}.',
+    'auth.meter.strong' => 'Strong',
+    'auth.meter.too_short' => 'Too short',
+    'auth.meter.weak' => 'Weak',
+    'auth.or' => 'or',
+    'auth.show_password' => 'Show password',
+    'auth_brand.currency_body' => 'Pay in euros or dollars; totals and budgets convert to your base currency.',
+    'auth_brand.currency_title' => 'Any currency, one total',
+    'auth_brand.footer' => 'Self-hosted. Your data stays on your own server.',
+    'auth_brand.household_body' =>
+        'Owners, Editors, Contributors and Viewers each see and change what their role allows.',
+    'auth_brand.household_title' => 'Built for the whole household',
+    'auth_brand.pitch' => 'Every subscription and recurring bill in the household, in one place.',
+    'auth_brand.reminders_body' =>
+        'Renewals, trial conversions, price rises and budgets, by email, chat apps or push notifications.',
+    'auth_brand.reminders_title' => 'Reminders before money moves',
+    'auth_email_change_done.intro' => 'Your account now signs in and receives mail at {email}.',
+    'auth_email_change_done.title' => 'Email address changed',
     'auth_email_change_failed.back' => 'Back to your account',
     'auth_email_change_failed.intro' =>
         'Confirmation links are valid for one hour and can be used once. Your address has not been '
@@ -78,6 +97,9 @@ return [
     'auth_invite.intro' =>
         'Your account is nearly ready. Choose a password and it is yours — nobody else, including '
         . 'whoever invited you, ever sees it.',
+    'auth_invite.intro_named' =>
+        'You have been invited to join {household}. Choose a password and it is yours — nobody else, '
+        . 'including whoever invited you, ever sees it.',
     'auth_invite.join' => 'Set password and join',
     'auth_invite.title' => 'Join the household',
     'auth_invite_expired.intro' =>
@@ -97,14 +119,179 @@ return [
     'cycle.custom' => 'Custom',
     'cycle.custom_days' => 'Every {days, plural, one {# day} other {# days}}',
 
+    // currency — the name beside each code in a currency select
+    'currency.option' => '{code} - {name}',
+    'currency.option_symbol' => '{code} · {symbol}',
+    'currency.name.AED' => 'United Arab Emirates Dirham',
+    'currency.name.AFN' => 'Afghan Afghani',
+    'currency.name.ALL' => 'Albanian Lek',
+    'currency.name.AMD' => 'Armenian Dram',
+    'currency.name.ANG' => 'Netherlands Antillean Guilder',
+    'currency.name.AOA' => 'Angolan Kwanza',
+    'currency.name.ARS' => 'Argentine Peso',
+    'currency.name.AUD' => 'Australian Dollar',
+    'currency.name.AWG' => 'Aruban Florin',
+    'currency.name.AZN' => 'Azerbaijani Manat',
+    'currency.name.BAM' => 'Bosnia-Herzegovina Convertible Mark',
+    'currency.name.BBD' => 'Barbadian Dollar',
+    'currency.name.BDT' => 'Bangladeshi Taka',
+    'currency.name.BGN' => 'Bulgarian Lev',
+    'currency.name.BHD' => 'Bahraini Dinar',
+    'currency.name.BIF' => 'Burundian Franc',
+    'currency.name.BMD' => 'Bermudan Dollar',
+    'currency.name.BND' => 'Brunei Dollar',
+    'currency.name.BOB' => 'Bolivian Boliviano',
+    'currency.name.BRL' => 'Brazilian Real',
+    'currency.name.BSD' => 'Bahamian Dollar',
+    'currency.name.BTN' => 'Bhutanese Ngultrum',
+    'currency.name.BWP' => 'Botswanan Pula',
+    'currency.name.BYN' => 'Belarusian Ruble',
+    'currency.name.BZD' => 'Belize Dollar',
+    'currency.name.CAD' => 'Canadian Dollar',
+    'currency.name.CDF' => 'Congolese Franc',
+    'currency.name.CHF' => 'Swiss Franc',
+    'currency.name.CLP' => 'Chilean Peso',
+    'currency.name.CNY' => 'Chinese Yuan',
+    'currency.name.COP' => 'Colombian Peso',
+    'currency.name.CRC' => 'Costa Rican Colón',
+    'currency.name.CUP' => 'Cuban Peso',
+    'currency.name.CVE' => 'Cape Verdean Escudo',
+    'currency.name.CZK' => 'Czech Koruna',
+    'currency.name.DJF' => 'Djiboutian Franc',
+    'currency.name.DKK' => 'Danish Krone',
+    'currency.name.DOP' => 'Dominican Peso',
+    'currency.name.DZD' => 'Algerian Dinar',
+    'currency.name.EGP' => 'Egyptian Pound',
+    'currency.name.ERN' => 'Eritrean Nakfa',
+    'currency.name.ETB' => 'Ethiopian Birr',
+    'currency.name.EUR' => 'Euro',
+    'currency.name.FJD' => 'Fijian Dollar',
+    'currency.name.FKP' => 'Falkland Islands Pound',
+    'currency.name.GBP' => 'Pounds sterling',
+    'currency.name.GEL' => 'Georgian Lari',
+    'currency.name.GHS' => 'Ghanaian Cedi',
+    'currency.name.GIP' => 'Gibraltar Pound',
+    'currency.name.GMD' => 'Gambian Dalasi',
+    'currency.name.GNF' => 'Guinean Franc',
+    'currency.name.GTQ' => 'Guatemalan Quetzal',
+    'currency.name.GYD' => 'Guyanaese Dollar',
+    'currency.name.HKD' => 'Hong Kong Dollar',
+    'currency.name.HNL' => 'Honduran Lempira',
+    'currency.name.HTG' => 'Haitian Gourde',
+    'currency.name.HUF' => 'Hungarian Forint',
+    'currency.name.IDR' => 'Indonesian Rupiah',
+    'currency.name.ILS' => 'Israeli New Shekel',
+    'currency.name.INR' => 'Indian Rupee',
+    'currency.name.IQD' => 'Iraqi Dinar',
+    'currency.name.IRR' => 'Iranian Rial',
+    'currency.name.ISK' => 'Icelandic Króna',
+    'currency.name.JMD' => 'Jamaican Dollar',
+    'currency.name.JOD' => 'Jordanian Dinar',
+    'currency.name.JPY' => 'Japanese Yen',
+    'currency.name.KES' => 'Kenyan Shilling',
+    'currency.name.KGS' => 'Kyrgyz Som',
+    'currency.name.KHR' => 'Cambodian Riel',
+    'currency.name.KMF' => 'Comorian Franc',
+    'currency.name.KPW' => 'North Korean Won',
+    'currency.name.KRW' => 'South Korean Won',
+    'currency.name.KWD' => 'Kuwaiti Dinar',
+    'currency.name.KYD' => 'Cayman Islands Dollar',
+    'currency.name.KZT' => 'Kazakhstani Tenge',
+    'currency.name.LAK' => 'Laotian Kip',
+    'currency.name.LBP' => 'Lebanese Pound',
+    'currency.name.LKR' => 'Sri Lankan Rupee',
+    'currency.name.LRD' => 'Liberian Dollar',
+    'currency.name.LSL' => 'Lesotho Loti',
+    'currency.name.LYD' => 'Libyan Dinar',
+    'currency.name.MAD' => 'Moroccan Dirham',
+    'currency.name.MDL' => 'Moldovan Leu',
+    'currency.name.MGA' => 'Malagasy Ariary',
+    'currency.name.MKD' => 'Macedonian Denar',
+    'currency.name.MMK' => 'Myanmar Kyat',
+    'currency.name.MNT' => 'Mongolian Tugrik',
+    'currency.name.MOP' => 'Macanese Pataca',
+    'currency.name.MRU' => 'Mauritanian Ouguiya',
+    'currency.name.MUR' => 'Mauritian Rupee',
+    'currency.name.MVR' => 'Maldivian Rufiyaa',
+    'currency.name.MWK' => 'Malawian Kwacha',
+    'currency.name.MXN' => 'Mexican Peso',
+    'currency.name.MYR' => 'Malaysian Ringgit',
+    'currency.name.MZN' => 'Mozambican Metical',
+    'currency.name.NAD' => 'Namibian Dollar',
+    'currency.name.NGN' => 'Nigerian Naira',
+    'currency.name.NIO' => 'Nicaraguan Córdoba',
+    'currency.name.NOK' => 'Norwegian Krone',
+    'currency.name.NPR' => 'Nepalese Rupee',
+    'currency.name.NZD' => 'New Zealand Dollar',
+    'currency.name.OMR' => 'Omani Rial',
+    'currency.name.PAB' => 'Panamanian Balboa',
+    'currency.name.PEN' => 'Peruvian Sol',
+    'currency.name.PGK' => 'Papua New Guinean Kina',
+    'currency.name.PHP' => 'Philippine Peso',
+    'currency.name.PKR' => 'Pakistani Rupee',
+    'currency.name.PLN' => 'Polish Zloty',
+    'currency.name.PYG' => 'Paraguayan Guarani',
+    'currency.name.QAR' => 'Qatari Riyal',
+    'currency.name.RON' => 'Romanian Leu',
+    'currency.name.RSD' => 'Serbian Dinar',
+    'currency.name.RUB' => 'Russian Ruble',
+    'currency.name.RWF' => 'Rwandan Franc',
+    'currency.name.SAR' => 'Saudi Riyal',
+    'currency.name.SBD' => 'Solomon Islands Dollar',
+    'currency.name.SCR' => 'Seychellois Rupee',
+    'currency.name.SDG' => 'Sudanese Pound',
+    'currency.name.SEK' => 'Swedish Krona',
+    'currency.name.SGD' => 'Singapore Dollar',
+    'currency.name.SHP' => 'St. Helena Pound',
+    'currency.name.SLE' => 'Sierra Leonean Leone',
+    'currency.name.SOS' => 'Somali Shilling',
+    'currency.name.SRD' => 'Surinamese Dollar',
+    'currency.name.SSP' => 'South Sudanese Pound',
+    'currency.name.STN' => 'São Tomé & Príncipe Dobra',
+    'currency.name.SVC' => 'Salvadoran Colón',
+    'currency.name.SYP' => 'Syrian Pound',
+    'currency.name.SZL' => 'Swazi Lilangeni',
+    'currency.name.THB' => 'Thai Baht',
+    'currency.name.TJS' => 'Tajikistani Somoni',
+    'currency.name.TMT' => 'Turkmenistani Manat',
+    'currency.name.TND' => 'Tunisian Dinar',
+    'currency.name.TOP' => 'Tongan Paʻanga',
+    'currency.name.TRY' => 'Turkish Lira',
+    'currency.name.TTD' => 'Trinidad & Tobago Dollar',
+    'currency.name.TWD' => 'New Taiwan Dollar',
+    'currency.name.TZS' => 'Tanzanian Shilling',
+    'currency.name.UAH' => 'Ukrainian Hryvnia',
+    'currency.name.UGX' => 'Ugandan Shilling',
+    'currency.name.USD' => 'US Dollar',
+    'currency.name.UYU' => 'Uruguayan Peso',
+    'currency.name.UZS' => 'Uzbekistani Som',
+    'currency.name.VED' => 'Bolívar Soberano',
+    'currency.name.VES' => 'Venezuelan Bolívar',
+    'currency.name.VND' => 'Vietnamese Dong',
+    'currency.name.VUV' => 'Vanuatu Vatu',
+    'currency.name.WST' => 'Samoan Tala',
+    'currency.name.XAF' => 'Central African CFA Franc',
+    'currency.name.XCD' => 'East Caribbean Dollar',
+    'currency.name.XCG' => 'Caribbean Guilder',
+    'currency.name.XOF' => 'West African CFA Franc',
+    'currency.name.XPF' => 'CFP Franc',
+    'currency.name.YER' => 'Yemeni Rial',
+    'currency.name.ZAR' => 'South African Rand',
+    'currency.name.ZMW' => 'Zambian Kwacha',
+    'currency.name.ZWG' => 'Zimbabwean Gold',
+
     'error.auth.disabled' =>
         'This account has been closed by an administrator of your household. Ask them to restore it.',
     'error.avatar.dimensions' => 'That image is too large to work with. Try a smaller one.',
     'error.avatar.too_large' => 'A picture must be {kilobytes} KB or smaller.',
     'error.avatar.type' => 'That file is not a PNG, JPEG, WebP or GIF image.',
+    'error.budget.household_isolated' =>
+        'A household budget is not available while members\' subscriptions are kept separate.',
+    'error.budget.subject_self_only' => 'You can set a budget for your own spending only.',
     'error.email.no_mailbox' =>
         'This account has no mailbox of its own, so it cannot confirm a new address. An Owner of your '
         . 'household can change it for you.',
+    'error.email.nothing_pending' => 'There is no change of address waiting to be confirmed.',
     'error.email.unchanged' => 'That is already your email address.',
     'error.email_change.invalid_token' =>
         'That confirmation link has expired or has already been used.',
@@ -117,13 +304,16 @@ return [
     'error.member.not_your_own_role' =>
         'You cannot change your own role. Ask another Owner to change it for you.',
     'error.member.not_yourself' => 'You cannot do that to your own account.',
+    'error.member.invite_as_owner' =>
+        'Invite them as an Editor, Contributor or Viewer, and make them an Owner once they have joined.',
+    'error.member.removal_choice_required' =>
+        'Choose what should happen to the subscriptions nobody else has seen.',
     'error.member.role_invalid' => 'Choose a role from the list.',
+    'error.palette.unknown' => 'Choose one of the palettes shown.',
     'flash.avatar_missing' => 'There was no picture to remove.',
     'flash.avatar_removed' => 'Your picture has been removed.',
     'flash.avatar_saved' => 'Your picture has been saved.',
     'flash.email_change_cancelled' => 'The pending email change has been cancelled.',
-    'flash.email_change_confirmed' =>
-        'Your email address has been changed. Use the new one to sign in from now on.',
     'flash.email_change_requested' =>
         'Check the new address for a confirmation link. Until you follow it, your current address '
         . 'stays your sign-in.',
@@ -137,9 +327,9 @@ return [
     'flash.member_revoked' =>
         'Their login has been revoked and they have been signed out everywhere.',
     'flash.member_role_changed' => 'Their role has been changed.',
-    'flash.name_saved' => 'Your name has been saved.',
     'flash.password_changed_sessions' =>
-        'Your password has been changed, and {count, plural, one {# other session was} other {# other sessions were}} signed out.',
+        'Your password has been changed, and {count, plural, one {# other session was} other {# other '
+        . 'sessions were}} signed out.',
     'mail.email_change.body' =>
         "Hello {name},\n\nConfirm that you can read mail at this address, and it becomes the one "
         . "you sign in with:\n\n{link}\n\nThe link is valid for one hour. Until you follow it, "
@@ -153,20 +343,26 @@ return [
     'mail.invite.body' =>
         "Hello {name},\n\n{inviter} has added you to their household on {instance}, a shared "
         . "subscription tracker.\n\nChoose a password and you are in:\n\n{link}\n\nThe link is "
-        . 'valid for seven days. If you were not expecting this, you can ignore this message.',
+        . 'valid for {days, plural, one {# day} other {# days}}. If you were not expecting this, you '
+        . 'can ignore this message.',
     'mail.invite.subject' => '{inviter} has invited you to {instance}',
     'members.actions' => 'Actions',
-    'members.add_button' => 'Add member',
-    'members.add_heading' => 'Add someone',
-    'members.add_intro' =>
-        'They get an invitation and choose their own password — you never see it. A member with no '
-        . 'mailbox of their own is the one exception; tick the box below for that.',
-    'members.change_role' => 'Change',
-    'members.email_hint' => 'Where their invitation goes. Leave it empty if they have no address.',
+    'members.email_placeholder' => 'name@example.com',
+    'members.figures_withheld_note' =>
+        'A dash is a figure that is not yours to see: other members\' spending is shown only where '
+        . 'you can see all of it.',
     'members.intro' =>
-        'Everybody who shares this household, what they may do in it, and whether they have arrived '
-        . 'yet.',
+        'Everyone in {household} and what their role lets them do. Only Owners can '
+        . 'change roles, invite people or remove them.',
+    'members.invite' => 'Invite member',
+    'members.invite_expiry' =>
+        'They\'ll get an email link that expires in {count, plural, one {# day} other {# days}}.',
+    'members.invite_title' => 'Invite to {household}',
     'members.last_seen' => 'Last seen',
+    'members.matrix_caption' => '"Own only" means only rows that member pays for.',
+    'members.matrix_heading' => 'What each role can do',
+    'members.matrix_permission' => 'Permission',
+    'members.monthly_share' => 'Monthly share',
     'members.never_signed_in' => 'Never',
     'members.no_mailbox' => 'No email address',
     'members.remove' => 'Remove',
@@ -185,10 +381,22 @@ return [
     'members.remove_heading' => 'Remove {name}?',
     'members.remove_intro' =>
         '{name} will lose access to this household immediately, and will be signed out everywhere.',
-    'members.resend_invite' => 'Resend invitation',
+    'members.remove_private_delete' => 'Delete them, with their price history and documents.',
+    'members.remove_private_legend' =>
+        'They keep {count, plural, one {# subscription} other {# subscriptions}} to themselves, which '
+        . 'nobody else has seen. What should happen to {count, plural, one {it} other {them}}?',
+    'members.remove_private_reassign' => 'Give them to me. They stay private — to me.',
+    'members.resend_invite' => 'Resend invite',
+    'members.role_description_contributor' =>
+        'Adds and edits their own subscriptions, prices, splits and budget.',
+    'members.role_description_editor' => 'Can change anything the household has.',
+    'members.role_description_viewer' => 'Sees subscriptions and totals. Changes nothing.',
     'members.restore_login' => 'Restore login',
     'members.revoke_login' => 'Revoke login',
-    'members.send_reset' => 'Send password reset',
+    'members.send_invitation' => 'Send invitation',
+    'members.send_reset' => 'Send reset',
+    'members.subtitle' => '{household} · {count, plural, one {# person} other {# people}}',
+    'members.table_heading' => 'Members',
     'members.temporary_password_heading' => 'Their temporary password',
     'members.temporary_password_note' =>
         'Give this to {name}. They will be asked to replace it as soon as they sign in.',
@@ -196,15 +404,28 @@ return [
         'This is the only time it is shown. Renovo keeps only a hash of it, so it cannot be looked '
         . 'up again — if it is lost, add nothing and simply issue a new one.',
     'members.this_household' => 'This household',
-    'members.title' => 'Household members',
+    'members.visibility_change' => 'Change it in instance settings',
+    'members.visibility_heading' => 'Data visibility',
+    'members.visibility_instance' => 'An instance administrator sets this for every household on the instance.',
+    'members.visibility_mode_isolated' => 'Isolated',
+    'members.visibility_mode_shared' => 'Shared',
+    'members.visibility_note_isolated' =>
+        'Each member of {household} sees only the subscriptions they pay for or share '
+        . 'the cost of, and changes only their own. That holds for every role, Owners included.',
+    'members.visibility_note_shared' =>
+        'Everyone in {household} sees all of its subscriptions and what they cost. '
+        . 'What each person may change is set by their role.',
+    'members.visibility_private' =>
+        'A subscription set to "Only me" is hidden from everyone else in either mode, and its cost '
+        . 'is left out of their totals.',
     'members.without_email' => 'This member has no email address',
     'members.without_email_hint' =>
         'For a child with no mailbox. Renovo creates the account with a one-time password shown to '
         . 'you once, which they must replace the first time they sign in.',
+    'members.you' => 'you',
     'membership_status.active' => 'Active',
-    'membership_status.pending' => 'Invited',
-    'membership_status.revoked' => 'Revoked',
-    'settings.manage_members' => 'Manage members',
+    'membership_status.pending' => 'Invite pending',
+    'membership_status.revoked' => 'Login revoked',
     'type.recurring' => 'Recurring',
     'type.one_off' => 'One-off',
     'type.lifetime' => 'Lifetime',
@@ -228,14 +449,19 @@ return [
     'split.equal' => 'Split equally',
     'split.custom' => 'Split by share',
 
-    'budget_period.monthly' => 'Next month',
-    'budget_period.annual' => 'Next 12 months',
+    'budget_period.monthly' => 'Monthly',
+    'budget_period.annual' => 'Yearly',
 
     'notice.none' => 'None',
     'notice.days' => '{count, plural, one {# day} other {# days}}',
     'notice.weeks' => '{count, plural, one {# week} other {# weeks}}',
     'notice.months' => '{count, plural, one {# month} other {# months}}',
 
+    'alert.price_change' => 'Price change',
+    'alert.price_change.line' => '{old} → {new} from {date}',
+    'alert.price_change.title_fall' => '{name} is going down',
+    'alert.price_change.title_rise' => '{name} is going up',
+    'alert.price_change.yearly' => '{amount} a year',
     'alert.renewal' => 'Upcoming renewal',
     'alert.trial_conversion' => 'Trial about to convert',
     'alert.cancel_by' => 'Cancellation deadline',
@@ -244,7 +470,6 @@ return [
     // -----------------------------------------------------------------------
     // Display preferences
     // -----------------------------------------------------------------------
-    'settings.appearance' => 'Appearance',
     'settings.theme' => 'Theme',
     'settings.language' => 'Language',
     'settings.language_instance_default' => 'Whatever this instance is set to',
@@ -254,7 +479,16 @@ return [
     'settings.landing_view' => 'Open on',
     'settings.landing_view_hint' => 'The page you see when you open Renovo.',
 
-    'theme.system' => 'Match my system',
+    'settings.palette' => 'Colour palette',
+    'settings.palette_hint' => 'The colours of the sidebar and of the buttons and highlights. Only you see your choice.',
+
+    'palette.navy' => 'Navy & emerald',
+    'palette.paper' => 'Light & emerald',
+    'palette.midnight' => 'Midnight & teal',
+    'palette.ocean' => 'Light & ocean blue',
+    'palette.forest' => 'Forest & mint',
+
+    'theme.system' => 'Auto',
     // The same choice on the sign-in screen's switch, where the three options
     // sit side by side and a sentence would not fit beside two single words.
     'theme.system_short' => 'Auto',
@@ -286,6 +520,11 @@ return [
     // Validation messages. Raised by services as keys and resolved by whoever
     // is rendering — a Twig form, or the API's error envelope.
     // -----------------------------------------------------------------------
+    'error.plan.too_long_60' => 'Keep the plan to 60 characters.',
+    'error.split.private' =>
+        'Only you can see this subscription, so it cannot be split. Make it visible to the household first.',
+    'error.subscription.cancelled_resume' =>
+        'A cancelled subscription cannot be resumed. Undo the cancellation first; it comes back paused.',
     'error.subscription.not_found' => 'That subscription does not exist.',
     'error.currency.required' => 'Choose a currency.',
     'error.member.not_in_household' => 'Choose a member of this household.',
@@ -315,10 +554,15 @@ return [
         'Use at least {count, plural, one {# character} other {# characters}}.',
     'error.recovery_code.invalid' => 'That recovery code is not valid, or has already been used.',
     'error.totp.code_wrong' => 'That code is not correct.',
-    'error.auth.credentials' => 'Those credentials are not correct.',
+    'error.auth.credentials' => 'That email and password don’t match an account.',
     'error.auth.unverified' => 'Confirm your email address before signing in. Check your inbox for the link.',
     'error.auth.throttled' =>
         'Too many attempts. Try again in {minutes, plural, one {# minute} other {# minutes}}.',
+    'error.verify.throttled' =>
+        'Too many requests for a new link. Try again in {minutes, plural, one {# minute} other {# minutes}}.',
+    'error.setup.household_name_required' => 'Give the household a name.',
+    'error.setup.invites_invalid' => 'These cannot be invited: {addresses}. Check each is an address nobody here uses yet.',
+    'error.setup.invites_too_many' => 'Invite at most {max} people here; add the rest from Members & roles.',
     'error.reset.throttled' =>
         'Too many reset requests. Try again in {minutes, plural, one {# minute} other {# minutes}}.',
     'error.reset.invalid_token' => 'That reset link has expired or has already been used.',
@@ -339,6 +583,13 @@ return [
     'error.passkey.unreadable' => 'The browser sent a response we could not read.',
 
     'error.url.required' => 'Enter a URL.',
+    'error.visibility.invalid' => 'Choose who can see this subscription.',
+    'error.visibility.owner_only' => 'Only a subscription that belongs to you can be kept to yourself.',
+    'error.visibility.payer_is_owner' =>
+        'A subscription kept to yourself is paid by you. Clear "Paid by" or choose yourself.',
+    'error.visibility.split' =>
+        'This subscription is split, and a shared cost is always visible to the people sharing it. '
+        . 'Remove the split first.',
     'error.website.too_long' => 'That address is too long.',
     'error.url.invalid' => 'Enter a valid URL, including https://.',
     'error.url.scheme' => 'The URL must start with https:// or http://.',
@@ -460,7 +711,8 @@ return [
     'error.trusted_host.required' => 'Enter a host name, address or CIDR range.',
     'error.trusted_host.too_long' => 'That is too long to be a host or range.',
     'error.trusted_host.invalid' =>
-        'Enter a host name (gotify.lan), a suffix (.lan), an address (192.168.1.10) or a range (100.64.0.0/10).',
+        'Enter a host name (gotify.lan), a suffix (.lan), an address (192.168.1.10) or a range '
+        . '(100.64.0.0/10).',
     'error.trusted_host.duplicate' => 'That is already on the list.',
 
     // -----------------------------------------------------------------------
@@ -468,12 +720,18 @@ return [
     // next one, so what is stored is the key and its arguments.
     // -----------------------------------------------------------------------
     'flash.raw' => '{message}',
+    'flash.subscription_cancelled' => 'Subscription cancelled.',
+    'flash.subscription_uncancelled' =>
+        'Cancellation undone. The subscription is paused until you resume it.',
     'flash.welcome_back' => 'Welcome back, {name}.',
     'flash.signed_out' => 'You have been signed out.',
-    'flash.email_confirmed' => 'Your email address is confirmed. You can sign in now.',
     'flash.password_changed' => 'Your password has been changed. Sign in with it now.',
     'flash.two_factor_expired' => 'That sign-in attempt expired. Start again.',
     'flash.preferences_saved' => 'Your preferences have been saved.',
+    'flash.dashboard_cards_saved' => 'Your dashboard cards have been saved.',
+    'flash.details_saved' => 'Your details have been saved.',
+    'flash.email_change_resent' =>
+        'A new confirmation link is on its way to the new address. The earlier link no longer works.',
 
     'flash.subscription_added' => 'Subscription added.',
     'flash.subscription_saved' => 'Subscription saved.',
@@ -520,6 +778,7 @@ return [
         '{count, plural, =0 {No other sessions were signed in.} one {# other session signed out.}'
         . ' other {# other sessions signed out.}}',
 
+    'flash.feed_link_created' => 'A new calendar feed link was created. Copy it now — it is not shown again.',
     'flash.token_created' => 'Token created. Copy it now — it is not shown again.',
     'flash.token_reissued' =>
         'Token reissued. The previous one has stopped working — copy the new one now, it is not shown again.',
@@ -550,9 +809,9 @@ return [
     'flash.trusted_host_added' => 'Trusted host added. Notifications may now reach it.',
     'flash.trusted_host_removed' => 'Trusted host removed.',
 
-    'flash.setup_ready' => 'Your instance is ready. One more step: where should reminders go?',
     'flash.setup_channel_added' => 'Channel added. Send yourself a test message to confirm it arrives.',
-    'flash.setup_finished' => 'All set. Add your first subscription to get started.',
+    'flash.setup_test_email_off' => 'Turn Email on to send a test message.',
+    'flash.setup_test_email_sent' => 'A test message is on its way to {address}.',
 
     // -----------------------------------------------------------------------
     // Notifications
@@ -585,6 +844,7 @@ return [
     'action.back_to_sign_in' => 'Back to sign in',
     'action.cancel' => 'Cancel',
     'action.close' => 'Close',
+    'action.back' => 'Back',
     'action.continue' => 'Continue',
     'action.delete' => 'Delete',
     'action.edit' => 'Edit',
@@ -649,63 +909,87 @@ return [
     'auth.link_expired' => 'Link expired',
 
     // auth_forgot_password
-    'auth_forgot_password.intro' => 'Enter your email address and we will send you a link to set a new password.',
+    'auth_forgot_password.intro' =>
+        'Enter the email you sign in with. If it belongs to an account, we’ll send a link that works for '
+        . '{minutes, plural, one {# minute} other {# minutes}}.',
     'auth_forgot_password.send_reset_link' => 'Send reset link',
     'auth_forgot_password.title' => 'Reset your password',
 
     // auth_forgot_password_sent
     'auth_forgot_password_sent.intro' =>
-        'If that address has an account, a reset link is on its way. It is valid for one hour.',
+        'If {email} has an account, a reset link is on its way. It expires in '
+        . '{minutes, plural, one {# minute} other {# minutes}} and works once.',
+    'auth_forgot_password_sent.nothing_arrived' =>
+        'Nothing arrived? Check spam, or ask your household Owner to send a reset from Members & roles.',
+    'auth_forgot_password_sent.send_again' => 'Send again',
     'auth_forgot_password_sent.title' => 'Check your inbox',
 
     // auth_login
-    'auth_login.forgotten_your_password' => 'Forgotten your password?',
+    'auth_login.forgot_password' => 'Forgot password?',
+    'auth_login.keep_signed_in' => 'Keep me signed in on this device',
+    'auth_login.no_account' => 'New here?',
     'auth_login.passkey' => 'Sign in with a passkey',
     'auth_login.title' => 'Sign in',
+    'auth_login.welcome_back' => 'Welcome back.',
 
     // auth_register
     'auth_register.already_have_an_account' => 'Already have an account?',
     'auth_register.create_account' => 'Create account',
+    'auth_register.intro' => 'Your own account, with a household of your own to start in.',
     'auth_register.title' => 'Create an account',
 
     // auth_register_sent
-    'auth_register_sent.follow_it' => 'Follow it to finish setting up your account. The link is valid for two days.',
-    'auth_register_sent.sent_to' => 'We have sent a confirmation link to',
+    'auth_register_sent.intro' =>
+        'We’ve sent a link to {email}. Follow it to finish setting up your account; it works for '
+        . '{days, plural, one {# day} other {# days}}.',
+    'auth_register_sent.nothing_arrived' => 'Nothing arrived? Check spam, or send the link again.',
+    'auth_register_sent.resent' => 'If that address is waiting to be confirmed, a new link is on its way.',
+    'auth_register_sent.send_again' => 'Send again',
     'auth_register_sent.title' => 'Confirm your email',
 
     // auth_reset_expired
-    'auth_reset_expired.intro' => 'Reset links last one hour and can only be used once.',
-    'auth_reset_expired.request_a_new_link' => 'Request a new link',
+    'auth_reset_expired.intro' =>
+        'Reset links work for {minutes, plural, one {# minute} other {# minutes}} and only once. Ask for a '
+        . 'new one and use it straight away.',
+    'auth_reset_expired.send_a_new_link' => 'Send a new link',
     'auth_reset_expired.title' => 'That reset link has expired',
 
     // auth_reset_password
-    'auth_reset_password.change_password' => 'Change password',
+    'auth_reset_done.intro' => 'Your password has been changed. Sign in with the new one.',
+    'auth_reset_done.title' => 'Password saved',
     'auth_reset_password.confirm_new_password' => 'Confirm new password',
+    'auth_reset_password.intro' => 'Choose a password you have not used here before.',
     'auth_reset_password.new_password' => 'New password',
+    'auth_reset_password.save_password' => 'Save password',
     'auth_reset_password.title' => 'Choose a new password',
 
     // auth_two_factor
-    'auth_two_factor.cancel' => 'Cancel and sign in as someone else',
     'auth_two_factor.code_label' => 'Code from your authenticator app',
-    'auth_two_factor.greeting' => 'Hello {name} — one more step to finish signing in.',
+    'auth_two_factor.enter_code' => 'Enter the 6-digit code from your authenticator app for {email}.',
     'auth_two_factor.no_factor' => 'This account has no second factor available. Ask an administrator for help.',
-    'auth_two_factor.passkey' => 'Use a passkey or security key',
+    'auth_two_factor.passkey' => 'Use a passkey instead',
     'auth_two_factor.recovery_code' => 'Recovery code',
-    'auth_two_factor.recovery_toggle' => 'Lost your device? Use a recovery code',
+    'auth_two_factor.recovery_hint' => 'One of the codes you saved when you turned on two-step verification.',
     'auth_two_factor.title' => 'Two-step verification',
+    'auth_two_factor.use_a_recovery_code' => 'Use a recovery code',
+    'auth_two_factor.use_passkey_intro' => 'Use the passkey registered to {email} to finish signing in.',
     'auth_two_factor.use_recovery_code' => 'Use recovery code',
-    'auth_two_factor.verify' => 'Verify',
+    'auth_two_factor.verify' => 'Verify and continue',
 
     // auth_verify_failed
     'auth_verify_failed.intro' =>
-        'Confirmation links expire after two days and can only be used once. Sign in to request a new '
-        . 'one.',
+        'Confirmation links work for {days, plural, one {# day} other {# days}} and only once. Enter your '
+        . 'email and we’ll send a new one.',
+    'auth_verify_failed.send_new_link' => 'Send a new link',
     'auth_verify_failed.title' => 'That link is no longer valid',
+    'auth_verify_done.intro' => 'Your email address is confirmed. Sign in to start.',
+    'auth_verify_done.title' => 'Email confirmed',
+    'auth_verify_used.intro' => 'This link has been used already, so your address is confirmed. Sign in to carry on.',
+    'auth_verify_used.title' => 'Already confirmed',
 
     // backup
     'backup.archive_label' => 'Backup archive (format {version})',
     'backup.download_backup' => 'Download backup',
-    'backup.export' => 'Export',
     'backup.export_exclusions' =>
         'Not included: user accounts, passwords, API tokens, the audit log and instance-wide settings. '
         . 'Those belong to the server rather than to this household.',
@@ -716,6 +1000,9 @@ return [
     'backup.export_scope' =>
         'It contains what you can see. If this instance keeps members\' data separate, your export has '
         . 'your own subscriptions and not other members\'.',
+    'backup.private_left_out' =>
+        '{count, plural, one {# subscription} other {# subscriptions}} that another member keeps to '
+        . 'themselves will not be in the backup.',
     'backup.restore' => 'Restore',
     'backup.restore_is_additive' =>
         'Reads a backup archive back into this household. It adds — nothing is deleted or overwritten, '
@@ -723,72 +1010,97 @@ return [
     'backup.restore_matching' =>
         'Members are matched by email address. A subscription whose owner is no longer in this household '
         . 'comes back owned by you, and every file in the archive is re-checked before it is stored.',
-    'backup.title' => 'Backup and restore',
 
     // budgets
-    'budgets.alerts_note' =>
-        'Over-budget and approaching-budget states are shown here only. Sending an alert about them '
-        . 'arrives in a later version.',
+    'budgets.alerts_off' => 'Alerts off',
+    'budgets.alerts_on' => 'Alert when projected over · {channels}',
     'budgets.all_categories' => 'All categories',
+    'budgets.bar_label' => '{charged} charged so far and {projected} projected, of a {limit} limit',
+    'budgets.edit_named' => 'Edit {name}',
     'budgets.empty' => 'No budgets yet.',
+    'budgets.history_alt' => 'Household spend each month for the last six months, in {currency}',
+    'budgets.history_caption' => 'Spend each month against the {limit} limit · over in {count} of {months}',
+    'budgets.history_caption_uncounted' => 'Spend each month against the {limit} limit',
+    'budgets.history_title' => 'Household total, last six months',
+    'budgets.household' => 'Household',
     'budgets.intro' =>
-        'A budget measures projected spend, not spend so far: scheduled price rises and trials about to '
-        . 'convert are counted before they happen, which is while there is still something you can do '
-        . 'about them. Each budget covers its owner\'s own share — their subscriptions, plus their portion '
-        . 'of anything split.',
-    'budgets.meter_label' => '{percent} percent of the budget projected',
+        'Each budget compares a limit with what your subscriptions will cost in the period, including '
+        . 'trials about to convert. You are alerted when one is projected over.',
     'budgets.new_budget' => 'New budget',
-    'budgets.of_limit' => 'of {limit}',
-    'budgets.over' => '{percent}% — over by {amount}.',
-    'budgets.remaining' => '{percent}% · {remaining} left.',
+    'budgets.note_left' => '{amount} left',
+    'budgets.note_over' => 'Over by {amount}',
+    'budgets.note_over_if_trials' => 'Projected {projected} if trials convert — over by {amount}',
+    'budgets.note_warning' => '{percent}% used — past the {threshold}% warning',
+    'budgets.of_limit_projected' => 'of {limit} projected',
+    'budgets.percent' => '{percent}%',
     'budgets.set_one_up' => 'Set one up.',
-    'budgets.unconvertible' =>
-        'Cannot be calculated: no exchange rate is available for {currencies}. Rather than leave that '
-        . 'spending out and show a figure that looks comfortable, no figure is shown.',
-    'budgets.warning' => '{percent}% — past the {threshold}% warning mark. {remaining} left.',
+    'budgets.state_bad' => 'Over',
+    'budgets.state_ok' => 'On track',
+    'budgets.state_warn' => 'Warning',
+    'budgets.tile_household_limit' => 'Household limit',
+    'budgets.tile_over' => 'Projected over',
+    'budgets.tiles' => 'Budgets by state',
+    'budgets.unavailable' =>
+        'Not available to you: it measures spending you cannot see while members\' subscriptions are '
+        . 'kept separate.',
+    'budgets.unconvertible' => 'Projection unavailable — no rate for {currencies}',
+    'budgets.warn_tick' => 'Warning at {percent}%',
 
     // budgets_form
-    'budgets_form.delete_budget' => 'Delete budget',
     'budgets_form.edit_title' => 'Edit budget',
-    'budgets_form.everything' => 'Everything',
-    'budgets_form.limit' => 'Limit',
-    'budgets_form.owner_hint' => 'A budget counts only this member\'s own share of what is spent.',
-    'budgets_form.period_hint' =>
-        'Both are rolling windows measured from today, so the figure is always a complete one. This '
-        . 'application tracks what is due rather than what has been paid, so a calendar month would have '
-        . 'to leave out whatever was already charged earlier in it.',
+    'budgets_form.limit_in' => 'Limit ({currency})',
+    'budgets_form.name_placeholder' => 'e.g. Streaming',
     'budgets_form.save_budget' => 'Save budget',
-    'budgets_form.threshold_hint' => 'Flag the budget once projected spend reaches this share of the limit.',
-    'budgets_form.warn_at_optional' => 'Warn at (optional)',
-    'budgets_form.whose_budget' => 'Whose budget',
+    'budgets_form.subject_hint' =>
+        'A member\'s budget counts only their share of what is spent. A household budget counts all of it.',
+    'budgets_form.subject_locked_hint' =>
+        'This budget measures spending you cannot choose here, and saving leaves that as it is.',
+    'budgets_form.threshold_hint' =>
+        'Shown as a warning once projected spend reaches this share of the limit. Alerts are sent only '
+        . 'when a budget is projected over.',
+    'budgets_form.warn_at' => 'Warn me at',
+    'budgets_form.whose_spending' => 'Whose spending',
 
     // calendar
-    'calendar.caption' => 'Renewals and trial conversions in {month}',
-    'calendar.cancel_by' => 'Cancel by {date}',
-    'calendar.deadlines_note' =>
-        'The last day notice can be given to avoid the charge shown. After it, the next charge is due '
-        . 'whether the subscription is cancelled or not.',
-    'calendar.deadlines_this_month' =>
-        '{count, plural, one {# cancellation deadline} other {# cancellation deadlines}} this month',
-    'calendar.due_this_month' =>
-        '{count, plural, one {# charge} other {# charges}} due this month',
-    'calendar.intro' =>
-        'Renewals and the day a free trial starts charging, on the dates they actually fall. '
-        . 'Scheduled price changes are applied from their own dates, so an amount here is what will '
-        . 'be taken rather than what is charged today.',
-    'calendar.insight' => 'Calendar insight',
+    'calendar.caption' => 'Charges, trial ends and cancel-by deadlines in {month}',
+    'calendar.charges' => 'Charges',
+    'calendar.charges_count' => '{count, plural, one {# charge} other {# charges}}',
+    'calendar.feed_copy' => 'Copy',
+    'calendar.feed_create' => 'Create a link',
+    'calendar.feed_created' => 'Your link was created on {date}.',
+    'calendar.feed_hidden' =>
+        'The link itself is shown only when it is created. To add it to another calendar, create a new one.',
+    'calendar.feed_intro' =>
+        'Subscribe in Google Calendar, Apple Calendar or Outlook to see renewals, trial conversions '
+        . 'and cancel-by deadlines.',
+    'calendar.feed_last_used' => 'A calendar last fetched it on {date}.',
+    'calendar.feed_never_used' => 'No calendar has fetched it yet.',
+    'calendar.feed_new_link' => 'Create a new link',
+    'calendar.feed_none' => 'You have no feed link yet.',
+    'calendar.feed_replace_confirm' => 'Stop the old link and create a new one',
+    'calendar.feed_replace_warning' =>
+        'The current link stops working at once, and every calendar subscribed to it stops updating '
+        . 'until it is given the new one.',
+    'calendar.feed_shown_once' => 'Copy it now: for your security the link is shown only this once.',
+    'calendar.feed_title' => 'Calendar feed',
+    'calendar.feed_url' => 'Calendar feed address',
+    'calendar.heaviest_day' => 'Heaviest day',
+    'calendar.item_cancel_by' => 'Cancel by — notice period {notice}',
+    'calendar.item_trial' => 'Trial ends — converts to paid',
     'calendar.just_mine' => 'Just mine',
+    'calendar.kind_cancel_by' => 'Cancel by',
+    'calendar.kind_charge' => 'Charge',
+    'calendar.kind_trial' => 'Trial ends',
+    'calendar.legend' => 'Key',
     'calendar.month_navigation' => 'Month navigation',
+    'calendar.month_total' => 'Month total',
+    'calendar.more' => '+{count} more',
     'calendar.next_month' => 'Next month',
-    'calendar.next_up' => 'Next up',
-    'calendar.next_up_note' => 'The next charges due, wherever in the year they fall.',
     'calendar.nothing_due' => 'Nothing due this month.',
-    'calendar.nothing_upcoming' => 'Nothing due in the next twelve months.',
+    'calendar.nothing_on_day' => 'Nothing due on this day.',
     'calendar.previous_month' => 'Previous month',
-    'calendar.rail' => 'Calendar summary',
-    'calendar.trials_ending' =>
-        '{count, plural, one {# free trial ends} other {# free trials end}} this month',
-    'calendar.trials_starting_note' => 'in new charges once they convert.',
+    'calendar.selected' => 'selected',
+    'calendar.summary' => 'Month summary',
 
     // cancellations
     'cancellations.days_left' => '{days, plural, one {# day left} other {# days left}}',
@@ -806,21 +1118,19 @@ return [
         '{days, plural, one {# day ago} other {# days ago}} — this renewal is already committed.',
 
     // categories
-    'categories.add_category' => 'Add category',
     'categories.category_colour' => 'Category colour',
-    'categories.category_name' => 'Category name',
     'categories.colour' => 'Colour',
     'categories.new_category' => 'New category',
     'categories.no_categories_yet' => 'No categories yet.',
     'categories.no_tags_yet' => 'No tags yet.',
-    'categories.tags_intro' => 'Tags are created as you type them on a subscription.',
-    'categories.title' => 'Categories and tags',
 
     // confirm — the questions a destructive control asks before it acts. They
     // are read out by the browser's own dialog, which is why they are short
     // sentences rather than labels, and they are here rather than written into
     // an onsubmit attribute so that one check covers every string the
     // application can show.
+    'confirm.cancel_subscription' =>
+        'Cancel {name}? It stops counting from today. You can undo it, and it comes back paused.',
     'confirm.delete_subscription' => 'Delete {name}?',
     'confirm.delete_category' => 'Delete {name}?',
     'confirm.delete_payment_method' =>
@@ -835,98 +1145,145 @@ return [
     'confirm.revoke_token' => 'Revoke this token? Anything using it stops working straight away.',
 
     // dashboard
-    'dashboard.active_subscriptions' => 'Active subscriptions',
-    'dashboard.by_category' => 'By category',
-    'dashboard.chart_unconvertible' =>
-        'The twelve-month chart is not drawn, because no exchange rate is available for {currencies} and '
-        . 'a month missing one of its currencies would be drawn as a cheap month rather than an unknown '
-        . 'one. The forecast shows those months per currency.',
-    'dashboard.combined_in' => 'Combined · {currency}',
-    'dashboard.coming_soon' => 'Coming soon',
-    'dashboard.coming_soon_note' => 'Next payments in the following {days} days',
-    'dashboard.days_away' =>
-        '{days, plural, one {# day} other {# days}}',
-    'dashboard.combined_note' =>
-        '{amount} per year, converted at the latest cached rates. The per-currency figures above are the '
-        . 'amounts actually charged.',
+    'dashboard.active' => 'Active',
+    'dashboard.all_subscriptions' => 'All subscriptions',
+    'dashboard.already_charged' => 'Already charged',
+    'dashboard.approx' => '≈ {amount}',
+    'dashboard.at_todays_prices' => 'at today’s prices',
+    'dashboard.budget_household' => 'Household',
+    'dashboard.budget_left' => '{amount} left this month',
+    'dashboard.budget_meter' => '{charged}% charged so far, {projected}% projected by the end of the month',
+    'dashboard.budget_over_if_trials' => 'Projected over if the running trials convert',
+    'dashboard.budget_pace' => 'Spent this year vs budget pace',
+    'dashboard.budget_pace_note' => 'Cumulative, January to now, {year}',
+    'dashboard.budget_past_warning' => 'Past the {threshold}% warning',
+    'dashboard.budget_projected_over' => 'Projected {amount} over',
+    'dashboard.budget_yours' => 'You',
+    'dashboard.budgets_this_month' => 'Budgets · {month}',
+    'dashboard.busiest_month' => 'Busiest',
+    'dashboard.cancel_trial' => 'Cancel trial',
+    'dashboard.cancel_trial_named' => 'Cancel the {name} trial',
+    'dashboard.charged_of_due' => 'already charged of {total} due this month',
+    'dashboard.charges_count' => '{count, plural, =0 {No charges} one {# charge} other {# charges}}',
+    'dashboard.coming_up' => 'Coming up',
+    'dashboard.coming_up_more' =>
+        'And {count, plural, one {# more charge} other {# more charges}} in the next {days} days.',
+    'dashboard.coming_up_note' => 'Charges and trial conversions in the next {days} days',
+    'dashboard.converts_to' => 'Converts to',
     'dashboard.converts_on' => 'converts {date}',
     'dashboard.due_in_total' => 'due in total',
+    'dashboard.due_next_days' => 'Due next {days} days',
+    'dashboard.due_this_month' => 'Due this month',
+    'dashboard.excluded_note' =>
+        '{count, plural, one {# subscription has} other {# subscriptions have}} no start date and '
+        . '{count, plural, one {is} other {are}} left out.',
+    'dashboard.filter_rows' => 'Which subscriptions to list',
+    'dashboard.forecast' => 'Forecast',
+    'dashboard.free_trials' => 'Free trials',
+    'dashboard.greeting' => 'Welcome back, {name}',
     'dashboard.metrics' => 'Spending at a glance',
-    'dashboard.member_shares' => 'Who pays for what',
-    'dashboard.member_shares_note' =>
-        'Each member\'s share of the household\'s recurring bill. Split subscriptions count '
-        . 'towards each of their participants at their own portion.',
+    'dashboard.month_bar_label' => '{charged} already charged, {due} still due',
+    'dashboard.month_so_far' => '{month} so far',
+    'dashboard.monthly_equivalent' => 'Monthly equivalent',
+    'dashboard.monthly_from_trials' =>
+        '{count, plural, =0 {No trials running} one {a month from # trial} other {a month from # trials}}',
     'dashboard.monthly_spend' => 'Monthly spend',
-    'dashboard.next_charge' => 'Next: {name}, {date} · {amount}',
+    'dashboard.next_12_months' => 'Next 12 months',
+    'dashboard.next_days' => 'Next {days} days',
     'dashboard.no_budget' => 'No budget set for you yet, so there is nothing to measure this against.',
     'dashboard.no_household' => 'No household',
     'dashboard.no_household_note' =>
         'You are not a member of a household yet, so there is nothing to show. Instance administration '
         . 'does not by itself grant access to anybody\'s subscriptions.',
+    'dashboard.no_trials' => 'No trials running.',
+    'dashboard.nothing_coming_up' => 'Nothing due in the next {days} days.',
     'dashboard.nothing_due' => 'Nothing due.',
     'dashboard.nothing_renewing' => 'Nothing renewing in the near window.',
+    'dashboard.of_household_spend' => '{percent}% of household spend',
     'dashboard.other_categories' => '{count, plural, one {# other category} other {# other categories}}',
-    'dashboard.peak_month' => 'Busiest month',
+    'dashboard.pace_budget_to_date' => 'budget to date',
+    'dashboard.pace_of_monthly' => 'An even pace of twelve times the {budget} monthly household budget.',
+    'dashboard.pace_of_yearly' => 'An even pace of the {budget} yearly household budget.',
+    'dashboard.pace_over' => '{amount} over pace',
+    'dashboard.pace_spent' => 'spent',
+    'dashboard.pace_unconvertible' =>
+        'No exchange rate for {currencies}, so this year’s spend cannot be added up in one currency.',
+    'dashboard.pace_under' => '{amount} under pace',
     'dashboard.one_off_in' => 'One-off & lifetime · {currency}',
     'dashboard.one_off_note' => '{count, plural, one {# entry} other {# entries}}, not included in monthly totals',
     'dashboard.per_month_unit' => '/ month',
     'dashboard.per_year_unit' => '/ year',
-    'dashboard.per_year_and_count' =>
-        '{amount} per year · {count, plural, one {# subscription} other {# subscriptions}}',
-    'dashboard.recurring' => 'Recurring',
+    'dashboard.percent_of_budget' => '{percent}% of {budget} budget',
+    'dashboard.price_change' => 'Price change',
+    'dashboard.price_rise_difference' =>
+        '{monthly} a month, {yearly} a year. Already included in the forecast.',
+    'dashboard.price_rises' => '{name} rises from {from} to {to} on {date}',
+    'dashboard.recent' => 'Subscriptions',
+    'dashboard.reconstructed_note' => 'Reconstructed from start dates and price history.',
     'dashboard.recurring_empty' => 'No active recurring subscriptions yet.',
-    'dashboard.recurring_in' => 'Recurring · {currency}',
     'dashboard.renewing_soon' => 'Renewing soon',
     'dashboard.renewing_soon_note' => 'in the next {days} days',
+    'dashboard.see_all' => 'See all',
+    'dashboard.see_price_history' => 'See price history',
+    'dashboard.series_actual' => 'Actual',
+    'dashboard.series_budget' => 'Budget {budget}',
+    'dashboard.see_forecast' => 'See the forecast',
+    'dashboard.series_forecast' => 'Forecast',
     'dashboard.share_of_spend' => '{name}: {percent}% of monthly spend',
-    'dashboard.part_month' => 'Part month',
-    'dashboard.part_month_note' =>
-        'The first month counts only the charges still ahead of today, so it is short by whatever has '
-        . 'already been paid this month.',
-    'dashboard.history_part_month_note' =>
-        'This month counts only the charges taken so far, so it is short by whatever is still to come '
-        . 'before the month is out.',
-    'dashboard.history_unconvertible' =>
-        'The chart of the last twelve months is not drawn, because no exchange rate is available for '
-        . '{currencies} and a month missing one of its currencies would be drawn as a cheap month rather '
-        . 'than an unknown one. Analytics shows the per-currency figures instead.',
-    'dashboard.series_committed' => 'Excluding trial conversions',
-    'dashboard.series_trial_gap' => 'What trials will add',
-    'dashboard.series_with_trials' => 'Including trial conversions',
     // The year ahead is no longer a dashboard card, but these three keep their
     // `dashboard.` prefix: they describe the picture `partials/spend_chart.twig`
     // draws, which the Analytics trajectory renders and which asks for them by
     // name. Renaming them would be renaming the partial's vocabulary to record
     // where it was first used.
-    'dashboard.spend_chart_alt' =>
-        'Line chart of spend per month for the next twelve months, in {currency}: one line including trial '
-        . 'conversions and one excluding them. The same figures are in the table that follows.',
-    // The same chart with no trial converting inside the horizon, where the
-    // second line would sit exactly on the first and is not drawn. The
-    // description has to match the picture, and the table under it.
-    'dashboard.spend_chart_alt_single' =>
-        'Line chart of spend per month for the next twelve months, in {currency}. The same figures are in '
-        . 'the table that follows.',
-    'dashboard.spend_history' => 'Spend, last 12 months',
-    'dashboard.spend_history_alt' =>
-        'Line chart of spend per month over the last twelve months, in {currency}. The same figures are '
-        . 'in the table that follows.',
+    'dashboard.spend_bars_alt' =>
+        'Spend per month in {currency}: six months reconstructed, this month charged so far and still due, '
+        . 'and six months forecast.',
+    'dashboard.spend_bars_unconvertible' =>
+        'The monthly spend chart is not drawn: no exchange rate is available for {currencies}, and a month '
+        . 'missing one of its currencies would look like a cheap month rather than an unknown one.',
+    'dashboard.spend_chart_note' => 'What was charged each month, and the forecast for the next six',
+    'dashboard.spend_trend' => 'Spend over time',
+    'dashboard.spend_trend_by_category' => 'By category',
+    'dashboard.spend_trend_by_member' => 'By member',
+    'dashboard.spend_trend_choice' => 'Draw a line for each',
+    'dashboard.spend_trend_empty' => 'Nothing was charged in the last {count} months.',
+    'dashboard.spend_trend_latest' => 'The figure beside each name is last month’s.',
+    'dashboard.spend_trend_note' => 'The last {count} full months, in {currency}',
+    'dashboard.spend_trend_unconvertible' =>
+        'No exchange rate for {currencies}, so these months cannot be added up in one currency.',
+    'dashboard.spend_trend_uncategorised' => 'Uncategorised',
     // Said rather than implied: the application records what is due, not a
     // ledger of payments taken, so these months were rebuilt from start dates,
     // billing cycles and price history. A reader comparing them with a bank
     // statement should know that before they do it.
-    'dashboard.spend_history_note' =>
-        'Reconstructed monthly spend in {currency}, from start dates and recorded price history',
-    'dashboard.trials_ending_soon' => 'Trials ending soon',
-    'dashboard.trials_note' => 'Free today. About to stop being.',
+    'dashboard.stands_on' => 'Here’s where {household} stands on {date}.',
+    'dashboard.still_due' => 'Still due',
+    'dashboard.this_month' => 'This month',
+    'dashboard.today' => 'Today',
+    'dashboard.trial_converts' => 'Trial converts',
+    'dashboard.trial_ends' => 'Ends {date} · {days, plural, one {# day} other {# days}} left',
+    'dashboard.trial_ends_today' => 'Ends today',
+    'dashboard.trial_started_by' => 'started by {name}',
+    'dashboard.trials_and_paused' =>
+        '{trials, plural, one {# trial} other {# trials}} · {paused} paused',
+    'dashboard.trials_converting' => 'Trials converting',
     'dashboard.trials_total_note' => 'about to start being charged',
-    'dashboard.usage' => 'Budget and where it goes',
+    'dashboard.view_active' => 'Active',
+    'dashboard.view_all' => 'All',
+    'dashboard.view_choice' => 'Which dashboard',
+    'dashboard.view_expiring' => 'Renewing soon',
+    'dashboard.vs_last_year' => '{percent, number, ::sign-always}% against the same period last year',
     'dashboard.where_it_goes' => 'Where it goes',
-    'dashboard.yearly_spend' => 'Yearly spend',
+    'dashboard.where_it_goes_note' => 'Monthly equivalent by category, in {currency}',
+    'dashboard.who_pays' => 'Who pays what',
+    'dashboard.who_pays_note' => 'Monthly share after splits',
+    'dashboard.year_to_date' => 'Year to date',
+    'dashboard.yearly_run_rate' => 'Yearly run-rate',
     'dashboard.unconvertible' =>
         'Totals are shown per currency. They cannot be combined because no exchange rate is available '
         . 'for {currencies} — a total leaving that out would be a wrong number rather than an approximate '
         . 'one.',
+    'dashboard.your_share' => 'Your share',
 
     // error
     'error.back_to_the_dashboard' => 'Back to the dashboard',
@@ -940,18 +1297,15 @@ return [
     'field.category' => 'Category',
     'field.payment_method' => 'Payment method',
     'field.change' => 'Change',
+    'field.date' => 'Date',
     'field.channel' => 'Channel',
     'field.confirm_password' => 'Confirm password',
     'field.currency' => 'Currency',
     'field.cycle' => 'Cycle',
     'field.detail' => 'Detail',
-    'field.device' => 'Device',
-    'field.due' => 'Due',
     'field.email' => 'Email address',
     'field.event' => 'Event',
     'field.file' => 'File',
-    'field.last_seen' => 'Last seen',
-    'field.last_used' => 'Last used',
     'field.member' => 'Member',
     'field.month' => 'Month',
     'field.name' => 'Name',
@@ -963,13 +1317,13 @@ return [
     'field.per_month' => 'Per month',
     'field.per_year' => 'Per year',
     'field.period' => 'Period',
+    'field.plan' => 'Plan',
     'field.price' => 'Price',
     'field.rating' => 'Rating',
     'field.result' => 'Result',
     'field.role' => 'Role',
     'field.share' => 'Share',
     'field.size' => 'Size',
-    'field.started' => 'Started',
     'field.status' => 'Status',
     'field.subscription' => 'Subscription',
     'field.subscriptions' => 'Subscriptions',
@@ -984,39 +1338,43 @@ return [
     'field.your_name' => 'Your name',
 
     // forecast
-    'forecast.intro' =>
-        'Each renewal is shown in the month it actually falls, rather than spread evenly — a yearly bill '
-        . 'is a bill in one month. Scheduled price changes and trial conversions are applied from their '
-        . 'own dates, so a figure here does not move when the change eventually happens.',
-    'forecast.next_12_months' => 'Next 12 months',
+    'forecast.cancel_charges' => '{count, plural, one {# charge} other {# charges}}',
+    'forecast.cancel_empty' => 'Nothing recurring is due in the next 12 months.',
+    'forecast.cancel_heading' => 'If you cancelled',
+    'forecast.cancel_note' => 'What cancelling today would save over the next 12 months',
+    'forecast.change_from' => 'From {date}',
+    'forecast.changes_heading' => 'Price changes ahead',
+    'forecast.chart_alt' => 'Forecast spend for each of the next 12 months, in {currency}',
+    'forecast.chart_heading' => 'The next 12 months',
+    'forecast.chart_note' => 'Renewals in the month they fall, trials from the day they convert',
+    'forecast.kpi_average' => 'Average month',
+    'forecast.kpi_average_note' => 'The next 12 months, evenly spread',
+    'forecast.kpi_busiest' => 'Busiest month',
+    'forecast.kpi_long' => 'Yearly & longer renewals',
+    'forecast.kpi_long_none' => 'None in the next 12 months',
+    'forecast.kpi_long_note' => '{count, plural, one {# renewal} other {# renewals}} in the next 12 months',
+    'forecast.mine_note' => 'Showing only your share of each charge.',
+    'forecast.month_in_calendar' => '{month} in the calendar',
+    'forecast.series_long' => 'Yearly & longer',
+    'forecast.series_regular' => 'Monthly & more often',
+    'forecast.trial_converts_on' => 'Converts {date}',
+    'forecast.trial_kept' => '{amount} in the next 12 months if kept',
+    'forecast.trials_empty' => 'No trials convert in the next 12 months.',
+    'forecast.trials_heading' => 'Trials converting',
     'forecast.show_only_my_share' => 'Show only my share',
     'forecast.show_whole_household' => 'Show the whole household',
-    'forecast.no_rate' => 'No rate to combine these.',
-    'forecast.nothing_due' => 'Nothing due',
 
     // form
     'form.has_errors' => 'Check the highlighted fields and try again.',
 
     // hint
-    'hint.password_length' => 'At least 10 characters.',
 
     // household
-    'household.capability_held' => 'Yes',
-    'household.capability_not_held' => 'No',
     'household.figures_withheld' => 'Not shown',
-    'household.figures_withheld_note' =>
-        'This instance keeps each member\'s subscriptions private, so only your own figures can be '
-        . 'added up here.',
-    'household.intro' =>
-        'Everyone in this household, and the share of the bill each of them carries. A subscription '
-        . 'that is split counts towards each member at their own portion of it.',
-    'household.manage_members' => 'Manage members',
     'household.one_off_count' =>
         '{count, plural, one {# of these is one-off} other {# of these are one-off}}',
-    'household.role_grants' => 'What they can do',
     'household.subscriptions_count' =>
         '{count, plural, =0 {No subscriptions} one {# subscription} other {# subscriptions}}',
-    'household.title' => 'Household',
 
     // import_map
     'import_map.column_in_your_file' => 'Column in your file',
@@ -1083,6 +1441,10 @@ return [
     'js.dashboard.spend_committed' => 'Excluding trial conversions',
     'js.dashboard.spend_with_trials' => 'Including trial conversions',
     'js.dashboard.trial_gap' => 'Trials add {amount}',
+    'js.copied' => 'Copied.',
+    'js.copy_failed' => 'That could not be copied. Select the address and copy it yourself.',
+    'js.dialog_loading' => 'Loading…',
+    'js.percent' => '{percent}%',
     'js.quick_add_failed' => 'That form could not be loaded. Open the full page instead.',
     'js.passkey_generic_error' => 'That did not work. Try again.',
     'js.passkey_not_used' => 'No passkey was used.',
@@ -1096,13 +1458,16 @@ return [
     'nav.analytics' => 'Analytics',
     'nav.audit' => 'Audit',
     'nav.budgets' => 'Budgets',
-    'nav.calendar' => 'Billing Calendar',
+    'nav.calendar' => 'Calendar',
     'nav.cancellations' => 'Cancel by',
     'nav.categories' => 'Categories',
     'nav.payment_methods' => 'Payment methods',
     'nav.dashboard' => 'Dashboard',
     'nav.forecast' => 'Forecast',
     'nav.household' => 'Household',
+    'nav.household_tools' => 'Household tools',
+    'nav.import' => 'Import',
+    'nav.members' => 'Members & roles',
     'nav.more' => 'More',
     'nav.notifications' => 'Notifications',
     'nav.primary' => 'Primary',
@@ -1112,12 +1477,50 @@ return [
     'nav.sign_out' => 'Sign out',
     'nav.skip_to_content' => 'Skip to content',
     'nav.subscriptions' => 'Subscriptions',
+    'nav.tab_add' => 'Add',
+    'nav.tab_home' => 'Home',
+    'nav.tab_subscriptions' => 'Subs',
     'nav.tools' => 'Tools',
+
+    // shell: the rail's and the top bar's own words
+    'shell.add_new' => 'Add new',
+    'shell.badge_active' => 'active',
+    'shell.bell' => 'What\'s coming up',
+    'shell.bell_due_soon' => 'A trial or a cancel-by deadline is close',
+    'shell.household_meta' => '{count, plural, one {# member} other {# members}} · you\'re {role}',
+    'shell.rates_on' => '{currency} · rates {date}',
+    'shell.rates_stale' => 'Out of date',
+    'shell.rates_unavailable' => '{currency} · rates unavailable',
+    'shell.search' => 'Search subscriptions…',
+    'shell.tagline' => 'Household spend',
+    'shell.theme_to_dark' => 'Switch to the dark theme',
+    'shell.theme_to_light' => 'Switch to the light theme',
+    'shell.your_profile' => 'Your profile',
+
+    // subtitle: the short line under each page's title in the top bar
+    'subtitle.audit' => 'Who changed what, and when',
+    'subtitle.budget_form' => 'A limit for a period, a category or one person',
+    'subtitle.budgets' => 'Limits against projected spend',
+    'subtitle.calendar' => 'Renewals, trials & deadlines',
+    'subtitle.cancellations' => 'Deadlines to cancel before the next charge',
+    'subtitle.dashboard' => 'Your household at a glance',
+    'subtitle.forecast' => 'What the coming year will cost',
+    'subtitle.import' => 'Bring subscriptions in from a file',
+    'subtitle.import_map' => 'Match your columns to the fields',
+    'subtitle.import_preview' => 'Check it before anything is saved',
+    'subtitle.member_remove' => 'What happens to what they own',
+    'subtitle.money' => 'Price history, splits and usage',
+    'subtitle.notifications' => 'How and when you are reminded',
+    'subtitle.profile' => 'Your account, sign-in and appearance',
+    'subtitle.settings' => 'Choices for the household and the instance',
+    'subtitle.stats' => 'Spending, forecast and price history',
+    'subtitle.subscription_form' => 'Price, renewal date, who pays and who can see it',
+    'subtitle.subscriptions' => 'Everything the household pays for',
+    'subtitle.totp_setup' => 'Pair an authenticator app',
 
     // notifications
     'notifications.add_a_channel' => 'Add a channel',
     'notifications.add_channel_of_type' => 'Add {type}',
-    'notifications.channel_enabled' => 'Send notifications to this channel',
     'notifications.channels' => 'Channels',
     'notifications.channels_empty' => 'No channels yet. Add one below and send yourself a test message.',
     'notifications.delivery' => 'Delivery',
@@ -1133,20 +1536,19 @@ return [
         . 'same thing again.',
     'notifications.last_delivered' => 'Last delivered {when}.',
     'notifications.last_error' => 'Last attempt failed: {reason}',
-    'notifications.lead_days_hint' =>
-        'Separate with commas, for example {example}. Each one is a separate reminder. Leave blank for '
-        . 'no advance reminders. A single subscription can override this on its own page.',
-    'notifications.lead_days_label' => 'Remind me this many days before a charge',
+    'notifications.price_change_hint' =>
+        'When a price is edited or a future one is scheduled, on any subscription you can see. Routed '
+        . 'like the other alerts below.',
+    'notifications.price_change_toggle' => 'Tell me when a price changes',
     'notifications.recently_sent' => 'Recently sent',
     'notifications.routing_hint' =>
-        'Leave every box ticked — or every box clear — to send everything to every channel.',
+        'Which channel each alert goes to. Channels that are off are greyed out, and keep their choices '
+        . 'for when they are turned back on. Clearing every box sends everything everywhere.',
     'notifications.save_channel' => 'Save channel',
     'notifications.save_preferences' => 'Save preferences',
     'notifications.secret_placeholder' => 'Leave blank to keep the stored value',
     'notifications.summary_day' => 'Summary day',
     'notifications.title' => 'Notifications',
-    'notifications.when_to_tell_me' => 'When to tell me',
-    'notifications.where_each_alert_goes' => 'Where each alert goes',
 
     // period
     'period.per_daily' => 'Per day',
@@ -1174,19 +1576,11 @@ return [
     'saved_views.save_current' => 'Save this view',
 
     // security
-    'security.active_sessions' => 'Active sessions',
     'security.add_a_passkey' => 'Add a passkey',
     'security.authenticator_app' => 'Authenticator app',
-    'security.none_registered' => 'None registered.',
     'security.passkey_name' => 'Passkey name',
     'security.passkey_name_label' => 'Name for the new passkey',
-    'security.passkeys_and_security_keys' => 'Passkeys and security keys',
-    'security.passkeys_intro' =>
-        'A passkey signs you in without a password, and counts as your second factor when you do use '
-        . 'one. You can register more than one — a phone and a hardware key, say — so losing one device is '
-        . 'not losing access.',
     'security.phone_yubikey_laptop' => 'Phone, YubiKey, laptop…',
-    'security.recovery_codes' => 'Recovery codes',
     'security.recovery_codes_note' =>
         'Save these now — they are shown once and each works a single time. They are the way back in if '
         . 'you lose your authenticator.',
@@ -1195,16 +1589,10 @@ return [
         '{count, plural, one {# unused code} other {# unused codes}}. Each works once, and they are the '
         . 'way back in if you lose your authenticator or every passkey you have registered.',
     'security.regenerate_recovery_codes' => 'Regenerate recovery codes',
-    'security.sessions_intro' =>
-        'Every browser currently signed in as you. Revoking one signs it out on its next request.',
     'security.sign_out_everywhere_else' => 'Sign out everywhere else',
     'security.this_device' => 'This device',
-    'security.title' => 'Account security',
     'security.totp_off' => 'Off. Add an authenticator app to require a six-digit code as well as your password.',
     'security.totp_off_password_label' => 'Confirm your password to turn two-step verification off',
-    'security.totp_on' => 'On. Codes from your authenticator app are required when you sign in.',
-    'security.totp_setup_action' => 'Set up an authenticator app',
-    'security.transports' => 'Transports',
     'security.turn_off' => 'Turn off',
     'security.your_recovery_codes' => 'Your recovery codes',
 
@@ -1219,19 +1607,14 @@ return [
 
     // settings
     'settings.allow_registration' => 'Allow anyone to create an account',
-    'settings.api_and_calendar' => 'API and calendar',
-    'settings.api_intro' =>
-        'Tokens for scripts, other machines and calendar apps. A token can never do more than you can.',
     'settings.api_key' => 'API key',
     'settings.base_currency' => 'Base currency',
     'settings.card_position' => 'Position of the {card} card',
     'settings.card_visible' => 'Show',
     'settings.dashboard_cards' => 'Dashboard cards',
+    'settings.dashboard_cards_for' => '{view} dashboard cards',
     'settings.dashboard_cards_hint' =>
         'Lower numbers come first. Clear the box to hide a card without losing where you had put it.',
-    'settings.data_intro' =>
-        'Bring subscriptions in from a file, or take everything out again — including the attached '
-        . 'invoices — in a format that needs no database to read.',
     'settings.data_isolation' => 'Data isolation',
     'settings.demo_mode' => 'Read-only demonstration',
     'settings.demo_mode_hint' =>
@@ -1242,19 +1625,13 @@ return [
     'settings.host_or_range' => 'Host or range',
     'settings.household' => 'Household',
     'settings.household_permission_note' => 'Only an owner or admin of this household can change these.',
-    'settings.import_a_file' => 'Import a file',
     'settings.instance' => 'Instance',
     'settings.instance_note' => 'These apply to everybody on this instance.',
-    'settings.members' => 'Members',
     'settings.rate_key_clear' => 'Remove the stored API key',
     'settings.rate_key_env_wins' => '{variable} in the environment overrides whatever is stored here.',
     'settings.rate_key_placeholder' => 'Leave blank to keep the current key',
-    'settings.rates_cached' =>
-        '{count, plural, one {# currency} other {# currencies}} cached, last updated {when} UTC.',
     'settings.rates_need_key' =>
         '{provider} needs an API key and has not been given one, so no rates are being fetched.',
-    'settings.rates_none' =>
-        'No rates cached yet. They are fetched the first time a dashboard is viewed, or by running',
     'settings.rates_note' =>
         'Rates are cached and used only for display. Amounts stay in the currency they were entered in. '
         . 'When a rate is unavailable, totals are shown per currency instead of combined.',
@@ -1262,8 +1639,6 @@ return [
     'settings.role_for' => 'Role for {name}',
     'settings.save_household' => 'Save household',
     'settings.save_instance_settings' => 'Save instance settings',
-    'settings.security_intro' => 'Two-step verification, passkeys and the browsers currently signed in as you.',
-    'settings.signing_in' => 'Signing in',
     'settings.trust_this_host' => 'Trust this host',
     'settings.trusted_host_note_placeholder' => 'What this is, for later',
     'settings.trusted_host_placeholder' => 'gotify.lan, .lan, 192.168.1.10 or 100.64.0.0/10',
@@ -1278,42 +1653,58 @@ return [
         . 'stops somebody using a webhook URL to make this server fetch something on your private network '
         . '— including, on a cloud host, the metadata service holding its credentials.',
     'settings.you' => '(you)',
-    'settings.your_data' => 'Your data',
 
-    'settings.lists' => 'Lists',
-    'settings.lists_intro' => 'The labels a subscription can carry: what it is for, and what it is paid with.',
     // setup_notifications
-    'setup_notifications.configured' => 'Configured',
-    'setup_notifications.finish' => 'Finish',
-    'setup_notifications.intro' =>
-        'Step 2 of 2. Renovo will tell you before a subscription renews, before a free trial starts '
-        . 'charging, before a cancellation deadline passes, and when a budget is heading over. Add '
-        . 'somewhere for it to send that — and send yourself a test message, because a token that looks '
-        . 'right and is not is the sort of thing you want to find out now rather than the week you miss a '
-        . 'renewal.',
+    'setup_notifications.add_another_channel' => 'Add another channel',
+    'setup_notifications.add_another_hint' =>
+        'Optional. Chat apps, push services and webhooks — pick one, fill in what it asks for, then send '
+        . 'it a test.',
+    'setup_notifications.email' => 'Email',
+    'setup_notifications.intro' => 'Reminders go out before a renewal, a trial conversion or a cancel-by deadline.',
     'setup_notifications.later_note' =>
         'You can add more channels, or change any of this, later under Settings → Notifications. Every '
         . 'member configures their own.',
-    'setup_notifications.skip_for_now' => 'Skip for now',
     'setup_notifications.mail_relay' => 'Mail goes out through {host}, from {from}. Those come from the environment:',
-    'setup_notifications.mail_relay_env' =>
-        'An instance secret belongs in the environment, not in the database, so they are not set here. '
-        . 'Add an Email channel below and send a test to confirm the relay actually works.',
+    'setup_notifications.other_channels' => 'Other channels',
+    'setup_notifications.remind_me' => 'Remind me',
+    'setup_notifications.send_test_email' => 'Send test email',
+    'setup_notifications.send_test_to' => 'Send a test message to {label}',
     'setup_notifications.test_message_delivered' => 'Test message delivered.',
     'setup_notifications.title' => 'Set up notifications',
     'setup_notifications.where_should_reminders_go' => 'Where should reminders go?',
 
     // setup_wizard
+    'setup_done.add_first' => 'Add your first subscription',
+    'setup_done.currency' => 'Totals will show in {currency}.',
+    'setup_done.go_to_dashboard' => 'Go to the dashboard',
+    'setup_done.invite_later' => 'You can invite members any time from Members & roles.',
+    'setup_done.invited' => 'Invitations went to {addresses}.',
+    'setup_done.invites_failed' =>
+        'These could not be invited, because an account now uses the address: {addresses}. Invite '
+        . 'them again from Members & roles.',
+    'setup_done.title' => '{household} is ready',
+    'setup_wizard.create_owner' => 'Create the owner account',
+    'setup_wizard.create_owner_intro' => 'You’ll manage members, backups and household settings.',
+    'setup_wizard.currencies_all' => 'All currencies',
+    'setup_wizard.currencies_common' => 'Common',
     'setup_wizard.finish_setup' => 'Finish setup',
-    'setup_wizard.intro' =>
-        'This instance has no accounts yet. The account you create here is the instance administrator.',
+    'setup_wizard.household' => 'Household',
+    'setup_wizard.household_intro' => 'Name it, and choose the currency it counts in.',
+    'setup_wizard.household_name' => 'Household name',
+    'setup_wizard.household_title' => 'Name your household',
+    'setup_wizard.invite_hint' => 'Invitees join as Contributors. You can change roles later.',
+    'setup_wizard.invite_members' => 'Invite members (optional, comma-separated)',
+    'setup_wizard.invite_placeholder' => 'alex@example.com, sam@example.com',
+    'setup_wizard.more_options' => 'More options',
+    'setup_wizard.reminders' => 'Reminders',
+    'setup_wizard.step_of' => 'Step {step} of {count}',
     'setup_wizard.title' => 'Set up {instance}',
-    'setup_wizard.welcome' => 'Welcome',
     'setup_wizard.your_account' => 'Your account',
 
     // state
     'state.active' => 'Active',
     'state.all' => 'All',
+    'state.cancelled' => 'Cancelled',
     'state.expired' => 'Expired',
     'state.never' => 'Never',
     'state.none' => 'None',
@@ -1321,10 +1712,42 @@ return [
     'state.revoked' => 'Revoked',
     'state.shared' => 'Shared',
     'state.today' => 'Today',
+    'state.tomorrow' => 'Tomorrow',
     'state.trial' => 'Trial',
     'state.trial_converts' => 'Trial converts',
 
     // stats
+    'stats.breakdown' => 'Breakdown',
+    'stats.converted' => 'Converted',
+    'stats.kpi_ahead' => 'Next 12 months',
+    'stats.kpi_ahead_note' => 'Forecast, including trials converting and scheduled price changes',
+    'stats.kpi_average' => 'Average month',
+    'stats.kpi_average_note' =>
+        '{months, plural, one {# month} other {# months}} so far this year · '
+        . '{count, plural, one {# active subscription} other {# active subscriptions}}',
+    'stats.kpi_rises' => 'Price rises in {year}',
+    'stats.kpi_rises_effect' => '{amount} a year',
+    'stats.kpi_rises_none' => 'None recorded or scheduled',
+    'stats.kpi_spent' => 'Spent this year',
+    'stats.kpi_vs_last_year' => '{percent} vs the same period last year',
+    'stats.months_alt' =>
+        'Monthly spend in {currency}: twelve months reconstructed, this month so far and still due, '
+        . 'and twelve months forecast.',
+    'stats.months_heading' => 'Twelve months back, twelve months ahead',
+    'stats.months_note' => 'Forecast includes trials converting and scheduled price changes',
+    'stats.old_new' => 'Old → new',
+    'stats.per_year' => 'Per year',
+    'stats.price_history' => 'Price history',
+    'stats.price_history_empty' => 'No price changes recorded yet.',
+    'stats.price_history_note' =>
+        'Every recorded change, newest first, in each subscription\'s own currency. A free trial ending '
+        . 'is not a price change, and a currency conversion changes the currency, not the price.',
+    'stats.price_history_pages' => 'Price history pages',
+    'stats.today' => 'Today',
+    'stats.yoy_alt' => 'Spend in {currency} for each month of this year and last.',
+    'stats.yoy_heading' => '{year} against {previous}',
+    'stats.yoy_note' => 'Same month, year over year. The rest of this year is the forecast.',
+    'stats.yoy_rolling' => 'Last 12 months {current}, against {previous} the 12 before:',
     'stats.cost_per_use' => 'Cost per use',
     'stats.donut_alt' =>
         'Doughnut chart of recurring monthly spend by category, in {currency}. The same figures are in '
@@ -1344,14 +1767,11 @@ return [
         . 'its own currency\'s monthly total.',
     'stats.no_payment_method' => 'No payment method',
     'stats.other_payment_methods' => '{count, plural, one {# other method} other {# other methods}}',
-    'stats.last_12_months' => 'Last 12 months',
-    'stats.least_expensive' => 'Least expensive',
     'stats.most_expensive' => 'Most expensive',
     'stats.no_previous_year' =>
         'Nothing recorded for the year before last, so there is nothing to compare against. {amount} in '
         . 'the last twelve months.',
     'stats.no_uses_recorded' => 'No uses recorded',
-    'stats.notable' => 'Notable subscriptions',
     'stats.notable_empty' => 'Nothing with a monthly cost to compare yet.',
     'stats.notable_excluded' =>
         '{count, plural, one {# subscription is} other {# subscriptions are}} not ranked: no exchange '
@@ -1367,27 +1787,12 @@ return [
         'All four are derived from the yearly figure, so they always multiply up to one another. Days '
         . 'and weeks use the mean Gregorian year of 365.25 days. One-off and lifetime entries are '
         . 'excluded.',
-    'stats.history' => 'The last 12 months',
-    // The dashboard's version of this sentence sends the reader to Analytics.
-    // This *is* Analytics, so it names the figures further down this page —
-    // the per-currency yearly totals the cost-by-period card falls back to
-    // when the same conversion fails there.
-    'stats.history_unconvertible' =>
-        'The chart of the last twelve months is not drawn, because no exchange rate is available for '
-        . '{currencies} and a month missing one of its currencies would be drawn as a cheap month rather '
-        . 'than an unknown one. The per-currency figures further down this page are the complete picture.',
-    'stats.history_note' =>
-        'What has already been spent, month by calendar month. Reconstructed from start dates, billing '
-        . 'cycles and recorded price history — this tracks what is due rather than a ledger of payments '
-        . 'taken, so a subscription with no start date is left out rather than guessed at.',
     'stats.rarely_used' => 'Rarely used',
     'stats.rating_label' => '{rating} out of {max}',
-    'stats.the_12_before_that' => 'The 12 before that',
+    'stats.tab_forecast' => 'Forecast',
+    'stats.tab_overview' => 'Overview',
+    'stats.tabs_label' => 'Analytics sections',
     'stats.title' => 'Analytics',
-    'stats.trajectory' => 'Spending trajectory',
-    'stats.trajectory_note' =>
-        'Each renewal in the month it actually falls, with scheduled price changes and trial conversions '
-        . 'applied from their own dates. The same figures the dashboard chart and the forecast show.',
     'stats.unconvertible' =>
         'These cannot be combined into {currency}: no exchange rate is available for {currencies}. The '
         . 'per-currency figures below are the complete picture; a combined number leaving that spending '
@@ -1399,7 +1804,6 @@ return [
         'Cost per use, highest first. Something with no uses recorded is unmeasured rather than poor '
         . 'value, and sorts to the bottom.',
     'stats.worth_it' => 'Worth it?',
-    'stats.year_over_year' => 'Year over year',
     'stats.year_over_year_empty' => 'Not enough convertible data to compare the two years.',
     'stats.year_over_year_excluded' =>
         '{count, plural, one {# subscription has} other {# subscriptions have}} no start date and so '
@@ -1409,9 +1813,9 @@ return [
         . 'tracks what is due rather than keeping a ledger of payments taken.',
 
     // subscriptions
-    'subscriptions.active_note' => 'Running right now, paused ones aside.',
     'subscriptions.add_subscription' => 'Add subscription',
     'subscriptions.apply_filters' => 'Apply filters',
+    'subscriptions.cancel_by_all' => 'All deadlines',
     'subscriptions.cancel_by_empty' =>
         'Nothing with a notice period is due. Add one to a subscription and its deadline appears here.',
     'subscriptions.cancel_by_heading' => 'Cancel by',
@@ -1425,47 +1829,87 @@ return [
         . 'blended into one bar.',
     'subscriptions.categories_total' => 'of {total} a month',
     'subscriptions.expiring_heading' => 'Expiring soon',
+    'subscriptions.export' => 'Export',
+    'subscriptions.filter_placeholder' => 'Filter subscriptions…',
     'subscriptions.include_paused' => 'Include paused',
     'subscriptions.name_or_notes' => 'Name or notes',
-    'subscriptions.paused_heading' => 'Paused / inactive',
+    'subscriptions.paused_heading' => 'Paused',
     'subscriptions.paused_if_resumed' => 'a year if resumed',
     'subscriptions.paused_note' => 'Switched off, and costing nothing while they are.',
     'subscriptions.renewing_note' => 'A charge falling in the next {days, plural, one {# day} other {# days}}.',
     'subscriptions.search' => 'Search',
     'subscriptions.strip' => 'Subscription totals',
     'subscriptions.notice_of' => '{period} notice',
+    'subscriptions.scope' => 'Scope',
+    'subscriptions.scope_mine' => 'Mine',
+    'subscriptions.status_filter.active' => 'Active',
+    'subscriptions.status_filter.cancelled' => 'Cancelled',
+    'subscriptions.status_filter.paused' => 'Paused',
+    'subscriptions.status_filter.trial' => 'Trials',
     'subscriptions.then_costs' => 'when it converts',
-    'subscriptions.trials_heading' => 'Free trials',
+    'subscriptions.toolbar' => 'Filter the list',
+    'subscriptions.trials_heading' => 'Trials',
     'subscriptions.trials_note' =>
         'The last day of a trial is the day of its first charge, so the countdown runs to the day it '
         . 'converts and the amount shown is what it converts to.',
 
     // subscriptions_form
+    'subscriptions_form.at_todays_rate' => '≈ {amount} at today’s rate',
     'subscriptions_form.back_to_list' => 'Back to list',
     'subscriptions_form.belongs_to' => 'Belongs to',
     'subscriptions_form.billing_cycle' => 'Billing cycle',
+    'subscriptions_form.cancel_subscription' => 'Cancel subscription',
     'subscriptions_form.converts_to' => 'Converts to',
     'subscriptions_form.converts_to_cycle' => 'Converts to cycle',
     'subscriptions_form.converts_to_cycle_days' => 'Converts to days between payments',
     'subscriptions_form.converts_to_cycle_days_hint' => 'Only used when it converts to a custom cycle.',
     'subscriptions_form.converts_to_price_hint' => 'Leave blank if it converts to the price above.',
+    'subscriptions_form.cost_split' => 'Cost split',
+    'subscriptions_form.costs_and_usage' => 'Costs and usage',
     'subscriptions_form.cycle_days_hint' => 'Only used when the cycle is “Custom”.',
+    'subscriptions_form.days_before' => '{days, plural, one {# day} other {# days}} before',
     'subscriptions_form.days_between_payments' => 'Days between payments',
+    'subscriptions_form.edit_name' => 'Edit {name}',
     'subscriptions_form.edit_title' => 'Edit subscription',
+    'subscriptions_form.end_it' => 'Stop paying for it',
+    'subscriptions_form.every_n_days' => 'Every how many days',
     'subscriptions_form.free_trial' => 'Free trial',
     'subscriptions_form.is_trial' => 'This is a free trial',
+    'subscriptions_form.is_trial_note' => 'We’ll remind you before it converts to a paid plan.',
     'subscriptions_form.isolated_owner_note' =>
         'This instance keeps members\' subscriptions separate, so new entries belong to you.',
+    'subscriptions_form.only_me_note' =>
+        'Only you will see it, in either isolation mode — nobody else in the household, Owner/Admins '
+        . 'included, and it stays out of their totals.',
+    'subscriptions_form.only_me_split_note' =>
+        'A shared cost is always visible to the people sharing it, so a split subscription cannot be '
+        . 'kept to yourself.',
     'subscriptions_form.own_rows_owner_note' =>
         'Your role covers the entries you own, so new ones belong to you.',
     'subscriptions_form.logo' => 'Logo',
     'subscriptions_form.logo_hint' => 'Uploading a new file replaces it.',
+    'subscriptions_form.more_details' => 'More details',
     'subscriptions_form.next_payment_date' => 'Next payment date',
+    'subscriptions_form.no_rate_yet' => 'No exchange rate from {currency} to {base} yet.',
     'subscriptions_form.not_recorded' => 'Not recorded',
     'subscriptions_form.notice_hint' => 'Used to work out the last day you can cancel before the next charge.',
     'subscriptions_form.notice_period' => 'Notice period',
     'subscriptions_form.notice_period_unit' => 'Notice period unit',
+    'subscriptions_form.notice_unit.days' => 'days',
+    'subscriptions_form.notice_unit.months' => 'months',
+    'subscriptions_form.notice_unit.weeks' => 'weeks',
+    'subscriptions_form.only_me' => 'Only me',
     'subscriptions_form.paid_by' => 'Paid by',
+    'subscriptions_form.paid_by_someone_else' => 'Paid by someone else',
+    'subscriptions_form.paid_by_someone_else_hint' =>
+        'Who actually pays, if it is not the member above. It changes nobody’s view of it.',
+    'subscriptions_form.name_placeholder' => 'Netflix, Octopus Energy…',
+    'subscriptions_form.plan_placeholder' => 'Standard, Family, Premium…',
+    'subscriptions_form.remind_me' => 'Remind me',
+    'subscriptions_form.remind_me_hint' => 'Days before each charge, and before a trial converts. Your defaults are the schedule in',
+    'subscriptions_form.reminder_days' => 'Choose days',
+    'subscriptions_form.reminder_default' => 'Use my defaults',
+    'subscriptions_form.reminder_never' => 'Never',
     'subscriptions_form.reminders' => 'Reminders',
     'subscriptions_form.reminders_hint' =>
         'Days before the charge, for example {example} — or {never} to never be reminded about this one. '
@@ -1483,40 +1927,77 @@ return [
     'subscriptions_form.started_on' => 'Started on',
     'subscriptions_form.streaming_shared' => 'streaming, shared',
     'subscriptions_form.remove_tag' => 'Remove {name}',
+    'subscriptions_form.service_name' => 'Service name',
+    'subscriptions_form.split_custom' => 'Custom shares',
+    'subscriptions_form.split_equal' => 'Split equally',
+    'subscriptions_form.split_hint' =>
+        'Shares are weights: 2 and 1 means two thirds and one third. The pennies always add up to the price.',
+    'subscriptions_form.split_none' => 'Payer only',
     'subscriptions_form.tags_hint' => 'Comma separated. New tags are created automatically.',
     'subscriptions_form.trial_end_hint' => 'The last free day — and the day the first charge falls.',
     'subscriptions_form.trial_ends' => 'Trial ends',
     'subscriptions_form.type_hint' => 'One-off and lifetime entries are tracked but left out of monthly totals.',
     'subscriptions_form.use_my_usual_reminders' => 'Use my usual reminders',
 
+    'subscriptions_form.visible_to' => 'Visible to',
     'subscriptions_form.website_hint' =>
         'Used for the link on this subscription, and to fetch its icon if you have not uploaded one.',
     'subscriptions_form.website_placeholder' => 'https://example.com',
 
     // subscriptions_list
+    'subscriptions_list.actions_for' => 'Actions for {name}',
     'subscriptions_list.add_tag' => 'Add tag',
     'subscriptions_list.add_the_first_one' => 'Add the first one.',
+    'subscriptions_list.approximately' => '≈ {amount}',
+    'subscriptions_list.cancel' => 'Cancel',
     'subscriptions_list.cancel_by' => 'Cancel by {date}',
+    'subscriptions_list.cancel_name' => 'Cancel {name}',
+    'subscriptions_list.cancel_trial' => 'Cancel trial',
     'subscriptions_list.convert_currency' => 'Convert currency',
     'subscriptions_list.convert_note' =>
         'Converting currency uses today\'s exchange rate and records the result in each subscription\'s '
         . 'price history. If a rate is unavailable the whole action is refused rather than re-labelling '
         . 'the amount, which would be a silent price change.',
     'subscriptions_list.cost' => 'Cost',
+    'subscriptions_list.delete_name' => 'Delete {name}',
+    'subscriptions_list.edit_name' => 'Edit {name}',
     'subscriptions_list.empty' => 'No subscriptions yet.',
+    'subscriptions_list.in_days' => 'in {days, plural, one {# day} other {# days}}',
+    'subscriptions_list.monthly_in' => 'Monthly ({currency})',
     'subscriptions_list.no_category' => 'No category',
     'subscriptions_list.no_matches' => 'Nothing matches those filters.',
+    'subscriptions_list.no_rate' => 'No exchange rate for {currency}',
     'subscriptions_list.nobody' => 'Nobody',
     'subscriptions_list.not_amortised' => 'One-off and lifetime entries are not amortised',
     'subscriptions_list.pager' => 'Page {page} of {pages} · {total} total',
     'subscriptions_list.pagination' => 'Pagination',
     'subscriptions_list.pause' => 'Pause',
+    'subscriptions_list.pause_name' => 'Pause {name}',
+    'subscriptions_list.per_cycle.custom_days' => '/{days, plural, one {day} other {# days}}',
+    'subscriptions_list.per_cycle.monthly' => '/mo',
+    'subscriptions_list.per_cycle.quarterly' => '/qtr',
+    'subscriptions_list.per_cycle.weekly' => '/wk',
+    'subscriptions_list.per_cycle.yearly' => '/yr',
+    'subscriptions_list.per_month' => '{amount}/mo',
     'subscriptions_list.remove_tag' => 'Remove tag',
     'subscriptions_list.resume' => 'Resume',
+    'subscriptions_list.resume_name' => 'Resume {name}',
     'subscriptions_list.select' => 'Select',
+    'subscriptions_list.select_all' => 'Select every subscription on this page',
+    'subscriptions_list.select_one' => 'Select {name}',
+    'subscriptions_list.selected_count' => '{count} selected',
+    'subscriptions_list.service' => 'Service',
     'subscriptions_list.set_category' => 'Set category',
     'subscriptions_list.set_member' => 'Set member',
     'subscriptions_list.set_payer' => 'Set payer',
+    'subscriptions_list.split_custom' => 'Custom split',
+    'subscriptions_list.split_equally_with' => 'Split equally with {name}',
+    'subscriptions_list.split_ways' => 'Split {count, plural, one {# way} other {# ways}}',
+    'subscriptions_list.summary' => '{matched, plural, other {#}} of {of, plural, other {#}}',
+    'subscriptions_list.trial_ends' => 'Trial ends',
+    'subscriptions_list.uncancel' => 'Undo cancel',
+    'subscriptions_list.uncancel_name' => 'Undo cancelling {name}',
+    'subscriptions_list.view_name' => 'View the costs of {name}',
     'subscriptions_list.with_selected' => 'With selected',
 
     // subscriptions_money
@@ -1526,6 +2007,7 @@ return [
         . 'subscription.',
     'subscriptions_money.attachment_period_label' => 'Billing period it covers (optional)',
     'subscriptions_money.by_the_shares_below' => 'By the shares below',
+    'subscriptions_money.change_split' => 'Change how it is split',
     'subscriptions_money.free_until' => 'Free until',
     'subscriptions_money.history_empty' => 'No price history recorded yet.',
     'subscriptions_money.history_note' =>
@@ -1543,6 +2025,8 @@ return [
     'subscriptions_money.nothing_attached_yet' => 'Nothing attached yet.',
     'subscriptions_money.price_history' => 'Price history',
     'subscriptions_money.price_note_placeholder' => 'Announced in their email of 3 March',
+    'subscriptions_money.private_no_split' =>
+        'Only you can see this subscription, so it is paid by you alone and cannot be split.',
     'subscriptions_money.reset_count' => 'Reset count',
     'subscriptions_money.save_rating' => 'Save rating',
     'subscriptions_money.save_split' => 'Save split',
@@ -1574,20 +2058,13 @@ return [
         . 'read-only tokens only.',
     'tokens.as_json' => 'as JSON',
     'tokens.bearer_note' => 'Send the token as a bearer credential:',
-    'tokens.calendar_feed' => 'Calendar feed',
-    'tokens.calendar_note' =>
-        'Subscribe to this URL in your calendar app, with a read-only token in place of the placeholder. '
-        . 'It shows renewals, trial conversions and the last day to cancel each subscription.',
-    'tokens.can' => 'Can',
     'tokens.create_token' => 'Create token',
     'tokens.expires_on' => 'Expires {date}',
     'tokens.expires_optional' => 'Expires (optional)',
-    'tokens.identifier' => 'Identifier',
     'tokens.intro' =>
         'A token lets a script, a calendar app or another machine reach this instance without a '
         . 'password. It can never do more than you can: a token issued by a Viewer reads what a Viewer '
         . 'reads and writes nothing.',
-    'tokens.issue_a_token' => 'Issue a token',
     'tokens.name_placeholder' => 'Home Assistant, my calendar, a backup script',
     'tokens.new_token_note' =>
         'Copy it now. Only a hash of it is stored, so this is the one and only time it can be shown.',
@@ -1598,7 +2075,6 @@ return [
     'tokens.what_it_is_for' => 'What it is for',
     'tokens.what_it_may_do' => 'What it may do',
     'tokens.your_new_token' => 'Your new token',
-    'tokens.your_tokens' => 'Your tokens',
 
     // type
     'type.one_off' => 'One-off',
@@ -1639,15 +2115,21 @@ return [
     'calendar.trial_description' => 'The free trial of {name} ends and it converts to {amount}.',
     'calendar.trial_summary' => '{name} trial ends ({amount})',
 
-    // capability — the household screen's plain-language ladder. Every card
-    // lists all five; the ones a member has not got are greyed rather than
-    // dropped, so the wording has to read the same either way. Third person,
-    // because a card is about somebody else as often as it is about you.
-    'capability.edit_anything' => 'Add and edit anything',
-    'capability.edit_own' => 'Add and edit their own',
-    'capability.manage_members' => 'Invite and remove members',
-    'capability.see_everything' => 'See every line',
-    'capability.set_budgets' => 'Set budgets',
+    // capability — the rows of the members screen's role table, one per
+    // RoleCapability. Each names a group of permissions a reader thinks of as
+    // one thing.
+    'capability.add_subscriptions' => 'Add subscriptions',
+    'capability.edit_money' => 'Edit prices, splits & invoices',
+    'capability.import_bulk_edit' => 'Import & bulk edit',
+    'capability.manage_budgets' => 'Manage budgets',
+    'capability.manage_household' => 'Members, backups & settings',
+    'capability.manage_shared' => 'Categories, tags & payment methods',
+    'capability.view_subscriptions' => 'View subscriptions & totals',
+
+    // capability_grant — one cell of that table, always a word beside its icon.
+    'capability_grant.no' => 'No',
+    'capability_grant.own_only' => 'Own only',
+    'capability_grant.yes' => 'Yes',
 
     // channel_field
     'channel_field.email.address' => 'Email address',
@@ -1673,7 +2155,8 @@ return [
     'channel_field.ntfy.priority_hint' => '1–5. 3 is the default; 5 bypasses Do Not Disturb.',
     'channel_field.ntfy.server' => 'Server URL',
     'channel_field.ntfy.server_hint' =>
-        'Leave blank for https://ntfy.sh. A self-hosted server on a private address must be on the trusted-host list.',
+        'Leave blank for https://ntfy.sh. A self-hosted server on a private address must be on the '
+        . 'trusted-host list.',
     'channel_field.ntfy.tags' => 'Tags',
     'channel_field.ntfy.tags_hint' => 'Optional, comma-separated. Emoji shortcodes such as warning become icons.',
     'channel_field.ntfy.token' => 'Access token',
@@ -1711,13 +2194,24 @@ return [
     'channel_field.webhook.url' => 'Endpoint URL',
 
     // dashboard_card
-    'dashboard_card.budget_usage' => 'Budget and where it goes',
+    'dashboard_card.budget_pace' => 'Spent this year vs budget pace',
+    'dashboard_card.budgets' => 'Budgets this month',
     'dashboard_card.by_category' => 'By category',
-    'dashboard_card.member_shares' => 'Who pays for what',
-    'dashboard_card.spend_history' => 'Spend, last 12 months',
+    'dashboard_card.coming_up' => 'Coming up',
+    'dashboard_card.free_trials' => 'Free trials',
+    'dashboard_card.month_so_far' => 'This month so far',
+    'dashboard_card.next_30_days' => 'Next 30 days',
+    'dashboard_card.price_change' => 'Next price change',
+    'dashboard_card.recent' => 'Subscriptions table',
+    'dashboard_card.spend_chart' => 'Monthly spend chart',
+    'dashboard_card.spend_trend' => 'Spend over time',
     'dashboard_card.totals' => 'Spending at a glance',
-    'dashboard_card.trials' => 'Trials ending soon',
-    'dashboard_card.upcoming' => 'Coming soon',
+    'dashboard_card.where_it_goes' => 'Where it goes',
+    'dashboard_card.who_pays' => 'Who pays what',
+
+    // dashboard_view
+    'dashboard_view.household' => 'Household',
+    'dashboard_view.overview' => 'Overview',
 
     // digest_mode
     'digest_mode.immediate' => 'As they happen',
@@ -1739,7 +2233,9 @@ return [
     'error.auth.throttled_short' => 'Too many attempts. Try again shortly.',
     'error.auth.unverified_short' => 'Confirm your email address before signing in.',
     'error.csrf.expired' => 'The form has expired. Reload the page and try again.',
+    'error.page.session_expired_title' => 'Session expired',
     'error.passkey.unexpected_response' => 'The browser sent an unexpected response.',
+    'error.reminder_days.none_chosen' => 'Choose at least one day to be reminded, or pick “Use my defaults”.',
     'error.two_factor.expired' => 'That sign-in attempt expired.',
     'error.two_factor.restart_passkey' => 'Start the passkey step again.',
 
@@ -1763,6 +2259,7 @@ return [
     'import_field.notice_period_amount.label' => 'Notice period',
     'import_field.notice_period_unit.hint' => 'days, weeks or months',
     'import_field.notice_period_unit.label' => 'Notice period unit',
+    'import_field.plan.label' => 'Plan',
     'import_field.price.hint' => 'A decimal amount, for example 9.99',
     'import_field.price.label' => 'Price',
     'import_field.price_minor.hint' =>
@@ -1802,8 +2299,14 @@ return [
     'rate_provider.frankfurter' =>
         'Free, no account needed. European Central Bank reference rates, updated each working day.',
 
+    // relative — how long ago something happened, for a moment within the
+    // last month. Older than that is shown as a date instead.
+    'relative.days_ago' => '{count, plural, one {# day ago} other {# days ago}}',
+    'relative.hours_ago' => '{count, plural, one {# hour ago} other {# hours ago}}',
+    'relative.just_now' => 'Just now',
+    'relative.minutes_ago' => '{count, plural, one {# minute ago} other {# minutes ago}}',
+
     // payment_methods
-    'payment_methods.title' => 'Payment methods',
     'payment_methods.intro' =>
         'What your subscriptions are paid with. A payment method is only a label: Renovo never stores a card '
         . 'number and never takes a payment.',
@@ -1837,4 +2340,117 @@ return [
     // token_ability
     'token_ability.read' => 'Read-only',
     'token_ability.write' => 'Read and write',
+    'visibility.household' => 'Household',
+    'visibility.payer' => 'Only me',
+
+    // -----------------------------------------------------------------------
+    // Phase 27: the profile
+    // -----------------------------------------------------------------------
+    'profile.appearance_heading' => 'Appearance & preferences',
+    'profile.dashboard_cards_heading' => 'Dashboard cards',
+    'profile.dashboard_cards_save' => 'Save dashboard cards',
+    'profile.new_recovery_codes' => 'New recovery codes',
+    'profile.passkey_added' => 'Passkey · added {date}',
+    'profile.passkey_remove' => 'Remove {name}',
+    'profile.session_address_unknown' => 'Unknown address',
+    'profile.session_meta' => '{address} · last seen {seen}',
+    'profile.session_sign_out' => 'Sign out {device}',
+    'profile.sessions_heading' => 'Where you’re signed in',
+    'profile.totp_on' => 'On',
+    'profile.totp_on_since' => 'On since {date} · {remaining} of {total} recovery codes left',
+    'profile.totp_set_up' => 'Set up',
+    'profile.two_step_heading' => 'Two-step verification & passkeys',
+
+    // -----------------------------------------------------------------------
+    // Phase 28: settings and notifications
+    // -----------------------------------------------------------------------
+    'action.add' => 'Add',
+    'confirm.delete_channel' => 'Remove {name}? Nothing more will be sent to it.',
+    'confirm.delete_tag' => 'Delete {name}? It comes off every subscription that carries it.',
+    'error.tag.duplicate' => 'A tag with that name already exists.',
+    'error.tag.too_long' => 'A tag must be 50 characters or fewer.',
+    'flash.channel_turned_off' => 'Channel turned off.',
+    'flash.channel_turned_on' => 'Channel turned on.',
+    'flash.rates_backing_off' => 'The last refresh failed, so the next can be tried after {time}.',
+    'flash.rates_refresh_failed' => 'The rates could not be refreshed: {reason}',
+    'flash.rates_refreshed' => '{count, plural, one {# rate} other {# rates}} refreshed.',
+    'flash.tag_added' => 'Tag added.',
+    'flash.tag_renamed' => 'Tag renamed.',
+    'notifications.budget_alerts' => 'Budget alerts',
+    'notifications.budget_alerts_hint' => 'When a budget is projected over.',
+    'notifications.channel_manage' => 'Edit {name}',
+    'notifications.channel_switch' => 'Send to {name}',
+    'notifications.days_before' => '{count, plural, one {# day} other {# days}}',
+    'notifications.lead_times' => 'Remind me before',
+    'notifications.lead_times_hint' =>
+        'Before each {types}. Choose any number, or none; each is a reminder of its own. A single '
+        . 'subscription can override this on its own page.',
+    'notifications.route_label' => '{alert} to {channel}',
+    'notifications.routing' => 'Routing',
+    'notifications.when_to_remind' => 'When to remind you',
+    'settings.added_by' => 'by {name}',
+    'settings.allow_registration_hint' =>
+        'Off, and accounts are made only by invitation from a household’s Owner or Admin.',
+    'settings.backup_heading' => 'Backup & restore',
+    'settings.base_currency_hint' => 'Totals, budgets and forecasts are shown in this currency.',
+    'settings.base_currency_instance_note' => 'It applies to every household on this instance.',
+    'settings.categories_intro' => 'Shared by the whole household. Renaming one renames it everywhere.',
+    'settings.delete_named' => 'Delete {name}',
+    'settings.export_csv' => 'CSV',
+    'settings.export_heading' => 'Export',
+    'settings.export_intro' =>
+        'Every subscription you can see, paused and cancelled ones included, as a spreadsheet or as JSON. '
+        . 'The importer reads either back.',
+    'settings.export_json' => 'JSON',
+    'settings.full_audit_log' => 'Full audit log',
+    'settings.household_name' => 'Household name',
+    'settings.import_note' => 'You map the columns and preview every row before anything is saved.',
+    'settings.import_title' => 'Import a CSV or JSON file',
+    'settings.instance_status' => 'This server',
+    'settings.instance_status_intro' => 'Set in the environment, and shown here as it is.',
+    'settings.new_tag' => 'New tag',
+    'settings.new_token' => 'New token',
+    'settings.rate' => 'Rate',
+    'settings.rate_pair' => 'Pair',
+    'settings.rate_pair_value' => '1 {from} → {to}',
+    'settings.rate_provider' => 'Provider',
+    'settings.rates_backing_off' => 'The last refresh failed. The next can be tried after {time}.',
+    'settings.rates_from' => 'Rates from {provider}.',
+    'settings.rates_last_refreshed' => 'Last refreshed {when}.',
+    'settings.rates_never' => 'Not refreshed yet.',
+    'settings.rates_none_in_use' => 'Every subscription is priced in {base}, so no rate is needed.',
+    'settings.rates_others' =>
+        '{count, plural, one {# other currency is} other {# other currencies are}} cached as well.',
+    'settings.recent_activity' => 'Recent activity',
+    'settings.refresh_now' => 'Refresh now',
+    'settings.reissue_named' => 'Reissue {name}',
+    'settings.remove_named' => 'Remove {name}',
+    'settings.rename_category' => 'Name of {name}',
+    'settings.rename_tag' => 'Name of {name}',
+    'settings.restore_from_file' => 'Restore from file',
+    'settings.revoke_named' => 'Revoke {name}',
+    'settings.save_currency' => 'Save currency',
+    'settings.save_provider' => 'Save provider',
+    'settings.set_by_instance_admin' => 'It is set by the instance administrator.',
+    'settings.status_mail' => 'Mail relay',
+    'settings.status_mail_encryption' => 'Encryption: {encryption}',
+    'settings.status_mail_no_sign_in' => 'no sign-in',
+    'settings.status_mail_signs_in' => 'signs in',
+    'settings.status_metrics' => 'Metrics',
+    'settings.status_metrics_off' => 'Off. Set {variable} to expose /metrics.',
+    'settings.status_metrics_on' => '/metrics answers a request that carries the token.',
+    'settings.status_scheduler' => 'Scheduler last ran',
+    'settings.status_scheduler_never' => 'Not yet',
+    'settings.subscriptions_count' => '{count, plural, one {subscription} other {subscriptions}}',
+    'settings.tab_data' => 'Data & integrations',
+    'settings.tab_general' => 'General',
+    'settings.tab_instance' => 'Instance',
+    'settings.tabs_label' => 'Settings sections',
+    'settings.tags_intro' =>
+        'Usually made by typing one on a subscription. Renaming one renames it everywhere; deleting one '
+        . 'takes it off every subscription and deletes none of them.',
+    'settings.token_last_used' => 'last used {when}',
+    'settings.token_never_used' => 'never used',
+    'state.off' => 'Off',
+    'state.on' => 'On',
 ];

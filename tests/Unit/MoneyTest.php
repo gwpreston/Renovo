@@ -23,6 +23,24 @@ final class MoneyTest extends TestCase
         self::assertSame(1000, Currency::subunits('BHD'));
     }
 
+    public function testTheCurrencyPickListLeadsWithPoundsEurosAndDollars(): void
+    {
+        $list = Currency::preferredFirst();
+
+        self::assertSame(['GBP', 'EUR', 'USD', 'AED'], array_slice($list, 0, 4));
+        self::assertEqualsCanonicalizing(Currency::all(), $list, 'Every currency is offered, once.');
+    }
+
+    public function testEveryCurrencyOnOfferHasANameInTheBaseCatalogue(): void
+    {
+        $catalogue = require __DIR__ . '/../../translations/en.php';
+
+        foreach (Currency::all() as $code) {
+            self::assertArrayHasKey('currency.name.' . $code, $catalogue, $code . ' has no name.');
+        }
+        self::assertSame('Pounds sterling', $catalogue['currency.name.GBP']);
+    }
+
     /**
      * @return list<array{string, string, int}>
      */

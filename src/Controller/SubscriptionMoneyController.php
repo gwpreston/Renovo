@@ -86,7 +86,7 @@ final class SubscriptionMoneyController extends Controller
 
         $this->flash('success', 'flash.price_change_scheduled');
 
-        return $this->redirectAfterWrite($request, $response, '/subscriptions/' . (int) $id . '/money');
+        return $this->redirectAfterWrite($request, $response, $this->subscriptionReturn($request, (int) $id));
     }
 
     public function updateSplit(
@@ -165,6 +165,6 @@ final class SubscriptionMoneyController extends Controller
     ): ResponseInterface {
         $this->flashErrors($exception);
 
-        return $this->redirectAfterWrite($request, $response, '/subscriptions/' . $id . '/money');
+        return $this->redirectAfterWrite($request, $response, $this->subscriptionReturn($request, $id));
     }
 }

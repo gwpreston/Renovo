@@ -1,0 +1,114 @@
+{% extends 'auth/_layout.twig' %}
+
+{#
+    Step two of three: the household.
+
+    The name and the base currency are asked outright; data visibility and the
+    exchange-rate provider are under More options, because both have defaults
+    that suit nearly everybody and both can be changed later in Settings.
+
+    No Back: step one created the account, and there is no un-creating it
+    from here. Everything on this step can be changed afterwards.
+#}
+
+{% block title %}{{ t('setup_wizard.household_title') }} — {{ instance_name }}{% endblock %}
+
+{% set v = values|default({}) %}
+{% set chosen_currency = v.base_currency|default(base_currency) %}
+{% set chosen_isolation = v.isolation_mode|default(isolation_mode) %}
+{% set chosen_provider = v.rate_provider|default(rate_provider) %}
+
+{% block card_top %}{% include 'setup/_progress.twig' with {'step': 2} only %}{% endblock %}
+{% block card_title %}{{ t('setup_wizard.household_title') }}{% endblock %}
+{% block card_intro %}{{ t('setup_wizard.household_intro') }}{% endblock %}
+
+{% block card_body %}
+    {% include 'partials/errors.twig' %}
+
+    <form method="post" action="/setup/household" class="auth-form">
+        {{ csrf_field() }}
+
+        {% include 'auth/_input.twig' with {
+            'id': 'household_name',
+            'name': 'household_name',
+            'label': t('setup_wizard.household_name'),
+            'value': v.household_name|default(household_name),
+            'error': errors.household_name|default(null),
+            'required': true,
+            'autofocus': true,
+        } only %}
+
+        <div class="auth-field">
+            <label for="base_currency">{{ t('settings.base_currency') }}</label>
+            <select id="base_currency" name="base_currency" aria-describedby="base_currency_hint">
+                <optgroup label="{{ t('setup_wizard.currencies_common') }}">
+                    {% for code in featured_currencies %}
+                        <option value="{{ code }}" {{ chosen_currency == code ? 'selected' : '' }}>{{ t('currency.option', { 'code': code, 'name': t('currency.name.' ~ code) }) }}</option>
+                    {% endfor %}
+                </optgroup>
+                <optgroup label="{{ t('setup_wizard.currencies_all') }}">
+                    {% for code in currencies %}
+                        <option value="{{ code }}" {{ chosen_currency == code ? 'selected' : '' }}>{{ t('currency.option', { 'code': code, 'name': t('currency.name.' ~ code) }) }}</option>
+                    {% endfor %}
+                </optgroup>
+            </select>
+            <p class="hint" id="base_currency_hint">{{ t('settings.base_currency_hint') }}</p>
+            {% if errors.base_currency is defined %}<p class="field-error">{{ error_message(errors.base_currency) }}</p>{% endif %}
+        </div>
+
+        {% include 'auth/_input.twig' with {
+            'id': 'invites',
+            'name': 'invites',
+            'type': 'text',
+            'label': t('setup_wizard.invite_members'),
+            'value': v.invites|default(''),
+            'autocomplete': 'off',
+            'placeholder': t('setup_wizard.invite_placeholder'),
+            'hint': t('setup_wizard.invite_hint'),
+            'error': errors.invites|default(null),
+        } only %}
+
+        <details class="auth-details" {{ errors.rate_provider is defined ? 'open' : '' }}>
+            <summary>{{ t('setup_wizard.more_options') }}</summary>
+
+            <fieldset class="auth-fieldset">
+                <legend>{{ t('settings.data_isolation') }}</legend>
+                {% for mode in isolation_modes %}
+                    <label class="choice">
+                        <input type="radio" name="isolation_mode" value="{{ mode.value }}"
+                               {{ chosen_isolation == mode.value ? 'checked' : '' }}>
+                        <span>{{ isolation_label(mode.value) }}</span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+
+            <fieldset class="auth-fieldset">
+                <legend>{{ t('settings.rate_provider') }}</legend>
+                {% for provider in rate_providers %}
+                    <label class="choice">
+                        <input type="radio" name="rate_provider" value="{{ provider.key }}"
+                               {{ chosen_provider == provider.key ? 'checked' : '' }}>
+                        <span>
+                            <strong>{{ provider.label }}</strong>
+                            <span class="muted block">{{ t(provider.descriptionKey) }}</span>
+                        </span>
+                    </label>
+                {% endfor %}
+            </fieldset>
+
+            {% include 'auth/_input.twig' with {
+                'id': 'rate_provider_key',
+                'name': 'rate_provider_key',
+                'type': 'password',
+                'label': t('settings.api_key'),
+                'autocomplete': 'off',
+                'placeholder': t('settings.rate_key_placeholder'),
+                'hint': t('settings.rate_key_env_wins', {'variable': 'EXCHANGE_RATE_API_KEY'}),
+            } only %}
+        </details>
+
+        <div class="wizard-nav">
+            <button type="submit" class="button button-primary auth-submit">{{ t('action.continue') }}</button>
+        </div>
+    </form>
+{% endblock %}

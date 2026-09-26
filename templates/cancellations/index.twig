@@ -1,6 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.cancellations') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.cancellations') }}{% endblock %}
 
 {% block content %}
     {% import 'partials/logo.twig' as logo %}
@@ -45,10 +46,10 @@
                                 <strong>{{ row.deadline|local_date('d MMM y') }}</strong>
                                 <div class="hint">
                                     {% if row.is_passed %}
-                                        <span class="badge badge-danger">{{ t('cancellations.deadline_passed') }}</span>
+                                        <span class="badge badge-bad">{{ t('cancellations.deadline_passed') }}</span>
                                         {{ t('cancellations.passed_days', {'days': row.days_remaining * -1}) }}
                                     {% elseif row.days_remaining == 0 %}
-                                        <span class="badge badge-warning">{{ t('state.today') }}</span>
+                                        <span class="badge badge-warn">{{ t('state.today') }}</span>
                                     {% else %}
                                         {{ t('cancellations.days_left', {'days': row.days_remaining}) }}
                                     {% endif %}
@@ -63,7 +64,7 @@
                             </td>
                             <td>{{ notice_label(row.subscription.noticePeriod.amount,
                                 row.subscription.noticePeriod.unit) }}</td>
-                            <td class="numeric">{{
+                            <td class="numeric num">{{
                                 row.subscription.price.amountMinor|money(row.subscription.price.currency) }}</td>
                         </tr>
                     {% endfor %}

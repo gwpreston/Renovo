@@ -10,6 +10,7 @@ use App\Domain\AlertType;
 use App\Domain\Entity\User;
 use App\Notification\Alert;
 use App\Repository\MembershipRepository;
+use App\Repository\NotificationLogRepository;
 use App\Repository\UserRepository;
 use App\Security\Scope;
 use App\Security\ScopeFactory;
@@ -40,6 +41,9 @@ use Throwable;
  */
 final class ReminderRunner
 {
+    /** How far back a digest looks for price changes when none has been delivered. */
+    private const DIGEST_FALLBACK_DAYS = 31;
+
     public function __construct(
         private readonly UserRepository $users,
         private readonly LocaleContext $locale,
@@ -48,6 +52,8 @@ final class ReminderRunner
         private readonly ScopeFactory $scopes,
         private readonly CatchUpService $catchUp,
         private readonly AlertScanner $scanner,
+        private readonly PriceChangeScanner $priceChanges,
+        private readonly NotificationLogRepository $log,
         private readonly DigestBuilder $digests,
         private readonly NotificationDispatcher $dispatcher,
         private readonly NotificationSettingsService $settings,
@@ -127,6 +133,7 @@ final class ReminderRunner
         }
 
         $alerts = [];
+        $since = $this->priceChangesSince($user, $isDigestDay, $preferences->digestMode->horizonDays());
 
         foreach ($memberships as $membership) {
             $scope = $this->scopes->forUser($user, $membership->householdId);
@@ -136,7 +143,11 @@ final class ReminderRunner
             // the application would show if the user opened it right now.
             $this->catchUp->run($scope);
 
-            $alerts = array_merge($alerts, $this->alertsFor($scope, $user, $isDigestDay));
+            $alerts = array_merge(
+                $alerts,
+                $this->alertsFor($scope, $user, $isDigestDay),
+                $this->priceChanges->alerts($scope, $preferences, $since),
+            );
         }
 
         if ($alerts === []) {
@@ -172,8 +183,40 @@ final class ReminderRunner
         // Budgets are a state, not a date, so they are evaluated on every run
         // regardless of lead times — and the evaluation is what advances the
         // armed/breached state machine, so it must happen exactly once per
-        // household per run.
-        return array_merge($alerts, $this->scanner->evaluateBudgets($scope));
+        // household per run. It still runs for a member who has turned budget
+        // alerts off — only what it reports is dropped — so a breach that
+        // happens while they are off is recorded as it happens, and turning
+        // them back on does not announce it later as though it were new.
+        $budgets = $this->scanner->evaluateBudgets($scope);
+
+        return $preferences->budgetAlerts ? array_merge($alerts, $budgets) : $alerts;
+    }
+
+    /**
+     * How far back a run looks for price changes.
+     *
+     * The ledger keys each change on its history row, so an immediate user can
+     * be given a generous window — a week, so a scheduler that was down on
+     * Tuesday still sends Tuesday's news on Wednesday — and hear each change
+     * once. A digest is ledgered per period rather than per item, so it is
+     * bounded instead: everything since the previous *delivered* digest.
+     * Without that bound a change would sit in two consecutive digests.
+     *
+     * With no delivered digest to measure from — a new digest user, a week
+     * with nothing to say, a channel that has been failing — it looks back a
+     * month, whatever the period, so that a digest which could not be sent
+     * does not quietly drop the changes it would have carried.
+     */
+    private function priceChangesSince(User $user, bool $isDigestDay, int $horizonDays): \DateTimeImmutable
+    {
+        $now = $this->clock->now();
+
+        if (!$isDigestDay) {
+            return $now->modify('-7 days');
+        }
+
+        return $this->log->lastDigestAt($user->id)
+            ?? $now->modify(sprintf('-%d days', max(self::DIGEST_FALLBACK_DAYS, $horizonDays)));
     }
 
     /**

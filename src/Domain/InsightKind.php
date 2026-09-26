@@ -59,4 +59,29 @@ enum InsightKind: string
     {
         return 'insight.' . $this->value . '.detail';
     }
+
+    /** The icon the insights list draws beside it — a name from `icons.json`. */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::TrialConverting => 'trial',
+            self::PriceRising, self::PriceRisen => 'trend-up',
+            self::Overlap => 'groups',
+            self::RarelyUsed => 'rarely-used',
+        };
+    }
+
+    /**
+     * The icon tile's tone: information for a trial, a warning for a price
+     * moving, the accent for an overlap and neutral for low use.
+     */
+    public function tone(): string
+    {
+        return match ($this) {
+            self::TrialConverting => 'info',
+            self::PriceRising, self::PriceRisen => 'warn',
+            self::Overlap => 'accent',
+            self::RarelyUsed => 'neutral',
+        };
+    }
 }

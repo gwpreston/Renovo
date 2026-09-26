@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\I18n\Translator;
 use App\Domain\AlertType;
 use App\Domain\DigestMode;
+use App\Domain\Entity\NotificationPreferences;
 use App\Notification\NotifierException;
 use App\Notification\NotifierRegistry;
 use App\Repository\NotificationLogRepository;
@@ -30,6 +31,8 @@ use Slim\Views\Twig;
  */
 final class NotificationController extends Controller
 {
+    private const PAGE = '/settings/notifications';
+
     public function __construct(
         Twig $view,
         SessionInterface $session,
@@ -65,7 +68,7 @@ final class NotificationController extends Controller
 
         $this->flash('success', 'flash.channel_added');
 
-        return $this->redirectAfterWrite($request, $response, '/settings/notifications');
+        return $this->redirectAfterWrite($request, $response, self::PAGE);
     }
 
     public function updateChannel(
@@ -89,7 +92,30 @@ final class NotificationController extends Controller
 
         $this->flash('success', 'flash.channel_updated');
 
-        return $this->redirectAfterWrite($request, $response, '/settings/notifications');
+        return $this->redirectAfterWrite($request, $response, self::PAGE);
+    }
+
+    /**
+     * The switch beside a channel. Posted on change with script, and with a
+     * button without it; either way the channel's settings are untouched.
+     */
+    public function setActive(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $body = $this->body($request);
+        $active = ($body['is_active'] ?? '0') === '1';
+
+        try {
+            $this->settings->setChannelActive($this->user($request)->id, (int) $id, $active);
+        } catch (ValidationException) {
+            throw $this->notFound($request);
+        }
+
+        $this->flash('success', $active ? 'flash.channel_turned_on' : 'flash.channel_turned_off');
+
+        return $this->redirectAfterWrite($request, $response, self::PAGE . '#channels');
     }
 
     public function deleteChannel(
@@ -100,7 +126,7 @@ final class NotificationController extends Controller
         $this->settings->deleteChannel($this->user($request)->id, (int) $id);
         $this->flash('success', 'flash.channel_removed');
 
-        return $this->redirectAfterWrite($request, $response, '/settings/notifications');
+        return $this->redirectAfterWrite($request, $response, self::PAGE);
     }
 
     public function test(ServerRequestInterface $request, ResponseInterface $response, string $id): ResponseInterface
@@ -155,7 +181,7 @@ final class NotificationController extends Controller
 
         $this->flash('success', 'flash.notification_preferences_saved');
 
-        return $this->redirectAfterWrite($request, $response, '/settings/notifications');
+        return $this->redirectAfterWrite($request, $response, self::PAGE);
     }
 
     /**
@@ -199,10 +225,23 @@ final class NotificationController extends Controller
         $user = $this->user($request);
         $preferences = $this->settings->preferences($user->id);
 
+        // The chips offered, plus any lead time already stored that is not
+        // one of them, so that saving the page keeps it.
+        $leadChoices = array_values(array_unique([
+            ...NotificationPreferences::OFFERED_LEAD_DAYS,
+            ...$preferences->leadDaysOutsideOffered(),
+        ]));
+        sort($leadChoices);
+
         return [
             'channels' => $this->settings->channels($user->id),
             'notifiers' => $this->notifiers->all(),
             'preferences' => $preferences,
+            'lead_choices' => $leadChoices,
+            'lead_types' => array_values(array_filter(
+                AlertType::all(),
+                static fn (AlertType $type): bool => $type->usesLeadTimes(),
+            )),
             'routes' => $routes ?? $this->settings->routes($user->id),
             'alert_types' => AlertType::all(),
             'digest_modes' => DigestMode::cases(),
@@ -221,7 +260,11 @@ final class NotificationController extends Controller
         $body = $this->body($request);
         $target = is_scalar($body['return_to'] ?? null) ? (string) $body['return_to'] : '';
 
-        return $target === '/setup/notifications' ? $target : '/settings/notifications';
+        // The wizard's reminders step is the one other page with a test
+        // button, and the only other place this sends anybody.
+        return $target === '/setup/notifications' || $target === '/setup/notifications#channels'
+            ? $target
+            : self::PAGE . '#channels';
     }
 
     /**

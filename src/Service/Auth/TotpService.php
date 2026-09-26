@@ -14,6 +14,7 @@ use App\Security\Totp;
 use App\Service\AuditLogService;
 use App\Service\ValidationException;
 use App\Support\Clock;
+use DateTimeImmutable;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 
@@ -48,6 +49,16 @@ final class TotpService
     public function isEnabled(int $userId): bool
     {
         return $this->totp->isConfirmed($userId);
+    }
+
+    /**
+     * When the authenticator was confirmed, or null while it is off — the
+     * "On since" on the profile. An enrolment still waiting for its first
+     * code is off.
+     */
+    public function enabledSince(int $userId): ?DateTimeImmutable
+    {
+        return $this->totp->find($userId)['confirmed_at'] ?? null;
     }
 
     /**

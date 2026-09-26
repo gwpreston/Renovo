@@ -1,0 +1,10 @@
+{% extends 'auth/_layout.twig' %}
+
+{% set card_icon = 'ok' %}
+
+{% block card_title %}{{ t('auth_verify_done.title') }}{% endblock %}
+{% block card_intro %}{{ t('auth_verify_done.intro') }}{% endblock %}
+
+{% block card_body %}
+    <a class="button button-primary auth-submit" href="/login">{{ t('auth_login.title') }}</a>
+{% endblock %}

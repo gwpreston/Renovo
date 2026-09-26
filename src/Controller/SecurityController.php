@@ -22,7 +22,12 @@ use Psr\Http\Message\ServerRequestInterface;
 use Slim\Views\Twig;
 
 /**
- * The account-security page: authenticator app, passkeys, active sessions.
+ * Account security: authenticator app, passkeys, recovery codes, sessions.
+ *
+ * Writes only, since Phase 27. The controls are sections of `/profile`, which
+ * `ProfileController` renders, and every action here lands back on the section
+ * it came from. The one page this still draws is the authenticator's QR step,
+ * which is a stage of enrolment rather than a place to visit.
  *
  * Every route here acts on the signed-in user's own id, taken from the session
  * and never from the request, so there is no permission to check beyond being
@@ -37,7 +42,15 @@ use Slim\Views\Twig;
 final class SecurityController extends Controller
 {
     private const ENROLMENT_SECRET_KEY = 'totp_enrolment_secret';
-    private const RECOVERY_CODES_KEY = 'recovery_codes_once';
+    /**
+     * Where freshly issued recovery codes wait for the one render that shows
+     * them. Public because that render is the profile's, in ProfileController;
+     * one name for the key, owned here where the codes are issued.
+     */
+    public const RECOVERY_CODES_KEY = 'recovery_codes_once';
+
+    private const TWO_STEP = '/profile#two-step';
+    private const SESSIONS = '/profile#sessions';
     private const REGISTRATION_OPTIONS_KEY = 'passkey_registration_options';
 
     public function __construct(
@@ -53,26 +66,13 @@ final class SecurityController extends Controller
         parent::__construct($view, $session, $translator);
     }
 
-    public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    /**
+     * Where this screen used to be. Kept for bookmarks, and pointed at the
+     * section that replaced it rather than the top of a long page.
+     */
+    public function moved(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $user = $this->user($request);
-
-        $codes = $this->session->get(self::RECOVERY_CODES_KEY);
-        $this->session->remove(self::RECOVERY_CODES_KEY);
-
-        return $this->render($request, $response, 'security/index.twig', [
-            'totp' => [
-                'enabled' => $this->totp->isEnabled($user->id),
-            ],
-            'recovery' => [
-                'remaining' => $this->twoFactor->unusedRecoveryCodeCount($user->id),
-                'applicable' => $this->twoFactor->isRequiredFor($user->id),
-            ],
-            'recovery_codes' => is_array($codes) ? $codes : [],
-            'passkeys' => $this->webAuthn->credentialsFor($user->id),
-            'sessions' => $this->sessions->listFor($user, $this->session->id()),
-            'errors' => [],
-        ]);
+        return $this->redirect($response, self::TWO_STEP);
     }
 
     /**
@@ -85,7 +85,7 @@ final class SecurityController extends Controller
         if ($this->totp->isEnabled($user->id)) {
             $this->flash('error', 'error.totp.already_set_up');
 
-            return $this->redirectAfterWrite($request, $response, '/settings/security');
+            return $this->redirectAfterWrite($request, $response, self::TWO_STEP);
         }
 
         $enrolment = $this->totp->beginEnrolment($user, $this->settings->instanceName());
@@ -128,7 +128,7 @@ final class SecurityController extends Controller
 
         $this->flash('success', 'flash.totp_enabled');
 
-        return $this->redirectAfterWrite($request, $response, '/settings/security');
+        return $this->redirectAfterWrite($request, $response, self::TWO_STEP);
     }
 
     public function cancelTotp(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -136,7 +136,7 @@ final class SecurityController extends Controller
         $this->totp->cancelEnrolment($this->user($request)->id);
         $this->session->remove(self::ENROLMENT_SECRET_KEY);
 
-        return $this->redirectAfterWrite($request, $response, '/settings/security');
+        return $this->redirectAfterWrite($request, $response, self::TWO_STEP);
     }
 
     public function disableTotp(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -153,7 +153,7 @@ final class SecurityController extends Controller
             $this->flashErrors($exception);
         }
 
-        return $this->redirectAfterWrite($request, $response, '/settings/security');
+        return $this->redirectAfterWrite($request, $response, self::TWO_STEP);
     }
 
     public function regenerateRecoveryCodes(
@@ -174,7 +174,7 @@ final class SecurityController extends Controller
             $this->flashErrors($exception);
         }
 
-        return $this->redirectAfterWrite($request, $response, '/settings/security');
+        return $this->redirectAfterWrite($request, $response, self::TWO_STEP);
     }
 
     /**
@@ -233,7 +233,7 @@ final class SecurityController extends Controller
 
         $this->flash('success', 'flash.passkey_added', ['name' => $credential->name]);
 
-        return $this->json($response, ['redirect' => '/settings/security']);
+        return $this->json($response, ['redirect' => self::TWO_STEP]);
     }
 
     public function renamePasskey(
@@ -254,7 +254,7 @@ final class SecurityController extends Controller
             $this->flashErrors($exception);
         }
 
-        return $this->redirectAfterWrite($request, $response, '/settings/security');
+        return $this->redirectAfterWrite($request, $response, self::TWO_STEP);
     }
 
     public function revokePasskey(
@@ -269,7 +269,7 @@ final class SecurityController extends Controller
             $this->flashErrors($exception);
         }
 
-        return $this->redirectAfterWrite($request, $response, '/settings/security');
+        return $this->redirectAfterWrite($request, $response, self::TWO_STEP);
     }
 
     public function revokeSession(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -284,7 +284,7 @@ final class SecurityController extends Controller
             $revoked ? 'flash.session_revoked' : 'flash.session_already_gone',
         );
 
-        return $this->redirectAfterWrite($request, $response, '/settings/security');
+        return $this->redirectAfterWrite($request, $response, self::SESSIONS);
     }
 
     public function revokeOtherSessions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -293,7 +293,7 @@ final class SecurityController extends Controller
 
         $this->flash('success', 'flash.other_sessions_revoked', ['count' => $count]);
 
-        return $this->redirectAfterWrite($request, $response, '/settings/security');
+        return $this->redirectAfterWrite($request, $response, self::SESSIONS);
     }
 
     /**

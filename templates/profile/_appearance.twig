@@ -1,0 +1,130 @@
+{#
+    Appearance & preferences: how Renovo looks and behaves for one account.
+
+    One form. With script each change posts it (`hx-trigger="change"`) and the
+    answer is a `renovo:preferences` event naming what was saved, which app.js
+    puts on the root element — the page changes theme, palette or density
+    under the reader with nothing reloaded — and whose sentence lands in the
+    status line below, a live region. Without script there is one Save button,
+    and the redirect comes back to this section.
+
+    Theme, density and week start are few enough to show every option at once,
+    so they are segmented controls — radios, which is what the reader is told
+    they are. The palettes are drawn in their own colours, as a small picture of
+    the app — rail, page, an accent button: `data-swatch` scopes each one's
+    colours to its card, so the five can be compared while
+    the page wears one of them.
+
+    Language is drawn only once a second catalogue exists; a field that is not
+    drawn is not posted, and a preference that is not posted is left alone.
+#}
+<section class="card" id="appearance" aria-labelledby="appearance-heading">
+    <h2 id="appearance-heading">{{ t('profile.appearance_heading') }}</h2>
+
+    <form method="post" action="/profile/preferences" class="stack preferences-form"
+          hx-post="/profile/preferences" hx-trigger="change" hx-swap="none">
+        {{ csrf_field() }}
+
+        <div class="preference-grid">
+            <fieldset class="preference">
+                <legend>{{ t('settings.theme') }}</legend>
+                <div class="segmented">
+                    {% for theme in themes %}
+                        <label class="segmented-option">
+                            <input type="radio" name="theme" value="{{ theme.value }}"
+                                   {{ current_user.theme == theme.value ? 'checked' : '' }}>
+                            {{ t(theme.labelKey()) }}
+                        </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <fieldset class="preference">
+                <legend>{{ t('settings.density') }}</legend>
+                <div class="segmented">
+                    {% for option in densities %}
+                        <label class="segmented-option">
+                            <input type="radio" name="density" value="{{ option.value }}"
+                                   {{ current_user.density == option.value ? 'checked' : '' }}>
+                            {{ t(option.labelKey()) }}
+                        </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <fieldset class="preference">
+                <legend>{{ t('settings.week_start') }}</legend>
+                <div class="segmented">
+                    {% for day in week_starts %}
+                        <label class="segmented-option">
+                            <input type="radio" name="week_start" value="{{ day.value }}"
+                                   {{ current_user.weekStart == day.value ? 'checked' : '' }}>
+                            {{ t(day.labelKey()) }}
+                        </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+        </div>
+
+        <fieldset class="palette-picker">
+            <legend>{{ t('settings.palette') }}</legend>
+            <p class="hint">{{ t('settings.palette_hint') }}</p>
+
+            <div class="palette-options">
+                {% for palette in palettes %}
+                    <label class="palette-option" data-swatch="{{ palette.value }}">
+                        <input type="radio" name="palette" value="{{ palette.value }}"
+                               {{ current_user.palettePreference() == palette ? 'checked' : '' }}>
+                        <span class="palette-swatch" aria-hidden="true">
+                            <span class="palette-swatch-rail"></span>
+                            <span class="palette-swatch-page">
+                                <span class="palette-swatch-accent"></span>
+                                <span class="palette-swatch-muted"></span>
+                            </span>
+                        </span>
+                        <span class="palette-name">{{ t(palette.labelKey()) }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <div class="preference-grid">
+            {% if locale_choices is not empty %}
+                <div class="field">
+                    <label for="locale">{{ t('settings.language') }}</label>
+                    <select id="locale" name="locale">
+                        {# An empty value is a real choice: follow whatever the instance is set to. #}
+                        <option value="" {{ current_user.locale == '' ? 'selected' : '' }}>
+                            {{ t('settings.language_instance_default') }}
+                        </option>
+                        {% for code, name in locale_choices %}
+                            <option value="{{ code }}"
+                                    {{ current_user.locale == code ? 'selected' : '' }}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+
+            <div class="field">
+                <label for="landing_view">{{ t('settings.landing_view') }}</label>
+                <select id="landing_view" name="landing_view" aria-describedby="landing-view-hint">
+                    {% for view in landing_views %}
+                        <option value="{{ view.value }}"
+                                {{ current_user.landingView == view.value ? 'selected' : '' }}>
+                            {{ t(view.labelKey()) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <p class="hint" id="landing-view-hint">{{ t('settings.landing_view_hint') }}</p>
+            </div>
+        </div>
+
+        <p class="hint" role="status" data-preferences-status></p>
+
+        <noscript>
+            <div class="form-actions">
+                <button type="submit" class="button">{{ t('action.save') }}</button>
+            </div>
+        </noscript>
+    </form>
+</section>

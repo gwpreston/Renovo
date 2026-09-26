@@ -1,0 +1,30 @@
+{#
+    The month in three figures, each by the per-currency rule.
+
+    The heaviest day is compared in the base currency and shown in it; when a
+    day holds a currency with no rate it could be the heaviest, so the figure
+    is left out rather than naming another day in its place.
+#}
+{% import 'calendar/_figures.twig' as figures %}
+
+<section class="card calendar-summary" aria-labelledby="calendar-summary-heading">
+    <h2 id="calendar-summary-heading" class="visually-hidden">{{ t('calendar.summary') }}</h2>
+    <dl class="calendar-summary-list">
+        <div class="calendar-summary-item" data-summary="total">
+            <dt>{{ t('calendar.month_total') }}</dt>
+            <dd class="stat-value num">{{ figures.inline(calendar.totals) }}</dd>
+        </div>
+        <div class="calendar-summary-item" data-summary="count">
+            <dt>{{ t('calendar.charges') }}</dt>
+            <dd class="stat-value num">{{ calendar.count }}</dd>
+        </div>
+        {% if calendar.heaviest %}
+            <div class="calendar-summary-item" data-summary="heaviest">
+                <dt>{{ t('calendar.heaviest_day') }}</dt>
+                <dd class="stat-value num">
+                    {{ calendar.heaviest.date|local_date('d MMM') }} · {{ calendar.heaviest.amount.amountMinor|money(calendar.heaviest.amount.currency) }}
+                </dd>
+            </div>
+        {% endif %}
+    </dl>
+</section>

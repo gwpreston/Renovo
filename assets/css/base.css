@@ -20,11 +20,8 @@
 }
 
 html {
-    /*
-     * Inter, at last. Phase 7 vendored the font and defined the token; this is
-     * the line that points the application at it.
-     */
-    font-family: var(--font-stack);
+    /* Plus Jakarta Sans for every word; figures take `.num` below. */
+    font-family: var(--font-text);
     -webkit-text-size-adjust: 100%;
 }
 
@@ -32,8 +29,9 @@ body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-size: 16px;
+    font-size: var(--size-body);
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
     font-weight: var(--weight-normal);
 }
 
@@ -50,23 +48,21 @@ h2,
 h3,
 h4 {
     margin: 0 0 0.5rem;
-    font-weight: var(--weight-semibold);
+    font-weight: var(--weight-bold);
     line-height: 1.25;
     text-wrap: balance;
 }
 
+/* The page title, then the section heading, then body-sized headings. */
 h1 {
-    font-size: 1.5rem;
+    font-size: var(--size-title);
 }
 
 h2 {
     font-size: var(--size-heading);
 }
 
-h3 {
-    font-size: 1.0625rem;
-}
-
+h3,
 h4 {
     font-size: var(--size-body);
 }
@@ -86,7 +82,12 @@ p:last-child {
  * calendar entries) turn it off for themselves.
  */
 a {
-    color: var(--accent);
+    /*
+     * `--accent-text`, never `--accent`: the accent is a fill colour, and the
+     * default emerald is 2.0:1 on white. Every palette defines a text shade
+     * of its accent that clears AA on the surfaces a link is read on.
+     */
+    color: var(--accent-text);
     text-decoration: underline;
     text-underline-offset: 0.15em;
 }
@@ -105,7 +106,7 @@ small {
 }
 
 code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-figures);
     font-size: 0.875em;
 }
 
@@ -129,38 +130,25 @@ dialog {
     margin: auto;
 }
 
-/* -------------------------------------------------------- tabular figures */
+/* ---------------------------------------------------------------- figures */
 
 /*
- * The reason the typeface is Inter.
+ * Every figure — an amount, a date in a table, a count, a KPI — is set in
+ * JetBrains Mono with tabular digits, and `.num` is the only rule that does
+ * it. A template marks a figure with the class; nothing else in the
+ * stylesheets names the figures face, so a screen added later cannot give one
+ * column of money a different face from the next by forgetting a selector.
  *
- * Proportional digits are different widths, so a column of amounts shifts left
- * and right as the values change and the decimal points stop lining up. In an
- * application that is read by scanning down columns of money that is a real
- * legibility cost, and `tabular-nums` is what removes it: every digit takes
- * the same advance width, so figures align without anything being padded.
- *
+ * Monospace digits are all the same width already; `tabular-nums` is stated
+ * anyway so a fallback face that is not monospace still lines a column up.
  * `font-variant-numeric` rather than `font-feature-settings: "tnum"`, which
- * would switch off every other feature in the font — Inter's subset also
- * carries `calt`, `frac`, `numr` and `dnom`, and the low-level property is
- * all-or-nothing about them.
+ * would switch off every other feature in the font along with it.
  *
- * Applied to figures and tables, and deliberately not to running prose: a
- * paragraph reads better with digits that fit their own shapes.
+ * Running prose keeps the text face, digits and all: a sentence reads better
+ * with numbers that match the words around them.
  */
-.table,
-.stat-value,
-.stat-unit,
-.kpi-value,
-.timeline-amount,
-.calendar-amount,
-.renewal-amount,
-.renewal-date,
-.renewal-days,
-.budget-header,
-.money,
-.tabular,
-code {
+.num {
+    font-family: var(--font-figures);
     font-variant-numeric: tabular-nums;
 }
 
@@ -187,9 +175,14 @@ canvas {
  * One focus treatment for everything that can take focus. Preflight removes
  * the browser's, and a page with no visible focus ring is unusable from a
  * keyboard.
+ *
+ * `--focus-ring` rather than `--accent`: a ring is a graphical object held to
+ * 3:1, and the light palettes' accents are fill colours that do not reach it
+ * on white. The token is the accent's text shade in light and the accent
+ * itself in dark, and the contrast test holds it to 3:1 on every surface.
  */
 :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
     border-radius: 2px;
 }

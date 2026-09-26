@@ -51,6 +51,16 @@ final class PriceHistoryRepository extends AbstractScopedRepository
             . ' AND split.' . $this->quote('user_id') . ' = :__participant)';
     }
 
+    /**
+     * Hidden with its subscription when that is private to somebody else. The
+     * row carries a copy of the owner but not of the visibility, so it asks
+     * the parent — see `AbstractScopedRepository::privateParentPredicate()`.
+     */
+    protected function privacyPredicate(string $viewerParam, bool $qualified): string
+    {
+        return $this->privateParentPredicate($viewerParam, $qualified);
+    }
+
     protected function filterableColumns(): array
     {
         return [

@@ -60,6 +60,7 @@ use App\Notification\NotifierRegistry;
 use App\Service\ExchangeRateService;
 use App\Service\InstanceSettingsService;
 use App\Service\Notification\AlertScanner;
+use App\Service\Notification\PriceChangeScanner;
 use App\Service\Notification\NotificationDispatcher;
 use App\Service\Notification\NotificationRateLimiter;
 use App\Service\Notification\ReminderRunner;
@@ -72,12 +73,14 @@ use App\Service\HouseholdMemberService;
 use App\Service\BackupService;
 use App\Service\ImportService;
 use App\Service\LogoStorage;
+use App\Service\SettingsScreenService;
 use App\Service\SetupService;
 use App\Service\MailerService;
 use App\Service\PasswordResetService;
 use App\Service\RateLimiter;
 use App\Support\AssetVersion;
 use App\Support\BuildManifest;
+use App\Support\IconSprite;
 use App\Support\ExternalAssetScanner;
 use App\Support\Clock;
 use App\Support\MoneyFormatter;
@@ -126,6 +129,7 @@ return static function (ContainerBuilder $builder, array $settings): void {
         PdoSessionHandler::class => static fn (ContainerInterface $c): PdoSessionHandler => new PdoSessionHandler(
             $c->get(Database::class),
             $c->get('settings')['session']['lifetime'],
+            $c->get('settings')['session']['browser_lifetime'],
         ),
 
         // ------------------------------------------------------------------
@@ -240,6 +244,19 @@ return static function (ContainerBuilder $builder, array $settings): void {
         // The links in a notification have to be absolute: the message is read
         // somewhere that has no idea what host the application is on.
         AlertScanner::class => autowire()->constructorParameter(
+            'appUrl',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
+
+        PriceChangeScanner::class => autowire()->constructorParameter(
+            'appUrl',
+            factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
+        ),
+
+        // The feed's address is pasted into a calendar app elsewhere, so it is
+        // built from APP_URL rather than from whatever host this request came
+        // in on — behind a TLS-terminating proxy that would be the inside one.
+        \App\Controller\CalendarController::class => autowire()->constructorParameter(
             'appUrl',
             factory(static fn (ContainerInterface $c): string => $c->get('settings')['app']['url']),
         ),
@@ -373,6 +390,31 @@ return static function (ContainerBuilder $builder, array $settings): void {
                 factory(static fn (ContainerInterface $c): string => $c->get('settings')['mail']['from_address']),
             ),
 
+        // The Instance tab reports the mail relay and the metrics endpoint as
+        // the environment configures them: read-only, and never the password
+        // or the token themselves.
+        SettingsScreenService::class => autowire()
+            ->constructorParameter(
+                'smtpHost',
+                factory(static fn (ContainerInterface $c): string => $c->get('settings')['mail']['host']),
+            )
+            ->constructorParameter(
+                'smtpPort',
+                factory(static fn (ContainerInterface $c): int => $c->get('settings')['mail']['port']),
+            )
+            ->constructorParameter(
+                'smtpEncryption',
+                factory(static fn (ContainerInterface $c): string => $c->get('settings')['mail']['encryption']),
+            )
+            ->constructorParameter(
+                'smtpAuthenticates',
+                factory(static fn (ContainerInterface $c): bool => $c->get('settings')['mail']['user'] !== ''),
+            )
+            ->constructorParameter(
+                'metricsEnabled',
+                factory(static fn (ContainerInterface $c): bool => $c->get('settings')['metrics']['token'] !== ''),
+            ),
+
         LogoStorage::class => static function (ContainerInterface $c): LogoStorage {
             $uploads = $c->get('settings')['uploads'];
 
@@ -449,6 +491,16 @@ return static function (ContainerBuilder $builder, array $settings): void {
         // vendored htmx that it does not.
         BuildManifest::class => static fn (ContainerInterface $c): BuildManifest => new BuildManifest(
             $c->get('settings')['paths']['build_manifest'],
+        ),
+
+        // The sprite the same build emits. Strict outside production, so an
+        // icon name nobody added to `assets/theme/icons.json` fails the page
+        // that uses it in development and in the tests, where someone will
+        // see it, rather than drawing nothing in front of a user.
+        IconSprite::class => static fn (ContainerInterface $c): IconSprite => new IconSprite(
+            $c->get('settings')['paths']['build'] . '/icons.json',
+            $c->get('settings')['app']['env'] !== 'production',
+            $c->get(LoggerInterface::class),
         ),
 
         ExternalAssetScanner::class => static fn (ContainerInterface $c): ExternalAssetScanner

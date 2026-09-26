@@ -1,0 +1,21 @@
+{#
+    Which household this is, how many people are in it, and what you are in it.
+
+    A label, not a control: no chevron and no menu, because there is one
+    household per session and nothing to switch to (decision 16). Drawn in the
+    rail and again at the top of the narrow screen's More sheet.
+
+    `household`  a HouseholdLabel
+#}
+<div class="household-label">
+    {{ icon('home', 'household-label-icon') }}
+    <div class="household-label-text">
+        <p class="household-label-name">{{ household.name }}</p>
+        <p class="household-label-meta">
+            {{ t('shell.household_meta', {
+                'count': household.memberCount,
+                'role': t(household.role.labelKey())
+            }) }}
+        </p>
+    </div>
+</div>

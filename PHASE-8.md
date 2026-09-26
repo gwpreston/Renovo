@@ -50,6 +50,15 @@ clients, not for this interface.
 
 ## The colour system — reconciled with the brand
 
+> **Superseded by Phase 18** where the two conflict. Brand, primary and active
+> are a flat **accent** per palette (emerald by default), not the logo
+> gradient; the gradient lives on the mark only. Amber is `--warn` and nothing
+> else. Dark surfaces are navy-slate (`#0B1422` page, `#111D2E` card), not
+> near-black. Cards are 12px, modals 14px, controls 8–10px, badges pill.
+> Colours are authored once in `assets/theme/tokens.json` (five palettes, each
+> light and dark). This phase's delivery-model and data-reconciliation
+> decisions still stand.
+
 The design mock specified an amber accent. The actual logo is a **teal-green →
 blue gradient** mark with a navy wordmark. An amber accent beside a green-and-blue
 logo reads as two brands in one window, so the palette is reconciled to the logo
@@ -86,6 +95,11 @@ fixed as tokens, so every gradient in the app is the same two colours as the mar
 rather than an approximation.
 
 ## Typography — Inter, and why
+
+> **Superseded by Phase 18.** Text is **Plus Jakarta Sans**; every figure is
+> **JetBrains Mono** with tabular digits, applied only through the `.num`
+> utility. The type scale is 22px KPI, 18px page title, 16px section heading,
+> 14px body (13px dense), 12px label, 11px caption — nothing smaller.
 
 The typeface is **Inter**, self-hosted as a variable font by Phase 7. It is a
 deliberate choice rather than the mock's default, and the deciding reason is

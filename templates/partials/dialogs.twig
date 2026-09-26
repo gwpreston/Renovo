@@ -4,11 +4,16 @@
     rather than ours.
 #}
 {% if can(scope, 'subscription.create') %}
-    <dialog id="quick-add" class="dialog" aria-labelledby="quick-add-title">
+    <dialog id="quick-add" class="dialog dialog-sectioned dialog-wide" aria-labelledby="quick-add-title"
+            aria-describedby="quick-add-subtitle">
         <div class="dialog-header">
-            <h2 id="quick-add-title">{{ t('subscriptions.add_subscription') }}</h2>
+            <span class="dialog-mark">{{ icon('add-circle') }}</span>
+            <div class="dialog-heading">
+                <h2 id="quick-add-title">{{ t('subscriptions.add_subscription') }}</h2>
+                <p class="dialog-subtitle" id="quick-add-subtitle">{{ t('subtitle.subscription_form') }}</p>
+            </div>
             <button type="button" class="button-icon" data-closes-dialog="quick-add"
-                    aria-label="{{ t('action.close') }}">×</button>
+                    aria-label="{{ t('action.close') }}">{{ icon('close') }}</button>
         </div>
 
         {#
@@ -16,7 +21,7 @@
             here is the same one the full page renders, so there is one
             definition of what a subscription needs.
         #}
-        <div class="dialog-body" data-quick-add-body data-url="/subscriptions/new">
+        <div class="dialog-body" data-dialog-body data-url="/subscriptions/new">
             <p class="muted">{{ t('quick_add.loading') }}</p>
         </div>
     </dialog>

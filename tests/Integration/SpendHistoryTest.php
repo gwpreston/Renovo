@@ -16,6 +16,7 @@ use App\Repository\HouseholdRepository;
 use App\Repository\InstanceSettingsRepository;
 use App\Repository\MembershipRepository;
 use App\Repository\PriceHistoryRepository;
+use App\Repository\SplitRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TagRepository;
 use App\Repository\UserRepository;
@@ -24,9 +25,12 @@ use App\Service\CatchUpService;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\ExchangeRate\FrankfurterProvider;
 use App\Service\ExchangeRateService;
+use App\Service\ForecastService;
 use App\Service\InstanceSettingsService;
 use App\Service\PriceHistoryService;
 use App\Service\SpendChartService;
+use App\Service\SpendHistoryService;
+use App\Service\SplitService;
 use App\Service\StatsService;
 use App\Service\SubscriptionService;
 use App\Service\TrialService;
@@ -60,7 +64,9 @@ final class SpendHistoryTest extends DatabaseTestCase
     private SubscriptionRepository $subscriptions;
     private PriceHistoryService $priceHistory;
     private StatsService $stats;
+    private SpendHistoryService $history;
     private SpendChartService $chart;
+    private ForecastService $forecast;
 
     private int $alice;
     private int $household;
@@ -136,12 +142,34 @@ final class SpendHistoryTest extends DatabaseTestCase
             $catchUp,
             $rates,
             $settings,
+            $clock,
+        );
+
+        $splits = new SplitService(new SplitRepository($this->db), $this->subscriptions, $memberships, $this->db);
+
+        $this->history = new SpendHistoryService(
+            $subscriptionService,
             $historyRepository,
+            $splits,
+            $this->stats,
+            $rates,
+            $settings,
+            $clock,
+        );
+
+        $this->forecast = new ForecastService(
+            $subscriptionService,
+            $historyRepository,
+            $splits,
+            $rates,
+            $settings,
             $clock,
         );
 
         $this->chart = new SpendChartService(
             $this->stats,
+            $this->history,
+            $this->forecast,
             $settings,
             new MoneyFormatter(new LocaleContext('en_GB')),
             new DateFormatter(new LocaleContext('en_GB')),
@@ -151,7 +179,7 @@ final class SpendHistoryTest extends DatabaseTestCase
 
     public function testTheWindowIsTwelveCalendarMonthsEndingWithThisOne(): void
     {
-        $months = $this->stats->monthlyHistory($this->scope());
+        $months = $this->history->monthly($this->scope());
 
         self::assertCount(12, $months);
         self::assertSame('2025-07', $months[0]['month']);
@@ -164,7 +192,7 @@ final class SpendHistoryTest extends DatabaseTestCase
         // charge has already been taken: twelve of them, one per bucket.
         $this->createMonthly('Streaming', 1000, '2023-06-15');
 
-        $months = $this->stats->monthlyHistory($this->scope());
+        $months = $this->history->monthly($this->scope());
 
         self::assertSame(
             array_fill(0, 12, 1000),
@@ -188,7 +216,7 @@ final class SpendHistoryTest extends DatabaseTestCase
             'is_active' => true,
         ], []);
 
-        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         self::assertSame(12000, $byMonth['2026-03']);
         self::assertSame(0, $byMonth['2026-02']);
@@ -219,21 +247,33 @@ final class SpendHistoryTest extends DatabaseTestCase
             new DateTimeImmutable('2026-01-01'),
         );
 
-        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         self::assertSame(1000, $byMonth['2025-12']);
         self::assertSame(2000, $byMonth['2026-01']);
     }
 
-    public function testACancelledSubscriptionStillCountsForTheMonthsItRan(): void
+    public function testAPausedSubscriptionStillCountsForTheMonthsItRan(): void
     {
         // The money was spent. Dropping it would make the months before a
         // cancellation look cheaper in hindsight than they were.
-        $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false);
+        $this->createMonthly('Paused', 1000, '2023-06-15', isActive: false);
 
-        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         self::assertSame(1000, $byMonth['2025-09']);
+    }
+
+    public function testACancelledSubscriptionStopsInTheMonthItWasCancelled(): void
+    {
+        // Cancelled on 10 February, before that month's charge on the 15th.
+        $this->createMonthly('Cancelled', 1000, '2023-06-15', isActive: false, cancelledAt: '2026-02-10');
+
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
+
+        self::assertSame(1000, $byMonth['2026-01']);
+        self::assertSame(0, $byMonth['2026-02']);
+        self::assertSame(0, $byMonth['2026-05']);
     }
 
     public function testASubscriptionWithNoStartDateContributesNothing(): void
@@ -256,7 +296,7 @@ final class SpendHistoryTest extends DatabaseTestCase
             array_fill(0, 12, 0),
             array_map(
                 static fn (array $month): ?int => $month['combined_minor'],
-                $this->stats->monthlyHistory($this->scope()),
+                $this->history->monthly($this->scope()),
             ),
         );
     }
@@ -266,82 +306,136 @@ final class SpendHistoryTest extends DatabaseTestCase
         $this->createMonthly('Sterling', 1000, '2023-06-15');
         $this->createMonthly('Exotic', 5000, '2023-06-15', currency: 'XOF');
 
-        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
+        $charts = [$this->chart->window($this->scope(), 12, 12), $this->chart->yearAgainstYear($this->scope())];
 
-        self::assertFalse($chart['is_drawable']);
-        self::assertSame(['XOF'], $chart['unconvertible']);
-    }
-
-    /**
-     * The property that separates this chart from the forecast, and the reason
-     * the payload names the bucket rather than leaving it to be found: the part
-     * month is the *last* one, because the window ends today rather than at the
-     * end of the month.
-     */
-    public function testThePartMonthIsTheLastOneNotTheFirst(): void
-    {
-        $this->createMonthly('Streaming', 1000, '2023-06-15');
-
-        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
-
-        self::assertSame(11, $chart['partial_index']);
-        self::assertFalse($chart['months'][0]['is_partial']);
-        self::assertTrue($chart['months'][11]['is_partial']);
-    }
-
-    /**
-     * A trial in the past either converted — in which case its charges are in
-     * these months as themselves — or cost nothing. Either way there is no
-     * second line to draw, and the legend and the table's third column go with
-     * it.
-     */
-    public function testThereIsNoTrialLineOnAChartOfThePast(): void
-    {
-        $this->createMonthly('Streaming', 1000, '2023-06-15');
-        $this->subscriptions->create($this->scope(), [
-            'name' => 'Trial',
-            'price_minor' => 0,
-            'currency' => 'GBP',
-            'subscription_type' => 'recurring',
-            'billing_cycle' => 'monthly',
-            'next_payment_date' => '2026-07-01',
-            'start_date' => '2026-06-01',
-            'anchor_day' => 1,
-            'is_active' => true,
-            'is_trial' => true,
-            'trial_end_date' => '2026-06-30',
-            'converts_to_price_minor' => 1500,
-        ], []);
-
-        $chart = $this->chart->fromHistory($this->stats->monthlyHistory($this->scope()));
-
-        self::assertFalse($chart['has_trials']);
-        foreach ($chart['months'] as $month) {
-            self::assertSame($month['minor'], $month['committed_minor']);
-            self::assertSame(0, $month['trial_minor']);
+        foreach ($charts as $chart) {
+            self::assertFalse($chart['is_drawable']);
+            self::assertSame(['XOF'], $chart['unconvertible']);
         }
     }
 
     /**
-     * The forecast is untouched by any of this. Its part month is still its
-     * first, which is the assertion that would fail if the shared builder were
-     * ever given the history's rule by default.
+     * The window's halves are the two services' own months: the past is the
+     * reconstruction ending yesterday, the future the forecast from today, and
+     * this month is the one bar holding a part of each.
      */
-    public function testTheForecastStillTreatsItsOpeningMonthAsThePartOne(): void
+    public function testTheWindowIsTheReconstructionThenTheForecast(): void
     {
-        $chart = $this->chart->fromMonths($this->stats->monthlyHistory($this->scope()));
+        $this->createMonthly('Streaming', 1000, '2023-06-01');
+        $this->createMonthly('Undated', 700, '2023-06-01');
+        $this->db->execute('UPDATE subscriptions SET start_date = NULL WHERE name = :name', ['name' => 'Undated']);
 
-        self::assertSame(0, $chart['partial_index']);
+        $chart = $this->chart->window($this->scope(), 12, 12);
+        $past = $this->history->history($this->scope(), 13, new DateTimeImmutable('2026-06-14'));
+        $future = $this->forecast->monthly($this->scope(), 13);
+
+        self::assertCount(25, $chart['bars']);
+        self::assertSame('2025-06', $chart['bars'][0]['key']);
+        self::assertSame('2026-06', $chart['bars'][12]['key']);
+        self::assertSame('current', $chart['bars'][12]['kind']);
+        self::assertSame('2027-06', $chart['bars'][24]['key']);
+
+        foreach ($chart['bars'] as $index => $bar) {
+            self::assertSame($index <= 12 ? $past['months'][$index]['combined_minor'] : 0, $bar['charged_minor']);
+            self::assertSame($index >= 12 ? $future[$index - 12]['combined_minor'] : 0, $bar['due_minor']);
+        }
+
+        self::assertSame(1, $chart['excluded_count']);
+    }
+
+    /**
+     * Last January to this month from the reconstruction, the rest of the year
+     * from the forecast — this month holding both, as it does on the window.
+     */
+    public function testThisYearAgainstLastIsTheReconstructionAndTheForecastByCalendarMonth(): void
+    {
+        $this->createMonthly('Streaming', 1000, '2024-03-01');
+
+        $chart = $this->chart->yearAgainstYear($this->scope());
+        $past = $this->history->history($this->scope(), 18, new DateTimeImmutable('2026-06-14'));
+        $future = $this->forecast->monthly($this->scope(), 7);
+
+        self::assertSame(2026, $chart['year']);
+        self::assertSame(2025, $chart['previous_year']);
+        self::assertCount(12, $chart['months']);
+        self::assertSame('2025-01', $past['months'][0]['month']);
+
+        foreach ($chart['months'] as $index => $month) {
+            self::assertSame($past['months'][$index]['combined_minor'], $month['previous_minor'], 'month ' . $index);
+            self::assertSame($index <= 5 ? $past['months'][12 + $index]['combined_minor'] : 0, $month['charged_minor']);
+            self::assertSame($index >= 5 ? $future[$index - 5]['combined_minor'] : 0, $month['due_minor']);
+        }
+
+        self::assertSame('past', $chart['months'][4]['kind']);
+        self::assertSame('current', $chart['months'][5]['kind']);
+        self::assertSame('future', $chart['months'][6]['kind']);
+        // Every month of last year had its charge on the 1st.
+        self::assertSame(array_fill(0, 12, 1000), array_column($chart['months'], 'previous_minor'));
+    }
+
+    public function testSpentTotalsTheChargesInItsWindowAndCountsWhatItLeftOut(): void
+    {
+        $this->createMonthly('Streaming', 1000, '2023-06-01');
+        $this->createMonthly('Euro', 1200, '2023-06-01', currency: 'EUR');
+        $this->createMonthly('Undated', 700, '2023-06-01');
+        $this->db->execute('UPDATE subscriptions SET start_date = NULL WHERE name = :name', ['name' => 'Undated']);
+
+        // 1 January to yesterday: the charges on the 1st of each of six months.
+        $spent = $this->history->spent(
+            $this->scope(),
+            new DateTimeImmutable('2025-12-31'),
+            new DateTimeImmutable('2026-06-14'),
+        );
+
+        self::assertSame(['EUR' => 7200, 'GBP' => 6000], $spent['by_currency']);
+        // €72.00 at 1.20 is £60.00.
+        self::assertSame(12000, $spent['combined']['amount_minor']);
+        self::assertSame(1, $spent['excluded_count']);
     }
 
     public function testSpendInAnotherCurrencyIsConvertedIntoTheBaseOne(): void
     {
         $this->createMonthly('Euro', 1200, '2023-06-15', currency: 'EUR');
 
-        $byMonth = $this->byMonth($this->stats->monthlyHistory($this->scope()));
+        $byMonth = $this->byMonth($this->history->monthly($this->scope()));
 
         // €12.00 at 1.20 is £10.00.
         self::assertSame(1000, $byMonth['2026-02']);
+    }
+
+    /**
+     * The months per category are one walk grouped, not a second
+     * reconstruction: each category carries its own name and colour, the
+     * uncategorised sit under `0`, and the sets add up to `history()` month
+     * by month.
+     */
+    public function testTheMonthsByCategoryPartitionTheHistory(): void
+    {
+        $streaming = (new CategoryRepository($this->db))->create($this->scope(), 'Streaming', '#aa3366');
+        $films = $this->createMonthly('Films', 1000, '2023-06-15');
+        $this->db->execute('UPDATE subscriptions SET category_id = :category WHERE id = :id', [
+            'category' => $streaming,
+            'id' => $films,
+        ]);
+        $this->createMonthly('Gym', 2500, '2026-01-15');
+
+        $grouped = $this->history->historyByCategory($this->scope());
+
+        self::assertSame(['Streaming', null], [
+            $grouped['categories'][$streaming]['name'],
+            $grouped['categories'][0]['name'],
+        ]);
+        self::assertSame('#aa3366', $grouped['categories'][$streaming]['colour']);
+
+        $total = $this->byMonth($this->history->monthly($this->scope()));
+        $streamingMonths = $this->byMonth($grouped['categories'][$streaming]['months']);
+        $uncategorised = $this->byMonth($grouped['categories'][0]['months']);
+        foreach ($total as $month => $amount) {
+            self::assertSame($amount, $streamingMonths[$month] + $uncategorised[$month], $month);
+        }
+        self::assertSame(1000, $streamingMonths['2025-07']);
+        self::assertSame(0, $uncategorised['2025-07']);
+        self::assertSame(2500, $uncategorised['2026-06']);
     }
 
     /**
@@ -368,6 +462,7 @@ final class SpendHistoryTest extends DatabaseTestCase
         string $startDate,
         string $currency = 'GBP',
         bool $isActive = true,
+        ?string $cancelledAt = null,
     ): int {
         return $this->subscriptions->create($this->scope(), [
             'name' => $name,
@@ -379,6 +474,7 @@ final class SpendHistoryTest extends DatabaseTestCase
             'start_date' => $startDate,
             'anchor_day' => (int) (new DateTimeImmutable($startDate))->format('j'),
             'is_active' => $isActive,
+            'cancelled_at' => $cancelledAt,
         ], []);
     }
 

@@ -5,28 +5,31 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\Domain\DashboardCard;
+use App\Domain\DashboardView;
 use PHPUnit\Framework\TestCase;
 
 /**
  * The dashboard's cards, as a contract rather than as a convention.
  *
- * A card is an enum case, a template and a label. Adding one and forgetting
- * either of the other two fails here rather than on the page — the template
- * with a fatal Twig error, the label with a raw translation key printed in the
- * settings form where its name should be.
+ * A card is an enum case, a view, a template and a label. Adding one and
+ * forgetting any of the others fails here rather than on the page — the
+ * template with a fatal Twig error, the label with a raw translation key
+ * printed in the settings form where its name should be.
  */
 final class DashboardCardTest extends TestCase
 {
-    public function testEveryCardHasATemplate(): void
+    public function testEveryCardHasATemplateUnderItsView(): void
     {
         foreach (DashboardCard::cases() as $card) {
-            $path = dirname(__DIR__, 2) . '/templates/dashboard/cards/' . $card->value . '.twig';
-
-            self::assertFileExists($path, $card->value . ' has no template');
+            self::assertStringStartsWith('dashboard/cards/' . $card->view()->value . '/', $card->template());
+            self::assertFileExists(
+                dirname(__DIR__, 2) . '/templates/' . $card->template(),
+                $card->value . ' has no template',
+            );
         }
     }
 
-    public function testEveryCardHasALabel(): void
+    public function testEveryCardAndViewHasALabel(): void
     {
         /** @var array<string, string> $catalogue */
         $catalogue = require dirname(__DIR__, 2) . '/translations/en.php';
@@ -34,145 +37,101 @@ final class DashboardCardTest extends TestCase
         foreach (DashboardCard::cases() as $card) {
             self::assertArrayHasKey($card->labelKey(), $catalogue, $card->value . ' has no label');
         }
+
+        foreach (DashboardView::cases() as $view) {
+            self::assertArrayHasKey($view->labelKey(), $catalogue, $view->value . ' has no label');
+        }
     }
 
     /**
-     * The grid is six columns, and the stylesheet has a class for each span
-     * the design actually uses. A span inside the grid but without a class —
-     * five, say — would not fail on width; it would silently fall through to
-     * the full-width default, which is why this asserts the set rather than a
-     * range.
+     * The grid is six columns, and the stylesheet has a class for each span a
+     * card asks for — columns and rows. A span without a class would not fail
+     * on width; it would silently fall through to the full-width default,
+     * which is why this asserts the set rather than a range.
      */
     public function testEverySpanHasAClassInTheStylesheet(): void
     {
         $css = (string) file_get_contents(dirname(__DIR__, 2) . '/assets/css/screens.css');
 
         foreach (DashboardCard::cases() as $card) {
-            self::assertStringContainsString(
-                '.bento-span-' . $card->columnSpan() . ' {',
-                $css,
-                $card->value . ' asks for a span the stylesheet does not define',
-            );
+            self::assertStringContainsString('.bento-span-' . $card->columnSpan() . ' {', $css, $card->value);
+
+            if ($card->rowSpan() > 1) {
+                self::assertStringContainsString('.bento-rows-' . $card->rowSpan() . ' {', $css, $card->value);
+            }
+        }
+    }
+
+    public function testEachViewHasTheCardsThePhaseNames(): void
+    {
+        self::assertSame(
+            ['totals', 'spend_chart', 'where_it_goes', 'coming_up', 'budgets', 'free_trials', 'price_change', 'recent'],
+            $this->keys(DashboardCard::defaultOrder(DashboardView::Overview)),
+        );
+        self::assertSame(
+            ['month_so_far', 'next_30_days', 'who_pays', 'spend_trend', 'by_category', 'budget_pace'],
+            $this->keys(DashboardCard::defaultOrder(DashboardView::Household)),
+        );
+    }
+
+    /**
+     * The subscriptions table is the Subscriptions page's own subject, so on
+     * the dashboard it is offered and off; everything else is on.
+     */
+    public function testOnlyTheSubscriptionsTableIsHiddenByDefault(): void
+    {
+        foreach (DashboardCard::cases() as $card) {
+            self::assertSame($card !== DashboardCard::Recent, $card->visibleByDefault(), $card->value);
         }
     }
 
     /**
-     * The design's split middle section: the chart and the usage widget are a
-     * row between them, which is the whole reason a card declares a span.
-     *
-     * Asserted as a sum rather than as two numbers because that is the claim —
-     * either card could be widened as long as the other gave the width back,
-     * and a row that adds up to seven silently becomes two rows.
+     * The prototype's rows: the chart beside the donut, Coming up beside the
+     * three narrow cards stacked in the column next to it, Who pays on a row of
+     * its own (it lays out a card per member inside), and Spend over time
+     * beside By category. Asserted as sums because that is the claim — a row that adds
+     * up to seven silently becomes two rows.
      */
-    public function testTheChartAndTheUsageWidgetShareARow(): void
+    public function testTheDefaultRowsAddUpToTheGrid(): void
     {
-        self::assertSame(
-            6,
-            DashboardCard::SpendHistory->columnSpan() + DashboardCard::BudgetUsage->columnSpan(),
-        );
-    }
+        self::assertSame(6, DashboardCard::SpendChart->columnSpan() + DashboardCard::WhereItGoes->columnSpan());
+        self::assertSame(6, DashboardCard::WhoPays->columnSpan());
+        self::assertSame(6, DashboardCard::SpendTrend->columnSpan() + DashboardCard::ByCategory->columnSpan());
 
-    /**
-     * A row is only a row where the two cards are next to each other, so the
-     * default order has to put them there. This is the assertion that fails if
-     * a card is ever inserted between the chart and the widget it shares its
-     * width with.
-     */
-    public function testTheDefaultOrderPutsTheUsageWidgetBesideTheChart(): void
-    {
-        $order = DashboardCard::defaultOrder();
-
-        self::assertSame(
-            array_search(DashboardCard::SpendHistory, $order, true) + 1,
-            array_search(DashboardCard::BudgetUsage, $order, true),
-            'budget_usage does not directly follow spend_history',
-        );
-    }
-
-    /**
-     * Every row of the default arrangement adds up to the full six.
-     *
-     * The spans are what make the rows, and with one chart rather than two
-     * they only tile if Trials is full width — 6, then 4 + 2, then 6, then
-     * 3 + 3. Narrow it again without giving it a partner and the grid gains a
-     * hole that nothing in the CSS or the enum would complain about, which is
-     * exactly the kind of wrong that ships.
-     */
-    public function testTheDefaultOrderTilesIntoWholeRows(): void
-    {
-        $row = 0;
-
-        foreach (DashboardCard::defaultOrder() as $card) {
-            $row += $card->columnSpan();
-
-            self::assertLessThanOrEqual(6, $row, 'the row holding ' . $card->value . ' overflows the grid');
-
-            $row %= 6;
+        $beside = [DashboardCard::Budgets, DashboardCard::FreeTrials, DashboardCard::PriceChange];
+        self::assertCount(DashboardCard::ComingUp->rowSpan(), $beside);
+        foreach ($beside as $card) {
+            self::assertSame(6, DashboardCard::ComingUp->columnSpan() + $card->columnSpan(), $card->value);
         }
-
-        self::assertSame(0, $row, 'the last row of the default arrangement is unfinished');
-    }
-
-    /**
-     * The second split row: the renewals list and the category table are half
-     * the grid each. This is the assertion that would fail if the grid went
-     * back to three columns, where there is no half to give them.
-     */
-    public function testComingSoonAndByCategoryShareARow(): void
-    {
-        self::assertSame(
-            3,
-            DashboardCard::Upcoming->columnSpan(),
-            'Coming soon should be half the grid',
-        );
-        self::assertSame(
-            3,
-            DashboardCard::ByCategory->columnSpan(),
-            'By category should be half the grid',
-        );
     }
 
     /**
      * The stored layout is keyed by these strings. Renaming one orphans every
-     * row in `dashboard_cards` that holds it, and the account that arranged it
-     * silently loses the card.
+     * row in `dashboard_cards` that holds it.
      *
-     * `spend_history` took the slot `spend_chart` held, and `trials` is a
-     * full-width callout again now that the chart it sat beside has gone. The
-     * order is a default, so an account that has already arranged its
-     * dashboard keeps its own — `DashboardLayoutService`'s rule, and the
-     * reason moving a case here is a change of first impression rather than a
-     * change to anybody's saved screen.
-     *
-     * `member_shares` is last because it is newest: appending is what lets an
-     * account that has already arranged its dashboard keep its arrangement and
-     * find the new tile at the bottom, rather than have the redesign shuffle
-     * the screen it chose.
-     *
-     * `per_period`, `recent` and now `spend_chart` are deliberately absent:
-     * each tile was removed because another screen is the same subject's home
-     * — the Analytics page for the four per-period figures and for the year
-     * ahead, the Subscriptions page for the list — and rows still naming them
-     * are passed over rather than migrated away.
+     * Phase 21 cleared every saved layout when it replaced the card set, so
+     * the keys below start with no rows behind them; from here on they are a
+     * data format again. `spend_chart` returns as a new card safely because
+     * the reset removed the rows that named the old one.
      */
     public function testTheStoredKeysAreUnchanged(): void
     {
         self::assertSame(
-            ['totals', 'spend_history', 'budget_usage', 'trials', 'upcoming', 'by_category', 'member_shares'],
-            array_map(static fn (DashboardCard $card): string => $card->value, DashboardCard::cases()),
+            [
+                'totals', 'spend_chart', 'where_it_goes', 'coming_up', 'budgets', 'free_trials', 'price_change',
+                'recent', 'month_so_far', 'next_30_days', 'who_pays', 'spend_trend', 'by_category',
+                'budget_pace',
+            ],
+            $this->keys(DashboardCard::cases()),
         );
     }
 
     /**
-     * A card that left is a key that must never come back as something else.
-     *
-     * `spend_chart` rows are still in `dashboard_cards` on any instance whose
-     * users had arranged their dashboard, and they are passed over because no
-     * case answers to the string. Re-using it for a different card would hand
-     * those accounts a tile they never chose, in a position they did choose.
+     * @param list<DashboardCard> $cards
+     * @return list<string>
      */
-    public function testARetiredKeyIsNotReused(): void
+    private function keys(array $cards): array
     {
-        self::assertNull(DashboardCard::tryFromString('spend_chart'));
+        return array_map(static fn (DashboardCard $card): string => $card->value, $cards);
     }
 }

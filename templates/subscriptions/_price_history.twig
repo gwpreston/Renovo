@@ -1,0 +1,76 @@
+{#
+    A subscription's price history, newest first: every recorded price and
+    every scheduled one, with the step from the one before it. Shared by the
+    edit page, where `editable` adds the schedule-a-change form, and the cost
+    page, which is the read-only view. `return_to` says which of the two the
+    schedule form comes back to.
+#}
+<section class="card price-history" aria-labelledby="price-history-heading">
+    <h2 id="price-history-heading">{{ t('subscriptions_money.price_history') }}</h2>
+    <p class="muted">{{ t('subscriptions_money.history_note') }}</p>
+
+    {% if trend is empty %}
+        <p class="muted empty">{{ t('subscriptions_money.history_empty') }}</p>
+    {% else %}
+        <ol class="price-timeline">
+            {% for entry in trend|reverse %}
+                <li class="{{ entry.is_scheduled ? 'is-scheduled' : '' }}">
+                    <div class="price-timeline-date num">
+                        {{ entry.change.effectiveFrom|local_date('d MMM y') }}
+                        {% if entry.is_scheduled %}
+                            <span class="badge badge-warn">{{ t('subscriptions_money.scheduled') }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="price-timeline-amount num">
+                        {{ entry.change.price.amountMinor|money(entry.change.price.currency) }}
+                        {% if entry.difference_minor is not null and entry.difference_minor != 0 %}
+                            <span class="{{ entry.difference_minor > 0 ? 'is-increase' : 'is-decrease' }}">
+                                {{ entry.difference_minor|money(entry.change.price.currency, true) }}
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="hint">
+                        {{ price_change_label(entry.change.source.value) }}
+                        {% if entry.change.note %} · {{ entry.change.note }}{% endif %}
+                        {% if entry.change.createdByName %} · {{ entry.change.createdByName }}{% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+
+    {% if editable %}
+        <form method="post" action="/subscriptions/{{ subscription.id }}/price-changes" class="stack">
+            {{ csrf_field() }}
+            <input type="hidden" name="return_to" value="{{ return_to }}">
+            <h3>{{ t('subscriptions_money.schedule_a_price_change') }}</h3>
+            <p class="muted">{{ t('subscriptions_money.schedule_note') }}</p>
+
+            <div class="field-grid">
+                <div class="field">
+                    <label for="scheduled_price">{{ t('subscriptions_money.new_price') }}</label>
+                    <div class="input-group">
+                        <input type="text" id="scheduled_price" name="price" inputmode="decimal"
+                               placeholder="{{ 12.99|decimal(2) }}" required>
+                        <select name="currency" aria-label="{{ t('field.currency') }}">
+                            <option value="{{ subscription.price.currency }}">{{ subscription.price.currency }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="effective_from">{{ t('subscriptions_money.starts_on') }}</label>
+                    <input type="date" id="effective_from" name="effective_from" required>
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="price_note">{{ t('subscriptions_money.note_optional') }}</label>
+                <input type="text" id="price_note" name="note" maxlength="255"
+                       placeholder="{{ t('subscriptions_money.price_note_placeholder') }}">
+            </div>
+
+            <button type="submit" class="button">{{ t('subscriptions_money.schedule_change') }}</button>
+        </form>
+    {% endif %}
+</section>

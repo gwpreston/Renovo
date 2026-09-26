@@ -4,44 +4,61 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\Currency;
 use App\Domain\Entity\Subscription;
+use App\Domain\Entity\SubscriptionSplit;
 use App\Domain\Money;
 use App\Domain\Permission;
+use App\Domain\SplitMode;
+use App\Domain\SubscriptionFilter;
+use App\Domain\SubscriptionStatus;
 use App\Security\PermissionService;
 use App\Security\Scope;
 use App\Support\Clock;
 use DateTimeImmutable;
+use InvalidArgumentException;
 
 /**
- * Everything on the my-subscriptions screen that is not the list itself.
+ * Everything on the my-subscriptions screen that the list's own query does not
+ * already answer.
  *
  * The counterpart to DashboardService, and built on the same principle: not one
- * figure here is computed for this screen. The strip is the statistics the
- * Statistics page reports, the expiring cards are the near-window renewals the
- * dashboard counts and the cancel-by deadlines that view is made of, the trials
- * are the trials the reminder run watches, and the widget is the category
- * distribution drawn against a stated total. Two screens showing different
- * answers to "what does this cost" is the failure this arrangement forbids.
+ * figure here is computed for this screen. The strip's counts are the statuses
+ * the list filters by and its monthly figure is the statistics service's own;
+ * the cancel-by card is `CancellationService`'s deadlines; the table's
+ * conversions are the exchange-rate service's; the summary line's total is the
+ * same per-currency rule applied to the rows the filter matched. Two screens
+ * showing different answers to "what does this cost" is the failure this
+ * arrangement forbids.
  *
  * **One near window.** Fourteen days, referenced from CancellationService
  * rather than re-declared, which is what makes "the same window the dashboard
- * uses" a fact about the code instead of a claim in a comment.
+ * uses" a fact about the code instead of a claim in a comment. It decides the
+ * "Renewing soon" badge, the "in N days" hint and which cancel-by dates the
+ * table mentions.
  *
- * @phpstan-type ExpiringRow array{
+ * @phpstan-type Figures array{
+ *     totals: list<array{currency: string, amount_minor: int}>,
+ *     combined: array{currency: string, amount_minor: int|null, unconvertible: list<string>}
+ * }
+ * @phpstan-type DeadlineRow array{
  *     subscription: Subscription,
  *     date: DateTimeImmutable,
  *     days: int,
  *     is_passed: bool,
- *     is_urgent: bool,
- *     can_act: bool
+ *     is_urgent: bool
  * }
- * @phpstan-type TrialRow array{
+ * @phpstan-type Phrase array{key: string, params: array<string, string|int>}
+ * @phpstan-type DatedPhrase array{key: string, params: array<string, string|int>, date: DateTimeImmutable|null}
+ * @phpstan-type ListRow array{
  *     subscription: Subscription,
- *     converts_on: DateTimeImmutable,
- *     days_left: int,
- *     is_urgent: bool,
- *     converts_to: Money,
- *     can_act: bool
+ *     badge: array{key: string, tone: string},
+ *     price_base: Money|null,
+ *     monthly: array{state: string, amount_minor: int|null, currency: string},
+ *     split: Phrase|null,
+ *     next: array{date: DateTimeImmutable|null, hint: DatedPhrase|null, is_near: bool},
+ *     can_update: bool,
+ *     can_delete: bool
  * }
  */
 final class SubscriptionScreenService
@@ -53,14 +70,16 @@ final class SubscriptionScreenService
         private readonly StatsService $stats,
         private readonly SubscriptionService $subscriptions,
         private readonly CancellationService $cancellations,
-        private readonly CategoryBreakdownService $breakdown,
+        private readonly SplitService $splits,
+        private readonly ExchangeRateService $rates,
+        private readonly InstanceSettingsService $settings,
         private readonly PermissionService $permissions,
         private readonly Clock $clock,
     ) {
     }
 
     /**
-     * The strip, the two expiring sections, the trials and the widget.
+     * The strip and the cancel-by card.
      *
      * Computed for a full page load and not for an htmx one: filtering, sorting
      * and paging replace the table, and recomputing the household's statistics
@@ -68,10 +87,8 @@ final class SubscriptionScreenService
      * same numbers that are already on the screen.
      *
      * @return array{
-     *     strip: array<string, mixed>,
-     *     expiring: array{days: int, renewing: list<ExpiringRow>, cancel_by: list<ExpiringRow>},
-     *     trials: array{rows: list<TrialRow>, totals: list<array{currency: string, total_minor: int, count: int}>},
-     *     category_spending: array<string, mixed>
+     *     strip: array{active: int, trials: int, paused: int, per_month: Figures},
+     *     cancel_by: array{days: int, rows: list<DeadlineRow>}
      * }
      */
     public function overview(Scope $scope): array
@@ -81,256 +98,336 @@ final class SubscriptionScreenService
         // page load would correct.
         $stats = $this->stats->dashboard($scope);
 
-        $soon = $this->subscriptions->upcoming($scope, self::NEAR_WINDOW_DAYS);
-        $trials = $this->subscriptions->trialsBeforeConversion($scope);
-
         return [
-            'strip' => $this->strip($stats, $soon, $this->subscriptions->paused($scope)),
-            'expiring' => $this->expiring($scope, $soon),
-            'trials' => $this->trials($scope, $trials),
-            // Not `categories`: the page already has a list of them for its
-            // filter, and a screen where one name means two things is a screen
-            // waiting to show the wrong one.
-            'category_spending' => $this->categories($stats),
+            'strip' => $this->strip($scope, $stats),
+            'cancel_by' => $this->cancelBy($scope),
         ];
     }
 
     /**
-     * The four figures across the top.
+     * The rows of one page of the table, with what each needs drawn beside it.
      *
-     * The yearly one keeps the per-currency rule the rest of the application
-     * follows — subtotals, with a combined figure only when every currency in
-     * play converts — so it is shaped exactly like the dashboard's spend tiles
-     * and rendered by the same partial. The design's single clean number is the
-     * common case rather than the only one; a headline that silently dropped a
-     * currency would be wrong rather than tidy.
-     *
-     * The paused figure is the count, and beside it what those subscriptions
-     * would cost over a year if they were all switched back on — which is the
-     * number that makes the card worth having, since "seven paused" answers
-     * nothing on its own. It is computed here rather than in SQL because a
-     * yearly figure is the billing cycle applied to the price. A lifetime or
-     * one-off purchase has no yearly cost at all and contributes nothing to it,
-     * exactly as it contributes nothing to the active yearly total.
-     *
-     * @param array<string, mixed> $stats
-     * @param list<Subscription>   $soon
-     * @param list<Subscription>   $paused
-     * @return array<string, mixed>
+     * @param list<Subscription> $subscriptions
+     * @return list<ListRow>
      */
-    private function strip(array $stats, array $soon, array $paused): array
+    public function rows(Scope $scope, array $subscriptions): array
     {
-        /** @var list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring */
-        $recurring = $stats['recurring'];
+        $base = $this->settings->baseCurrency();
+        $today = $this->clock->today();
+        $mayUpdate = $this->permissions->allows($scope, Permission::UpdateSubscription);
+        $mayDelete = $this->permissions->allows($scope, Permission::DeleteSubscription);
+        $participants = $subscriptions === [] ? [] : $this->splits->allInScope($scope);
 
-        return [
-            'active_count' => $stats['active_count'],
-            'yearly' => [
-                'totals' => array_map(
-                    static fn (array $row): array => [
-                        'currency' => $row['currency'],
-                        'amount_minor' => $row['yearly_minor'],
-                    ],
-                    $recurring,
-                ),
-                'combined' => $stats['combined_yearly'],
-            ],
-            'renewals' => [
-                'count' => count($soon),
-                'days' => self::NEAR_WINDOW_DAYS,
-                'total' => $this->stats->sumByCurrency($soon),
-            ],
-            'paused' => [
-                'count' => count($paused),
-                'yearly' => $this->pausedYearly($paused),
-            ],
-        ];
+        $rows = [];
+        foreach ($subscriptions as $subscription) {
+            $writable = $scope->mayWriteRow($subscription->householdId, $subscription->ownerUserId);
+            $next = $this->next($subscription, $today);
+
+            $rows[] = [
+                'subscription' => $subscription,
+                'badge' => $this->badge($subscription, $next['is_near']),
+                'price_base' => $subscription->price->currency === $base
+                    ? null
+                    : $this->rates->convert($subscription->price, $base),
+                'monthly' => $this->monthly($subscription, $base),
+                'split' => $this->splitNote($subscription, $participants[$subscription->id] ?? []),
+                'next' => $next,
+                'can_update' => $mayUpdate && $writable,
+                'can_delete' => $mayDelete && $writable,
+            ];
+        }
+
+        return $rows;
     }
 
     /**
-     * What the paused subscriptions would cost over a year, per currency.
+     * The line above the table: how many rows matched, out of how many are in
+     * the list at all, and what the matched ones cost a month.
      *
-     * Shaped like `renewals.total` rather than like the `yearly` figure, and
-     * rendered the same way: a count as the headline with the money as a muted
-     * line beneath it. Deliberately **not** put through `partials/spend.twig`,
-     * because that macro's job is to produce a single combined headline when
-     * every currency converts — and this figure has not earned a headline. It
-     * is a "what if you turned these back on", not a commitment, so per-currency
-     * subtotals are the honest presentation and a blended total would overstate
-     * what is actually known.
+     * The monthly figure is every matched row, not the page on screen — a
+     * total that changed as you paged would be a total of nothing in
+     * particular — and it is the per-currency rule again: subtotals, with a
+     * combined figure only when every currency in play converts. Only running
+     * rows count (a trial included, at whatever it costs during the trial),
+     * and only recurring ones: a one-off or a lifetime purchase has no monthly
+     * cost to add.
      *
-     * @param list<Subscription> $paused
-     * @return list<array{currency: string, total_minor: int, count: int}>
+     * @return array{matched: int, of: int, per_month: Figures}
      */
-    private function pausedYearly(array $paused): array
+    public function summary(Scope $scope, SubscriptionFilter $filter, int $matched): array
     {
-        $totals = [];
-        foreach ($paused as $subscription) {
-            // A lifetime or one-off purchase has no yearly cost, and so
-            // contributes nothing here — exactly as it contributes nothing to
-            // the active yearly total beside it.
-            $yearly = $subscription->yearlyMinor();
-            if ($yearly === null) {
+        $byCurrency = [];
+        foreach ($this->subscriptions->list($scope, $filter->unpaged()) as $subscription) {
+            $monthly = $subscription->isActive ? $subscription->monthlyMinor() : null;
+            if ($monthly === null) {
                 continue;
             }
 
             $currency = $subscription->price->currency;
-            $totals[$currency] ??= ['currency' => $currency, 'total_minor' => 0, 'count' => 0];
-            $totals[$currency]['total_minor'] += $yearly;
-            $totals[$currency]['count']++;
+            $byCurrency[$currency] = ($byCurrency[$currency] ?? 0) + $monthly;
         }
 
-        ksort($totals);
+        ksort($byCurrency);
 
-        return array_values($totals);
+        return [
+            'matched' => $matched,
+            // "Of" the list as it stands with nothing chosen: running and
+            // paused, the cancelled ones being behind their own filter.
+            'of' => $this->subscriptions->count($scope, (new SubscriptionFilter())->withIncludeInactive()),
+            'per_month' => $this->figures($byCurrency),
+        ];
     }
 
     /**
-     * The two deadlines this application actually distinguishes.
+     * "≈ £12.34 at today's rate", beneath the form's price, or null when there
+     * is nothing to say — the price is already in the base currency, or is not
+     * a price yet.
      *
-     * *Renewing soon* is a charge inside the near window — the same list the
-     * strip counted, passed in rather than queried again. *Cancel by* is the
-     * last day notice can be given, and it exists only for a subscription with
-     * a notice period: without one the deadline **is** the renewal date, and a
-     * second card saying so again would be noise. That filtering is not done
-     * here — `CancellationService` has always skipped a subscription without a
-     * notice period, for that reason.
+     * The arithmetic is here, and the form asks for it over htmx as the price
+     * changes, so the browser never multiplies money by a rate.
      *
-     * Deadlines already missed are kept and shown first. Nothing can be done
-     * about them, but the user has just been committed to another period and is
-     * the last person who should have to work that out for themselves.
-     *
-     * @param list<Subscription> $soon
-     * @return array{days: int, renewing: list<ExpiringRow>, cancel_by: list<ExpiringRow>}
+     * @return array{converted: Money|null, base: string, currency: string}|null
      */
-    private function expiring(Scope $scope, array $soon): array
+    public function conversionNote(string $price, string $currency): ?array
     {
-        $today = $this->clock->today();
-        $mayUpdate = $this->permissions->allows($scope, Permission::UpdateSubscription);
+        $base = $this->settings->baseCurrency();
+        $currency = Currency::normalise($currency);
 
-        $renewing = [];
-        foreach ($soon as $subscription) {
-            $date = $subscription->nextChargeDate();
-            if ($date === null) {
-                continue;
-            }
-
-            $renewing[] = [
-                'subscription' => $subscription,
-                'date' => $date,
-                // Counted to the date the card shows, the way the cancel-by
-                // view counts to its deadline. Asking the payment date instead
-                // would answer for a different day than the one printed beside
-                // it the moment the two are not the same — which for a trial
-                // they are not.
-                'days' => (int) $today->diff($date->setTime(0, 0))->format('%r%a'),
-                'is_passed' => false,
-                // Every row in this card is inside the near window already, so
-                // singling one out would mark the whole list. The card is the
-                // warning; the dates inside it are a list.
-                'is_urgent' => false,
-                'can_act' => $this->canAct($scope, $subscription, $mayUpdate),
-            ];
+        if (!Currency::isValidCode($currency) || $currency === $base || trim($price) === '') {
+            return null;
         }
 
-        $cancelBy = [];
+        try {
+            $money = Money::fromUserInput($price, $currency);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        if ($money->isNegative()) {
+            return null;
+        }
+
+        return [
+            'converted' => $this->rates->convert($money, $base),
+            'base' => $base,
+            'currency' => $currency,
+        ];
+    }
+
+    /**
+     * The four tiles.
+     *
+     * Active, Trials and Paused are the list's own statuses — each tile is the
+     * number the status filter of the same name would page through — so an
+     * Active count here excludes the trials that sit beside it. Per month is the
+     * statistics service's recurring monthly total, per currency, with the
+     * combined figure only when every currency converts.
+     *
+     * @param array<string, mixed> $stats
+     * @return array{active: int, trials: int, paused: int, per_month: Figures}
+     */
+    private function strip(Scope $scope, array $stats): array
+    {
+        $trials = 0;
+        foreach ($this->subscriptions->allForStats($scope) as $subscription) {
+            if ($subscription->status() === SubscriptionStatus::Trial) {
+                $trials++;
+            }
+        }
+
+        /** @var list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring */
+        $recurring = $stats['recurring'];
+        /** @var array{currency: string, amount_minor: int|null, unconvertible: list<string>} $combined */
+        $combined = $stats['combined_monthly'];
+
+        return [
+            'active' => max(0, (int) $stats['active_count'] - $trials),
+            'trials' => $trials,
+            'paused' => count($this->subscriptions->paused($scope)),
+            'per_month' => [
+                'totals' => array_map(
+                    static fn (array $row): array => [
+                        'currency' => $row['currency'],
+                        'amount_minor' => $row['monthly_minor'],
+                    ],
+                    $recurring,
+                ),
+                'combined' => $combined,
+            ],
+        ];
+    }
+
+    /**
+     * The cancel-by card: the last day notice can be given, for every
+     * subscription with a notice period whose deadline falls inside the near
+     * window. Deadlines already missed are kept and shown first — the user has
+     * just been committed to another period, and is the last person who should
+     * have to work that out for themselves.
+     *
+     * @return array{days: int, rows: list<DeadlineRow>}
+     */
+    private function cancelBy(Scope $scope): array
+    {
+        $rows = [];
         foreach ($this->cancellations->deadlines($scope, self::NEAR_WINDOW_DAYS) as $row) {
-            $cancelBy[] = [
+            $rows[] = [
                 'subscription' => $row['subscription'],
                 'date' => $row['deadline'],
                 'days' => $row['days_remaining'],
                 'is_passed' => $row['is_passed'],
                 // The cancel-by view's own judgement, carried over rather than
-                // re-made: one row must not be urgent on this screen and
-                // ordinary on that one.
+                // re-made: one row must not be urgent here and ordinary there.
                 'is_urgent' => $row['is_urgent'],
-                'can_act' => $this->canAct($scope, $row['subscription'], $mayUpdate),
             ];
         }
 
-        return [
-            'days' => self::NEAR_WINDOW_DAYS,
-            'renewing' => $renewing,
-            'cancel_by' => $cancelBy,
-        ];
+        return ['days' => self::NEAR_WINDOW_DAYS, 'rows' => $rows];
     }
 
     /**
-     * Trials that have not converted yet.
+     * The status badge: the derived status, except that a running
+     * subscription charging inside the near window reads "Renewing soon".
      *
-     * The trial's last day is the day the first charge falls, so the countdown
-     * runs to that day and the amount shown is what it converts to — the price
-     * the subscription will have, not the zero it has now and not a placeholder.
-     * A trial is the subscription it will become rather than a separate record,
-     * which is why the action on this card is the ordinary one: pausing it here
-     * pauses the subscription, because they are the same row.
-     *
-     * @param list<Subscription> $trials
-     * @return array{rows: list<TrialRow>, totals: list<array{currency: string, total_minor: int, count: int}>}
+     * @return array{key: string, tone: string}
      */
-    private function trials(Scope $scope, array $trials): array
+    private function badge(Subscription $subscription, bool $isNear): array
     {
-        $today = $this->clock->today();
-        $mayUpdate = $this->permissions->allows($scope, Permission::UpdateSubscription);
+        return match ($subscription->status()) {
+            SubscriptionStatus::Cancelled => ['key' => 'state.cancelled', 'tone' => 'neutral'],
+            SubscriptionStatus::Paused => ['key' => 'state.paused', 'tone' => 'warn'],
+            SubscriptionStatus::Trial => ['key' => 'state.trial', 'tone' => 'info'],
+            SubscriptionStatus::Active => $isNear
+                ? ['key' => 'dashboard.renewing_soon', 'tone' => 'warn']
+                : ['key' => 'state.active', 'tone' => 'ok'],
+        };
+    }
 
-        $rows = [];
-        foreach ($trials as $trial) {
-            if ($trial->trialEndDate === null) {
-                continue;
+    /**
+     * The monthly equivalent in the base currency.
+     *
+     * Three answers, each drawn differently: a figure; "not recurring" for a
+     * one-off or a lifetime purchase, which has no monthly cost; and "no rate"
+     * for a currency the rates cannot convert yet, which is a gap rather than
+     * a zero.
+     *
+     * @return array{state: string, amount_minor: int|null, currency: string}
+     */
+    private function monthly(Subscription $subscription, string $base): array
+    {
+        $monthly = $subscription->monthlyMinor();
+        if ($monthly === null) {
+            return ['state' => 'not_recurring', 'amount_minor' => null, 'currency' => $base];
+        }
+
+        $converted = $subscription->price->currency === $base
+            ? $monthly
+            : $this->rates->convertMinor($monthly, $subscription->price->currency, $base);
+
+        return $converted === null
+            ? ['state' => 'no_rate', 'amount_minor' => null, 'currency' => $base]
+            : ['state' => 'ok', 'amount_minor' => $converted, 'currency' => $base];
+    }
+
+    /**
+     * The next-charge cell's second line.
+     *
+     * A trial says when it ends, since that is the charge; a subscription with
+     * a notice period whose cancel-by date falls inside the near window says
+     * that date, since it is the one that can still be missed; anything else
+     * charging inside the window says how far away it is. Nothing is said for
+     * a paused or cancelled row — its date is not a charge anybody expects.
+     *
+     * @return array{date: DateTimeImmutable|null, hint: DatedPhrase|null, is_near: bool}
+     */
+    private function next(Subscription $subscription, DateTimeImmutable $today): array
+    {
+        $date = $subscription->isCancelled() ? null : $subscription->nextChargeDate();
+        if ($date === null || !$subscription->isActive) {
+            return ['date' => $date, 'hint' => null, 'is_near' => false];
+        }
+
+        $days = (int) $today->diff($date->setTime(0, 0))->format('%r%a');
+        $isNear = $days >= 0 && $days <= self::NEAR_WINDOW_DAYS;
+
+        if ($subscription->isTrial) {
+            return [
+                'date' => $date,
+                'hint' => ['key' => 'subscriptions_list.trial_ends', 'params' => [], 'date' => null],
+                'is_near' => $isNear,
+            ];
+        }
+
+        $deadline = $subscription->noticePeriod->isSet() ? $subscription->cancellationDeadline() : null;
+        if ($deadline !== null) {
+            $deadlineDays = (int) $today->diff($deadline->setTime(0, 0))->format('%r%a');
+            if ($deadlineDays >= 0 && $deadlineDays <= self::NEAR_WINDOW_DAYS) {
+                return [
+                    'date' => $date,
+                    // The date is formatted where it is drawn, in the reader's
+                    // locale, so it travels as a date rather than a string.
+                    'hint' => ['key' => 'subscriptions_list.cancel_by', 'params' => [], 'date' => $deadline],
+                    'is_near' => $isNear,
+                ];
             }
-
-            $daysLeft = $trial->daysUntilTrialEnds($today) ?? 0;
-
-            $rows[] = [
-                'subscription' => $trial,
-                'converts_on' => $trial->trialEndDate,
-                'days_left' => $daysLeft,
-                // Trials are not bounded by the near window — this section
-                // lists every one of them — so a conversion falling inside it
-                // is the row worth picking out, by the same fourteen days
-                // everything else on this screen calls near.
-                'is_urgent' => $daysLeft <= self::NEAR_WINDOW_DAYS,
-                'converts_to' => $trial->priceAfterConversion(),
-                'can_act' => $this->canAct($scope, $trial, $mayUpdate),
-            ];
         }
 
-        return [
-            'rows' => $rows,
-            // What the trials will cost once they convert, which is the only
-            // figure anybody is interested in about a set of free things.
-            'totals' => $this->stats->sumConvertedPrices($trials),
-        ];
+        if (!$isNear) {
+            return ['date' => $date, 'hint' => null, 'is_near' => false];
+        }
+
+        $hint = match ($days) {
+            0 => ['key' => 'state.today', 'params' => [], 'date' => null],
+            1 => ['key' => 'state.tomorrow', 'params' => [], 'date' => null],
+            default => ['key' => 'subscriptions_list.in_days', 'params' => ['days' => $days], 'date' => null],
+        };
+
+        return ['date' => $date, 'hint' => $hint, 'is_near' => true];
     }
 
     /**
-     * Where the recurring spend goes, as proportion bars.
+     * "Split equally with Tom", "Split 3 ways", "Custom split" — or nothing
+     * for a subscription one person pays.
      *
-     * The rows, the ordering and the denominator are all
-     * `CategoryBreakdownService`'s — the same breakdown the analytics screen
-     * draws as a donut. Two pictures of one set of figures, which is the only
-     * arrangement in which they cannot disagree.
-     *
-     * @param array<string, mixed> $stats
-     * @return array<string, mixed>
+     * @param list<SubscriptionSplit> $participants
+     * @return Phrase|null
      */
-    private function categories(array $stats): array
+    private function splitNote(Subscription $subscription, array $participants): ?array
     {
-        return $this->breakdown->fromStats($stats);
+        if ($subscription->splitMode === SplitMode::Custom) {
+            return ['key' => 'subscriptions_list.split_custom', 'params' => []];
+        }
+
+        if ($subscription->splitMode !== SplitMode::Equal) {
+            return null;
+        }
+
+        $others = array_values(array_filter(
+            $participants,
+            static fn (SubscriptionSplit $split): bool => $split->userId !== $subscription->ownerUserId,
+        ));
+
+        // Two people, one of them the payer: name the other one.
+        if (count($participants) === 2 && count($others) === 1 && $others[0]->userName !== null) {
+            return ['key' => 'subscriptions_list.split_equally_with', 'params' => ['name' => $others[0]->userName]];
+        }
+
+        return ['key' => 'subscriptions_list.split_ways', 'params' => ['count' => count($participants)]];
     }
 
     /**
-     * Whether this member could act on this subscription at all.
+     * Per-currency subtotals and the combined figure, in the shape
+     * `partials/spend.twig` draws.
      *
-     * Two questions, both of which have to be yes: may their role change a
-     * subscription, and is this particular row one they may change? The second
-     * is not implied by seeing it — under ISOLATED isolation a member can see a
-     * shared cost they contribute to without owning it — so a card that offered
-     * them the button would be offering a refusal. The refusal itself still
-     * happens in the repository; this only decides what to draw.
+     * @param array<string, int> $byCurrency
+     * @return Figures
      */
-    private function canAct(Scope $scope, Subscription $subscription, bool $mayUpdate): bool
+    private function figures(array $byCurrency): array
     {
-        return $mayUpdate && $scope->mayWriteRow($subscription->householdId, $subscription->ownerUserId);
+        $totals = [];
+        foreach ($byCurrency as $currency => $amount) {
+            $totals[] = ['currency' => (string) $currency, 'amount_minor' => $amount];
+        }
+
+        return ['totals' => $totals, 'combined' => $this->stats->combine($byCurrency)];
     }
 }

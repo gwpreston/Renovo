@@ -70,7 +70,7 @@ final class InstanceSettingsService
 
     public function registrationAllowed(): bool
     {
-        return $this->get(self::KEY_ALLOW_REGISTRATION, '1') === '1';
+        return $this->get(self::KEY_ALLOW_REGISTRATION, '0') === '1';
     }
 
     public function setRegistrationAllowed(bool $allowed): void
@@ -129,6 +129,16 @@ final class InstanceSettingsService
     public function markRatesAttempted(DateTimeImmutable $at): void
     {
         $this->set(self::KEY_RATES_LAST_ATTEMPT_AT, $at->format('Y-m-d H:i:s'));
+    }
+
+    /**
+     * Forget the last attempt. An attempt belongs to the provider and the base
+     * it was made against; once either changes, its back-off says nothing
+     * about the new one.
+     */
+    public function clearRatesAttempted(): void
+    {
+        $this->set(self::KEY_RATES_LAST_ATTEMPT_AT, '');
     }
 
     public function isSetupComplete(): bool

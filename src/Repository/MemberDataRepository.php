@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Domain\Visibility;
 use App\Security\Scope;
 use App\Security\ScopeViolationException;
 
@@ -90,6 +91,27 @@ final class MemberDataRepository extends AbstractRepository
     }
 
     /**
+     * How many of those rows are private to them — "only me" subscriptions,
+     * which nobody else in the household has ever been able to see.
+     *
+     * Asked separately because those rows are the one kind a SHARED removal
+     * cannot hand over without ceremony: the rest of the household could see
+     * everything else already, and could not see these.
+     */
+    public function countPrivateOwnedBy(Scope $scope, int $userId): int
+    {
+        $householdId = $this->assertAdministrator($scope);
+
+        return (int) $this->db->fetchValue(
+            'SELECT COUNT(*) FROM ' . $this->quote('subscriptions')
+            . ' WHERE ' . $this->quote('household_id') . ' = :household'
+            . ' AND ' . $this->quote('owner_user_id') . ' = :user'
+            . ' AND ' . $this->quote('visibility') . ' = :private',
+            ['household' => $householdId, 'user' => $userId, 'private' => Visibility::Payer->value],
+        );
+    }
+
+    /**
      * Take a member out of the household, rows and all, in one transaction.
      *
      * The order inside matters. Their split participations go first and
@@ -98,17 +120,36 @@ final class MemberDataRepository extends AbstractRepository
      * whatever happened to the rows they owned. Then the rows they owned are
      * either handed over or deleted, and only then does the membership go.
      *
-     * @param bool $deleteData Delete what they owned instead of reassigning it.
-     *                         The caller decides whether the isolation mode
-     *                         makes that question worth asking.
+     * Budgets that measure the departing member go too, whoever set them: a
+     * budget over the spending of somebody who is no longer here measures
+     * nothing, and handing it to the new owner would quietly change what it
+     * measured.
+     *
+     * @param bool $deleteData    Delete what they owned instead of reassigning
+     *                            it. The caller decides whether the isolation
+     *                            mode makes that question worth asking.
+     * @param bool $deletePrivate Delete their private subscriptions even when
+     *                            the rest is reassigned. A reassigned private
+     *                            row stays private — to its new owner.
      * @return list<string> The attachment paths whose files the caller must now
-     *                      unlink. Empty unless the rows were deleted.
+     *                      unlink. Empty unless rows were deleted.
      */
-    public function removeFromHousehold(Scope $scope, int $userId, int $reassignTo, bool $deleteData): array
-    {
+    public function removeFromHousehold(
+        Scope $scope,
+        int $userId,
+        int $reassignTo,
+        bool $deleteData,
+        bool $deletePrivate = false,
+    ): array {
         $householdId = $this->assertAdministrator($scope);
 
-        return $this->db->transactional(function () use ($householdId, $userId, $reassignTo, $deleteData): array {
+        return $this->db->transactional(function () use (
+            $householdId,
+            $userId,
+            $reassignTo,
+            $deleteData,
+            $deletePrivate,
+        ): array {
             $this->db->execute(
                 'DELETE FROM ' . $this->quote('subscription_splits')
                 . ' WHERE ' . $this->quote('household_id') . ' = :household'
@@ -116,9 +157,20 @@ final class MemberDataRepository extends AbstractRepository
                 ['household' => $householdId, 'user' => $userId],
             );
 
-            $paths = $deleteData
-                ? $this->purge($householdId, $userId)
-                : $this->reassign($householdId, $userId, $reassignTo);
+            $this->db->execute(
+                'DELETE FROM ' . $this->quote('budgets')
+                . ' WHERE ' . $this->quote('household_id') . ' = :household'
+                . ' AND ' . $this->quote('subject_user_id') . ' = :user',
+                ['household' => $householdId, 'user' => $userId],
+            );
+
+            if ($deleteData) {
+                $paths = $this->purge($householdId, $userId);
+            } else {
+                $paths = $deletePrivate ? $this->purgePrivate($householdId, $userId) : [];
+                $this->releasePrivatePayer($householdId, $userId);
+                $this->reassign($householdId, $userId, $reassignTo);
+            }
 
             $this->db->execute(
                 'DELETE FROM ' . $this->quote('household_memberships')
@@ -138,9 +190,11 @@ final class MemberDataRepository extends AbstractRepository
      * the owner, and a half-reassigned tree is exactly the dangling reference
      * this class exists to prevent.
      *
-     * @return list<string> Always empty — nothing is deleted, so no file is.
+     * Budgets are the exception to "every table": their owner moves like the
+     * rest, but those that measured the departing member have already been
+     * deleted by the caller, so none left here measures somebody gone.
      */
-    private function reassign(int $householdId, int $fromUserId, int $toUserId): array
+    private function reassign(int $householdId, int $fromUserId, int $toUserId): void
     {
         foreach (self::OWNED_TABLES as $table) {
             $this->db->execute(
@@ -150,8 +204,53 @@ final class MemberDataRepository extends AbstractRepository
                 ['to' => $toUserId, 'household' => $householdId, 'from' => $fromUserId],
             );
         }
+    }
 
-        return [];
+    /**
+     * Delete only the departing member's private subscriptions, and so — by
+     * cascade — their history and attachments.
+     *
+     * @return list<string> The files the caller must unlink afterwards.
+     */
+    private function purgePrivate(int $householdId, int $userId): array
+    {
+        $params = ['household' => $householdId, 'user' => $userId, 'private' => Visibility::Payer->value];
+
+        $rows = $this->db->fetchAll(
+            'SELECT a.' . $this->quote('stored_path') . ' AS stored_path FROM ' . $this->quote('attachments') . ' a'
+            . ' INNER JOIN ' . $this->quote('subscriptions') . ' s'
+            . ' ON s.' . $this->quote('id') . ' = a.' . $this->quote('subscription_id')
+            . ' WHERE s.' . $this->quote('household_id') . ' = :household'
+            . ' AND s.' . $this->quote('owner_user_id') . ' = :user'
+            . ' AND s.' . $this->quote('visibility') . ' = :private',
+            $params,
+        );
+
+        $this->db->execute(
+            'DELETE FROM ' . $this->quote('subscriptions')
+            . ' WHERE ' . $this->quote('household_id') . ' = :household'
+            . ' AND ' . $this->quote('owner_user_id') . ' = :user'
+            . ' AND ' . $this->quote('visibility') . ' = :private',
+            $params,
+        );
+
+        return array_values(array_map(static fn (array $row): string => (string) $row['stored_path'], $rows));
+    }
+
+    /**
+     * A private subscription is paid by its owner or by nobody named. When it
+     * changes hands the departing payer's name comes off it, so the rule still
+     * holds for the member it passes to.
+     */
+    private function releasePrivatePayer(int $householdId, int $userId): void
+    {
+        $this->db->execute(
+            'UPDATE ' . $this->quote('subscriptions') . ' SET ' . $this->quote('payer_user_id') . ' = NULL'
+            . ' WHERE ' . $this->quote('household_id') . ' = :household'
+            . ' AND ' . $this->quote('owner_user_id') . ' = :user'
+            . ' AND ' . $this->quote('visibility') . ' = :private',
+            ['household' => $householdId, 'user' => $userId, 'private' => Visibility::Payer->value],
+        );
     }
 
     /**

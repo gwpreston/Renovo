@@ -12,8 +12,10 @@ use App\Repository\MembershipRepository;
 use App\Repository\PaymentMethodRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
+use App\Security\CsrfTokenManager;
 use App\Security\Scope;
 use App\Security\SessionInterface;
+use App\Service\BudgetService;
 use App\Service\InstanceSettingsService;
 use App\Tests\Integration\DatabaseTestCase;
 use App\Tests\Support\ArraySession;
@@ -44,6 +46,8 @@ final class AccessibilityTest extends DatabaseTestCase
     private int $userId;
     private int $householdId;
     private int $subscriptionId;
+    private int $budgetId;
+    private int $memberId;
 
     protected function setUp(): void
     {
@@ -73,6 +77,11 @@ final class AccessibilityTest extends DatabaseTestCase
         $this->householdId = $households->create('Household', $this->userId);
         $memberships->create($this->householdId, $this->userId, Role::OwnerAdmin);
 
+        // Somebody else in the household, so the members screen draws its
+        // controls and the removal dialog has a member to ask about.
+        $this->memberId = $users->create('editor@example.test', 'Editor', 'hash', false, new DateTimeImmutable());
+        $memberships->create($this->householdId, $this->memberId, Role::Editor);
+
         $scope = Scope::forMember($this->userId, true, $this->householdId, Role::OwnerAdmin, IsolationMode::Shared);
 
         // Two payment methods, one with an uploaded logo and one with only an
@@ -99,6 +108,34 @@ final class AccessibilityTest extends DatabaseTestCase
             [],
         );
 
+        // A household budget, so the budget screen is checked with its tiles,
+        // a card and the six-month history rather than its empty state, and
+        // its edit form is one of the pages below.
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $this->budgetId = $container->get(BudgetService::class)->create($scope, [
+            'name' => 'Household',
+            'period' => 'monthly',
+            'amount' => '50.00',
+            'warn_threshold_percent' => '85',
+            'subject_user_id' => BudgetService::SUBJECT_HOUSEHOLD,
+        ]);
+
+        // Phase 28's sections in their populated states: a category and a tag
+        // (the chips and their rename forms), two channels, one of them off
+        // (the switches and every column of the routing grid, disabled boxes
+        // included), a token (its row and its actions) and a trusted host.
+        (new \App\Repository\CategoryRepository($this->db))->create($scope, 'Streaming', '#112233');
+        (new \App\Repository\TagRepository($this->db))->create($scope, 'family');
+        $channels = $container->get(\App\Repository\NotificationChannelRepository::class);
+        $channels->create($this->userId, 'email', 'My email', ['address' => 'owner@example.test']);
+        $channels->create($this->userId, 'webhook', 'My webhook', ['url' => 'https://hooks.example.test/x'], false);
+        $user = $users->findById($this->userId);
+        self::assertNotNull($user);
+        $container->get(\App\Service\ApiTokenService::class)
+            ->issue($user, $this->householdId, 'Calendar', \App\Domain\TokenAbility::Read);
+        $container->get(\App\Service\TrustedHostService::class)->add('gotify.lan', 'The LAN one', $user);
+
         $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $this->userId);
         $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $this->householdId);
     }
@@ -110,6 +147,8 @@ final class AccessibilityTest extends DatabaseTestCase
     {
         return [
             ['/'],
+            // The Household dashboard: the same URL, chosen on the account.
+            ['household:/'],
             ['/subscriptions'],
             ['/subscriptions/new'],
             ['/subscriptions/{id}/edit'],
@@ -120,17 +159,97 @@ final class AccessibilityTest extends DatabaseTestCase
             ['/forecast'],
             ['/cancellations'],
             ['/stats'],
-            ['/categories'],
-            ['/payment-methods'],
             ['/profile'],
+            // Settings' three tabs (Phase 28). General carries categories,
+            // tags and payment methods; Data & integrations the tokens and
+            // backups that were screens of their own.
             ['/settings'],
+            ['/settings/data'],
+            ['/settings/instance'],
+            ['/settings/members'],
+            // The invite dialog's form, as the page it is without script.
+            ['/settings/members/invite'],
+            ['/settings/members/{member}/remove'],
             ['/settings/notifications'],
-            ['/settings/security'],
-            ['/settings/api-tokens'],
-            ['/settings/backup'],
             ['/import'],
             ['/audit'],
+            // The wizard's signed-in steps (Phase 29), in the signed-out
+            // layout: the owner here is an instance administrator and the
+            // wizard has not been finished.
+            ['/setup/household'],
+            ['/setup/notifications'],
         ];
+    }
+
+    /**
+     * The pages somebody sees before they are inside the application, with
+     * the status each answers — a spent link is a 410, a missing page a 404,
+     * and both are pages a reader has to be able to find their way out of.
+     *
+     * @return list<array{0: string, 1: int}>
+     */
+    public static function signedOutPages(): array
+    {
+        return [
+            ['/login', 200],
+            ['/forgot-password', 200],
+            ['/register', 200],
+            ['/reset-password?token=spent', 410],
+            ['/verify-email?token=spent', 410],
+            ['/accept-invite?token=spent', 410],
+            ['/confirm-email-change?token=spent', 410],
+            ['/no-such-page', 404],
+        ];
+    }
+
+    /**
+     * @dataProvider signedOutPages
+     */
+    public function testEverySignedOutPageIsStructurallyNavigableAndNamed(string $path, int $status): void
+    {
+        $this->session->clear();
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $container->get(InstanceSettingsService::class)->setRegistrationAllowed(true);
+
+        $response = $this->app->handle(
+            (new ServerRequestFactory())->createServerRequest(
+                'GET',
+                'http://localhost' . $path,
+                ['REMOTE_ADDR' => '127.0.0.1'],
+            ),
+        );
+
+        self::assertSame($status, $response->getStatusCode(), $path);
+        $html = (string) $response->getBody();
+
+        self::assertSame(1, preg_match_all('/<h1\b/', $html), $path . ' should have exactly one <h1>.');
+        self::assertStringContainsString('<main', $html, $path . ' has no main landmark.');
+        self::assertMatchesRegularExpression('/<html[^>]+lang="[a-zA-Z-]+"/', $html, $path . ' declares no language.');
+        self::assertStringContainsString('class="skip-link"', $html, $path . ' has no skip link.');
+        self::assertSame([], $this->unnamedControls($html), $path . ' has controls a screen reader cannot name.');
+    }
+
+    /**
+     * A failure on a signed-out form is announced, not only drawn.
+     */
+    public function testASignedOutFormsFailureIsAnAlert(): void
+    {
+        $this->session->clear();
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+
+        $response = $this->app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('POST', 'http://localhost/login', ['REMOTE_ADDR' => '127.0.0.1'])
+                ->withParsedBody(['email' => 'owner@example.test', 'password' => 'not the password'])
+                ->withHeader(CsrfTokenManager::HEADER_NAME, $container->get(CsrfTokenManager::class)->token()),
+        );
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringContainsString('role="alert"', (string) $response->getBody());
     }
 
     /**
@@ -198,6 +317,160 @@ final class AccessibilityTest extends DatabaseTestCase
     }
 
     /**
+     * The quick-add dialog's content: the form fragment htmx loads into it.
+     *
+     * A fragment has no landmarks, heading or skip link of its own — the page
+     * it is loaded into carries those — so only the checks that apply to the
+     * markup it brings are made: every control named, every table header
+     * scoped, every image described or decorative.
+     */
+    public function testTheQuickAddDialogsFormIsNamedAndDescribed(): void
+    {
+        $response = $this->app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('GET', 'http://localhost/subscriptions/new', ['REMOTE_ADDR' => '127.0.0.1'])
+                ->withHeader('HX-Request', 'true'),
+        );
+        self::assertSame(200, $response->getStatusCode());
+        $html = (string) $response->getBody();
+
+        self::assertStringNotContainsString('<html', $html, 'The dialog was sent a whole document.');
+        self::assertSame([], $this->unnamedControls($html), 'The dialog has controls a screen reader cannot name.');
+
+        preg_match_all('/<th\b([^>]*)>/', $html, $headers);
+        foreach ($headers[1] as $attributes) {
+            self::assertStringContainsString('scope=', $attributes);
+        }
+
+        preg_match_all('/<img\b([^>]*)>/', $html, $images);
+        foreach ($images[1] as $attributes) {
+            self::assertStringContainsString('alt=', $attributes);
+        }
+    }
+
+    /**
+     * The budget dialog's two forms, New and Edit, as the dialog loads them,
+     * and the edit form's full page — a URL the static list cannot name.
+     */
+    public function testTheBudgetFormsAreNamedAndDescribed(): void
+    {
+        foreach (['/budgets/new', '/budgets/' . $this->budgetId . '/edit'] as $path) {
+            $response = $this->app->handle(
+                (new ServerRequestFactory())
+                    ->createServerRequest('GET', 'http://localhost' . $path, ['REMOTE_ADDR' => '127.0.0.1'])
+                    ->withHeader('HX-Request', 'true'),
+            );
+            self::assertSame(200, $response->getStatusCode(), $path);
+            $html = (string) $response->getBody();
+
+            self::assertStringNotContainsString('<html', $html, $path);
+            self::assertSame([], $this->unnamedControls($html), $path . ' has controls a screen reader cannot name.');
+        }
+
+        $page = $this->get('/budgets/' . $this->budgetId . '/edit');
+        self::assertSame(1, preg_match_all('/<h1\b/', $page));
+        self::assertSame([], $this->unnamedControls($page));
+    }
+
+    /**
+     * The calendar with all three kinds of chip on it, the open day, and the
+     * feed card showing its one-time address — the states `/calendar` on an
+     * empty month does not reach.
+     *
+     * Dates are next month's, from the real clock this test runs on: a trial
+     * ending on the 10th, a charge on the 12th, and thirty days' notice on a
+     * charge due the month after, whose last day to cancel falls in this one.
+     */
+    public function testTheCalendarsChipsPanelAndFeedAreNamed(): void
+    {
+        $next = new DateTimeImmutable('first day of next month');
+        $scope = Scope::forMember($this->userId, true, $this->householdId, Role::OwnerAdmin, IsolationMode::Shared);
+        $subscriptions = new SubscriptionRepository($this->db);
+
+        $subscriptions->create($scope, [
+            'name' => 'Trial service',
+            'price_minor' => 0,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'is_trial' => true,
+            'trial_end_date' => $next->modify('+9 days')->format('Y-m-d'),
+            'converts_to_price_minor' => 1299,
+            'is_active' => true,
+        ], []);
+        $subscriptions->create($scope, [
+            'name' => 'Gym',
+            'price_minor' => 4000,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => $next->modify('+1 month +19 days')->format('Y-m-d'),
+            'anchor_day' => 20,
+            'notice_period_amount' => 30,
+            'notice_period_unit' => 'days',
+            'is_active' => true,
+        ], []);
+        $subscriptions->create($scope, [
+            'name' => 'Streaming',
+            'price_minor' => 999,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => $next->modify('+11 days')->format('Y-m-d'),
+            'anchor_day' => 12,
+            'is_active' => true,
+        ], []);
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $created = $this->app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('POST', 'http://localhost/calendar/feed-link', ['REMOTE_ADDR' => '127.0.0.1'])
+                ->withParsedBody([])
+                ->withHeader(CsrfTokenManager::HEADER_NAME, $container->get(CsrfTokenManager::class)->token()),
+        );
+        self::assertSame(302, $created->getStatusCode());
+
+        $html = $this->get(
+            '/calendar?month=' . $next->format('Y-m') . '&day=' . $next->modify('+9 days')->format('Y-m-d'),
+        );
+
+        self::assertStringContainsString('id="calendar-feed-url"', $html, 'The new link was not shown.');
+        self::assertSame([], $this->unnamedControls($html), 'The calendar has controls a screen reader cannot name.');
+        self::assertSame(1, preg_match_all('/<h1\b/', $html));
+
+        // Every chip in the grid says what it is in a word and an icon, not by
+        // its colour alone.
+        preg_match_all(
+            '~<span class="calendar-chip is-([a-z-]+)">(.*?)</span>\s*</span>~s',
+            $html,
+            $chips,
+            PREG_SET_ORDER,
+        );
+        self::assertSame(['cancel-by', 'charge', 'trial'], $this->sorted(array_column($chips, 1)));
+        foreach ($chips as [, $kind, $inner]) {
+            self::assertStringContainsString('<svg', $inner, 'A ' . $kind . ' chip has no icon.');
+            self::assertMatchesRegularExpression(
+                '~class="visually-hidden">[^<]+:~',
+                $inner,
+                'A ' . $kind . ' chip has no word.',
+            );
+        }
+    }
+
+    /**
+     * @param list<string> $values
+     * @return list<string>
+     */
+    private function sorted(array $values): array
+    {
+        $values = array_values(array_unique($values));
+        sort($values);
+
+        return $values;
+    }
+
+    /**
      * Controls with neither a wrapping label, a `for=`, nor an aria-label.
      *
      * @return list<string>
@@ -234,7 +507,16 @@ final class AccessibilityTest extends DatabaseTestCase
 
     private function get(string $path): string
     {
-        $path = str_replace('{id}', (string) $this->subscriptionId, $path);
+        $path = str_replace(
+            ['{id}', '{member}'],
+            [(string) $this->subscriptionId, (string) $this->memberId],
+            $path,
+        );
+
+        if (str_starts_with($path, 'household:')) {
+            (new UserRepository($this->db))->updatePreferences($this->userId, ['dashboard_view' => 'household']);
+            $path = substr($path, strlen('household:'));
+        }
 
         $response = $this->app->handle(
             (new ServerRequestFactory())->createServerRequest(

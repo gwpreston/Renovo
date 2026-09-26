@@ -60,11 +60,11 @@ RUN composer install --no-dev --no-interaction --no-progress --no-scripts --pref
 # ---------------------------------------------------------------------------
 # The front-end assets.
 #
-# Tailwind is compiled, the JavaScript bundled and the Inter webfont vendored
-# here, at build time, so the running container fetches nothing: an instance on
-# a LAN or behind a VPN may have no route to a CDN at all. This stage is the
-# only place in the image's life where the network is used for JavaScript — the
-# same bargain the vendor stage makes with Packagist.
+# Tailwind is compiled, the JavaScript bundled, the icon sprite built and the
+# webfonts vendored here, at build time, so the running container fetches
+# nothing: an instance on a LAN or behind a VPN may have no route to a CDN at
+# all. This stage is the only place in the image's life where the network is
+# used for JavaScript — the same bargain the vendor stage makes with Packagist.
 #
 # templates/ is copied because Tailwind scans it for the class names it has to
 # generate; a build without it would emit a stylesheet missing every utility

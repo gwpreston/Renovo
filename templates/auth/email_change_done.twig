@@ -1,0 +1,13 @@
+{% extends 'auth/_layout.twig' %}
+
+{% set card_icon = 'mail-sent' %}
+
+{% block card_title %}{{ t('auth_email_change_done.title') }}{% endblock %}
+{% block card_intro %}{{ t('auth_email_change_done.intro', {'email': email}) }}{% endblock %}
+
+{% block card_body %}
+    {% set signed_in = signed_in|default(false) %}
+    <a class="button button-primary auth-submit" href="{{ signed_in ? '/profile' : '/login' }}">
+        {{- signed_in ? t('auth_email_change_failed.back') : t('auth_login.title') -}}
+    </a>
+{% endblock %}

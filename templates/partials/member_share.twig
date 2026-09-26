@@ -1,16 +1,14 @@
 {#
-    One member's share, in the two forms the application shows it in.
+    One member's share: how many subscriptions it is.
 
-    The page draws a card per member and the dashboard draws a table of them,
-    but what a share *is* — a count, a monthly figure, a yearly one, and the
-    sentence that appears instead when isolation withholds them — is one thing,
-    so it is written once. Two copies would eventually be two answers.
+    The members screen draws a row per member and the dashboard draws a card
+    of them, but what a share's count *is* — subscriptions carried, with the
+    one-off entries kept out of the money beside it — is one thing, so it is
+    written once. Two copies would eventually be two answers.
 
-    The money itself is not here. Both callers take it straight from
-    `partials/spend.twig`, the macro the metric tiles use, so the per-currency
-    rule is obeyed rather than restated — and a macro cannot reach an import
-    made by the file it is declared in, so routing the figures through this one
-    would have meant importing that partial twice to no end.
+    The money itself is not here. Both callers take it from
+    `dashboard/_headline.twig`, which applies the per-currency rule rather than
+    restating it.
 #}
 
 {#
@@ -25,16 +23,4 @@
     {%- if row.one_off_count %}
         <span class="hint">{{ t('household.one_off_count', { 'count': row.one_off_count }) }}</span>
     {%- endif %}
-{% endmacro %}
-
-{#
-    Why there is no figure, when there is none.
-
-    ISOLATED mode means this instance only ever shows a member their own rows,
-    so anybody else's total would be a fraction of the truth presented as all of
-    it. Saying so is the point: a blank space reads as nothing spent.
-#}
-{% macro withheld() %}
-    <p class="muted">{{ t('household.figures_withheld') }}</p>
-    <p class="hint">{{ t('household.figures_withheld_note') }}</p>
 {% endmacro %}

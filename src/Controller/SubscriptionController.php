@@ -9,6 +9,7 @@ use App\Domain\BillingCycle;
 use App\Domain\Currency;
 use App\Domain\NoticePeriod;
 use App\Domain\SubscriptionFilter;
+use App\Domain\SubscriptionStatus;
 use App\Domain\SubscriptionType;
 use App\Repository\MembershipRepository;
 use App\Security\ScopeViolationException;
@@ -19,8 +20,15 @@ use App\Service\LogoStorage;
 use App\Service\BulkActionService;
 use App\Service\CatchUpService;
 use App\Service\SavedViewService;
+use App\Service\AttachmentService;
+use App\Service\PriceHistoryService;
+use App\Service\SplitService;
+use App\Service\SubscriptionExportService;
+use App\Service\SubscriptionFormService;
 use App\Service\SubscriptionScreenService;
 use App\Service\SubscriptionService;
+use App\Service\UserPreferencesService;
+use App\Support\Clock;
 use App\Service\TagService;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
@@ -48,6 +56,13 @@ final class SubscriptionController extends Controller
         private readonly BulkActionService $bulkActions,
         private readonly SavedViewService $savedViews,
         private readonly SubscriptionScreenService $screen,
+        private readonly SubscriptionFormService $form,
+        private readonly SubscriptionExportService $export,
+        private readonly SplitService $splits,
+        private readonly PriceHistoryService $priceHistory,
+        private readonly AttachmentService $attachments,
+        private readonly UserPreferencesService $preferences,
+        private readonly Clock $clock,
     ) {
         parent::__construct($view, $session, $translator);
     }
@@ -67,9 +82,7 @@ final class SubscriptionController extends Controller
         // up to date — the overview's first act is that same catch-up — so the
         // list is always read after due price changes, ended trials and overdue
         // payment dates have been applied. What an htmx request skips is the
-        // rest: recomputing the household's statistics to swap twenty-five rows
-        // would be a great deal of work to arrive at the figures already on the
-        // screen, which the filter has not changed.
+        // strip and the cancel-by card, which the filter does not change.
         $overview = [];
         if ($fragment) {
             $this->catchUp->run($scope);
@@ -82,18 +95,27 @@ final class SubscriptionController extends Controller
 
         $data = [
             'subscriptions' => $items,
+            'rows' => $this->screen->rows($scope, $items),
+            'summary' => $this->screen->summary($scope, $filter, $total),
             'filter' => $filter,
             'total' => $total,
             'page_count' => max(1, (int) ceil($total / $filter->perPage)),
             'categories' => $this->categories->all($scope),
             'tags' => $this->tags->all($scope),
+            'statuses' => SubscriptionStatus::cases(),
+            // Household / Mine, offered only where it could change anything: a
+            // member who can only see their own rows would get the same list
+            // from both.
+            'offers_scope' => $scope->hasHousehold() && !$scope->restrictsReadsToOwner(),
             'members' => $scope->hasHousehold()
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],
+            'all_currencies' => Currency::all(),
             'saved_views' => $this->savedViews->forScope($scope),
             // What "save this view" would store: the filter as the list itself
             // would write it, rather than whatever is in the address bar.
             'current_query' => $filter->toQueryString(['page' => null]),
+            'density' => $this->user($request)->densityPreference()->value,
         ] + $overview;
 
         // htmx asks for just the table when filtering, sorting or paging.
@@ -103,6 +125,87 @@ final class SubscriptionController extends Controller
             $fragment ? 'subscriptions/_list.twig' : 'subscriptions/index.twig',
             $data,
         );
+    }
+
+    /**
+     * The list as a CSV file: the same filter, the same scoped query, every
+     * matched row rather than one page.
+     */
+    public function export(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $scope = $this->scope($request);
+        $filter = SubscriptionFilter::fromQueryParams($request->getQueryParams())->withIncludeInactive();
+
+        $response->getBody()->write($this->export->csv($scope, $filter));
+
+        return $response
+            ->withHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->withHeader(
+                'Content-Disposition',
+                'attachment; filename="' . $this->export->filename($this->clock->today()) . '"',
+            )
+            ->withHeader('Cache-Control', 'no-store');
+    }
+
+    /**
+     * The same rows as `export()`, as JSON.
+     */
+    public function exportJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $scope = $this->scope($request);
+        $filter = SubscriptionFilter::fromQueryParams($request->getQueryParams())->withIncludeInactive();
+
+        $response->getBody()->write($this->export->json($scope, $filter));
+
+        return $response
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
+            ->withHeader(
+                'Content-Disposition',
+                'attachment; filename="' . $this->export->filename($this->clock->today(), 'json') . '"',
+            )
+            ->withHeader('Cache-Control', 'no-store');
+    }
+
+    /**
+     * The list's density toggle. The same preference the profile page sets,
+     * written on its own, and back to the list with the filter the member was
+     * looking at — re-parsed through the value object, like a saved view, so
+     * the query field is never a redirect to anywhere else.
+     */
+    public function density(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body = $this->body($request);
+
+        $this->preferences->updateDensity(
+            $this->user($request)->id,
+            is_scalar($body['density'] ?? null) ? (string) $body['density'] : null,
+        );
+
+        parse_str(is_scalar($body['query'] ?? null) ? (string) $body['query'] : '', $query);
+        $filter = SubscriptionFilter::fromQueryParams($query);
+        $queryString = $filter->toQueryString(['page' => null]);
+
+        return $this->redirectAfterWrite(
+            $request,
+            $response,
+            '/subscriptions' . ($queryString !== '' ? '?' . $queryString : ''),
+        );
+    }
+
+    /**
+     * "≈ £12.34 at today's rate", beneath the form's price. Asked for by htmx
+     * as the price or currency changes, so the conversion is the server's.
+     */
+    public function conversionNote(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $query = $request->getQueryParams();
+
+        return $this->render($request, $response, 'subscriptions/_conversion_note.twig', [
+            'note' => $this->screen->conversionNote(
+                is_scalar($query['price'] ?? null) ? (string) $query['price'] : '',
+                is_scalar($query['currency'] ?? null) ? (string) $query['currency'] : '',
+            ),
+        ]);
     }
 
     /**
@@ -141,6 +244,8 @@ final class SubscriptionController extends Controller
             // chosen yet, so any date offered would be arbitrary, and one that
             // is silently accepted is worse than one the user has to enter.
             'start_date' => date('Y-m-d'),
+            'reminder_mode' => SubscriptionFormService::REMINDER_DEFAULT,
+            'split_mode' => 'none',
         ]));
     }
 
@@ -151,7 +256,7 @@ final class SubscriptionController extends Controller
 
         try {
             $body['logo_path'] = $this->logos->store($this->uploadedLogo($request)) ?? '';
-            $this->subscriptions->create($scope, $body);
+            $this->form->create($scope, $body);
         } catch (ValidationException $exception) {
             return $this->render(
                 $request,
@@ -206,20 +311,25 @@ final class SubscriptionController extends Controller
             'converts_to_cycle_days' => $subscription->convertsToCycleDays,
             'notice_period_amount' => $subscription->noticePeriod->amount,
             'notice_period_unit' => $subscription->noticePeriod->unit,
-            // An empty override is a real setting — "never remind me about this
-            // one" — so it renders as the word rather than as a blank box that
-            // would read as "use my usual schedule".
-            'reminder_days' => $subscription->reminderDays === '' ? 'none' : $subscription->reminderDays,
             'category_id' => $subscription->categoryId,
             'payment_method_id' => $subscription->paymentMethodId,
             'owner_user_id' => $subscription->ownerUserId,
             'payer_user_id' => $subscription->payerUserId,
+            'visibility' => $subscription->visibility->value,
+            'plan' => $subscription->plan,
             'notes' => $subscription->notes,
             'is_active' => $subscription->isActive ? '1' : '0',
             'logo_path' => $subscription->logoPath,
             'website_url' => $subscription->websiteUrl,
             'tags' => implode(', ', array_map(static fn ($tag): string => $tag->name, $subscription->tags)),
-        ], [], $subscription->id));
+        ]
+            // The three reminder states — use my defaults, never, these days —
+            // as the chips draw them, and the split as its controls do.
+            + $this->form->reminderValues($subscription->reminderDays)
+            + $this->form->splitValues(
+                $subscription,
+                $this->splits->participants($scope, $subscription->id),
+            ), [], $subscription->id));
     }
 
     public function update(ServerRequestInterface $request, ResponseInterface $response, string $id): ResponseInterface
@@ -233,7 +343,7 @@ final class SubscriptionController extends Controller
                 $body['logo_path'] = $uploaded;
             }
 
-            $this->subscriptions->update($scope, (int) $id, $body);
+            $this->form->update($scope, (int) $id, $body);
         } catch (ValidationException $exception) {
             return $this->render(
                 $request,
@@ -280,11 +390,69 @@ final class SubscriptionController extends Controller
             $this->subscriptions->setActive($scope, $subscription->id, !$subscription->isActive);
         } catch (ScopeViolationException) {
             throw $this->notFound($request);
+        } catch (ValidationException) {
+            // Resuming a cancelled subscription: the way back is un-cancel.
+            $this->flash('error', 'error.subscription.cancelled_resume');
+
+            return $this->redirectAfterWrite($request, $response, '/subscriptions');
         }
 
         $this->flash('success', $subscription->isActive ? 'flash.subscription_paused' : 'flash.subscription_resumed');
 
         return $this->redirectAfterWrite($request, $response, '/subscriptions');
+    }
+
+    public function cancel(ServerRequestInterface $request, ResponseInterface $response, string $id): ResponseInterface
+    {
+        return $this->changeCancellation($request, $response, (int) $id, true);
+    }
+
+    public function uncancel(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        return $this->changeCancellation($request, $response, (int) $id, false);
+    }
+
+    private function changeCancellation(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        int $id,
+        bool $cancel,
+    ): ResponseInterface {
+        $scope = $this->scope($request);
+
+        try {
+            $cancel ? $this->subscriptions->cancel($scope, $id) : $this->subscriptions->uncancel($scope, $id);
+        } catch (ScopeViolationException) {
+            throw $this->notFound($request);
+        }
+
+        $this->flash('success', $cancel ? 'flash.subscription_cancelled' : 'flash.subscription_uncancelled');
+
+        return $this->redirectAfterWrite($request, $response, $this->cancellationReturn($request, $id));
+    }
+
+    /**
+     * Where a cancel sends the member back to.
+     *
+     * The dashboard's Cancel trial uses this same action, and should leave the
+     * member on the dashboard, and the edit page's Cancel subscription should
+     * leave them on the edit page. Only the paths that carry the control are
+     * honoured — a named allowlist rather than any local path, so the field
+     * can never become a redirect to somewhere unexpected.
+     */
+    private function cancellationReturn(ServerRequestInterface $request, int $id): string
+    {
+        $body = $this->body($request);
+        $target = is_scalar($body['return_to'] ?? null) ? (string) $body['return_to'] : '';
+
+        return match ($target) {
+            '/' => '/',
+            '/subscriptions/' . $id . '/edit' => $target,
+            default => '/subscriptions',
+        };
     }
 
     private function uploadedLogo(ServerRequestInterface $request): ?UploadedFileInterface
@@ -307,26 +475,66 @@ final class SubscriptionController extends Controller
         ?int $id = null,
     ): array {
         $scope = $this->scope($request);
+        $subscription = $id !== null ? $this->subscriptions->find($scope, $id) : null;
+        $members = $scope->hasHousehold()
+            ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
+            : [];
+
+        // The split controls are drawn only for somebody who could save them,
+        // and only where there is anybody to split with.
+        $offersSplit = count($members) > 1 && $this->form->mayEditSplit($scope, $subscription);
+
+        // A row split before this form carried the split: "only me" cannot be
+        // chosen while it stays split, and here it cannot be un-split either.
+        $isSplit = $subscription?->splitMode->isSplit() ?? false;
+
+        // Every ISO currency, and the row's own when it is one since withdrawn,
+        // so an edit never silently changes it to whatever is first.
+        $currency = is_scalar($values['currency'] ?? null) ? (string) $values['currency'] : '';
+        $currencies = Currency::all();
+        if ($currency !== '' && !in_array($currency, $currencies, true)) {
+            $currencies[] = $currency;
+            sort($currencies);
+        }
+
+        $chosenDays = [];
+        foreach ((array) ($values['reminder_day'] ?? []) as $day) {
+            if (is_scalar($day) && ctype_digit((string) $day)) {
+                $chosenDays[] = (int) $day;
+            }
+        }
 
         return [
             'values' => $values,
             'errors' => $errors,
             'subscription_id' => $id,
+            'subscription' => $subscription,
+            'is_split' => $isSplit,
+            'offers_split' => $offersSplit,
             'categories' => $this->categories->all($scope),
             'payment_methods' => $this->paymentMethods->all($scope),
-            'members' => $scope->hasHousehold()
-                ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
-                : [],
-            'currencies' => Currency::common(),
+            'members' => $members,
+            'currencies' => $currencies,
+            'base_currency_note' => $this->screen->conversionNote(
+                is_scalar($values['price'] ?? null) ? (string) $values['price'] : '',
+                $currency,
+            ),
             'cycles' => BillingCycle::cases(),
             'types' => SubscriptionType::cases(),
             'notice_units' => NoticePeriod::units(),
+            'reminder_choices' => $this->form->reminderChoices($chosenDays),
             // The household's existing tags, so the form can offer them rather
             // than make the user remember how they spelled one last time. The
             // field still accepts anything typed into it: `TagRepository::
             // resolveOrCreate()` matches an existing name or creates a new tag,
             // so choosing and inventing are the same request.
             'tags' => $this->tags->all($scope),
+            // The edit page's own sections: the price history with its
+            // schedule-a-change form, and the attachments.
+            'trend' => $subscription !== null ? $this->priceHistory->trendFor($scope, $subscription->id) : [],
+            'attachments' => $subscription !== null
+                ? $this->attachments->forSubscription($scope, $subscription->id)
+                : [],
         ];
     }
 }

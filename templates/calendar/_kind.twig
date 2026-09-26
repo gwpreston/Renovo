@@ -1,0 +1,28 @@
+{#
+    What each kind of calendar item is called and drawn with.
+
+    Every kind carries a word and an icon as well as its colour, so a chip is
+    told apart in greyscale, in forced colours and by a screen reader — the
+    colour is the third signal, never the only one.
+
+    `kind`  'charge', 'trial' or 'cancel_by'
+#}
+{% macro icon(kind) %}
+    {%- if kind == 'trial' -%}
+        {{ icon('clock', 'icon calendar-kind-icon') }}
+    {%- elseif kind == 'cancel_by' -%}
+        {{ icon('cancellations', 'icon calendar-kind-icon') }}
+    {%- else -%}
+        {{ icon('payment-repeat', 'icon calendar-kind-icon') }}
+    {%- endif -%}
+{% endmacro %}
+
+{% macro label(kind) %}
+    {%- if kind == 'trial' -%}
+        {{ t('calendar.kind_trial') }}
+    {%- elseif kind == 'cancel_by' -%}
+        {{ t('calendar.kind_cancel_by') }}
+    {%- else -%}
+        {{ t('calendar.kind_charge') }}
+    {%- endif -%}
+{% endmacro %}

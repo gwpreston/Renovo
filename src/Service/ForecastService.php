@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\BillingCycle;
 use App\Domain\Entity\PriceChange;
 use App\Domain\Entity\Subscription;
 use App\Domain\Money;
-use App\Domain\Rounding;
 use App\Repository\PriceHistoryRepository;
 use App\Security\Scope;
 use App\Support\Clock;
@@ -51,6 +51,18 @@ final class ForecastService
 
     public const DEFAULT_MONTHS = 12;
 
+    /** A charge that recurs monthly or more often. */
+    public const CADENCE_REGULAR = 'regular';
+
+    /** A charge that lands as a lump: quarterly, yearly, a long custom cycle or a one-off. */
+    public const CADENCE_LONG = 'long';
+
+    /**
+     * The longest custom cycle that still counts as regular: a month, at its
+     * longest.
+     */
+    private const REGULAR_MAX_DAYS = 31;
+
     public function __construct(
         private readonly SubscriptionService $subscriptions,
         private readonly PriceHistoryRepository $priceHistory,
@@ -71,12 +83,25 @@ final class ForecastService
      */
     public function monthly(Scope $scope, int $months = self::DEFAULT_MONTHS, ?int $forUserId = null): array
     {
+        return $this->monthsOf($this->charges($scope, $months, $forUserId), $months);
+    }
+
+    /**
+     * Charges from `charges()` bucketed into the horizon's months — what
+     * `monthly()` returns, for a caller that already holds the charges and
+     * would otherwise walk every subscription a second time for them.
+     *
+     * @param list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}> $charges
+     * @return list<MonthTotals>
+     */
+    public function monthsOf(array $charges, int $months = self::DEFAULT_MONTHS): array
+    {
         $today = $this->clock->today();
         $baseCurrency = $this->settings->baseCurrency();
 
         $buckets = $this->emptyMonths($today, $months);
 
-        foreach ($this->charges($scope, $months, $forUserId) as $charge) {
+        foreach ($charges as $charge) {
             $key = $charge['date']->format('Y-m');
             if (!isset($buckets[$key])) {
                 continue;
@@ -137,10 +162,11 @@ final class ForecastService
                     // The share is a proportion of the current price, applied
                     // to the price that will actually be charged, so a member
                     // paying a third still pays a third after an increase.
-                    $charge['amount'] = $this->proportion(
+                    $charge['amount'] = $this->splits->chargeShare(
                         $charge['amount'],
-                        $subscription->price,
-                        $this->splits->shareFor($subscription, $participants, $forUserId),
+                        $subscription,
+                        $participants,
+                        $forUserId,
                     );
                 }
 
@@ -155,6 +181,124 @@ final class ForecastService
         );
 
         return $charges;
+    }
+
+    /**
+     * Every charge expected from today to `$days` days ahead, inclusive, in
+     * date order.
+     *
+     * The same walk as `charges()`, cut to a window measured in days rather
+     * than months — the dashboard's Due next 7 days, Coming up and Next 30
+     * days all read it, so a trial converting on Friday is in all three.
+     *
+     * @return list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}>
+     */
+    public function chargesWithin(Scope $scope, int $days): array
+    {
+        $end = $this->clock->today()->modify(sprintf('+%d days', $days));
+
+        // Whole months enough to cover the window; the shortest month is 28
+        // days, so this is never one short.
+        $months = intdiv(max(0, $days), 28) + 1;
+
+        return array_values(array_filter(
+            $this->charges($scope, $months),
+            static fn (array $charge): bool => $charge['date'] <= $end,
+        ));
+    }
+
+    /**
+     * Whether a subscription's charges recur monthly (or more often) or land
+     * as a lump.
+     *
+     * Read from the cycle a charge is actually billed on, which for a trial is
+     * the cycle it converts to: a free trial becoming a yearly plan is a
+     * yearly bill, and its current cycle says nothing about that.
+     *
+     * @return self::CADENCE_*
+     */
+    public function cadenceOf(Subscription $subscription): string
+    {
+        if (!$subscription->type->countsTowardsRecurringTotals()) {
+            return self::CADENCE_LONG;
+        }
+
+        $cycle = $subscription->isTrial
+            ? $subscription->billingCycleAfterConversion()
+            : $subscription->billingCycle;
+        $days = $subscription->isTrial
+            ? $subscription->cycleDaysAfterConversion()
+            : $subscription->cycleDays;
+
+        return match ($cycle) {
+            BillingCycle::Weekly, BillingCycle::Monthly => self::CADENCE_REGULAR,
+            BillingCycle::CustomDays => $days !== null && $days <= self::REGULAR_MAX_DAYS
+                ? self::CADENCE_REGULAR
+                : self::CADENCE_LONG,
+            default => self::CADENCE_LONG,
+        };
+    }
+
+    /**
+     * The scheduled price changes that take effect inside the horizon, with
+     * the price each replaces, in date order.
+     *
+     * Only for subscriptions in `$subscriptions` — the caller's set, which is
+     * the rows it has forecast charges for — so a change to something paused,
+     * or to something a member bears none of, is not listed as theirs.
+     *
+     * With `$forUserId`, both prices are that member's share of them, by the
+     * same proportion `charges()` applies — so the card and the charges agree.
+     *
+     * @param array<int, Subscription> $subscriptions Keyed by id.
+     * @return list<array{subscription: Subscription, change: PriceChange, previous: Money, price: Money}>
+     */
+    public function scheduledChanges(
+        Scope $scope,
+        array $subscriptions,
+        int $months = self::DEFAULT_MONTHS,
+        ?int $forUserId = null,
+    ): array {
+        $today = $this->clock->today();
+        $horizon = $today->modify(sprintf('+%d months', $months));
+        $splits = $forUserId === null ? [] : $this->splits->allInScope($scope);
+
+        $share = function (Money $amount, Subscription $subscription) use ($splits, $forUserId): Money {
+            return $forUserId === null
+                ? $amount
+                : $this->splits->chargeShare($amount, $subscription, $splits[$subscription->id] ?? [], $forUserId);
+        };
+
+        $rows = [];
+        foreach ($this->priceHistory->findScheduledAfter($scope, $today) as $subscriptionId => $changes) {
+            $subscription = $subscriptions[$subscriptionId] ?? null;
+            if ($subscription === null) {
+                continue;
+            }
+
+            $previous = $subscription->isTrial ? $subscription->priceAfterConversion() : $subscription->price;
+            foreach ($changes as $change) {
+                if ($change->effectiveFrom > $horizon) {
+                    break;
+                }
+
+                $rows[] = [
+                    'subscription' => $subscription,
+                    'change' => $change,
+                    'previous' => $share($previous, $subscription),
+                    'price' => $share($change->price, $subscription),
+                ];
+                $previous = $change->price;
+            }
+        }
+
+        usort(
+            $rows,
+            static fn (array $a, array $b): int => $a['change']->effectiveFrom <=> $b['change']->effectiveFrom
+                ?: $a['subscription']->id <=> $b['subscription']->id,
+        );
+
+        return $rows;
     }
 
     /**
@@ -310,30 +454,6 @@ final class ForecastService
         }
 
         return $price;
-    }
-
-    /**
-     * Scale a future charge by the proportion a member bears today.
-     *
-     * Expressed as a ratio rather than as a stored amount so that an increase
-     * is divided the same way the original was. If the current price is zero —
-     * a trial — the member bears the whole of their converted charge, since
-     * there is no ratio to take.
-     */
-    private function proportion(Money $charge, Money $currentPrice, Money $currentShare): Money
-    {
-        if ($currentPrice->isZero()) {
-            return $charge;
-        }
-
-        return Money::of(
-            Rounding::multiplyDivide(
-                $charge->amountMinor,
-                $currentShare->amountMinor,
-                $currentPrice->amountMinor,
-            ),
-            $charge->currency,
-        );
     }
 
     /**

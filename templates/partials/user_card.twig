@@ -1,0 +1,37 @@
+{#
+    Who is signed in: a face, a name and an address, the whole of which is the
+    way to your own profile — and beside it, the way out.
+
+    The card is a navigation item like any rail row. `NavigationService` claims
+    `/profile` for it, so on your profile it is what is lit, and it carries
+    `aria-current` like any other.
+
+    Sign-out is a form, because signing out changes state and so takes a POST
+    with its CSRF token; it sits here so that it is one click from anywhere,
+    as it was in the top bar before.
+
+    `account`  the NavLink for the profile
+    `user`     the signed-in User
+#}
+{% import 'partials/avatar.twig' as avatar %}
+<div class="user-card">
+    <a class="user-card-link{{ account.active ? ' is-active' : '' }}" href="{{ account.href }}"
+       {{ account.active ? 'aria-current="page"' : '' }}>
+        {{ avatar.face(user.id, user.displayName, user.avatarPath is not null, 36) }}
+        <span class="user-card-text">
+            <span class="user-card-name">{{ user.displayName }}</span>
+            {# A member added without an address of their own has a placeholder one; it is nobody's to show. #}
+            {% if user.canReceiveMail() %}
+                <span class="user-card-email">{{ user.email }}</span>
+            {% endif %}
+            <span class="visually-hidden">{{ t('shell.your_profile') }}</span>
+        </span>
+    </a>
+    <form method="post" action="/logout" class="user-card-signout">
+        {{ csrf_field() }}
+        <button type="submit" class="icon-button" title="{{ t('nav.sign_out') }}">
+            {{ icon('sign-out', 'icon-button-icon') }}
+            <span class="visually-hidden">{{ t('nav.sign_out') }}</span>
+        </button>
+    </form>
+</div>

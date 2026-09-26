@@ -1,11 +1,40 @@
-{% extends 'layout.twig' %}
+{% extends 'auth/_layout.twig' %}
 
-{% block title %}{{ t('auth.link_expired') }} — {{ instance_name }}{% endblock %}
+{#
+    A confirmation link that confirmed nothing. Spent: the address is already
+    confirmed, so the way on is signing in. Run out, or never a link: a new one
+    is needed, and the form here asks for it — the same request, and the same
+    answer whoever types what, as "Send again" after registering.
+#}
 
-{% block content %}
-    <section class="card narrow">
-        <h1>{{ t('auth_verify_failed.title') }}</h1>
-        <p class="muted">{{ t('auth_verify_failed.intro') }}</p>
-        <p><a class="button" href="/login">{{ t('action.back_to_sign_in') }}</a></p>
-    </section>
+{% set used = already_used|default(false) %}
+{% set card_icon = used ? 'ok' : 'clock' %}
+
+{% block card_title %}{{ used ? t('auth_verify_used.title') : t('auth_verify_failed.title') }}{% endblock %}
+{% block card_intro %}
+    {{- used ? t('auth_verify_used.intro') : t('auth_verify_failed.intro', {'days': days}) -}}
+{% endblock %}
+
+{% block card_body %}
+    {% if used %}
+        <a class="button button-primary auth-submit" href="/login">{{ t('auth_login.title') }}</a>
+    {% else %}
+        <form method="post" action="/verify-email/resend" class="auth-form">
+            {{ csrf_field() }}
+
+            {% include 'auth/_input.twig' with {
+                'id': 'email',
+                'name': 'email',
+                'type': 'email',
+                'label': t('field.email'),
+                'autocomplete': 'username',
+                'placeholder': t('auth.email_placeholder'),
+                'required': true,
+            } only %}
+
+            <button type="submit" class="button auth-submit">{{ t('auth_verify_failed.send_new_link') }}</button>
+        </form>
+
+        <p class="auth-links"><a class="auth-back" href="/login">← {{ t('action.back_to_sign_in') }}</a></p>
+    {% endif %}
 {% endblock %}

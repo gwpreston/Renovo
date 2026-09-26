@@ -139,6 +139,9 @@ final class PermissionEnforcementTest extends DatabaseTestCase
             ['POST', '/subscriptions'],
             ['POST', '/subscriptions/{id}'],
             ['POST', '/subscriptions/{id}/toggle'],
+            // Phase 20: cancelling is editing, and so is undoing it.
+            ['POST', '/subscriptions/{id}/cancel'],
+            ['POST', '/subscriptions/{id}/uncancel'],
             ['POST', '/subscriptions/{id}/delete'],
             ['POST', '/categories'],
             ['POST', '/categories/1'],

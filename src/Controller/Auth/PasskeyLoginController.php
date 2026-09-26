@@ -118,7 +118,11 @@ final class PasskeyLoginController extends Controller
             $this->clientIp($request),
         );
 
-        $this->signIn->establish($user, SignInService::METHOD_PASSKEY);
+        // The body is the authenticator's response, so the sign-in form's
+        // "Keep me signed in" rides on the query string beside `next`.
+        $remember = ($request->getQueryParams()['remember'] ?? '1') !== '0';
+
+        $this->signIn->establish($user, SignInService::METHOD_PASSKEY, $remember);
 
         $this->flash('success', 'flash.welcome_back', ['name' => $user->displayName]);
 

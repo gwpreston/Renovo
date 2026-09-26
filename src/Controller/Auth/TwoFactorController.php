@@ -86,7 +86,7 @@ final class TwoFactorController extends Controller
                     'error.auth.throttled',
                     ['minutes' => max(1, (int) ceil($remaining / 60))],
                 ),
-            ]);
+            ], $useRecovery);
         }
 
         $accepted = $useRecovery
@@ -108,7 +108,7 @@ final class TwoFactorController extends Controller
                 'code' => $useRecovery
                     ? new ValidationError('error.recovery_code.invalid')
                     : new ValidationError('error.totp.code_wrong'),
-            ]);
+            ], $useRecovery);
         }
 
         return $this->complete(
@@ -218,12 +218,14 @@ final class TwoFactorController extends Controller
 
         $this->audit->record(AuditAction::TwoFactorSucceeded, $user, ['method' => $method]);
 
+        $remember = $this->twoFactor->pendingRemember();
+
         // Cleared before the session is established, not after: a pending
         // challenge left behind is a second door into the account it names.
         $this->twoFactor->clear();
         $this->session->remove(self::CHALLENGE_SESSION_KEY);
 
-        $this->signIn->establish($user, $method);
+        $this->signIn->establish($user, $method, $remember);
     }
 
     /**
@@ -234,11 +236,18 @@ final class TwoFactorController extends Controller
         ResponseInterface $response,
         User $user,
         array $errors = [],
+        bool $recovery = false,
     ): ResponseInterface {
         return $this->render($request, $response, 'auth/two_factor.twig', [
             'methods' => $this->twoFactor->availableMethods($user->id),
+            // The address, not the name: it is what the authenticator app
+            // lists the account under, so it is what tells the reader which
+            // of their codes to type.
+            'email' => $user->email,
             'display_name' => $user->displayName,
             'errors' => $errors,
+            // Keep the recovery form open when it was the one that failed.
+            'recovery_open' => $recovery,
         ]);
     }
 

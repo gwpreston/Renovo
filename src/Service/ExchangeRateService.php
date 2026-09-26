@@ -171,6 +171,52 @@ final class ExchangeRateService
     }
 
     /**
+     * The settings page's "Refresh now": a refresh asked for by a person,
+     * through the same provider and the same shared HTTP client as the
+     * scheduled one.
+     *
+     * It is refused while a failed attempt is inside its retry window — the
+     * back-off that keeps a provider outage from becoming a request on every
+     * page view is not something a button should be able to click through. A
+     * refresh that succeeded is no such bar: asking again is what the button
+     * is for.
+     *
+     * @return int|null Number of rates cached, or null when backing off.
+     * @throws RateProviderException
+     */
+    public function refreshNow(): ?int
+    {
+        if ($this->retryAfter() !== null) {
+            return null;
+        }
+
+        return $this->refresh();
+    }
+
+    /**
+     * When the failure back-off lifts, or null when nothing is holding a
+     * refresh back.
+     */
+    public function retryAfter(): ?DateTimeImmutable
+    {
+        $lastAttempt = $this->settings->ratesLastAttemptAt();
+        if ($lastAttempt === null) {
+            return null;
+        }
+
+        // A successful attempt stores its table at or after the moment it was
+        // marked, so an attempt later than the last table is one that failed.
+        $fetchedAt = $this->lastRefreshedAt();
+        if ($fetchedAt !== null && $fetchedAt >= $lastAttempt) {
+            return null;
+        }
+
+        $until = $lastAttempt->modify(sprintf('+%d seconds', $this->retrySeconds));
+
+        return $until > $this->clock->now() ? $until : null;
+    }
+
+    /**
      * Fetch and store the current table.
      *
      * @return int Number of rates cached.
@@ -210,6 +256,12 @@ final class ExchangeRateService
     {
         $this->repository->clear();
         $this->cache = null;
+
+        // The back-off went with the table: it was about the old provider or
+        // base. Left in place, a successful refresh just before the change
+        // would read as a failure — an attempt newer than any table — and
+        // hold Refresh now back at exactly the moment it is wanted.
+        $this->settings->clearRatesAttempted();
     }
 
     public function isStale(): bool
@@ -243,6 +295,23 @@ final class ExchangeRateService
         sort($codes);
 
         return $codes;
+    }
+
+    /**
+     * The cached table against the base currency, one rate per other
+     * currency, alphabetically — what the settings page lists.
+     *
+     * @return list<ExchangeRate>
+     */
+    public function rates(): array
+    {
+        $rates = array_values(array_filter(
+            $this->cachedRates(),
+            fn (ExchangeRate $rate): bool => $rate->quoteCurrency !== $this->settings->baseCurrency(),
+        ));
+        usort($rates, static fn (ExchangeRate $a, ExchangeRate $b): int => $a->quoteCurrency <=> $b->quoteCurrency);
+
+        return $rates;
     }
 
     public function provider(): ExchangeRateProvider

@@ -1,150 +1,64 @@
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.subscriptions') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.subscriptions') }}{% endblock %}
 
 {% block content %}
     {#
-        The screen the design asks for: the figures across the top, the list
-        itself, then the two deadline sections and the trials, with the category
-        widget and the saved views alongside. The list is the list — the same
-        fragment htmx swaps — rather than a second one built for this
-        arrangement.
+        The screen the design asks for: the four figures, the toolbar, the list
+        itself, and the cancel-by deadlines beneath it. The list is the list —
+        the same fragment htmx swaps — rather than a second one built for this
+        arrangement. Free trials and the category breakdown live on the
+        dashboard now, which carries both.
     #}
     {% include 'subscriptions/_strip.twig' %}
 
-    <div class="subscriptions-layout">
-        <div class="subscriptions-main">
+    <section class="card subscriptions-toolbar" aria-label="{{ t('subscriptions.toolbar') }}">
         {#
-            The filter form drives the list through htmx: it replaces only the
-            table, and pushes the query string so the view is bookmarkable and the
-            back button works.
+            The search box. A GET form, so without script it is an ordinary
+            search that reloads the page; with htmx it replaces only the list and
+            pushes the query string, so the view is bookmarkable and the back
+            button works. The rest of the filter rides along in the hidden
+            fields `_toolbar.twig` keeps current.
 
-            Search, category and member, and the tag chips. Currency and type
-            are still understood as query parameters — the API takes them, and
-            a saved view may carry them — but they are not offered here: a
-            household types a name far more often than it narrows by currency.
-            Paused subscriptions are always listed, at the bottom, so there is
-            nothing to tick either.
+            The add button sits beside it but outside the form: it is a link to
+            the quick-add dialog, not part of the search.
         #}
-        <form class="card filters"
-              hx-get="/subscriptions"
-              hx-target="#subscription-list"
-              hx-select="#subscription-list"
-              hx-swap="outerHTML"
-              hx-push-url="true"
-              hx-trigger="change, keyup delay:300ms from:#q, submit">
-
-            <div class="filter-row">
-                <div class="filter-field grow">
-                    <label for="q">{{ t('subscriptions.search') }}</label>
+        <div class="list-search-bar">
+            <form id="list-search" class="list-search" role="search" method="get" action="/subscriptions"
+                  hx-get="/subscriptions"
+                  hx-target="#subscription-list"
+                  hx-select="#subscription-list"
+                  hx-swap="outerHTML"
+                  hx-push-url="true"
+                  hx-trigger="keyup changed delay:300ms from:#q, search from:#q, submit">
+                <label for="q" class="visually-hidden">{{ t('subscriptions.search') }}</label>
+                <span class="list-search-field">
+                    {{ icon('search') }}
                     <input type="search" id="q" name="q" value="{{ filter.search }}"
-                           placeholder="{{ t('subscriptions.name_or_notes') }}">
-                </div>
+                           placeholder="{{ t('subscriptions.filter_placeholder') }}">
+                </span>
+                {% include 'subscriptions/_toolbar_search_state.twig' %}
+                <noscript><button type="submit" class="button">{{ t('subscriptions.apply_filters') }}</button></noscript>
+            </form>
 
-                <div class="filter-field">
-                    <label for="category">{{ t('field.category') }}</label>
-                    <select id="category" name="category">
-                        <option value="">{{ t('state.all') }}</option>
-                        {% for category in categories %}
-                            <option value="{{ category.id }}"
-                                    {{ filter.categoryId == category.id ? 'selected' : '' }}>{{ category.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="filter-field">
-                    <label for="owner">{{ t('field.member') }}</label>
-                    <select id="owner" name="owner">
-                        <option value="">{{ t('state.all') }}</option>
-                        {% for member in members %}
-                            <option value="{{ member.id }}"
-                                    {{ filter.ownerUserId == member.id ? 'selected' : '' }}>{{ member.display_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-            </div>
-
-            {% if tags %}
-                <div class="filter-tags">
-                    {% for tag in tags %}
-                        <label class="chip">
-                            <input type="checkbox" name="tag[]" value="{{ tag.id }}"
-                                   {{ tag.id in filter.tagIds ? 'checked' : '' }}>
-                            <span>{{ tag.name }}</span>
-                        </label>
-                    {% endfor %}
-                </div>
+            {% if can(scope, 'subscription.create') %}
+                <a class="button button-primary list-search-add" href="/subscriptions/new"
+                   data-opens-dialog="quick-add">
+                    {{ icon('add') }}<span>{{ t('subscriptions.add_subscription') }}</span>
+                </a>
             {% endif %}
-
-            <noscript><button type="submit" class="button">{{ t('subscriptions.apply_filters') }}</button></noscript>
-        </form>
-
-        {#
-            The list fragment, included from here rather than wrapped from inside
-            it: `#subscription-list` has to stay the outermost element of that file,
-            because the filter form selects it and swaps it whole.
-        #}
-        {#
-            `oob_query: false` because this page renders the real hidden field
-            itself — in the saved-views card, now in the column alongside — and
-            the fragment's out-of-band copy of it would be a second element with
-            the same id.
-        #}
-        {% include 'subscriptions/_list.twig' with {'oob_query': false} %}
-
-        {% include 'subscriptions/_expiring.twig' %}
-        {% include 'subscriptions/_trials.twig' %}
         </div>
 
-        <aside class="subscriptions-side">
-            {% include 'subscriptions/_categories.twig' %}
+        {% include 'subscriptions/_toolbar.twig' with {'oob': false} %}
+    </section>
 
-            {#
-                Saved views. Ordinary links, not an htmx swap: applying one is a change
-                of view, and the address bar should say so — a saved view that cannot
-                be bookmarked or shared is barely saved at all.
-            #}
-            <section class="card saved-views" aria-labelledby="saved-views-heading">
-                <h2 id="saved-views-heading" class="stat-label">{{ t('saved_views.heading') }}</h2>
+    {#
+        `oob_query: false` because this page renders the toolbar itself, just
+        above, and the fragment's out-of-band copy of it would be a second set
+        of elements with the same ids.
+    #}
+    {% include 'subscriptions/_list.twig' with {'oob_query': false} %}
 
-                {% if saved_views is empty %}
-                    <p class="muted">{{ t('saved_views.empty') }}</p>
-                {% else %}
-                    <ul class="saved-view-list">
-                        {% for view in saved_views %}
-                            <li class="chip chip-static">
-                                <a href="{{ view.path }}">{{ view.name }}</a>
-                                <form method="post" action="/saved-views/{{ view.id }}/delete" class="inline">
-                                    {{ csrf_field() }}
-                                    <button type="submit" class="button-icon"
-                                            aria-label="{{ t('saved_views.forget', {'name': view.name}) }}">×</button>
-                                </form>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-
-                <form method="post" action="/saved-views" class="inline-form">
-                    {{ csrf_field() }}
-                    {#
-                        What "save this view" would store. The filter form in the
-                        other column swaps only the list, so this field would
-                        otherwise still hold the query the page was *loaded* with
-                        — which is how a view saved after filtering came out
-                        empty. `_list.twig` sends a replacement for it out of band
-                        on every filter, sort and page request; the id is what that
-                        replacement aims at, so the two have to keep matching, and
-                        that is why this card can sit in either column without the
-                        out-of-band swap noticing.
-                    #}
-                    <input type="hidden" id="saved-view-query" name="query" value="{{ current_query }}">
-                    <label for="saved-view-name" class="visually-hidden">{{ t('saved_views.name_label') }}</label>
-                    <input type="text" id="saved-view-name" name="name" maxlength="60"
-                           placeholder="{{ t('saved_views.name_placeholder') }}">
-                    <button type="submit" class="button">{{ t('saved_views.save_current') }}</button>
-                </form>
-            </section>
-        </aside>
-    </div>
+    {% include 'subscriptions/_cancel_by.twig' %}
 {% endblock %}

@@ -41,7 +41,7 @@
 .renewal-date,
 .renewal-days,
 .renewal-amount {
-    color: var(--text-muted);
+    color: var(--muted);
     white-space: nowrap;
 }
 
@@ -55,7 +55,7 @@
  * anyone who cannot tell the two apart.
  */
 .renewal-days.is-due-soon {
-    color: var(--danger);
+    color: var(--bad);
     font-weight: 600;
 }
 
@@ -140,6 +140,11 @@
 
 .metric .stat-value {
     line-height: 1.1;
+}
+
+/* The one-off and lifetime line under the tiles is set apart from them. */
+.one-off-note {
+    margin-top: 1rem;
 }
 
 /* "/ year" is one label: on a narrow tile it wraps as a unit or not at all. */
@@ -238,7 +243,7 @@
     padding: 0;
     list-style: none;
     font-size: var(--size-label);
-    color: var(--text-muted);
+    color: var(--muted);
 }
 
 .chart-card.is-drawn .chart-legend {
@@ -264,13 +269,14 @@
     border-top-style: solid;
 }
 
+/* The same series tokens the chart draws its two lines in. */
 .chart-key-total {
-    border-top-color: var(--warning);
+    border-top-color: var(--s4);
 }
 
 .chart-key-committed {
     border-top-style: dashed;
-    border-top-color: var(--accent);
+    border-top-color: var(--s2);
 }
 
 .chart-key-gap {
@@ -289,7 +295,7 @@
 
 .chart-figures .is-peak th,
 .chart-figures .is-peak td {
-    color: var(--warning);
+    color: var(--warn);
 }
 
 /* Where the money goes, as a share of the combined monthly total. */
@@ -314,7 +320,7 @@
 }
 
 .distribution-amount {
-    color: var(--text-muted);
+    color: var(--muted);
     white-space: nowrap;
 }
 
@@ -326,7 +332,7 @@
 
 .budget-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
     gap: 1rem;
 }
 
@@ -341,18 +347,242 @@
     margin: 0;
 }
 
-/*
- * Approaching and over, in the two hues PHASE.md separates. Amber is the
- * heads-up — money is about to move, nothing is wrong yet — and red is the
- * problem. Keeping them different hues is what lets a screen say "this is the
- * action" and "this needs attention" without the two competing.
- */
-.budget.is-warning {
-    border-left: 4px solid var(--warning);
+.budget-tiles {
+    margin-bottom: 1rem;
 }
 
-.budget.is-over {
-    border-left: 4px solid var(--danger);
+/* A tile led by its icon: a large tinted square, the eyebrow and figure beside it. */
+.kpi.kpi-side {
+    flex-direction: row;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.kpi-side .kpi-icon {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: var(--radius);
+}
+
+.kpi-side .kpi-icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.kpi-body {
+    min-width: 0;
+}
+
+.kpi-body .stat-value {
+    margin: 0;
+}
+
+.kpi-icon-bad {
+    background: var(--bad-bg);
+    color: var(--bad);
+}
+
+.budget-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.budget-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.625rem;
+}
+
+.budget-card-title {
+    min-width: 0;
+}
+
+.budget-card-title h2 {
+    margin: 0;
+    font-size: var(--size-body);
+    font-weight: var(--weight-bold);
+}
+
+.budget-meta {
+    margin: 0.125rem 0 0;
+    font-size: var(--size-caption);
+    color: var(--muted);
+}
+
+.budget-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+
+.budget-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--size-caption);
+}
+
+.budget-projected {
+    font-size: var(--size-kpi);
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.02em;
+}
+
+/*
+ * The dashboard's budget track, taller, with the warning threshold as a tick
+ * across it: the projection as a wash, charged so far solid over it, on the
+ * limit's scale — so the gap between the two is what is still to come.
+ */
+.budget-bar {
+    position: relative;
+    height: 0.625rem;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+}
+
+.budget-bar > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-pill);
+}
+
+.budget-bar-projected {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.budget-bar-charged {
+    background: var(--accent);
+}
+
+.budget-bar > .budget-bar-warn {
+    top: -0.25rem;
+    bottom: -0.25rem;
+    width: 0;
+    border-left: 2px solid var(--text);
+    border-radius: 0;
+    opacity: 0.5;
+}
+
+.budget-card.is-warn .budget-bar-charged {
+    background: var(--warn);
+}
+
+.budget-card.is-warn .budget-bar-projected {
+    background: var(--warn-bg);
+    box-shadow: inset 0 0 0 1px var(--warn);
+}
+
+.budget-card.is-bad .budget-bar-charged {
+    background: var(--bad);
+}
+
+.budget-card.is-bad .budget-bar-projected {
+    background: var(--bad-bg);
+    box-shadow: inset 0 0 0 1px var(--bad);
+}
+
+.budget-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.625rem;
+    margin: 0;
+    font-size: var(--size-caption);
+}
+
+.budget-note {
+    margin: 0;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+}
+
+.budget-card.is-warn .budget-note {
+    color: var(--warn);
+}
+
+.budget-card.is-bad .budget-note {
+    color: var(--bad);
+}
+
+.budget-alerts {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: auto 0 0;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--border);
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.budget-alerts svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex-shrink: 0;
+}
+
+.budget-history {
+    margin-top: 1rem;
+}
+
+/*
+ * The budget form: the limit and its period share a row where there is room
+ * for both, and the slider runs the full width under a label that carries its
+ * percentage at the far end.
+ */
+.budget-form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 0.875rem;
+}
+
+.budget-form .segmented {
+    align-self: flex-start;
+}
+
+.range-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.range-label output {
+    font-weight: var(--weight-semibold);
+}
+
+.range-input {
+    width: 100%;
+    accent-color: var(--accent);
+}
+
+/* In the dialog the form takes the dialog's width, under its title. */
+.dialog .budget-form {
+    max-width: none;
+    margin: 0;
+}
+
+.budget-form > .stack {
+    gap: 1rem;
+}
+
+.budget-form .field > label,
+.budget-form .group-label,
+.range-label label {
+    font-weight: var(--weight-semibold);
+}
+
+/* Delete to the left, away from Save. */
+.budget-form-actions .button-danger {
+    margin-right: auto;
 }
 
 /*
@@ -363,68 +593,193 @@
 .meter {
     height: 0.6rem;
     border-radius: var(--radius-pill);
-    background: var(--surface-sunken);
+    background: var(--surface-2);
     border: 1px solid var(--border);
     overflow: hidden;
     margin: 0.5rem 0;
 }
 
-.meter-slim {
-    height: 0.4rem;
+/* A meter inside a row or a table cell sits flush against its figures. */
+.distribution-row .meter,
+.table .meter {
     margin: 0;
 }
 
 .meter-fill {
     display: block;
     height: 100%;
-    background: var(--gradient-brand);
+    background: var(--accent);
 }
 
-.budget.is-warning .meter-fill,
 .meter.is-warning .meter-fill {
-    background: var(--warning);
+    background: var(--warn);
 }
 
-.budget.is-over .meter-fill,
 .meter.is-over .meter-fill {
-    background: var(--danger);
+    background: var(--bad);
 }
 
 /* --------------------------------------------------------------- forecast */
 
-.forecast-events {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: var(--size-body);
+/*
+ * The Forecast page's chart: the spend bars, each in two parts — regular
+ * charges beneath in the first series colour, lump renewals on top in the
+ * second. A hairline of the card's own surface between the two keeps them
+ * apart where the colours sit close in a palette.
+ */
+.spend-bar-regular {
+    background: var(--s1);
 }
 
-.forecast-events li {
-    display: flex;
-    flex-wrap: wrap;
+.spend-bar-long {
+    background: var(--s2);
+    border-bottom: 1px solid var(--surface);
+}
+
+.chart-key-regular,
+.chart-key-long,
+.cadence-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-top: 0;
+    border-radius: 3px;
+}
+
+.chart-key-regular,
+.cadence-regular {
+    background: var(--s1);
+}
+
+.chart-key-long,
+.cadence-long {
+    background: var(--s2);
+}
+
+/* The same key beside each row of the cards. */
+.cadence-dot {
+    display: inline-block;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+/*
+ * Each month is a link to it in the calendar: the bar for a pointer, the
+ * label for a keyboard. A label reads as the axis text it replaces until it
+ * is pointed at or focused.
+ */
+.forecast-chart .spend-bar:hover {
+    opacity: 0.85;
+}
+
+.forecast-chart .spend-bars-labels a {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    font-size: var(--size-caption);
+    color: var(--faint);
+    text-decoration: none;
+}
+
+.forecast-chart .spend-bars-labels a.is-current {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+}
+
+.forecast-chart .spend-bars-labels a:hover,
+.forecast-chart .spend-bars-labels a:focus-visible {
+    color: var(--text);
+    text-decoration: underline;
+}
+
+/* Twelve bars: labels fit down to a phone, where every other one shows. */
+@media (max-width: 479px) {
+    .forecast-chart .spend-bars-labels a:nth-child(even):not(.is-current) {
+        visibility: hidden;
+    }
+}
+
+/* A card's rows: name, a detail beneath it, the figure on the right. */
+.forecast-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.5rem 0 0;
+}
+
+.forecast-list-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.125rem 0.75rem;
     align-items: baseline;
+}
+
+.forecast-row-name {
+    display: flex;
+    flex: 1;
+    align-items: center;
     gap: 0.5rem;
+    min-width: 0;
+    font-weight: var(--weight-semibold);
+}
+
+.forecast-row-name .logo {
+    flex-shrink: 0;
+}
+
+.forecast-row-name .hint {
+    font-weight: var(--weight-normal);
+}
+
+.forecast-row-detail {
+    grid-column: 1;
+    font-size: var(--size-label);
+}
+
+.forecast-row-figure {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    font-weight: var(--weight-semibold);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.forecast-row-figure .hint {
+    display: block;
+    font-weight: var(--weight-normal);
+}
+
+.forecast-cancel .top-row {
+    align-items: center;
+}
+
+.forecast-cancel .top-figure {
+    text-align: right;
 }
 
 /* -------------------------------------------------------------- cancel-by */
 
 tr.is-urgent > td {
-    background: var(--warning-bg);
+    background: var(--warn-bg);
 }
 
 tr.is-passed > td {
-    background: var(--error-bg);
+    background: var(--bad-bg);
 }
 
 /* A failed sign-in should be findable by eye in a long log. */
 .row-warning td:first-child {
-    border-left: 3px solid var(--warning);
+    border-left: 3px solid var(--warn);
     padding-left: 0.5rem;
 }
 
 /* ---------------------------------------------------------- price history */
 
-.timeline {
+/*
+ * A subscription's price history. Its own names: the household dashboard's
+ * thirty-day line is `.timeline`, positioned absolutely, and sharing the class
+ * laid these rows on top of one another.
+ */
+.price-timeline {
     list-style: none;
     margin: 0 0 1rem;
     padding: 0;
@@ -433,25 +788,25 @@ tr.is-passed > td {
     gap: 0.75rem;
 }
 
-.timeline li {
+.price-timeline li {
     border-left: 2px solid var(--border);
     padding-left: 0.75rem;
 }
 
-.timeline li.is-scheduled {
+.price-timeline li.is-scheduled {
     border-left-style: dashed;
-    border-left-color: var(--warning);
+    border-left-color: var(--warn);
 }
 
-.timeline-date {
+.price-timeline-date {
     font-size: var(--size-label);
-    color: var(--text-muted);
+    color: var(--muted);
     display: flex;
     gap: 0.5rem;
     align-items: center;
 }
 
-.timeline-amount {
+.price-timeline-amount {
     font-weight: var(--weight-semibold);
     display: flex;
     gap: 0.5rem;
@@ -460,11 +815,11 @@ tr.is-passed > td {
 
 /* A price going up is bad news in a bills application; going down is good. */
 .is-increase {
-    color: var(--increase);
+    color: var(--bad);
 }
 
 .is-decrease {
-    color: var(--decrease);
+    color: var(--ok);
 }
 
 /* ------------------------------------------------- security and the audit log */
@@ -509,8 +864,9 @@ tr.is-passed > td {
 /* ----------------------------------------------------------- notifications */
 
 /*
- * Every list in the templates carries a class and is laid out here. This one
- * relied on the browser's own list styling until Preflight removed it.
+ * The setup wizard's list of the channels added so far. Every list in the
+ * templates carries a class and is laid out here; this one relied on the
+ * browser's own list styling until Preflight removed it.
  */
 .channel-list {
     list-style: none;
@@ -531,24 +887,117 @@ tr.is-passed > td {
     border-bottom: 0;
 }
 
-/* ----------------------------------------------------------- saved views */
+/*
+ * A channel that is off: its row dimmed, and its column in the routing grid
+ * too. Dimmed text is still AA — `--muted` is the pair the contrast test holds
+ * — and the word "Off" says it as well, so the state is never colour alone.
+ */
+.channel-row.is-off .account-row-name,
+.routing-channel.is-off {
+    color: var(--muted);
+}
 
-.saved-views {
+/*
+ * The channel list: each channel its own bordered tile rather than a ruled
+ * row, with its edit disclosure a small quiet link under the detail so the
+ * name, the detail and the switch are what the eye lands on.
+ */
+.channel-rows {
     display: grid;
     gap: 0.6rem;
 }
 
-.saved-view-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
+.channel-rows .account-row,
+.channel-rows .account-row:first-child {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    column-gap: 1rem;
 }
 
-.saved-view-list a {
-    text-decoration: none;
+.channel-rows .account-row-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--text);
+}
+
+.channel-rows .account-row-more > summary {
+    min-height: 0;
+    padding: 0.15rem 0;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: var(--size-label);
+    gap: 0.3rem;
+}
+
+.channel-rows .account-row-more > summary:hover {
+    color: var(--text);
+}
+
+.channel-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* The eleven channel types under Add a channel, one disclosure each. */
+.channel-form {
+    border-top: 1px solid var(--border);
+    padding: 0.6rem 0;
+}
+
+.channel-form > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-weight: var(--weight-medium);
+}
+
+.channel-form > summary svg {
+    width: 1rem;
+    height: 1rem;
+    color: var(--muted);
+}
+
+.channel-form[open] > summary {
+    margin-bottom: 0.75rem;
+}
+
+/*
+ * Alert types down the side, channels across the top, a box where they meet.
+ * The grid scrolls inside its card on a phone rather than widening the page.
+ */
+.routing-table th[scope='col'].routing-channel,
+.routing-cell {
+    text-align: center;
+}
+
+/*
+ * The alert types and the channel names are the grid's content, not column
+ * eyebrows, so they keep the case they are written in rather than `.table th`'s
+ * uppercase caption.
+ */
+.routing-table tbody th[scope='row'],
+.routing-table th[scope='col'].routing-channel {
+    font-size: var(--size-body);
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: var(--weight-medium);
+}
+
+.routing-table tbody th[scope='row'] {
+    color: var(--text);
+}
+
+.routing-cell input {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.routing-cell input:disabled {
+    cursor: not-allowed;
 }
 
 /* ---------------------------------------------------------------- profile */
@@ -585,6 +1034,122 @@ tr.is-passed > td {
     }
 }
 
+/*
+ * A row about something attached to the account — a second factor, a passkey,
+ * a signed-in browser: an icon in a tile, what it is with a line of detail
+ * under it, and what can be done to it at the end. A disclosure belonging to
+ * the row (rename, turn off) opens on a line of its own beneath.
+ */
+.account-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.account-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.account-row:first-child {
+    border-top: 0;
+}
+
+.account-row-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.account-row-text {
+    display: grid;
+    min-width: 0;
+}
+
+.account-row-name {
+    font-weight: var(--weight-semibold);
+    overflow-wrap: anywhere;
+}
+
+.account-row-meta {
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+.account-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.account-row-more {
+    grid-column: 2 / -1;
+}
+
+.account-row-more > summary {
+    list-style: none;
+    display: inline-flex;
+}
+
+.account-row-more > summary::-webkit-details-marker {
+    display: none;
+}
+
+.account-row-more[open] > summary {
+    margin-bottom: 0.75rem;
+}
+
+.account-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.account-footer > .account-row-more {
+    flex-basis: 100%;
+}
+
+.pending-email {
+    margin: 0.5rem 0 0;
+    font-size: var(--size-label);
+}
+
+/* The appearance controls, as many to a line as fit. */
+.preference-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 1rem;
+}
+
+.preference {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.preference > legend {
+    margin-bottom: 0.4rem;
+    font-weight: var(--weight-medium);
+}
+
+.profile-signout {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+}
+
 /* --------------------------------------------------- dashboard card layout */
 
 .card-layout {
@@ -613,17 +1178,14 @@ tr.is-passed > td {
 /* --------------------------------------------------------------- calendar */
 
 /*
- * The screen's shape: the month grid, and the rail beside it on a wide screen
- * and below it on a narrow one.
+ * The screen's shape: the month's card on the left, and the open day, the
+ * summary and the feed stacked beside it on a wide screen; one column below
+ * that.
  *
- * The same breakpoint and the same column widths as `.subscriptions-layout`,
- * deliberately — two screens that are "a wide thing with a rail" should change
- * shape at the same width, or the interface appears to reflow at two arbitrary
- * points instead of one.
- *
- * The gap is horizontal only, because the cards space themselves vertically
- * with their own margin and a row gap on top of that is a double space on
- * every phone.
+ * `#calendar-month` is what htmx swaps, and it holds three of those four
+ * cards — so it lays out through this grid (`display: contents`) instead of
+ * being a box of its own, and the feed card outside it still lines up in the
+ * same column.
  */
 .calendar-layout {
     display: grid;
@@ -631,235 +1193,958 @@ tr.is-passed > td {
     align-items: start;
 }
 
+.calendar-month {
+    display: contents;
+}
+
 @media (min-width: 1100px) {
     .calendar-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
+        grid-template-columns: minmax(0, 1fr) clamp(20rem, 34%, 36rem);
+    }
+
+    .calendar-layout .calendar {
+        grid-column: 1;
+        grid-row: 1 / span 4;
+    }
+
+    .calendar-layout .calendar-day-panel,
+    .calendar-layout .calendar-summary,
+    .calendar-layout .calendar-feed {
+        grid-column: 2;
     }
 }
 
-/*
- * A seven-column table will happily refuse to be narrower than its content and
- * push the whole page sideways; `min-width: 0` is what makes it scroll inside
- * its own wrapper instead.
- */
-.calendar-layout > .calendar,
-.calendar-rail {
+/* A seven-column grid must scroll inside its card, never widen the page. */
+.calendar-layout > *,
+.calendar-month > * {
     min-width: 0;
-}
-
-/*
- * In a rail this narrow the three-across row the dashboard uses does not fit,
- * so the name takes the first line and the date and amount share the second.
- */
-.calendar-rail .renewals li {
-    flex-wrap: wrap;
-}
-
-.calendar-rail .renewal-name {
-    flex: 1 0 100%;
-}
-
-.calendar-rail .renewal-date {
-    flex: 1 1 auto;
-}
-
-/*
- * The month's figure, stated once and here. Several currencies are several
- * figures side by side and never a sum: this instance may hold no rate for one
- * of them, and adding them would invent one.
- */
-.calendar-insight-total {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.75rem;
-    margin: 0;
-}
-
-.calendar-insight-heading {
-    font-size: var(--size-heading);
-    margin: 1rem 0 0.25rem;
-}
-
-/*
- * A deadline is the one thing in the rail that expires, so it is not left to
- * the amber badge alone to say so — the row carries a border as well, which
- * survives greyscale and colour blindness.
- */
-.calendar-deadline {
-    border-left: 3px solid var(--warning);
-    padding-left: 0.5rem;
 }
 
 .calendar-header {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
+    margin-bottom: 1rem;
 }
 
 .calendar-header h2 {
     margin: 0;
 }
 
+.calendar-count {
+    margin: 0.15rem 0 0;
+    font-size: var(--size-label);
+}
+
 .calendar-nav {
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.calendar-today {
+    padding-block: 0.45rem;
 }
 
 .calendar-grid {
+    border-collapse: separate;
+    border-spacing: 0.375rem;
     width: 100%;
-    border-collapse: collapse;
     table-layout: fixed;
 }
 
 .calendar-grid th {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--text-muted);
-    font-weight: var(--weight-semibold);
-    padding: 0.35rem 0.25rem;
+    color: var(--muted);
+    font-weight: var(--weight-bold);
+    padding: 0 0.375rem;
     text-align: left;
 }
 
 .calendar-day {
     vertical-align: top;
-    border: 1px solid var(--border);
-    padding: 0.35rem;
-    /*
-     * A month is five or six rows; a fixed minimum keeps the grid from
-     * collapsing into strips on a quiet month.
-     */
-    height: 5.5rem;
-    width: 14.28%;
-}
-
-.calendar-day.is-empty {
-    background: var(--surface-sunken);
-    border-color: transparent;
-}
-
-.calendar-day.is-today {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
-}
-
-.calendar-date {
-    font-size: var(--size-label);
-    color: var(--text-muted);
-    display: block;
-}
-
-.calendar-day.is-today .calendar-date {
-    color: var(--accent);
-    font-weight: var(--weight-semibold);
-}
-
-.calendar-events {
-    list-style: none;
-    margin: 0.25rem 0 0;
+    height: 6.5rem;
     padding: 0;
-    display: grid;
-    gap: 0.2rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
 }
 
-.calendar-event {
-    font-size: 0.75rem;
-    line-height: 1.3;
-    padding: 0.2rem 0.3rem;
-    border-radius: var(--radius-small);
-    background: var(--surface-sunken);
-    border-left: 3px solid var(--accent);
+.calendar-day.is-outside {
+    background: var(--surface-2);
+    border-color: transparent;
+    padding: 0.375rem;
 }
 
-.calendar-event.is-trial {
-    border-left-color: var(--warning);
+.calendar-day.is-outside .calendar-date {
+    color: var(--faint);
 }
 
-.calendar-event a {
-    display: block;
-    color: inherit;
-    text-decoration: none;
-    font-weight: var(--weight-semibold);
+.calendar-day:not(.is-outside):hover,
+.calendar-day.is-selected {
+    border-color: var(--accent-text);
 }
 
-.calendar-event a:hover {
-    text-decoration: underline;
-}
-
-.calendar-amount {
-    color: var(--text-muted);
+.calendar-day.is-selected {
+    box-shadow: inset 0 0 0 1px var(--accent-text);
 }
 
 /*
- * On a phone a seven-column grid is unreadable, so the same markup becomes a
- * list: each day that has something on it is a block, and every other cell —
- * the padding days of a neighbouring month and the days with nothing due — is
- * dropped, because a column of thirty bare numbers is not a calendar.
- *
- * With the headings gone, each remaining day carries its own weekday in
- * `data-weekday`, which the template fills from the reader's locale.
+ * The whole cell is the link, so a day is chosen by clicking anywhere on it
+ * as the prototype does — and it is still one focusable, named control.
  */
-@media (max-width: 720px) {
-    .calendar-grid,
-    .calendar-grid tbody,
-    .calendar-grid tr,
-    .calendar-grid td {
+.calendar-day-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    height: 100%;
+    min-height: 6.5rem;
+    padding: 0.375rem;
+    box-sizing: border-box;
+    color: inherit;
+    text-decoration: none;
+    border-radius: inherit;
+}
+
+.calendar-day-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+}
+
+.calendar-date {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.375rem;
+    height: 1.375rem;
+    padding: 0 0.3rem;
+    box-sizing: border-box;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: var(--weight-bold);
+    color: var(--text);
+}
+
+.calendar-day.is-today .calendar-date {
+    background: var(--accent);
+    color: var(--accent-ink);
+}
+
+.calendar-day-total {
+    font-size: 0.625rem;
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/*
+ * A chip: an icon, a word for screen readers, and the name. The fill says the
+ * kind at a glance; the icon says it in greyscale and in forced colours.
+ */
+.calendar-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 0.125rem 0.3rem;
+    border-radius: var(--radius-small);
+    font-size: 0.625rem;
+    font-weight: var(--weight-bold);
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
+.calendar-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar-chip.is-charge {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.calendar-chip.is-trial {
+    background: var(--info-bg);
+    color: var(--info);
+}
+
+.calendar-chip.is-cancel-by {
+    background: var(--warn-bg);
+    color: var(--warn);
+}
+
+.calendar-kind-icon {
+    flex: none;
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+.calendar-more {
+    font-size: 0.625rem;
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+    padding-left: 0.125rem;
+}
+
+.calendar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    margin-top: 1rem;
+}
+
+.calendar-legend .calendar-chip {
+    font-size: 0.6875rem;
+}
+
+/* ---------------------------------------------------- the day's items */
+
+.calendar-day-panel-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.calendar-day-panel-header h2 {
+    margin: 0;
+    font-size: var(--size-heading);
+}
+
+.calendar-day-panel-total {
+    font-weight: var(--weight-bold);
+}
+
+.calendar-items {
+    display: grid;
+}
+
+.calendar-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.75rem;
+    padding: 0.625rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.calendar-item-body {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+}
+
+.calendar-item-name {
+    font-weight: var(--weight-bold);
+    color: inherit;
+    text-decoration: none;
+}
+
+.calendar-item-name:hover {
+    text-decoration: underline;
+}
+
+/* Wraps rather than truncating: "notice period 30 days" is the point of the line. */
+.calendar-item-what {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.calendar-item-what .calendar-kind-icon {
+    align-self: center;
+}
+
+.calendar-item.is-trial .calendar-kind-icon {
+    color: var(--info);
+}
+
+.calendar-item.is-cancel-by .calendar-kind-icon {
+    color: var(--warn);
+}
+
+.calendar-item.is-charge .calendar-kind-icon {
+    color: var(--accent-text);
+}
+
+.calendar-item-owner {
+    flex: none;
+}
+
+.calendar-item-amount {
+    display: grid;
+    justify-items: end;
+    font-weight: var(--weight-bold);
+}
+
+/* ------------------------------------------------------------ summary */
+
+.calendar-summary-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875rem;
+    margin: 0;
+}
+
+.calendar-summary-item dt {
+    font-size: 0.6875rem;
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.calendar-summary-item dd {
+    margin: 0.125rem 0 0;
+    font-size: 1.125rem;
+}
+
+.calendar-summary-item[data-summary='heaviest'] {
+    grid-column: 1 / -1;
+}
+
+/* --------------------------------------------------------------- feed */
+
+.calendar-feed-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--size-heading);
+}
+
+.copy-field {
+    display: flex;
+    gap: 0.375rem;
+}
+
+.copy-field-input {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.6875rem;
+    color: var(--muted);
+    background: var(--surface-2);
+}
+
+.calendar-feed-replace {
+    margin-top: 0.75rem;
+}
+
+.calendar-feed-replace > summary {
+    list-style: none;
+}
+
+.calendar-feed-replace > summary::-webkit-details-marker {
+    display: none;
+}
+
+.calendar-feed-warning {
+    color: var(--warn);
+}
+
+/*
+ * The phone form. Below 768px the grid gives way to a list of the days that
+ * have something on them — the prototype's mobile layout — and the open-day
+ * panel goes with it, because the list already shows every item of every day.
+ */
+.calendar-narrow {
+    display: none;
+}
+
+.calendar-list {
+    display: grid;
+    gap: 0.875rem;
+}
+
+.calendar-list-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-weight: var(--weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+}
+
+.calendar-list .calendar-item:first-child {
+    border-top: 0;
+}
+
+@media (max-width: 767px) {
+    .calendar-wide,
+    .calendar-layout .calendar-day-panel {
+        display: none;
+    }
+
+    .calendar-narrow {
         display: block;
-        width: auto;
-    }
-
-    .calendar-grid thead {
-        display: none;
-    }
-
-    .calendar-day {
-        height: auto;
-        border: 0;
-        border-bottom: 1px solid var(--border);
-        padding: 0.5rem 0;
-    }
-
-    .calendar-day.is-empty,
-    .calendar-day.is-quiet {
-        display: none;
-    }
-
-    .calendar-date::after {
-        content: ' ' attr(data-weekday);
     }
 }
 
 /* ------------------------------------------------------- my subscriptions */
 
-/*
- * The screen's shape: the list and the sections beneath it in one column, the
- * category widget alongside on a wide screen and below on a narrow one.
- *
- * The gap is horizontal only. Cards space themselves vertically with their own
- * margin, and a row gap on top of that would be a double space on every phone.
- */
-.subscriptions-layout {
-    display: grid;
-    gap: 0 1rem;
-    align-items: start;
+/* The KPI tiles give up their card margin; the strip keeps the row's spacing. */
+#subscription-strip {
+    margin-bottom: 1rem;
 }
 
-@media (min-width: 1100px) {
-    .subscriptions-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(17rem, 21rem);
+/*
+ * The toolbar, as the prototype lays it out: the category chips with the
+ * search box at the end of their line, the tag chips beneath them when there
+ * are any, then a rule and the status and scope segments with saved views,
+ * density and export at the far end. Everything wraps rather than scrolling —
+ * on a phone the chips are two lines, not a sideways strip nobody finds the
+ * end of.
+ *
+ * The markup is three blocks — the search form, `#list-filters` and
+ * `#list-tools` — because the last two are swapped out of band by their ids
+ * with every list request. `#list-filters` is `display: contents`, so its
+ * chips, tags and segments are laid out as cells of this grid in their own
+ * right. Dense placement lets the tags row simply not exist when there are no
+ * tags, instead of leaving an empty track and a double gap.
+ */
+.subscriptions-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-auto-flow: row dense;
+    gap: 0.75rem 0;
+    align-items: center;
+}
+
+/* The search and the add button beside it. The button is outside the
+   search form, so the pair is laid out by this wrapper rather than the form. */
+.list-search-bar {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-left: 1rem;
+}
+
+.list-search {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 0.5rem;
+}
+
+.list-search-add {
+    flex: none;
+    white-space: nowrap;
+}
+
+.list-search-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    width: 18rem;
+    max-width: 100%;
+}
+
+.list-search-field svg {
+    position: absolute;
+    left: 0.65rem;
+    width: 1rem;
+    height: 1rem;
+    color: var(--faint);
+    pointer-events: none;
+}
+
+.list-search-field input {
+    padding-left: 2.1rem;
+}
+
+.list-filters {
+    display: contents;
+}
+
+.list-filters .chip-row {
+    grid-column: 1;
+    margin-bottom: 0;
+}
+
+.list-filters .chip-row-tags {
+    grid-column: 1 / -1;
+}
+
+/* The second line, under a rule that runs the width of the card: the
+   segments on one side, the tools on the other. No column gap in this grid,
+   so the two halves of the rule meet. */
+.list-segments,
+.list-tools {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.list-segments {
+    grid-column: 1;
+}
+
+.list-tools {
+    grid-column: 2;
+    justify-content: flex-end;
+    padding-left: 1rem;
+}
+
+/* Narrower than the two can share a line: one column, search first, and a
+   single rule above the segments. */
+@media (max-width: 899px) {
+    .subscriptions-toolbar {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .list-search-bar,
+    .list-filters .chip-row,
+    .list-segments,
+    .list-tools {
+        grid-column: 1;
+    }
+
+    .list-search-bar,
+    .list-tools {
+        padding-left: 0;
+    }
+
+    .list-search-field {
+        width: auto;
+    }
+
+    .list-tools {
+        justify-content: flex-start;
+        padding-top: 0;
+        border-top: 0;
     }
 }
 
+.chip-action[aria-current='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+}
+
+.chip-tag {
+    background: var(--surface);
+}
+
+.list-segments,
+.list-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.25rem;
+}
+
+.list-segment {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.list-segment .group-label {
+    margin: 0;
+}
+
+/* A segment that is a link rather than a radio: chosen is `aria-current`. */
+a.segmented-option {
+    text-decoration: none;
+}
+
+.segmented-option[aria-current='true'] {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow);
+}
+
+.list-tools {
+    gap: 0.5rem;
+}
+
+/* The current density, read from the root rather than written into the markup. */
+:root:not([data-density='compact']) .density-toggle .density-comfortable,
+:root[data-density='compact'] .density-toggle .density-compact {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: var(--shadow);
+}
+
+.list-tools .button svg,
+.menu > summary svg {
+    width: 1rem;
+    height: 1rem;
+}
+
 /*
- * Either column can hold a table, and a grid item defaults to refusing to be
- * narrower than its content — which is how a wide table pushes a whole page
- * sideways instead of scrolling inside its own wrapper.
+ * A menu that is a <details>: it opens with no script, closes with a second
+ * click, and the panel floats over the content below rather than pushing it.
  */
-.subscriptions-main,
-.subscriptions-side {
+.menu {
+    position: relative;
+}
+
+.menu > summary {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+
+.menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.menu-panel {
+    position: absolute;
+    z-index: 5;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    display: grid;
+    gap: 0.6rem;
+    min-width: 16rem;
+    max-width: min(22rem, calc(100vw - 2rem));
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    box-shadow: var(--shadow);
+}
+
+.saved-view-list {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.saved-view-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.saved-view-list a {
+    text-decoration: none;
+}
+
+/* The summary line above the table: "12 of 14 · £84.20/mo". */
+.list-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0 0 0.75rem;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+}
+
+/*
+ * The bulk bar. Drawn open so it works without script; the list script hides
+ * it until a row is selected. It is its own form, which the row checkboxes
+ * join through their `form` attribute.
+ */
+.bulk-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+}
+
+.bulk-bar[hidden] {
+    display: none;
+}
+
+.bulk-count {
+    margin: 0 0.5rem 0 0;
+    font-weight: var(--weight-semibold);
+}
+
+/*
+ * The base form styles stretch every control to the width of its container,
+ * which is right in a stacked form and wrong in a toolbar.
+ */
+.bulk-bar select,
+.bulk-bar input {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 8rem;
+}
+
+.bulk-hint {
+    flex-basis: 100%;
+    margin: 0;
+}
+
+.select-column {
+    width: 2.5rem;
+}
+
+.select-column input {
+    width: auto;
+}
+
+/* The service cell: tile, name and lock, then "Plan · Payment method". */
+.service-tile {
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    background: var(--surface-2);
+}
+
+.service-initial {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: var(--weight-heavy);
+    font-size: var(--size-label);
+    color: var(--text);
+}
+
+.cell-name {
+    align-items: center;
+}
+
+.cell-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-weight: var(--weight-bold);
+}
+
+.cell-title a {
+    color: var(--text);
+    text-decoration: none;
+}
+
+.cell-title a:hover {
+    text-decoration: underline;
+}
+
+.private-mark {
+    display: inline-flex;
+    color: var(--faint);
+}
+
+.private-mark svg {
+    width: 0.8rem;
+    height: 0.8rem;
+}
+
+.cell-subline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0;
+}
+
+.subscription-list .hint {
+    display: block;
+    margin: 0.1rem 0 0;
+}
+
+.subscription-list .hint.is-near {
+    color: var(--warn);
+}
+
+.subscription-list td .member-identity {
+    align-items: flex-start;
+}
+
+.member-name {
+    font-weight: var(--weight-semibold);
+}
+
+.price-figure {
+    white-space: nowrap;
+}
+
+.price-figure .num {
+    font-weight: var(--weight-bold);
+}
+
+.subscription-list .badge {
+    margin-left: 0;
+}
+
+.actions-column {
+    text-align: right;
+}
+
+/*
+ * The row's actions, as icons with their words kept for a screen reader and
+ * as a tooltip. Square, the same size, one row.
+ */
+.subscription-list .row-actions {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+}
+
+.icon-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.icon-action:hover {
+    background: var(--surface-2);
+}
+
+.icon-action svg {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+
+.icon-action-danger {
+    color: var(--bad);
+    background: var(--bad-bg);
+    border-color: transparent;
+}
+
+/* The word is for assistive technology; the tooltip is the title. */
+.icon-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/*
+ * Below 768px the table gives way to cards. Both are in the markup, and only
+ * one is ever displayed, so a screen reader meets the list once.
+ */
+.subscription-cards {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .subscription-table {
+        display: none;
+    }
+
+    .subscription-cards {
+        display: grid;
+    }
+}
+
+.subscription-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.subscription-card:last-child {
+    border-bottom: 0;
+}
+
+.subscription-card .service-tile {
+    width: 2.4rem;
+    height: 2.4rem;
+}
+
+.subscription-card-main {
     min-width: 0;
+}
+
+.subscription-card-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--weight-bold);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.subscription-card-figure {
+    display: grid;
+    justify-items: end;
+    gap: 0.2rem;
+}
+
+.subscription-card-figure .price-base {
+    display: none;
+}
+
+.row-menu .menu-panel {
+    left: auto;
+    right: 0;
+    min-width: 0;
+}
+
+/* In the menu the words are shown: a column of labelled actions, not icons. */
+.row-menu .row-actions {
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 11rem;
+}
+
+.row-menu .row-actions form {
+    display: block;
+}
+
+.row-menu .icon-action {
+    justify-content: flex-start;
+    gap: 0.5rem;
+    width: 100%;
+    height: 2.5rem;
+    padding: 0 0.75rem;
+}
+
+.row-menu .icon-action-label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+}
+
+.row-menu > summary {
+    width: 2.75rem;
+    height: 2.75rem;
+    justify-content: center;
+}
+
+.row-menu > summary svg {
+    width: 1.1rem;
+    height: 1.1rem;
 }
 
 .section-heading {
@@ -924,19 +2209,237 @@ tr.is-passed > td {
  * card, where a background wash would read as a second card.
  */
 .deadline.is-urgent {
-    border-left: 3px solid var(--warning);
+    border-left: 3px solid var(--warn);
     padding-left: 0.5rem;
 }
 
 .deadline.is-passed {
-    border-left: 3px solid var(--error-text);
+    border-left: 3px solid var(--bad);
     padding-left: 0.5rem;
 }
 
-/* Each currency's bars are a block of their own when they cannot be combined. */
-.category-widget h3 {
-    margin: 1rem 0 0;
+/* The cancel-by card beneath the list: compact rows, a link to the full view. */
+.cancel-by .deadline {
+    grid-template-columns: minmax(0, 1fr);
 }
+
+@media (min-width: 30rem) {
+    .cancel-by .deadline {
+        grid-template-columns: minmax(0, 1fr) fit-content(20rem);
+    }
+}
+
+.cancel-by .card-header .button svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ------------------------------------------------------ subscription form */
+
+/*
+ * What a choice reveals — "every N days" for a custom cycle, the weights for
+ * custom shares, the trial's dates, the reminder days — is shown from the
+ * checked state, so it works with no script. Hidden fields are never
+ * disabled: the server reads what the choice makes relevant and ignores the
+ * rest.
+ */
+.subscription-form .reveal {
+    display: none;
+}
+
+.subscription-form:has(input[name='billing_cycle'][value='custom_days']:checked) .reveal-custom-cycle,
+.subscription-form:has(input[name='reminder_mode'][value='days']:checked) .reveal-reminder-days,
+.subscription-form:has(input[name='split_mode'][value='equal']:checked) .reveal-split-equal,
+.subscription-form:has(input[name='split_mode'][value='custom']:checked) .reveal-split-custom,
+.subscription-form:has(#is_trial:checked) .reveal-trial,
+.subscription-form:has(#converts_to_billing_cycle option[value='custom_days']:checked) .reveal-trial-custom-cycle {
+    display: grid;
+}
+
+/* Chips are revealed as the row of chips they are, not a column. */
+.subscription-form:has(input[name='reminder_mode'][value='days']:checked) .reveal-reminder-days,
+.subscription-form:has(input[name='split_mode'][value='equal']:checked) .reveal-split-equal {
+    display: flex;
+}
+
+.subscription-form .reveal-trial {
+    gap: 0.75rem;
+}
+
+/*
+ * The prototype draws this form flat: rows of fields, one rule above who it is
+ * for, and no boxes. The sections stay fieldsets, because their legends are
+ * what a screen reader announces with each field; they are simply not drawn.
+ */
+.subscription-form .form-section {
+    border: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.subscription-form .form-section > legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.subscription-form .form-section-ruled {
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+}
+
+/*
+ * Who pays beside how it is split. The split takes the width its three
+ * options need, so they stay on one line, and no more — its hint and the
+ * custom shares wrap within that. The members' chips have the rest.
+ */
+@container form (min-width: 34rem) {
+    .subscription-form .ownership-row {
+        grid-template-columns: minmax(0, 1fr) fit-content(20rem);
+    }
+}
+
+.subscription-form .field > label,
+.subscription-form .group-label {
+    font-weight: var(--weight-semibold);
+}
+
+/* A required field says so beside its label; the input already tells a
+   screen reader, so the mark is drawn and not read. */
+.subscription-form .field > label:has(+ [required])::after {
+    content: ' *' / '';
+}
+
+/* A choice of a few is as wide as its options, not the row. */
+.subscription-form .segmented {
+    align-self: flex-start;
+}
+
+/* The member who pays: the accent's soft wash and its edge when chosen. */
+.subscription-form .member-chip:has(input:checked) {
+    color: var(--text);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+
+.subscription-form .form-actions {
+    justify-content: flex-end;
+}
+
+/* A one-off or a lifetime purchase has no cycle, no next charge and no trial. */
+.subscription-form:has(input[name='subscription_type'][value='one_off']:checked) .recurring-only,
+.subscription-form:has(input[name='subscription_type'][value='lifetime']:checked) .recurring-only {
+    display: none;
+}
+
+.chip-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.subscription-form .segmented + .chip-choices,
+.subscription-form .segmented + .share-grid {
+    margin-top: 0.5rem;
+}
+
+.member-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-heavy);
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.filter-chip:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.segmented-option:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.share-grid {
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: 0.5rem;
+}
+
+.share-field {
+    display: grid;
+    gap: 0.25rem;
+    font-size: var(--size-label);
+}
+
+.conversion-note {
+    margin: 0.35rem 0 0;
+    font-size: var(--size-label);
+    color: var(--muted);
+}
+
+.conversion-note:empty {
+    display: none;
+}
+
+.choice.toggle {
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.choice-title {
+    display: block;
+    font-weight: var(--weight-semibold);
+}
+
+.choice-note {
+    display: block;
+    font-size: var(--size-label);
+    color: var(--muted);
+}
+
+.more-details {
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+}
+
+.more-details > summary {
+    cursor: pointer;
+    font-weight: var(--weight-semibold);
+}
+
+.more-details-body {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.edit-sections {
+    display: grid;
+    max-width: 46rem;
+    margin: 1rem auto 0;
+}
+
+.danger-zone h2 {
+    margin-top: 0;
+}
+
 
 .category-widget h3:first-of-type {
     margin-top: 0.5rem;
@@ -945,33 +2448,350 @@ tr.is-passed > td {
 /* ------------------------------------------------------------- analytics */
 
 /*
- * The trajectory and the donut side by side on a wide screen, stacked on a
- * narrow one. Horizontal gap only: cards space themselves vertically with their
- * own margin, and a row gap on top of that is a double space on every phone.
+ * The KPI row and the chart space themselves from the cards below them with
+ * the cards' own margin; the pairs are two columns on a wide screen — the
+ * wider for the chart or the table, the narrower for the stack beside it —
+ * and one on a narrow one. Horizontal gap only, as everywhere here: cards
+ * bring their own vertical margin, and a row gap on top of that is a double
+ * space on every phone.
  */
-.analytics-layout {
+.analytics-kpis {
+    margin-bottom: 1rem;
+}
+
+/* The dashboard's KPI note, coloured by what it says: a rise is bad news. */
+.analytics-kpis .kpi-note {
+    margin-top: 0.25rem;
+}
+
+.analytics-kpis .kpi-note.is-increase {
+    color: var(--bad);
+}
+
+.analytics-kpis .kpi-note.is-decrease {
+    color: var(--ok);
+}
+
+.analytics-pair,
+.analytics-breakdown {
     display: grid;
     gap: 0 1rem;
     align-items: start;
 }
 
 @media (min-width: 1100px) {
-    .analytics-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem);
+    /* Two columns only when there is a second thing to put in one: with no
+       insight firing, the price history keeps the full width. */
+    .analytics-pair:has(> :nth-child(2)) {
+        grid-template-columns: minmax(0, 3fr) minmax(18rem, 2fr);
+    }
+}
+
+/* The two donuts sit side by side while the review is one column, and stack
+   in its narrower left column once it splits at 1100px. */
+@media (min-width: 900px) and (max-width: 1099px) {
+    .analytics-breakdown {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 /* A grid item defaults to refusing to be narrower than its content, which is
    how a wide table pushes a whole page sideways instead of scrolling inside
    its own wrapper. */
-.analytics-main,
-.analytics-side {
+.analytics-pair > *,
+.analytics-breakdown > * {
     min-width: 0;
 }
 
+/* Twenty-five bars: closer together than the dashboard's thirteen. */
+.analytics-months .spend-bars-plot,
+.analytics-months .spend-bars-labels {
+    gap: 0.25rem;
+}
+
+/* Twenty-five labels do not fit much below a laptop: every other one, this
+   month always. */
+@media (min-width: 480px) and (max-width: 899px) {
+    .analytics-months .spend-bars-labels span:nth-child(even):not(.is-current) {
+        visibility: hidden;
+    }
+}
+
+@media (max-width: 899px) {
+    .analytics-months .spend-bars-labels span {
+        overflow: visible;
+        white-space: nowrap;
+    }
+}
+
+/* On a phone even every other one collides: every third, which still lands on
+   this month (the thirteenth). */
+@media (max-width: 479px) {
+    .analytics-months .spend-bars-labels span:not(:nth-child(3n + 1)):not(.is-current) {
+        visibility: hidden;
+    }
+
+    /* Outranks the dashboard's every-other rule, which would hide the even
+       ones among these. */
+    .analytics-months .spend-bars-labels span:nth-child(3n + 1):not(.is-current) {
+        visibility: visible;
+    }
+}
+
 /*
- * The review: the figures to read in one column — year over year, the notable
- * pair and the same cost by period — and the cost-per-use table beside them.
+ * Today: a dashed rule through this month's bar and a word at its head. The
+ * bar is already this month's in two parts, so the rule marks where the
+ * reconstruction meets the forecast rather than a position of its own.
+ */
+.spend-bar.is-current {
+    position: relative;
+}
+
+.spend-bar-today {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    bottom: 0;
+    border-left: 1px dashed var(--faint);
+    font-size: var(--size-caption);
+    font-style: normal;
+    font-weight: var(--weight-bold);
+    color: var(--faint);
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding-left: 0.3rem;
+    pointer-events: none;
+}
+
+/* This year against last: a pair of bars a month, last year's quieter. */
+.analytics-yoy .chart-legend {
+    display: flex;
+    margin: 0;
+}
+
+.chart-key-previous,
+.chart-key-current {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-top: 0;
+    border-radius: 3px;
+}
+
+.chart-key-previous {
+    background: var(--s6);
+}
+
+.chart-key-current {
+    background: var(--accent);
+}
+
+.yoy-bars-plot {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    height: 12.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.yoy-month {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.yoy-bar {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.yoy-bar-previous {
+    height: auto;
+    background: var(--s6);
+    border-radius: 3px 3px 0 0;
+}
+
+.yoy-bar > span {
+    display: block;
+    flex-shrink: 0;
+}
+
+.yoy-bar > span:first-of-type {
+    border-radius: 3px 3px 0 0;
+}
+
+.yoy-bar-charged {
+    background: var(--accent);
+}
+
+.yoy-labels {
+    gap: 0.5rem;
+}
+
+.yoy-summary {
+    margin: 0.85rem 0 0;
+}
+
+@media (max-width: 479px) {
+    .yoy-bars-plot,
+    .yoy-labels {
+        gap: 0.25rem;
+    }
+}
+
+/* The most expensive five: rank, name, monthly figure. */
+.top-list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0.5rem 0 0;
+}
+
+.top-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.625rem;
+}
+
+.top-rank {
+    width: 1rem;
+    color: var(--faint);
+}
+
+.top-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: var(--weight-semibold);
+}
+
+.top-figure {
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+}
+
+/* Dates, amounts and changes in the price history do not break mid-figure;
+   the table is set a step smaller, as the prototype's is, so its five columns
+   fit beside the insights before they need to scroll. */
+.price-history-table {
+    font-size: var(--size-label);
+}
+
+.price-history-table .nowrap {
+    white-space: nowrap;
+}
+
+/* The header row on the rates table's tint (`.settings-rates`). */
+.price-history-table thead th,
+.subscription-table .table thead th {
+    background: var(--surface-2);
+}
+
+.top-figure .stat-unit {
+    margin-left: 0.2rem;
+}
+
+.insight-more {
+    margin-top: 0.75rem;
+}
+
+.insight-more > summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+.insight-more .insight-list {
+    margin-top: 0.75rem;
+}
+
+/*
+ * The insights: a card each, an icon tile in the kind's tone, a heading and
+ * the sentence with its arithmetic.
+ */
+.analytics-insights > h2 {
+    margin: 0.25rem 0 0.75rem;
+    font-size: var(--size-heading);
+}
+
+.insight-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+}
+
+.insight-row {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0;
+}
+
+.insight-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.125rem;
+    height: 2.125rem;
+    border-radius: 8px;
+}
+
+.insight-icon svg {
+    width: 1.0625rem;
+    height: 1.0625rem;
+}
+
+.insight-icon.tone-info {
+    background: var(--info-bg);
+    color: var(--info);
+}
+
+.insight-icon.tone-warn {
+    background: var(--warn-bg);
+    color: var(--warn);
+}
+
+.insight-icon.tone-accent {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+}
+
+.insight-icon.tone-neutral {
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.insight-body {
+    min-width: 0;
+}
+
+.insight-row h3 {
+    /*
+     * A sentence, not a label. The eyebrow styling the KPI headings use sets
+     * its text in caps, and "A PRICE IS GOING UP" reads as shouting rather
+     * than as the heading of a paragraph.
+     */
+    margin: 0;
+    font-size: var(--size-body);
+    font-weight: var(--weight-semibold);
+}
+
+.insight-row p {
+    margin: 0.2rem 0 0;
+    font-size: var(--size-label);
+}
+
+.analytics-insights > .hint {
+    margin-top: 0.75rem;
+}
+
+/*
+ * The review: the two breakdown donuts stacked in one column, and the
+ * cost-per-use table beside it.
  *
  * The table takes the wider share because it is the only six-column thing on
  * the page, and it breaks at the same 1100px the charts above it do, so the
@@ -991,7 +2811,7 @@ tr.is-passed > td {
     }
 }
 
-/* The same reason `.analytics-main` needs it: a grid item refuses to be
+/* The same reason `.analytics-pair` needs it: a grid item refuses to be
    narrower than its content by default, which is how the wide table would push
    the page sideways instead of scrolling inside `.table-scroll`. */
 .analytics-review > * {
@@ -999,38 +2819,16 @@ tr.is-passed > td {
 }
 
 /*
- * The figures in the review column are quieter than the ones at the top.
+ * The same cost by period, across the full width above the review, is quieter
+ * than the KPI row at the top.
  *
- * The KPI row states three numbers the page is about; these nine restate parts
- * of them, sliced by year, by extreme and by period. At the full KPI size they
- * shout as loudly as the row they are derived from, and in a column this
- * narrow they also stack into a very tall wall of digits beside a table. One
- * step down the scale settles both: the hierarchy reads correctly and the
- * column ends up roughly the height of the thing it sits next to.
+ * The KPI row states the numbers the page is about; these four restate one of
+ * them, sliced by period. At the full KPI size they shout as loudly as the row
+ * they are derived from. One step down the scale keeps the hierarchy reading
+ * correctly.
  */
-.analytics-review-figures {
+.analytics-per-period {
     --size-kpi: 1.75rem;
-}
-
-/*
- * How many of those figures stand abreast, decided per card.
- *
- * `.columns` and `.stat-grid` both key off the viewport, not the container, so
- * the moment the review splits they size themselves for a page they are no
- * longer as wide as. These two minimums are layout thresholds rather than text
- * measurements: year over year has three figures and looks wrong as two and an
- * orphan, so its minimum is set high enough to keep it a clean stack until the
- * column can take all three; the four per-period figures pair up happily, so
- * theirs is set to let two stand side by side at a laptop width.
- */
-@media (min-width: 1100px) {
-    .analytics-review-figures .columns {
-        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-    }
-
-    .analytics-review-figures .stat-grid {
-        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-    }
 }
 
 /*
@@ -1067,114 +2865,14 @@ tr.is-passed > td {
 .donut-centre-value {
     display: block;
     font-size: var(--size-heading);
-    font-weight: var(--weight-semibold);
-    font-variant-numeric: tabular-nums;
+    font-weight: var(--weight-bold);
     line-height: 1.2;
 }
 
 .donut-centre-label {
     display: block;
     font-size: var(--size-label);
-    color: var(--text-muted);
-}
-
-/*
- * The spend-insight card.
- *
- * The one card on this screen that wears the brand gradient, which is what
- * `.card-featured` is for and why it has waited until now to be used: the rule
- * is one featured card per screen, and a card that tells the member to go and
- * do something is the one that earns it here.
- *
- * Its own type scale is deliberately modest. The KPI row below states the
- * figures; this states a sentence, and a sentence set at KPI size would shout
- * over the numbers it was derived from.
- */
-.insight-headline {
-    margin: 0.35rem 0 0;
-    font-size: var(--size-heading);
-    font-weight: var(--weight-semibold);
-}
-
-.insight-detail {
-    margin: 0.35rem 0 0;
-    max-width: 60ch;
-}
-
-.insight-action {
-    margin: 0.85rem 0 0;
-}
-
-/*
- * The rest of the insights, folded away. `<details>` rather than a script:
- * this is a disclosure and the browser has one, so the card works before any
- * JavaScript loads and on a page where none does.
- */
-.insight-more {
-    margin-top: 0.85rem;
-}
-
-.insight-more > summary {
-    cursor: pointer;
-    color: var(--text-muted);
-    font-size: var(--size-label);
-}
-
-.insight-list {
-    display: grid;
-    gap: 0.75rem;
-    margin: 0.75rem 0 0;
-}
-
-.insight-row {
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.insight-row:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
-}
-
-.insight-row h3 {
-    /*
-     * A sentence, not a label. The eyebrow styling the KPI headings use sets
-     * its text in caps, and "A PRICE IS GOING UP" reads as shouting rather
-     * than as the heading of a paragraph.
-     */
-    margin: 0;
-    font-size: var(--size-body);
-    font-weight: var(--weight-semibold);
-}
-
-.insight-row p {
-    margin: 0.2rem 0 0;
-}
-
-/* The provenance line, kept off the last insight above it. */
-.insight-card > .hint {
-    margin-top: 0.85rem;
-}
-
-/* The most and the least expensive, one above the other. */
-.notable-list {
-    display: grid;
-    gap: 0.75rem;
-    margin: 0.5rem 0 0;
-}
-
-.notable-row {
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.notable-row:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
-}
-
-.notable-name {
-    margin: 0.1rem 0;
+    color: var(--muted);
 }
 
 /*
@@ -1190,102 +2888,1316 @@ tr.is-passed > td {
     padding: 0;
 }
 
-/* -------------------------------------------------------------- household */
+/* ------------------------------------------------------ members & roles */
 
-/*
- * A card per member, on the same grid the budgets use. Twenty rem is the width
- * at which a name, a pair of figures and a row of permission chips stop
- * wrapping awkwardly, and `min(100%, …)` is what keeps a single card from
- * overflowing a narrow screen rather than shrinking to fit it.
- */
-.member-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-    gap: 1rem;
-}
-
-.member-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-/* The card's header sits flush with the content below it. */
-.member-card .member-identity {
-    align-items: center;
-}
-
-/*
- * The two figures on a card, side by side while there is room for them.
- *
- * `auto-fit` rather than two fixed columns: a member whose spending is in two
- * currencies gets a taller cell, and at the narrow end the pair stacks instead
- * of squeezing a money figure into nine characters' width.
- */
-.member-figures {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
-    gap: 0.75rem;
-}
-
-/*
- * The KPI type is for a tile with one number on it. A member card carries two,
- * and a table cell carries one of many, so both ask the shared spend macro for
- * its figure at a size that belongs to a list rather than to a headline. The
- * markup is the same markup; only the scale changes.
- */
-.member-figures .stat-value,
-.member-figure .stat-value {
-    font-size: var(--size-heading);
-    margin-bottom: 0;
-}
-
-.member-figure .stat-lines {
-    align-items: flex-end;
-}
-
-/*
- * The ladder of what a role can do.
- *
- * A stacked list rather than a row of chips, because every card carries every
- * rung — including the ones this member has not got — and five short phrases
- * read down a column where five wrapped pills read as a crowd. Stacking also
- * makes the cards comparable line for line, which is the point of putting
- * people beside each other.
- */
-.capability-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    list-style: none;
-    margin: 0;
+.members-card {
     padding: 0;
+    overflow: hidden;
+}
+
+.members-table th,
+.members-table td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+}
+
+.members-table thead th {
+    background: var(--surface-2);
+}
+
+.member-you {
+    color: var(--muted);
+    font-weight: var(--weight-normal);
+}
+
+.member-cell-seen,
+.member-cell-status {
+    white-space: nowrap;
+}
+
+.member-role-form select {
+    width: auto;
+    min-width: 9rem;
+}
+
+.member-cell-status .badge {
+    margin-left: 0;
+}
+
+.member-cell-share .member-share,
+.member-cell-share .member-count {
+    display: block;
+}
+
+.member-share {
+    font-weight: var(--weight-semibold);
+}
+
+.members-table .members-actions-heading {
+    text-align: right;
+}
+
+/* Rows to manage, not to pick: no hover band behind a member. */
+.members-table tbody tr:hover td {
+    background: none;
+}
+
+.member-cell-actions .row-actions {
+    justify-content: flex-end;
+}
+
+/* Smaller than a form's buttons: four of them share one table cell. */
+.member-action {
+    min-height: 2rem;
+    padding: 0.3rem 0.65rem;
     font-size: var(--size-label);
 }
 
-.capability {
-    display: grid;
-    grid-template-columns: 1rem 1fr;
-    gap: 0.4rem;
-    align-items: baseline;
+.member-action .icon {
+    width: 0.8rem;
+    height: 0.8rem;
 }
 
-.capability-mark {
-    color: var(--success-text);
-    text-align: center;
-    line-height: 1;
+.members-withheld-note {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
 }
 
 /*
- * Not held: greyed, and dimmer than the muted text around it so the two are
- * distinguishable rather than merely both quiet. The mark loses its colour
- * with the words, because a green tick beside faded text would be the one
- * thing on the row still claiming a yes.
+ * Below 768px each row is a card: the member and their status across the top,
+ * the role and their share beneath, then when they were last here and the
+ * actions. The same cells, placed by name, so nothing is in the markup twice.
  */
-.capability.is-absent,
-.capability.is-absent .capability-mark {
-    color: var(--text-muted);
-    opacity: 0.65;
+@media (max-width: 767px) {
+    .members-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    .members-table,
+    .members-table tbody {
+        display: block;
+    }
+
+    .members-table .member-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) fit-content(20rem);
+        grid-template-areas:
+            "identity status"
+            "role share"
+            "seen seen"
+            "actions actions";
+        gap: 0.6rem 0.75rem;
+        align-items: center;
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .members-table .member-row:last-child {
+        border-bottom: 0;
+    }
+
+    .members-table .member-row td {
+        display: block;
+        padding: 0;
+        border: 0;
+        background: none;
+    }
+
+    .member-cell-identity { grid-area: identity; min-width: 0; }
+    .member-cell-status { grid-area: status; }
+    .member-cell-role { grid-area: role; }
+    .member-cell-share { grid-area: share; text-align: right; }
+    .member-cell-seen { grid-area: seen; color: var(--muted); font-size: var(--size-label); }
+    .member-cell-actions { grid-area: actions; }
+
+    .member-cell-actions:empty,
+    .member-cell-actions:not(:has(*)) {
+        display: none;
+    }
+
+    .member-cell-actions .row-actions {
+        justify-content: flex-start;
+    }
+
+    .member-email {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .member-role-form select {
+        min-height: 2.75rem;
+    }
+
+    .member-action {
+        min-height: 2.75rem;
+    }
+}
+
+/*
+ * The role table and the visibility card, side by side while there is room:
+ * the table takes the larger share, and each stacks at its own minimum rather
+ * than squeezing.
+ */
+.members-panels {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1.5rem;
+}
+
+.role-matrix {
+    flex: 3 1 30rem;
+    min-width: 0;
+}
+
+.data-visibility {
+    flex: 2 1 17.5rem;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.data-visibility p {
+    margin: 0;
+}
+
+.role-matrix-table {
+    min-width: 28rem;
+}
+
+.role-matrix-table tbody th {
+    font-size: var(--size-body);
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--text);
+}
+
+.role-matrix-table .grant-heading,
+.role-matrix-table .grant {
+    text-align: center;
+}
+
+/* A table to read across, not rows to pick: no hover band behind the words. */
+.role-matrix-table tbody tr:hover td {
+    background: none;
+}
+
+.grant {
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+}
+
+.grant-icon {
+    width: 1rem;
+    height: 1rem;
+    vertical-align: -0.15em;
+    margin-right: 0.25rem;
+}
+
+.grant-yes .grant-icon,
+.grant-no .grant-icon {
+    margin-right: 0;
+}
+
+.grant-yes {
+    color: var(--ok);
+}
+
+.grant-own_only {
+    color: var(--warn);
+}
+
+.grant-no {
+    color: var(--muted);
+    font-weight: var(--weight-normal);
+}
+
+.data-visibility-mode {
+    margin-left: 0;
+}
+
+.data-visibility-private {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    padding: 0.75rem;
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+.data-visibility-private .icon {
+    flex: 0 0 auto;
+    margin-top: 0.1rem;
+}
+
+/* The invitation: two fields abreast, then a card per role. */
+.member-invite-names {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 1rem;
+}
+
+.role-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.role-options > legend {
+    padding: 0;
+    margin-bottom: 0.4rem;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+}
+
+.role-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-button);
+    background: var(--surface);
+    cursor: pointer;
+}
+
+.role-option:hover {
+    border-color: var(--border-control);
+}
+
+.role-option input {
+    margin-top: 0.2rem;
+    accent-color: var(--accent);
+}
+
+.role-option:has(input:checked) {
+    border-color: var(--accent-text);
+    background: var(--accent-soft);
+}
+
+.role-option-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.role-option-name {
+    font-weight: var(--weight-bold);
+}
+
+/* ------------------------------------------------ dashboard: the two views */
+
+/*
+ * The greeting and the Overview / Household toggle share a row that wraps
+ * on a narrow screen, the toggle dropping under the greeting.
+ */
+.dashboard-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.dashboard-greeting {
+    margin: 0;
+    font-size: var(--size-heading);
+    font-weight: var(--weight-bold);
+}
+
+.dashboard-date {
+    margin: 0.125rem 0 0;
+    font-size: var(--size-label);
+}
+
+/* Coming up spans three rows so the narrow cards stack in the column beside it. */
+.bento-rows-3 {
+    grid-row: span 3;
+}
+
+/*
+ * A card fills the height of its row, so the chart and the donut beside it
+ * end level, and the cards stacked beside Coming up close up into one column
+ * instead of floating with gaps between them.
+ */
+.bento-item {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+}
+
+.bento-item > .card {
+    flex: 1;
+}
+
+/* Restated after the rule above, which would otherwise show an empty card's slot again. */
+.bento-item:not(:has(*)) {
+    display: none;
+}
+
+.coming-up-more {
+    margin: 0.75rem 0 0;
+}
+
+@media (max-width: 767px) {
+    .bento-rows-3 {
+        grid-row: auto;
+    }
+}
+
+/* The KPI tiles: eyebrow and icon on one line, the figure, then a note. */
+.kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0;
+}
+
+.kpi-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.kpi-head .stat-label {
+    margin: 0;
+}
+
+.kpi-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-small);
+}
+
+.kpi-icon svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.kpi-icon-info {
+    background: var(--info-bg);
+    color: var(--info);
+}
+
+.kpi-icon-ok {
+    background: var(--ok-bg);
+    color: var(--ok);
+}
+
+.kpi-icon-warn {
+    background: var(--warn-bg);
+    color: var(--warn);
+}
+
+.kpi-icon-neutral {
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.kpi-note {
+    margin: 0;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    color: var(--muted);
+}
+
+.kpi-note.is-under {
+    color: var(--accent-text);
+}
+
+.kpi-note.is-over {
+    color: var(--bad);
+}
+
+.card-icon {
+    display: inline-flex;
+    color: var(--faint);
+}
+
+.card-icon svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ------------------------------------------ dashboard: the monthly spend bars */
+
+.spend-bars-card .chart-legend {
+    display: flex;
+    margin: 0;
+}
+
+.chart-key-actual,
+.chart-key-forecast {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-top: 0;
+    border-radius: 3px;
+}
+
+.chart-key-actual {
+    background: var(--s1);
+}
+
+.chart-key-forecast {
+    background: var(--hatch);
+}
+
+.chart-key-budget {
+    border-top: 2px dashed var(--bad);
+}
+
+.spend-bars {
+    display: flex;
+    gap: 0.625rem;
+}
+
+.spend-bars-axis {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 13.75rem;
+    font-size: var(--size-caption);
+    color: var(--faint);
+    text-align: right;
+}
+
+.spend-bars-body {
+    flex: 1;
+    min-width: 0;
+}
+
+/*
+ * The plot: a baseline, a rule at the top and one at half height — the three
+ * values the axis names — and the bars standing on the baseline.
+ */
+.spend-bars-plot {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.375rem;
+    height: 13.75rem;
+    border-bottom: 1px solid var(--border);
+    background:
+        linear-gradient(var(--border), var(--border)) 0 0 / 100% 1px no-repeat,
+        linear-gradient(var(--border), var(--border)) 0 50% / 100% 1px no-repeat;
+}
+
+.spend-bars-budget {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 2px dashed var(--bad);
+    pointer-events: none;
+}
+
+/*
+ * One month. Its parts are stacked from the baseline up — already charged,
+ * then still due — so this month reads as one bar with its charged part
+ * beneath the part still to come.
+ */
+.spend-bar {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.spend-bar > span {
+    display: block;
+    flex-shrink: 0;
+}
+
+/* The topmost part of a bar is rounded — still due when there is some. */
+.spend-bar > span:first-of-type {
+    border-radius: 5px 5px 0 0;
+}
+
+.spend-bar-charged {
+    background: var(--s1);
+}
+
+.spend-bar-due {
+    background: var(--hatch);
+}
+
+.spend-bar.is-past .spend-bar-charged {
+    opacity: 0.85;
+}
+
+/*
+ * The busiest month carries its total above it, as the line charts label
+ * their peak: a figure, not a second colour, so it reads on the hatch as well
+ * as on the solid bars.
+ */
+.spend-bar-peak {
+    margin-bottom: 0.25rem;
+    overflow: visible;
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--text);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.spend-bars-labels {
+    display: flex;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+}
+
+.spend-bars-labels span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.spend-bars-labels .is-current {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+}
+
+/* Thirteen labels do not fit a phone: every other one, this month always. */
+@media (max-width: 479px) {
+    .spend-bars-labels span:nth-child(even):not(.is-current) {
+        visibility: hidden;
+    }
+
+    /* The shown labels may spill into the hidden neighbour's column. */
+    .spend-bars-labels span {
+        overflow: visible;
+        white-space: nowrap;
+    }
+
+    .spend-bars-plot,
+    .spend-bars-labels {
+        gap: 0.1875rem;
+    }
+}
+
+/* --------------------------------------------- dashboard: lists of charges */
+
+.charge-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.charge-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6875rem 0.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.date-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 2.75rem;
+}
+
+.date-tile-month {
+    font-size: var(--size-caption);
+    font-weight: var(--weight-bold);
+    color: var(--faint);
+    text-transform: uppercase;
+}
+
+.date-tile-day {
+    font-size: var(--size-title);
+    font-weight: var(--weight-bold);
+    line-height: 1.1;
+}
+
+.charge-name {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+
+.charge-name a {
+    overflow: hidden;
+    font-weight: var(--weight-bold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.charge-owner {
+    flex-shrink: 0;
+}
+
+.charge-amount {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 4.5rem;
+    font-weight: var(--weight-bold);
+}
+
+@media (max-width: 479px) {
+    .charge-row .logo,
+    .charge-owner {
+        display: none;
+    }
+}
+
+/* ----------------------------------------------- dashboard: narrow cards */
+
+.budget-rows,
+.trial-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+.budget-row-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.375rem;
+    font-size: var(--size-label);
+}
+
+/*
+ * Two widths on one track: the projected month as a wash, what has already
+ * been charged solid over it — the same scale, so the gap between them is
+ * what is still to come.
+ */
+.budget-track {
+    position: relative;
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+}
+
+.budget-track > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-pill);
+}
+
+.budget-track-projected {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.budget-track-charged {
+    background: var(--accent);
+}
+
+.budget-row.is-warning .budget-track-charged {
+    background: var(--warn);
+}
+
+.budget-row.is-warning .budget-track-projected {
+    background: var(--warn-bg);
+    box-shadow: inset 0 0 0 1px var(--warn);
+}
+
+.budget-row.is-over .budget-track-charged {
+    background: var(--bad);
+}
+
+.budget-row.is-over .budget-track-projected {
+    background: var(--bad-bg);
+    box-shadow: inset 0 0 0 1px var(--bad);
+}
+
+.budget-row-note {
+    margin: 0.3rem 0 0;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    color: var(--accent-text);
+}
+
+.budget-row.is-warning .budget-row-note {
+    color: var(--warn);
+}
+
+.budget-row.is-over .budget-row-note {
+    color: var(--bad);
+}
+
+.trial-row {
+    padding: 0.625rem 0.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+}
+
+.trial-row p {
+    margin: 0 0 0.25rem;
+}
+
+.trial-row form {
+    margin-top: 0.5rem;
+}
+
+.price-banner {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.price-banner-label {
+    margin: 0;
+    color: var(--warn);
+}
+
+.price-banner-title {
+    margin: 0.25rem 0;
+    font-weight: var(--weight-bold);
+}
+
+/* The subscriptions table's chips, restored with the table. */
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.chip-action {
+    text-decoration: none;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.chip-action:hover {
+    color: var(--text);
+}
+
+.chip-action.is-active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+}
+
+/* --------------------------------------------- dashboard: household view */
+
+/*
+ * The month hero sits on the rail's colour, as the prototype's does: the one
+ * dark band on the Household view, so the month's position is what is read
+ * first. Every colour on it is a rail token, which each palette sets.
+ */
+.month-hero {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem 2.5rem;
+    padding: 1.5rem;
+    background: var(--rail);
+    color: var(--rail-ink);
+    border-color: var(--rail-border);
+}
+
+.month-hero-main {
+    flex: 2 1 22rem;
+    min-width: 0;
+}
+
+.month-hero-label,
+.month-hero .stat-label {
+    color: var(--rail-muted);
+}
+
+.month-hero-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.625rem;
+    margin: 0.5rem 0 0;
+    color: var(--rail-text);
+}
+
+.month-hero-amount {
+    font-size: 2.5rem;
+    font-weight: var(--weight-bold);
+    letter-spacing: -0.03em;
+    color: var(--rail-ink);
+}
+
+.month-bar {
+    position: relative;
+    height: 0.75rem;
+    margin-top: 1.125rem;
+    border-radius: var(--radius-pill);
+    background: var(--rail-tint);
+}
+
+.month-bar > span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: var(--radius-pill);
+}
+
+.month-bar-due {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.month-bar-charged {
+    background: var(--accent);
+}
+
+.month-bar > .month-bar-budget {
+    top: -0.3125rem;
+    bottom: -0.3125rem;
+    width: 0;
+    border-left: 2px solid var(--rail-ink);
+    border-radius: 0;
+}
+
+.month-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem 1.125rem;
+    margin-top: 0.625rem;
+    font-size: var(--size-label);
+    color: var(--rail-text);
+}
+
+.month-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.month-key-charged,
+.month-key-due {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-top: 0;
+    border-radius: 3px;
+}
+
+.month-key-charged {
+    background: var(--accent);
+}
+
+.month-key-due {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.month-key-budget {
+    width: 2px;
+    height: 0.75rem;
+    border-top: 0;
+    background: var(--rail-ink);
+}
+
+.month-hero-stats {
+    display: grid;
+    flex: 1 1 16rem;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    align-content: center;
+    gap: 1rem;
+    margin: 0;
+}
+
+.month-hero-stats > div {
+    padding-left: 0.875rem;
+    border-left: 1px solid var(--rail-line);
+}
+
+.month-hero-stats dt {
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--rail-muted);
+}
+
+.month-hero-stats dd {
+    margin: 0.25rem 0 0;
+    font-size: 1.25rem;
+    font-weight: var(--weight-bold);
+}
+
+.month-hero-stats .month-hero-note {
+    margin-top: 0.125rem;
+    font-family: var(--font-text);
+    font-size: var(--size-caption);
+    font-weight: var(--weight-semibold);
+    color: var(--rail-text);
+}
+
+.month-hero-foot {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: var(--size-caption);
+    color: var(--rail-muted);
+}
+
+.month-hero-lines .stat-value {
+    color: var(--rail-ink);
+}
+
+/* The thirty-day line: ticks beneath, a marker per charge above it. */
+.timeline {
+    position: relative;
+    height: 5.5rem;
+    margin: 0 0.75rem 0.5rem;
+}
+
+.timeline-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3.5rem;
+    height: 2px;
+    background: var(--border);
+}
+
+.timeline-tick {
+    position: absolute;
+    top: 4rem;
+    transform: translateX(-50%);
+    font-size: var(--size-caption);
+    color: var(--faint);
+    white-space: nowrap;
+}
+
+.timeline-marker {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    transform: translateX(-50%);
+    border: 2px solid var(--surface);
+    border-radius: var(--radius-small);
+    background: var(--s1);
+    color: var(--surface);
+    font-size: var(--size-caption);
+    font-weight: var(--weight-heavy);
+}
+
+.timeline-marker.is-trial {
+    background: var(--warn);
+}
+
+.timeline-marker.lane-0 {
+    top: 2rem;
+}
+
+.timeline-marker.lane-1 {
+    top: 0.75rem;
+}
+
+.timeline-marker.lane-2 {
+    top: -0.5rem;
+}
+
+/*
+ * The first and last tick are dates now, wider than the line's margin: each
+ * is anchored at its end rather than centred, so neither hangs off the card.
+ */
+.timeline-tick.is-start {
+    transform: none;
+}
+
+.timeline-tick.is-end {
+    transform: translateX(-100%);
+}
+
+/* The key to the markers' colours: the same fill, the same corner. */
+.timeline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin: 0 0 0.75rem;
+    font-size: var(--size-caption);
+    color: var(--muted);
+}
+
+.timeline-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.timeline-key {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 3px;
+    background: var(--s1);
+}
+
+.timeline-key.is-trial {
+    background: var(--warn);
+}
+
+.timeline-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    gap: 0.5rem;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-small);
+    font-size: var(--size-label);
+    font-weight: var(--weight-bold);
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.timeline-item:hover {
+    background: var(--surface-2);
+    border-color: var(--border-control);
+}
+
+/* A trial's conversion, edged in the colour its marker is drawn in. */
+.timeline-item.is-trial {
+    border-left: 3px solid var(--warn);
+}
+
+.timeline-date {
+    flex-shrink: 0;
+    width: 3.25rem;
+    color: var(--muted);
+}
+
+.timeline-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/*
+ * Who pays: a card per member, as many to a row as fit the width, so three
+ * members share a row and a fourth wraps rather than squeezing the others.
+ */
+.who-pays-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 1rem;
+}
+
+.member-card-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.member-card-head h3 {
+    margin: 0;
+}
+
+.member-card-head p {
+    margin: 0.1rem 0 0;
+    font-size: var(--size-label);
+}
+
+.member-card-figure {
+    margin: 0.875rem 0 0.5rem;
+    font-size: var(--size-kpi);
+    font-weight: var(--weight-semibold);
+}
+
+/*
+ * A member's bar in their tone's ink: the stronger half of the pair their
+ * avatar is drawn in, which holds its own against the meter's track where the
+ * disc's soft fill would not.
+ */
+.member-card .meter-fill[class*='avatar-tone-'] {
+    background: var(--avatar-ink);
+}
+
+.member-card .hint {
+    margin: 0.5rem 0 0;
+}
+
+/* The pace chart: an SVG stretched to its box, its strokes kept to width. */
+.pace-chart {
+    height: 12.5rem;
+}
+
+.pace-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.pace-area {
+    fill: var(--accent);
+    fill-opacity: 0.12;
+}
+
+.pace-spent,
+.pace-budget {
+    fill: none;
+    vector-effect: non-scaling-stroke;
+}
+
+.pace-spent {
+    stroke: var(--accent-text);
+    stroke-width: 3;
+}
+
+.pace-budget {
+    stroke: var(--bad);
+    stroke-width: 2;
+    stroke-dasharray: 6 5;
+}
+
+.pace-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.pace-figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 0.875rem 0 0.25rem;
+    font-size: var(--size-label);
+    color: var(--muted);
+}
+
+.pace-figures strong {
+    color: var(--text);
+}
+
+.pace-figures .is-over {
+    color: var(--bad);
+    font-weight: var(--weight-bold);
+}
+
+.pace-figures .is-under {
+    color: var(--accent-text);
+    font-weight: var(--weight-bold);
+}
+
+/*
+ * Spend over time: lines in an SVG stretched to its box, like the pace chart,
+ * with the axis labels laid over its left edge at the gridlines' heights.
+ */
+.trend-chart {
+    position: relative;
+    height: 12.5rem;
+    /* Room for the top axis label, which sits above its gridline. */
+    margin-top: 1.25rem;
+}
+
+.trend-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.trend-grid {
+    stroke: var(--border);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+
+.trend-line {
+    fill: none;
+    stroke: var(--accent-text);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+/* A member's line in their tone's ink, as their bar is. */
+.trend-line[class*='avatar-tone-'] {
+    stroke: var(--avatar-ink);
+}
+
+.trend-axis {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.trend-axis li {
+    position: absolute;
+    left: 0;
+    transform: translateY(-110%);
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.trend-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.trend-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+    gap: 0.4rem 1rem;
+    margin: 0.875rem 0 0.25rem;
+    font-size: var(--size-label);
+}
+
+.trend-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.trend-legend-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trend-key {
+    flex-shrink: 0;
+    width: 0.75rem;
+    height: 0.2rem;
+    border-radius: 999px;
+    background: var(--accent-text);
+}
+
+.trend-key[class*='avatar-tone-'] {
+    background: var(--avatar-ink);
 }
 
 /* ---------------------------------------------------------------- density */
@@ -1331,14 +4243,416 @@ tr.is-passed > td {
     gap: 0.35rem;
 }
 
-:root[data-density='compact'] .notable-row {
-    padding-bottom: 0.4rem;
+:root[data-density='compact'] .top-list,
+:root[data-density='compact'] .insight-list {
+    gap: 0.4rem;
 }
 
 /* ------------------------------------------------------- forced colours */
 
 @media (forced-colors: active) {
-    .calendar-day.is-today {
+    .calendar-day.is-today .calendar-date,
+    .calendar-day.is-selected {
         outline: 2px solid currentColor;
     }
+
+    .calendar-chip {
+        border: 1px solid currentColor;
+    }
+}
+
+/* --------------------------------------------------------- palette picker */
+
+/*
+ * Profile → Appearance: five palettes as cards, each drawn in its own rail and
+ * accent. `data-swatch` on the option scopes that palette's two colours to it
+ * (the generated theme stylesheet defines `--swatch-rail`, `--swatch-accent`
+ * and `--swatch-border` per key), so the page can show all five while it
+ * wears one.
+ *
+ * The radio is the state and stays a real radio: visually hidden, keyboard-
+ * reachable, posted as-is. The card around it shows which is chosen with the
+ * accent edge *and* the heavier name, so the choice does not rest on colour.
+ */
+.palette-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.palette-picker {
+    border: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.palette-picker > legend {
+    padding: 0;
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+}
+
+.palette-options {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+}
+
+.palette-option {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-button);
+    background: var(--surface);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+}
+
+.palette-option:hover {
+    border-color: var(--border-control);
+}
+
+.palette-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.palette-option:has(input:checked) {
+    border-color: var(--accent-text);
+    box-shadow: 0 0 0 1px var(--accent-text);
+    font-weight: var(--weight-bold);
+}
+
+.palette-option:has(input:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/*
+ * A small picture of the app in that palette: the rail down the left third,
+ * the page beside it with an accent button and a quiet one on it.
+ */
+.palette-swatch {
+    display: flex;
+    height: 2.75rem;
+    overflow: hidden;
+    border: 1px solid var(--swatch-line);
+    border-radius: var(--radius-control);
+    background: var(--swatch-canvas);
+}
+
+.palette-swatch-rail {
+    flex: 0 0 36%;
+    background: var(--swatch-rail);
+    border-right: 1px solid var(--swatch-border);
+}
+
+.palette-swatch-page {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0 0.5rem;
+}
+
+.palette-swatch-accent,
+.palette-swatch-muted {
+    height: 0.5rem;
+    border-radius: var(--radius-pill);
+}
+
+.palette-swatch-accent {
+    width: 1.75rem;
+    background: var(--swatch-accent);
+}
+
+.palette-swatch-muted {
+    width: 1rem;
+    background: var(--swatch-line);
+}
+
+.palette-name {
+    font-size: var(--size-label);
+}
+
+/* --------------------------------------------------------------- settings */
+
+/*
+ * A page's tabs: links along a rule, the current one underlined in the
+ * accent. The underline is drawn from `aria-current`, so the page that is
+ * shown and the page a screen reader is told is shown cannot disagree. On a
+ * narrow screen the row scrolls sideways inside itself rather than wrapping
+ * into a second line of tabs.
+ */
+.page-tabs {
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.page-tabs-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.page-tabs-list a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.page-tabs-list a:hover {
+    color: var(--text);
+}
+
+.page-tabs-list a[aria-current='page'] {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+
+/* The Data & integrations tab: as many cards to a row as fit. */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+    gap: 0 1rem;
+    align-items: start;
+}
+
+/* A second form in a card, under a rule: the base currency under the name. */
+.settings-subform {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+/* A setting stated rather than offered: what it is, and its value. */
+.settings-facts {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.5rem 1rem;
+    margin: 0 0 0.5rem;
+}
+
+.settings-facts dt {
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+.settings-facts dd {
+    margin: 0;
+    font-weight: var(--weight-medium);
+    overflow-wrap: anywhere;
+}
+
+/*
+ * The rates table, framed: a rounded border round the whole table and the
+ * header row on the same tint as the members table's. The table collapses its borders, and
+ * a collapsed table ignores a radius, so the frame is the scroll wrapper's and
+ * it clips the header's corners — `auto` rather than `hidden`, so a narrow
+ * screen still scrolls it sideways.
+ */
+.settings-rates {
+    margin: 0.75rem 0 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    overflow: auto;
+}
+
+.settings-rates .table th {
+    background: var(--surface-2);
+    border-bottom-color: var(--border);
+}
+
+.settings-rates .table th,
+.settings-rates .table td {
+    padding-inline: 0.9rem;
+}
+
+/* A disclosure whose summary is a button, and whose body is a form. */
+.settings-disclosure {
+    margin-top: 0.75rem;
+}
+
+.settings-disclosure > summary {
+    list-style: none;
+    display: inline-flex;
+}
+
+.settings-disclosure > summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-disclosure[open] > summary {
+    margin-bottom: 0.75rem;
+}
+
+/*
+ * A category or a tag as a chip: its name, how many subscriptions carry it,
+ * and — for a reader who may change it — a pencil that opens it in place to
+ * rename or delete. The disclosure's panel takes the row's full width, so an
+ * open chip pushes the ones after it down rather than overlapping them.
+ */
+.setting-chips {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.setting-chips > li:has(> .setting-chip[open]) {
+    flex-basis: 100%;
+}
+
+.setting-chip > summary,
+.setting-chip.is-static {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    font-size: var(--size-label);
+    font-weight: var(--weight-semibold);
+}
+
+.setting-chip > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.setting-chip > summary::-webkit-details-marker {
+    display: none;
+}
+
+.setting-chip > summary:hover {
+    border-color: var(--border-control);
+}
+
+.setting-chip[open] > summary {
+    border-color: var(--accent);
+}
+
+.setting-chip-count {
+    color: var(--muted);
+    font-size: var(--size-caption);
+}
+
+.setting-chip-icon {
+    width: 0.8rem;
+    height: 0.8rem;
+    color: var(--muted);
+}
+
+.setting-chip-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+}
+
+/* A payment method's chip: its badge is the chip's name, in the chip's ink. */
+.setting-chip .payment-badge {
+    color: var(--text);
+    font-size: inherit;
+}
+
+/* New category, tag or payment method: a field and its button on one line, wrapping if not. */
+.setting-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    max-width: 28rem;
+}
+
+.setting-add input[type='text'] {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+
+.setting-add input[type='color'] {
+    width: 2.75rem;
+}
+
+/*
+ * The import drop zone, as a link into the wizard: a dashed panel with an
+ * icon, what to do, and what happens next.
+ */
+.drop-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 1.5rem 1rem;
+    border: 2px dashed var(--border-control);
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+    color: var(--text);
+    text-align: center;
+    text-decoration: none;
+}
+
+.drop-link:hover {
+    border-color: var(--accent);
+}
+
+.drop-link-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: var(--muted);
+}
+
+.drop-link-title {
+    font-weight: var(--weight-semibold);
+}
+
+.drop-link-note {
+    color: var(--muted);
+    font-size: var(--size-label);
+}
+
+/* Recent activity: rows with no icon, who and what over when. */
+.activity-rows .account-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/*
+ * A switch with its title and a line of explanation: the words on the left,
+ * the switch at the far end of the row, as the prototype draws them.
+ */
+.choice.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.input-short {
+    max-width: 7rem;
 }

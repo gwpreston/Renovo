@@ -4,303 +4,335 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\BudgetPeriod;
+use App\Domain\Permission;
 use App\Domain\Entity\Subscription;
 use App\Domain\Money;
+use App\Domain\Rounding;
+use App\Domain\SubscriptionFilter;
+use App\Security\PermissionService;
 use App\Security\Scope;
-use App\Support\Distribution;
+use App\Support\Clock;
 use DateTimeImmutable;
 
 /**
- * The landing screen's tiles.
+ * The Overview dashboard: what the month and the year cost, what is coming,
+ * and where the money goes.
  *
- * Nothing here computes a figure of its own. Every number on the dashboard is
- * one an existing service already produces — the statistics, the forecast, the
- * budget projection, the subscription list — and this assembles them into the
- * shapes the tiles render. That is the whole point: the dashboard's twelve-month
- * chart is literally the walk the Analytics page reconstructs the past from, so
- * the two cannot show different totals for the same data, and a figure fixed in
- * one place is fixed on both screens.
+ * Nothing here computes a figure of its own. Every number is one an existing
+ * service already produces — the statistics, the reconstruction, the forecast,
+ * the budgets, the category breakdown, the price-rise rule — and this
+ * assembles them into the shapes the cards render. That is the point: the
+ * chart's future half *is* the Forecast page's months, its past half *is* the
+ * reconstruction year-over-year totals, and a figure fixed in one place is
+ * fixed on every screen that shows it.
  *
- * The forecast is still read here — the metric tiles and the budget widget are
- * projections — but it is no longer drawn. The year ahead is the Analytics
- * page's trajectory and the Forecast page's whole subject; two twelve-month
- * charts on the landing screen asked a reader to tell them apart before either
- * had said anything.
+ * **Two windows, both from the forecast.** Due next 7 days and Coming up (30
+ * days) are cut from the same walk of the forecast, so a trial converting on
+ * Friday is in both, priced at what it will convert to.
  *
- * **One near window.** "Renewing soon" is fourteen days — the window the
- * cancel-by view already calls urgent — and the renewals metric is counted
- * from it rather than from a definition of its own. Given two definitions they
- * would eventually disagree, and a dashboard that contradicts itself is worse
- * than one with fewer tiles.
+ * The Household view is `HouseholdDashboardService`'s.
  *
- * @phpstan-import-type BudgetProgress from BudgetService
- * @phpstan-import-type MonthTotals from ForecastService
- * @phpstan-import-type MemberOverview from HouseholdOverviewService
+ * @phpstan-import-type MonthBudget from BudgetMonthService
+ * @phpstan-type ForecastCharge array{
+ *     subscription: Subscription,
+ *     date: DateTimeImmutable,
+ *     amount: Money,
+ *     reason: string
+ * }
  */
 final class DashboardService
 {
-    /**
-     * The near window, in days.
-     *
-     * The cancel-by view's urgent window, reused rather than re-chosen. It is
-     * *renewals* inside it that this counts, not cancel-by deadlines: with a
-     * month's notice period a deadline can be behind you while the renewal it
-     * belongs to is weeks away, and a tile headed "renewing soon" must count
-     * the renewals.
-     */
-    public const NEAR_WINDOW_DAYS = CancellationService::URGENT_DAYS;
+    /** The Due KPI's window, in days. */
+    public const DUE_SOON_DAYS = 7;
 
-    /** Distribution bars past this many are a legend, not a picture. */
-    private const CATEGORY_BARS = 6;
+    /** Coming up's window, in days. */
+    public const COMING_UP_DAYS = 30;
+
+    /** Complete months of reconstructed spend the chart shows before this one. */
+    public const CHART_PAST_MONTHS = 6;
+
+    /** Forecast months the chart shows after this one. */
+    public const CHART_FUTURE_MONTHS = 6;
+
+    /**
+     * Coming up's rows. The rest of the window is counted, not listed: the
+     * card is a glance at what is next, and the three narrow cards stacked
+     * beside it are what its height is measured against.
+     */
+    private const COMING_UP_ROWS = 8;
+
+    /** The budgets card's rows: enough to be a summary, not the budgets page. */
+    private const BUDGET_ROWS = 4;
+
+    /** The views the subscriptions table's chips offer. */
+    public const TABLE_VIEWS = ['active', 'all', 'expiring'];
+
+    /** Enough of the list to be useful, not so much that it becomes the list. */
+    private const TABLE_ROWS = 8;
+
+    /** The table's Expiring chip: the cancel-by view's urgent window. */
+    private const TABLE_EXPIRING_DAYS = CancellationService::URGENT_DAYS;
 
     public function __construct(
         private readonly StatsService $stats,
         private readonly ForecastService $forecast,
-        private readonly BudgetService $budgets,
+        private readonly BudgetMonthService $budgets,
         private readonly SubscriptionService $subscriptions,
         private readonly ExchangeRateService $rates,
         private readonly SpendChartService $spendChart,
-        private readonly HouseholdOverviewService $household,
+        private readonly CategoryBreakdownService $breakdown,
+        private readonly SpendInsightService $insights,
+        private readonly InstanceSettingsService $settings,
+        private readonly PermissionService $permissions,
+        private readonly Clock $clock,
     ) {
     }
 
     /**
-     * The whole screen: the metric row, the chart and the usage widget.
+     * The whole Overview.
      *
-     * @return array{
-     *     stats: array<string, mixed>,
-     *     metrics: array<string, mixed>,
-     *     history: array<string, mixed>,
-     *     usage: array<string, mixed>,
-     *     member_shares: list<MemberOverview>
-     * }
+     * @return array<string, mixed>
      */
     public function overview(Scope $scope): array
     {
         // First, because it brings due price changes, ended trials and overdue
         // payment dates up to date; everything below is read afterwards so no
-        // tile is computed from a figure the next page load would correct.
+        // card is computed from a figure the next page load would correct.
         $stats = $this->stats->dashboard($scope);
 
-        $soon = $this->subscriptions->upcoming($scope, self::NEAR_WINDOW_DAYS);
-        $months = $this->forecast->monthly($scope, ForecastService::DEFAULT_MONTHS);
+        $comingUp = $this->forecast->chargesWithin($scope, self::COMING_UP_DAYS);
+        $dueSoonEnd = $this->clock->today()->modify(sprintf('+%d days', self::DUE_SOON_DAYS));
+        $dueSoon = array_values(array_filter(
+            $comingUp,
+            static fn (array $charge): bool => $charge['date'] <= $dueSoonEnd,
+        ));
+
+        $trials = $this->subscriptions->trialsBeforeConversion($scope);
+        $monthlyBudget = $this->budgets->householdOverall($scope, BudgetPeriod::Monthly);
+        $breakdown = $this->breakdown->fromStats($stats);
 
         return [
             'stats' => $stats,
-            'metrics' => $this->metrics($stats, $soon, $months),
-            // The year behind, drawn by the same builder the Analytics page's
-            // trajectory uses and reconstructed by `StatsService` from the same
-            // walk its year-over-year card reads — so the two price a given past
-            // charge identically, even though their windows differ (twelve
-            // calendar months here, a rolling year there).
-            'history' => $this->spendChart->fromHistory($this->stats->monthlyHistory($scope)),
-            'usage' => $this->usage($scope, $stats),
-            // Who carries what, from the same service the household screen
-            // reads, so the card and the page cannot put different figures
-            // against the same name. Empty — and the card therefore silent —
-            // for a Viewer, for a household of one, and in ISOLATED mode,
-            // where there is nothing to compare because there is nothing
-            // honest to say about anybody else's spending.
-            'member_shares' => $this->memberShares($scope),
+            'kpis' => [
+                'monthly' => $this->figures($stats['recurring'], 'monthly_minor', $stats['combined_monthly'])
+                    + ['budget' => $this->budgetNote($stats['combined_monthly'], $monthlyBudget?->amount)],
+                'yearly' => $this->figures($stats['recurring'], 'yearly_minor', $stats['combined_yearly']),
+                'due' => [
+                    'count' => count($dueSoon),
+                    'days' => self::DUE_SOON_DAYS,
+                ] + $this->chargeTotals($dueSoon),
+                'active' => [
+                    'count' => $stats['active_count'],
+                    'trials' => count($trials),
+                    'paused' => count($this->subscriptions->paused($scope)),
+                ],
+                'one_off' => $stats['one_off'],
+            ],
+            'chart' => $this->chart($scope, $monthlyBudget?->amount),
+            'where_it_goes' => $breakdown + ['donut' => $this->breakdown->donut($breakdown)],
+            'coming_up' => [
+                'days' => self::COMING_UP_DAYS,
+                'rows' => array_map(
+                    fn (array $charge): array => $this->chargeRow($charge),
+                    array_slice($comingUp, 0, self::COMING_UP_ROWS),
+                ),
+                'more' => max(0, count($comingUp) - self::COMING_UP_ROWS),
+            ] + $this->chargeTotals($comingUp),
+            'budgets' => $this->budgets->thisMonth($scope, self::BUDGET_ROWS),
+            'trials' => array_map(fn (Subscription $trial): array => $this->trialRow($scope, $trial), $trials),
+            'price_change' => $this->insights->nextScheduledRise(
+                $scope,
+                $this->subscriptions->allForStats($scope),
+            ),
+            'base_currency' => $this->settings->baseCurrency(),
         ];
     }
 
     /**
-     * The member-shares card's rows, or none at all.
+     * The subscriptions table, optional on Overview and hidden by default.
      *
-     * The decision about whether the comparison is worth drawing belongs to the
-     * service that knows what is in the rows, not to a template counting them:
-     * "more than one member whose figures are actually shown" is a judgement
-     * about isolation, and isolation is not a thing a Twig file should be
-     * reasoning about.
+     * Every row comes through the repository the list page uses, so the
+     * scoping layer decides what is in it exactly as it does there. The chips
+     * are the list's own filter, not a new query path: Active is the default,
+     * All includes the paused ones, and Expiring is what renews within the
+     * cancel-by view's urgent window.
      *
-     * @return list<MemberOverview>
+     * @return array{view: string, views: list<string>, rows: list<Subscription>}
      */
-    private function memberShares(Scope $scope): array
+    public function table(Scope $scope, string $view = 'active'): array
     {
-        $members = $this->household->members($scope);
+        $view = in_array($view, self::TABLE_VIEWS, true) ? $view : 'active';
 
-        return $this->household->isWorthComparing($members) ? $members : [];
+        $rows = match ($view) {
+            'expiring' => array_slice(
+                $this->subscriptions->upcoming($scope, self::TABLE_EXPIRING_DAYS),
+                0,
+                self::TABLE_ROWS,
+            ),
+            'all' => $this->subscriptions->list($scope, new SubscriptionFilter(
+                includeInactive: true,
+                perPage: self::TABLE_ROWS,
+            )),
+            default => $this->subscriptions->list($scope, new SubscriptionFilter(perPage: self::TABLE_ROWS)),
+        };
+
+        return ['view' => $view, 'views' => self::TABLE_VIEWS, 'rows' => $rows];
     }
 
     /**
-     * The four metric tiles.
+     * The monthly spend chart: six months reconstructed, this month split,
+     * six forecast.
      *
-     * Four tiles, not one per currency. Monthly and yearly spend are a tile
-     * each listing their per-currency subtotals, with the combined figure
-     * alongside only when every currency in play converts — the rule the rest
-     * of the application follows. A card may therefore be two lines tall, and
-     * that is the correct answer rather than a compromise: a single big number
-     * that silently omits a currency is a wrong number.
+     * `SpendChartService::window()`, which the analytics screen asks for
+     * twelve months either side — so these thirteen bars are thirteen of its
+     * twenty-five, by construction rather than by agreement.
      *
-     * The fourth tile is where the design put a virtual card. It holds the
-     * active-subscription count and the next charge with its date, both of
-     * which are true.
-     *
-     * @param array<string, mixed>   $stats
-     * @param list<Subscription>     $soon
-     * @param list<MonthTotals>      $months
      * @return array<string, mixed>
      */
-    private function metrics(array $stats, array $soon, array $months): array
+    private function chart(Scope $scope, ?Money $budget): array
     {
-        /** @var list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring */
-        $recurring = $stats['recurring'];
+        $budgetMinor = $budget === null
+            ? null
+            : $this->rates->convertMinor($budget->amountMinor, $budget->currency, $this->settings->baseCurrency());
 
+        return $this->spendChart->window($scope, self::CHART_PAST_MONTHS, self::CHART_FUTURE_MONTHS, $budgetMinor);
+    }
+
+    /**
+     * One spend tile's figures, shaped for `partials/spend.twig`.
+     *
+     * @param list<array{currency: string, monthly_minor: int, yearly_minor: int, count: int}> $recurring
+     * @param 'monthly_minor'|'yearly_minor' $field
+     * @param array{currency: string, amount_minor: int|null, unconvertible: list<string>} $combined
+     * @return array{totals: list<array{currency: string, amount_minor: int}>, combined: array<string, mixed>}
+     */
+    private function figures(array $recurring, string $field, array $combined): array
+    {
         return [
-            'monthly' => [
-                'totals' => array_map(
-                    static fn (array $row): array => [
-                        'currency' => $row['currency'],
-                        'amount_minor' => $row['monthly_minor'],
-                    ],
-                    $recurring,
-                ),
-                'combined' => $stats['combined_monthly'],
-            ],
-            'yearly' => [
-                'totals' => array_map(
-                    static fn (array $row): array => [
-                        'currency' => $row['currency'],
-                        'amount_minor' => $row['yearly_minor'],
-                    ],
-                    $recurring,
-                ),
-                'combined' => $stats['combined_yearly'],
-            ],
-            'renewals' => [
-                'count' => count($soon),
-                'days' => self::NEAR_WINDOW_DAYS,
-                'total' => $this->stats->sumByCurrency($soon),
-            ],
-            'portfolio' => [
-                'active_count' => $stats['active_count'],
-                'next' => $this->nextCharge($months),
-            ],
-            'one_off' => $stats['one_off'],
+            'totals' => array_map(
+                static fn (array $row): array => ['currency' => $row['currency'], 'amount_minor' => $row[$field]],
+                $recurring,
+            ),
+            'combined' => $combined,
         ];
     }
 
     /**
-     * The next charge due, whatever kind of charge it is.
+     * "N% of {budget}" under the monthly spend, or nothing.
      *
-     * Taken from the forecast rather than from the next payment date, because
-     * the forecast is the thing that knows a trial converting on Friday is a
-     * charge and that a scheduled increase applies from its own date. The
-     * charges are in date order, so the first event in the first month that has
-     * one is the next thing to be paid for.
+     * Only against the household's monthly overall budget, because the tile
+     * is the household's monthly total and a percentage must be a figure over
+     * its own limit. Stated in the budget's currency; when the total cannot be
+     * converted into it there is no honest percentage and so no note.
      *
-     * @param list<MonthTotals> $months
-     * @return array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}|null
+     * @param array{currency: string, amount_minor: int|null, unconvertible: list<string>} $combined
+     * @return array{percent: int, limit: Money, is_over: bool}|null
      */
-    private function nextCharge(array $months): ?array
+    private function budgetNote(array $combined, ?Money $limit): ?array
     {
-        foreach ($months as $month) {
-            foreach ($month['events'] as $event) {
-                return $event;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * The usage widget: this member's budget, and where the money goes.
-     *
-     * The design's "$1200 from $299 limit" was a made-up allowance. The real
-     * version of it is a budget against the spend projected for it, which the
-     * application already computes from the same forecast the chart draws — so
-     * the widget and the bars above it are two readings of one number.
-     *
-     * @param array<string, mixed> $stats
-     * @return array{budget: BudgetProgress|null, categories: array<string, mixed>}
-     */
-    private function usage(Scope $scope, array $stats): array
-    {
-        return [
-            'budget' => $this->ownBudget($scope),
-            'categories' => $this->categoryShares($stats),
-        ];
-    }
-
-    /**
-     * The signed-in member's own budget, or null if they have not set one.
-     *
-     * A budget measures one member's share, so in SHARED isolation — where an
-     * Owner can see everybody's — theirs is the only one that belongs on their
-     * dashboard. Somebody with several gets the one that covers the most
-     * ground: the overall budget before a per-category one, the shorter period
-     * before the longer, and the older before the newer so the choice is
-     * stable rather than a matter of row order.
-     *
-     * @return BudgetProgress|null
-     */
-    private function ownBudget(Scope $scope): ?array
-    {
-        $own = array_values(array_filter(
-            $this->budgets->progress($scope),
-            static fn (array $row): bool => $row['budget']->ownerUserId === $scope->userId,
-        ));
-
-        if ($own === []) {
+        if ($limit === null || $combined['amount_minor'] === null || $limit->amountMinor <= 0) {
             return null;
         }
 
-        usort($own, static function (array $a, array $b): int {
-            return ($a['budget']->isOverall() ? 0 : 1) <=> ($b['budget']->isOverall() ? 0 : 1)
-                ?: $a['budget']->period->months() <=> $b['budget']->period->months()
-                ?: $a['budget']->id <=> $b['budget']->id;
-        });
+        $inBudgetCurrency = $this->rates->convertMinor(
+            $combined['amount_minor'],
+            $combined['currency'],
+            $limit->currency,
+        );
+        if ($inBudgetCurrency === null) {
+            return null;
+        }
 
-        return $own[0];
+        return [
+            'percent' => Rounding::multiplyDivide($inBudgetCurrency, 100, $limit->amountMinor),
+            'limit' => $limit,
+            'is_over' => $inBudgetCurrency > $limit->amountMinor,
+        ];
     }
 
     /**
-     * Where the recurring spend goes, as a share of the monthly total.
+     * A set of charges totalled per currency, and combined when all convert.
      *
-     * The rows are the ones the By category card shows, converted to the base
-     * currency so that two categories in different currencies can be compared —
-     * which is the entire claim a distribution bar makes. The bars are drawn
-     * only when the combined monthly total exists, and when it does every
-     * currency has a rate, so no category can be the one that fails to convert.
+     * @param list<ForecastCharge> $charges
+     * @return array{totals: list<array{currency: string, amount_minor: int}>, combined: array<string, mixed>}
+     */
+    private function chargeTotals(array $charges): array
+    {
+        $byCurrency = [];
+        foreach ($charges as $charge) {
+            $currency = $charge['amount']->currency;
+            $byCurrency[$currency] = ($byCurrency[$currency] ?? 0) + $charge['amount']->amountMinor;
+        }
+        ksort($byCurrency);
+
+        $totals = [];
+        foreach ($byCurrency as $currency => $amount) {
+            $totals[] = ['currency' => (string) $currency, 'amount_minor' => $amount];
+        }
+
+        return ['totals' => $totals, 'combined' => $this->stats->combine($byCurrency)];
+    }
+
+    /**
+     * One Coming up row: the charge in its own currency, and roughly what that
+     * is in the base currency when it is a different one that converts.
      *
-     * @param array<string, mixed> $stats
+     * @param ForecastCharge $charge
      * @return array<string, mixed>
      */
-    private function categoryShares(array $stats): array
+    private function chargeRow(array $charge): array
     {
-        /** @var array{currency: string, amount_minor: int|null, unconvertible: list<string>} $combined */
-        $combined = $stats['combined_monthly'];
-        $currency = $combined['currency'];
-        $total = $combined['amount_minor'];
-
-        if ($total === null || $total <= 0) {
-            return ['currency' => $currency, 'total_minor' => $total, 'rows' => [], 'other' => null];
-        }
-
-        /** @var list<array{name: string, currency: string, monthly_minor: int, count: int}> $byCategory */
-        $byCategory = $stats['by_category'];
-
-        $byName = [];
-        foreach ($byCategory as $row) {
-            $byName[$row['name']][$row['currency']] = ($byName[$row['name']][$row['currency']] ?? 0)
-                + $row['monthly_minor'];
-        }
-
-        $rows = [];
-        foreach ($byName as $name => $amounts) {
-            $rows[] = [
-                'name' => (string) $name,
-                'amount_minor' => $this->rates->combine($amounts, $currency) ?? 0,
-            ];
-        }
-
-        // Ordering, the tail and the percentages are shared with the
-        // my-subscriptions widget, which draws the same bars against a
-        // denominator of its own choosing.
-        return Distribution::bars($rows, $total, self::CATEGORY_BARS) + [
-            'currency' => $currency,
-            'total_minor' => $total,
+        return $charge + [
+            'approx_base' => $this->approxBase($charge['amount']),
+            'is_trial_conversion' => $charge['reason'] === 'trial_conversion',
         ];
+    }
+
+    /**
+     * One running trial: when it ends, who started it, what it becomes, and
+     * whether this viewer may cancel it.
+     *
+     * Cancelling takes both answers the subscription screen asks for: a role
+     * that may change subscriptions, and a row this scope may change — a
+     * Contributor sees every trial in the household and may cancel only their
+     * own. This decides whether the button is drawn; the repository is still
+     * what refuses a forged cancel.
+     *
+     * @return array<string, mixed>
+     */
+    private function trialRow(Scope $scope, Subscription $trial): array
+    {
+        $price = $trial->priceAfterConversion();
+        $cycle = $trial->billingCycleAfterConversion();
+
+        return [
+            'subscription' => $trial,
+            'ends' => $trial->trialEndDate,
+            'days_left' => $trial->daysUntilTrialEnds($this->clock->today()),
+            'converts_to' => $price,
+            'converts_to_cycle' => $cycle,
+            'approx_base' => $this->approxBase($price),
+            'may_cancel' => $this->permissions->allows($scope, Permission::UpdateSubscription)
+                && $scope->mayWriteRow($trial->householdId, $trial->ownerUserId),
+        ];
+    }
+
+    /**
+     * An amount in the base currency, when it is in another one and converts.
+     *
+     * Null when the amount is already in the base currency (there is nothing
+     * to add) or has no rate (there is nothing honest to add).
+     */
+    private function approxBase(Money $amount): ?Money
+    {
+        $base = $this->settings->baseCurrency();
+        if ($amount->currency === $base) {
+            return null;
+        }
+
+        $converted = $this->rates->convertMinor($amount->amountMinor, $amount->currency, $base);
+
+        return $converted === null ? null : Money::of($converted, $base);
     }
 }

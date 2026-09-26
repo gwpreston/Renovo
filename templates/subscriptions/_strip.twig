@@ -1,57 +1,49 @@
 {#
     The stats strip.
 
-    Four figures the application already has, and not one of them invented for
-    this screen: the active count and the yearly total are the Statistics page's
-    own, the renewal count is the near window the dashboard and the cancel-by
-    view are built from, and the paused count is the same list the filter's
-    "include paused" checkbox reveals — read through the scoping layer, so it
-    counts what its reader is allowed to see and nothing more.
+    Active, Trials and Paused are the list's own statuses, so each count is the
+    number of rows the status filter of the same name would page through — the
+    Active tile leaves out the trials beside it. Per month is the statistics
+    service's recurring monthly total, through the same partial the dashboard's
+    tiles use: one clean number when there is an honest one to show, subtotals
+    with the combined figure when every currency converts, and subtotals alone
+    with the missing currency named when one does not.
 
-    The yearly figure keeps the per-currency rule, through the same partial the
-    dashboard's tiles use — so it is a single clean number whenever there is an
-    honest single number to show, and two lines when there is not.
+    Every count is read through the scoping layer, so it counts what its reader
+    may see and nothing more.
 #}
 {% import 'partials/spend.twig' as figure %}
 
 <section class="metric-grid" id="subscription-strip" aria-label="{{ t('subscriptions.strip') }}">
-    <article class="card stat metric">
-        <h2 class="stat-label">{{ t('dashboard.active_subscriptions') }}</h2>
-        <p class="stat-value">{{ strip.active_count }}</p>
-        <p class="muted">{{ t('subscriptions.active_note') }}</p>
+    <article class="card stat metric kpi kpi-side">
+        <span class="kpi-icon kpi-icon-ok">{{ icon('ok') }}</span>
+        <div class="kpi-body">
+            <h2 class="stat-label">{{ t('state.active') }}</h2>
+            <p class="stat-value num">{{ strip.active|decimal(0) }}</p>
+        </div>
     </article>
 
-    <article class="card stat metric">
-        <h2 class="stat-label">{{ t('dashboard.yearly_spend') }}</h2>
-        {{ figure.spend(strip.yearly, t('dashboard.per_year_unit')) }}
+    <article class="card stat metric kpi kpi-side">
+        <span class="kpi-icon kpi-icon-info">{{ icon('trial') }}</span>
+        <div class="kpi-body">
+            <h2 class="stat-label">{{ t('subscriptions.trials_heading') }}</h2>
+            <p class="stat-value num">{{ strip.trials|decimal(0) }}</p>
+        </div>
     </article>
 
-    <article class="card stat metric">
-        <h2 class="stat-label">{{ t('subscriptions.paused_heading') }}</h2>
-        <p class="stat-value">{{ strip.paused.count }}</p>
-        {% if strip.paused.yearly is not empty %}
-            <p class="muted">
-                {% for total in strip.paused.yearly %}
-                    {{ total.total_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
-                {% endfor %}
-                {{ t('subscriptions.paused_if_resumed') }}
-            </p>
-        {% else %}
-            <p class="muted">{{ t('subscriptions.paused_note') }}</p>
-        {% endif %}
+    <article class="card stat metric kpi kpi-side">
+        <span class="kpi-icon kpi-icon-warn">{{ icon('paused') }}</span>
+        <div class="kpi-body">
+            <h2 class="stat-label">{{ t('state.paused') }}</h2>
+            <p class="stat-value num">{{ strip.paused|decimal(0) }}</p>
+        </div>
     </article>
 
-    <article class="card stat metric">
-        <h2 class="stat-label">{{ t('dashboard.renewing_soon') }}</h2>
-        <p class="stat-value">{{ strip.renewals.count }}</p>
-        <p class="muted">{{ t('dashboard.renewing_soon_note', {'days': strip.renewals.days}) }}</p>
-        {% if strip.renewals.total is not empty %}
-            <p class="muted">
-                {% for total in strip.renewals.total %}
-                    {{ total.total_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}
-                {% endfor %}
-                {{ t('dashboard.due_in_total') }}
-            </p>
-        {% endif %}
+    <article class="card stat metric kpi kpi-side">
+        <span class="kpi-icon kpi-icon-neutral">{{ icon('calculator') }}</span>
+        <div class="kpi-body">
+            <h2 class="stat-label">{{ t('field.per_month') }}</h2>
+            {{ figure.spend(strip.per_month, t('dashboard.per_month_unit')) }}
+        </div>
     </article>
 </section>

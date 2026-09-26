@@ -120,7 +120,13 @@ paths:
         - name: inactive
           in: query
           schema: { type: string, enum: ["1"] }
-          description: Include inactive subscriptions.
+          description: Include inactive subscriptions — paused and cancelled.
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, trial, paused, cancelled] }
+          description: >
+            Only subscriptions in this state (see `status` on the resource).
+            Takes precedence over `inactive`.
         - name: sort
           in: query
           schema: { type: string, enum: [name, next_payment, price, created] }
@@ -250,6 +256,65 @@ paths:
       responses:
         "204":
           description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/subscriptions/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/SubscriptionId"
+    post:
+      tags: [Subscriptions]
+      summary: Cancel the subscription.
+      description: |
+        Finished, as of today: `cancelled_at` is set and the subscription is
+        made inactive, so it leaves every total, the forecast, budgets,
+        reminders and the calendar. On a trial it stops the conversion — a
+        cancelled trial never becomes a paid subscription. Cancelling an
+        already-cancelled subscription keeps the first date. Needs the same
+        access as editing it.
+      responses:
+        "200":
+          description: The cancelled subscription.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Subscription"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/subscriptions/{id}/uncancel:
+    parameters:
+      - $ref: "#/components/parameters/SubscriptionId"
+    post:
+      tags: [Subscriptions]
+      summary: Undo a cancellation.
+      description: |
+        Clears `cancelled_at`. The subscription returns to **paused**, not
+        active, so an accidental cancel corrected cannot silently restart
+        charges; resume it with a PUT setting `is_active` to true.
+      responses:
+        "200":
+          description: The subscription, now paused.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Subscription"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -935,7 +1000,29 @@ components:
           nullable: true
           enum: [weekly, monthly, quarterly, yearly, custom_days]
         converts_to_cycle_days: { type: integer, nullable: true }
-        is_active: { type: boolean, default: true }
+        is_active:
+          type: boolean
+          default: true
+          description: |
+            False pauses the subscription. A cancelled subscription stays
+            inactive whatever is sent; un-cancel it first.
+        plan:
+          type: string
+          nullable: true
+          maxLength: 60
+          description: |
+            The tier it is on — "Standard", "Family". An absent key keeps the
+            current value; send null or an empty string to clear it.
+        visibility:
+          type: string
+          enum: [household, payer]
+          default: household
+          description: |
+            `payer` keeps the subscription to its owner: nobody else in the
+            household sees it, in either isolation mode and whatever their
+            role, and it is left out of their totals. Only the owner may set it,
+            only when the payer is the owner or unset, and never on a split
+            subscription. An absent key keeps the current setting.
         category_id: { type: integer, nullable: true }
         payment_method_id:
           type: integer
@@ -1009,5 +1096,18 @@ components:
               nullable: true
               description: Read-only. The last day to cancel and avoid the next charge.
             days_until_next_payment: { type: integer, nullable: true }
+            cancelled_at:
+              type: string
+              format: date
+              nullable: true
+              description: |
+                Read-only. The day it was cancelled. Set and cleared by the
+                cancel and uncancel endpoints only.
+            status:
+              type: string
+              enum: [active, trial, paused, cancelled]
+              description: |
+                Read-only. Derived in this order: cancelled, then paused
+                (inactive and not cancelled), then trial, then active.
             created_at: { type: string, format: date-time }
             updated_at: { type: string, format: date-time }

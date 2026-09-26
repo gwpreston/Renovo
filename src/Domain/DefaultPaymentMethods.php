@@ -19,7 +19,7 @@ namespace App\Domain;
 final class DefaultPaymentMethods
 {
     /**
-     * The glyphs a payment method may carry, by the name `assets/js/icons.js`
+     * The glyphs a payment method may carry, by the name `assets/theme/icons.json`
      * knows them by. A stored icon is checked against this list, so a row can
      * never name a drawing the page does not have.
      */

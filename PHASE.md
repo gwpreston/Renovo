@@ -4,210 +4,272 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `PHASE.md` at the repo root.
 
-# Phase 17 — payment methods
+# Phase 29 — the signed-out screens
 
-A subscription is paid *with* something — a card, PayPal, a direct debit — and
-the application does not record which. This phase adds that: a managed list of
-payment methods (a sensible default set, plus the household's own additions with
-logos), an assignment on each subscription, and the method surfaced everywhere a
-subscription's shape is shown, including a new breakdown so "what am I paying
-through each method" reads as easily as spend by category does.
+Every screen someone sees before they are inside the application — sign in, the
+two-step challenge, forgotten password, the reset, registration, invitations,
+email confirmations and the first-run setup wizard — restyled to the Claude
+Design auth prototype (`Renovo_Auth_dc.html`). It is a restyle over flows that
+already work: no authentication rule, token, rate limit or lifetime changes. The
+prototype shows five of these screens; the others follow the same pattern so the
+signed-out experience reads as one design rather than five designed pages and a
+dozen old ones.
 
-It is a new **attribute**, not a new kind of money. A payment method is a label
-with a logo; it holds no amount, moves no money, and charges nothing. Renovo
-tracks what is due, not a ledger of what was paid, and a payment method does not
-change that — it groups what is due by how it will be paid.
+These pages sit outside the Phase 19 shell (there is no shell before there is an
+account), so this phase can be built any time after Phase 18 and is independent
+of Phases 19–28.
 
 ## Depends on
 
-- **P1** — the subscription model and the central scoping layer; **categories**,
-  whose pattern this mirrors almost exactly.
-- **P2 / P12** — the statistics and the category breakdown/donut this extends.
-- **P5** — the API (a new editable field must be carried), backup/restore
-  (fidelity), and the file-upload/validation used for logos.
-- **P7–P8** — the asset pipeline (icons) and the design tokens (chart colours).
+- **Phase 18** — the tokens, fonts, icons, component vocabulary, and the rule
+  that signed-out pages render as **navy + system**.
+- **Phase 1** — sign in, registration, email verification, password reset, rate
+  limiting, the setup wizard (extended in Phases 2 and 3).
+- **Phase 4** — TOTP, passkeys (as a login method and as a second factor),
+  recovery codes.
+- **Phase 15** — invitations, the email-change confirmation link, and the
+  temporary-credential path if it was built.
+- **Phase 6** — `LocaleMiddleware` (the only locale available before sign-in),
+  demo mode.
 
-Mirroring categories is the through-line of the whole phase: a payment method is
-household-scoped metadata visible to the whole household even in ISOLATED mode
-(like a category name, it carries no financial information), assigned to a
-subscription through a nullable foreign key, and it feeds the same breakdown
-machinery. Where a decision has already been made for categories, this phase
-makes the same one for payment methods rather than inventing a second answer.
+## The layout
+
+A split screen, as in the prototype:
+
+- **Brand panel** (left, `--rail` background): the mark, "Renovo", "Household
+  spend", a one-line pitch, three feature points with icons, and a footer line.
+  Below 900px it collapses to a slim header with the mark and name only, so the
+  form is the first thing on a phone.
+- **Form card** (right, centred): 14px radius, `--surface`, `--shadow`, an icon
+  tile where the prototype has one, a heading (the page's single `<h1>`), a
+  one-line explanation, the form, and secondary links beneath.
+- **Demo banner** above the card when demo mode is on, stating that the instance
+  is a read-only demonstration.
+
+The prototype hardcodes `#00D084`, `#E53E3E` and `#F59E0B` in about 27 places;
+every one becomes a token (`--accent`, `--bad`, `--warn`, `--ok`). It also loads
+its fonts from Google and Lucide from unpkg — Phase 18 already vendors both.
+
+### Brand panel copy, corrected
+
+The pitch points are kept, with two corrections because the panel must not make
+claims the application does not keep:
+
+| Prototype | Shipped |
+| --- | --- |
+| "…by email, Slack or Gotify." | "…by email, chat apps or push notifications." — there are eleven channels, and the list will change |
+| "Self-hosted on your own server. Nothing leaves it." | "Self-hosted. Your data stays on your own server." — exchange rates are fetched and alerts are sent out, so "nothing leaves it" is untrue |
+
+All panel text is catalogued.
 
 ## In scope this phase (build ONLY these)
 
-### The model
+### A. Sign in
 
-- **`payment_methods` table**, household-scoped, mirroring `categories`: `id`,
-  `household_id`, `name`, `logo_path` (nullable), `colour` (nullable, for the
-  breakdown's segments), `created_at`, `updated_at`, unique `(household_id,
-  name)`, FK on `household_id`. No owner column — household-wide metadata, as
-  categories are.
-- **`subscriptions.payment_method_id`** (nullable) — a foreign key to
-  `payment_methods`, **`ON DELETE SET NULL`**, indexed, mirroring `category_id`
-  exactly. Removing a method unassigns it from its subscriptions; it never
-  deletes a subscription.
+- Heading **Sign in**, subtitle **"Welcome back."** — not the prototype's
+  "Welcome back to the Jenkins household": a signed-out visitor is anonymous,
+  an instance may hold several households, and naming one to anybody who loads
+  the page is a disclosure.
+- The failure message stays generic ("That email and password don't match an
+  account") and appears in a `bad` alert with an icon, announced to screen
+  readers (`role="alert"`). The throttle's lock-out message uses the same alert,
+  with the wait time.
+- Email, Password with a **show/hide** button (a real `<button>` with an
+  `aria-label` that changes with state; without script the field is a plain
+  password field), **Forgot password?** link.
+- **Sign in** (primary). An "or" divider, then **Sign in with a passkey**
+  (secondary) — shown only where WebAuthn is available, since it needs script
+  and a secure context.
+- Footer: **Create an account** only when public registration is open. The
+  prototype's "Setting Renovo up for the first time?" link is not shown: until
+  setup is complete every request is redirected to the wizard anyway.
 
-### The default list (seeded, generic icons — not brand logos)
+### B. Two-step verification
 
-A default set is seeded when a household is created (in the same two places a
-household is made today: the setup wizard and registration), so a new instance
-has methods to choose from immediately — e.g. **Credit Card, Debit Card, Direct
-Debit, Bank Transfer, Standing Order, PayPal, Cash, Gift Card, App Store, Google
-Play**. Two rules on the defaults:
+- Icon tile, **Two-step verification**, "Enter the 6-digit code from your
+  authenticator app for {email}".
+- The six boxes are drawn around **one** input (`inputmode="numeric"`,
+  `autocomplete="one-time-code"`, `maxlength="6"`), so pasting, autofill and
+  screen readers see a single field; without script it is that field, styled.
+- **Verify and continue**; **Use a recovery code** (a second form on the same
+  page, revealed by a link or `<details>`); **Use a passkey instead** when the
+  account has one; **← Back to sign in**.
 
-- **Generic icons, not brand marks.** The defaults ship with neutral Lucide icons
-  (`credit-card`, `banknote`, `landmark`, `wallet`…), **not** bundled PayPal / Visa
-  / Mastercard logos. Those are trademarks, and this project is careful about what
-  it vendors (the SIL-licensed font, MIT-licensed icons). A household that wants a
-  brand's own logo uploads it themselves.
-- **Editable free text after seeding.** The seeded names are resolved through the
-  catalogue at creation time (so a non-English instance gets sensible defaults),
-  then are ordinary editable rows — rename, recolour, remove, or add to freely.
+### C. Forgotten password
 
-### Managing the list
+- **Reset your password**: "Enter the email you sign in with. If it belongs to
+  an account, we'll send a link that works for {N} minutes." N is **the real
+  reset-token lifetime**, read from configuration — not the prototype's fixed 60.
+- **Check your inbox**: "If {email} has an account, a reset link is on its way.
+  It expires in {N} minutes and works once." The same page whether or not the
+  account exists, so the flow still reveals nothing. "Nothing arrived? Check
+  spam, or ask your household Owner to send a reset from Members & roles."
+  **Send again** (a re-post of the form, under the existing rate limit) and
+  **Back to sign in**.
+- **Choose a new password** (the page the link opens — not in the prototype):
+  new password with the strength meter (section F), confirm, **Save password**;
+  then a success state with **Sign in**. An expired or used link gets its own
+  state with **Send a new link**.
 
-A small management screen **under Settings, beside Categories**: create a method
-(name + optional colour + optional uploaded logo), rename/recolour, upload or
-clear a logo, and delete (which unassigns via the FK, per above). Logo upload
-reuses the existing upload validation — type detected from the bytes, size-capped,
-app-chosen filename — and the existing logo storage. Managing the list is gated by
-the **same permission as managing categories**; a Viewer hitting these endpoints
-gets 403 from the permission layer.
+### D. The other signed-out screens (same pattern, not in the prototype)
 
-### Assigning it
+- **Create an account** (when registration is open): name, email, password with
+  meter, confirm.
+- **Confirm your email**: "we've sent a link to {email}" with resend, and the
+  landing states for a valid, expired and already-used link.
+- **Accept an invitation** (Phase 15): "{inviter} invited you to {household}" —
+  here naming the household is correct, because the link was sent to this
+  person — then set a password.
+- **Email change confirmed / expired** (Phase 15's link, which may be opened
+  signed out).
+- **Choose a new password** on first sign-in, if Phase 15's temporary-credential
+  path was built.
+- **Signed-out error pages** (404, 403, 500, session expired) in the same
+  layout, with a way back to sign in.
 
-- A **select on the subscription form** (create and edit), showing each method's
-  logo and name, with "none" allowed. Changing it is a subscription edit, so it
-  follows subscription-edit permissions (Editor+; Viewer 403), and is written
-  through the same service and repository as every other field.
-- Shown on the **subscription list** and detail as a small logo-and-name badge,
-  and wherever a subscription's identity is presented.
+### E. First-run setup
 
-### The breakdown (the donut, and its honest degrade)
+The prototype's three-step wizard, carrying everything the current wizard
+collects (Phases 1–3), so nothing it configures today is lost:
 
-- Add a **`by_payment_method`** aggregation to the statistics the pages already
-  compute, alongside `by_category`.
-- Render it with the **existing breakdown machinery** (`CategoryBreakdownService`
-  and its donut/bars), as a **spend-by-payment-method donut** on the Analytics
-  screen (P12), and as the proportion bars in the category-spending widget's
-  neighbour where it fits. Segment colours come from each method's `colour`, with
-  a generated fallback.
-- It obeys the **per-currency rule identically**: a donut implies one whole, so
-  when the methods span currencies that cannot all convert to one base, the
-  screen shows per-currency figures rather than a donut whose centre is a number
-  that does not exist — the same degrade the category donut already performs.
-  One-off/lifetime entries stay out of the recurring figures exactly as elsewhere.
+- **Progress**: "Step N of 3" with three labelled bars — **Your account**,
+  **Household**, **Reminders**. Each step is its own request (the current
+  wizard's state handling), so Back and Continue work without script.
+- **1 · Your account** — "Create the owner account — you'll manage members,
+  backups and household settings." Name, email, password with meter, confirm.
+  Pre-verified, as today.
+- **2 · Household** — household name; base currency (the **full ISO list**, the
+  common few first, not only three) with "Totals, budgets and forecasts are shown
+  in this currency"; and a **More options** `<details>` holding **data
+  visibility** (Shared / Isolated, default Shared) and the **exchange-rate
+  provider** (Frankfurter default, key field where needed) — both already in the
+  wizard, both easy to leave on their defaults. **Invite members** (optional,
+  comma-separated emails, "Invitees join as Contributors. You can change roles
+  later.") only if Phase 15 is built; invitations are sent when setup finishes,
+  and an address that fails validation is reported on this step.
+- **3 · Reminders** — "Reminders go out before a renewal, a trial conversion or a
+  cancel-by deadline." The **mail relay the instance will use** (from the
+  environment, as Phase 3 decided) with **Send test email**; toggles for
+  **Email** and **Budget alerts**; **Add another channel** (optional: pick a
+  type, its fields rendered from the channel's own `fields()`, with **Send
+  test**) — the prototype's hardcoded "Gotify push" becomes this choice; and
+  **Remind me** as one or more lead times.
+- **Done** — "{household} is ready", a summary ("Totals will show in {currency}.
+  Invitations went to …" or "You can invite members any time from Members &
+  roles."), and **Add your first subscription** (primary).
 
-### The edges that must move with it
+### F. The password meter
 
-- **API (P5).** Add `payment_method_id` to the subscription payload, the OpenAPI
-  spec, **and** `docs/api.md` — CI's OpenAPI-coverage and API-doc-coverage checks
-  fail if any of the three is missing. Add payment methods to the taxonomy
-  endpoint for parity with categories/tags.
-- **Backup / restore (P5).** Include `payment_methods` and the assignment in the
-  export and import so a restore reproduces them; the fidelity test must cover it.
-- **Sample data.** Update the demo seeder **and** the in-app demo-mode seed so a
-  fresh dev database and the demo instance both have the default methods *and*
-  have them assigned across the sample subscriptions — otherwise the new donut has
-  nothing to draw.
+A four-bar meter with a label (Too short / Weak / Fair / Good / Strong) under
+every new-password field. It is a **hint drawn from the server's rules**, not a
+second set of rules: its minimum and label thresholds come from the same
+validator `AuthService` applies, and the caption states the real minimum ("at
+least {N} characters") rather than the prototype's fixed 12. Without script the
+caption remains and the server's message is the answer. A mismatched confirm
+field shows `bad` with text, not only a red border.
+
+## Data-model changes
+
+**None.**
 
 ## Explicitly out of scope (leave clean seams, do NOT stub)
 
-- Any actual payment processing, charging, or storing of card numbers / PANs. A
-  payment method is a label; this is not a wallet and stores no credential. (The
-  design's virtual-card furniture stays dropped, per Phase 8.)
-- Bank / transaction sync — out of v1 entirely, unchanged.
-- Per-payment-method budgets or alerts — a possible later idea; leave the seam,
-  do not build it.
-- CSV import column-mapping for payment method — a clean seam to add later; note
-  it, do not build it now unless trivial.
+- **"Keep me signed in on this device"** — see the open decision; not built by
+  default.
+- A theme switch on signed-out pages (they follow the device, per Phase 18).
+- OIDC / SSO buttons (OIDC is not built).
+- Any change to token lifetimes, rate limits or password rules.
 
 ## Decisions & assumptions (confirm or correct before build)
 
-- Defaults are **names + generic icons**, seeded per household; brand logos are
-  user-uploaded only (trademark reason above).
-- Delete = **unassign** (`ON DELETE SET NULL`), never block and never cascade-
-  delete subscriptions.
-- Management lives **under Settings beside Categories**; assignment lives on the
-  **subscription form**.
-- The breakdown lands on **Analytics** (a payment-method donut); adding it to the
-  dashboard as well is optional and easy once the aggregation exists — say if you
-  want it there too.
-- `colour` is stored on the method for the donut; if you would rather derive
-  colours from a palette and drop the column, say so.
+- **"Keep me signed in" — open.** The prototype shows it; the application has no
+  long-lived session. Building it means a second session lifetime, a
+  remember-token, and revocation of that token everywhere sessions are revoked —
+  an authentication change, not a restyle. **Default: not built in this phase**,
+  noted as a candidate phase of its own. Say if you want it included.
+- **No household name on the sign-in page**; it appears only where the visitor is
+  already known to it (an invitation).
+- **No theme toggle** on signed-out pages: navy + system, as Phase 18 set.
+- The brand panel's two claims are corrected as above.
+- Wizard: three steps, with visibility and rate provider under More options, and
+  invitations only if Phase 15 is built.
+- Lifetimes and password minimums on screen are read from the application, never
+  typed into a template.
 
 ## Status
 
-- [x] Migration: `payment_methods` table (+ FK, unique index) — plus a nullable
-      `icon` column the spec did not list, holding the seeded defaults' generic
-      icon key (checked against `DefaultPaymentMethods::ICONS`)
-- [x] Migration: `subscriptions.payment_method_id` (nullable, `SET NULL`, index)
-- [x] Default set seeded on household creation (wizard + registration, and the
-      demo seed), generic icons, catalogue-resolved names; seeded once, never
-      topped up. Households that predate the phase get an "Add the default
-      list" button on the empty management screen instead of a backfill
-- [x] Payment-method management screen (create/rename/recolour/logo/delete),
-      permission-gated like categories (`category.manage`) — at
-      `/payment-methods`, a nav item after Categories and linked from Settings;
-      colour is optional ("Automatic colour" takes the theme palette)
-- [x] Logo upload reuses existing validation + storage (`LogoStorage`); old
-      files are removed on replace, clear and delete
-- [x] Assignment select on the subscription form (create + edit), through the
-      existing service/repository — a native select with a logo/icon preview
-      beside it
-- [x] Method badge shown on the subscription list + detail (list row, edit
-      form, cost page)
-- [x] `by_payment_method` stat + payment-method donut on Analytics, per-currency
-      degrade honoured — the category donut's template became the shared
-      `stats/_breakdown.twig`; a method's own colour is used when set
-- [x] API: `payment_method_id` in payload + OpenAPI + `docs/api.md`; taxonomy
-      endpoint parity (`/api/v1/payment-methods` GET/POST/PUT/DELETE). Unlike
-      the older fields, an absent `payment_method_id` on PUT keeps the current
-      assignment; only an explicit `null` clears it
-- [x] Backup/restore includes methods + assignment (and method logos), merged
-      by name on restore; archives without payment methods still restore
-- [x] Demo seeder + demo-mode seed updated (methods seeded and assigned), and
-      `bin/dev-setup.sh --with-sample-data` assigns them across both members
-- [x] New strings catalogued in `translations/en.php`
-- [x] `composer check`, `i18n:check`, OpenAPI + API-doc coverage green on both
-      engines (PostgreSQL and MySQL 8.4; migrations apply, roll back and
-      re-apply on both)
+- [x] Signed-out layout: brand panel (catalogued, corrected copy), card, narrow
+      header, demo banner; all hardcoded colours tokenised
+- [x] Sign in (generic error, lock-out, show/hide, passkey, registration link
+      only when open) — plus "Keep me signed in" (see Decisions as built)
+- [x] Two-step: single-input code boxes, recovery code, passkey fallback
+- [x] Forgot, sent, choose new password, expired link — real lifetimes
+- [x] Register, confirm email, accept invitation, email change landing, forced
+      password change, signed-out error pages
+- [x] Setup wizard: three steps, More options, invites, SMTP test, optional
+      channel with test, lead times, done
+- [x] Password meter driven by the server's rules
+- [x] New strings in `translations/en.php`
+- [x] `composer check`, `i18n:check`, offline guard green on both engines
 
-Not yet checked by hand: the screens in a browser (covered by functional and
-accessibility tests only), and `bin/dev-setup.sh --with-sample-data` end to end
-(its payment-method id lookup was checked against rendered form HTML).
+## Decisions as built
 
-Seams left, per scope: CSV import column mapping, per-method budgets/alerts,
-the badge on the dashboard/calendar/cancellations/forecast, and a
-payment-method donut on the dashboard.
+- **Keep me signed in — built** (the owner chose to include it). Sessions were
+  already a 14-day persistent cookie with a sliding database expiry, so no
+  remember-token was needed: ticked (the default) keeps exactly that; unticked
+  makes the cookie a browser-session cookie and gives the row a shorter idle
+  lifetime, `SESSION_BROWSER_LIFETIME_SECONDS` (default 12 hours). Revocation
+  is unchanged — deleting the row ends either kind. The choice is carried
+  through the second factor and the passkey sign-in.
+- **The theme switch stays** on signed-out pages (it existed since Phase 18);
+  it moved to the form pane's top corner. Error pages still carry none.
+- **The wizard's household step is new behaviour**: the old wizard asked only
+  for the account. Step 1 still creates the account (and a household called
+  Home) and signs the owner in; steps 2 and 3 are signed-in routes
+  (`/setup/household`, `/setup/notifications`, `/setup/done`) named one by one
+  in SetupGuardMiddleware, and every value goes through the service that owns
+  it (HouseholdSettingsService, InstanceAdminService,
+  NotificationSettingsService). Invitations are checked on step 2, held in the
+  session and sent on Finish, as Contributors named after their address's
+  local part. "Email" is an email channel to the owner's own address.
+- **No inviter is named** on the invitation page ("You have been invited to join
+  {household}"): nothing stores who sent an invite, and adding it would be a
+  data-model change.
+- **Email confirmation gained "Send again"** (`POST /verify-email/resend`),
+  shaped like the reset request: same page whatever the address, own rate
+  limit. A spent confirmation link says "Already confirmed".
+- **Lifetimes on screen come from code**: `PasswordResetService::tokenLifetimeMinutes()`
+  and `AuthService::verificationLifetimeDays()`; the meter reads
+  `AuthService::passwordMeterRules()`.
+- **Error pages** use the card; the way back is "Back to sign in" or "Back to the
+  dashboard" depending on whether the session names an account. An expired
+  CSRF token is titled "Session expired".
+- A completed reset and a confirmed email now land on their own page rather
+  than a flash over the sign-in form.
 
 ## Definition of done
 
-`docker compose up` runs clean, the migrations apply and roll back on a fresh DB,
-a new household starts with the default methods, a member can add/rename/remove
-methods (with logos) and assign one to a subscription, the assignment survives an
-API round-trip and a backup/restore, the Analytics screen shows a spend-by-method
-donut that degrades to per-currency figures when it must, the demo data shows it
-populated, and the quality gates, `i18n:check` and the API-coverage checks are
-green on PostgreSQL and MySQL. Then update `PHASE.md` to the next phase.
+Every signed-out page uses the new layout in light and dark (following the
+device), wide and narrow; every flow behaves exactly as before; nothing on these
+pages names a household to an anonymous visitor or states a lifetime or rule the
+server does not apply; every form works without script; the gates pass on both
+engines. Then update `PHASE.md` to the next phase.
 
 ## Tests
 
-- `payment_methods` CRUD is household-scoped (a Viewer cannot manage; ISOLATED
-  does not hide household-wide methods, matching categories).
-- Assigning a method to a subscription persists and is returned; clearing it
-  writes null.
-- Deleting a method **unassigns** its subscriptions (`SET NULL`) and deletes no
-  subscription.
-- Default methods are seeded exactly once per household on creation and not
-  re-seeded.
-- `by_payment_method` sums correctly; the donut degrades to per-currency figures
-  when currencies cannot all convert, and one-off/lifetime entries are excluded
-  from the recurring figures.
-- API: `payment_method_id` round-trips through create/edit; OpenAPI-coverage and
-  API-doc-coverage tests pass with the new field.
-- Backup → restore reproduces methods and assignments faithfully and respects
-  isolation.
-- Logo upload rejects a disguised or oversized file and stores a safe filename.
-- Demo/sample data includes methods and assigns them across subscriptions.
+- The existing auth, rate-limit, reset, verification, 2FA, passkey and wizard
+  suites pass unchanged.
+- Sign in renders no household name; the error for an unknown email and a wrong
+  password is identical.
+- "Check your inbox" is identical for an existing and a non-existent address.
+- The lifetime shown on the forgot and sent pages equals the configured token
+  lifetime; the meter's stated minimum equals the validator's.
+- The registration link appears only when registration is open.
+- The two-step form accepts a pasted six-digit code in one field and a recovery
+  code in the other.
+- The wizard persists every value the old wizard did — base currency, isolation
+  mode, rate provider and key, channel — and a skipped optional step leaves the
+  defaults.
+- Every signed-out page passes `AccessibilityTest` (one `<h1>`, `main`, `lang`,
+  named controls, `role="alert"` on errors).
+- No signed-out page loads anything from a third-party host.

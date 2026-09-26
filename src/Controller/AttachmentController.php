@@ -118,7 +118,7 @@ final class AttachmentController extends Controller
         return $this->redirectAfterWrite(
             $request,
             $response,
-            sprintf('/subscriptions/%d/money', $subscriptionId),
+            $this->subscriptionReturn($request, $subscriptionId),
         );
     }
 }

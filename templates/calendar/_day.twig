@@ -1,0 +1,29 @@
+{#
+    The open day: what falls on it, and what it costs.
+
+    Chosen by the grid's links — `?day=` on a page load, the same address
+    through htmx — so it works with the script blocked. Its total counts the
+    charges and trial conversions; a deadline is listed but costs nothing.
+
+    `day`  a CalendarService day
+#}
+{% import 'calendar/_figures.twig' as figures %}
+
+<section id="calendar-day" class="card calendar-day-panel" aria-labelledby="calendar-day-heading">
+    <header class="calendar-day-panel-header">
+        <h2 id="calendar-day-heading">{{ day.date|local_date('EEEE d MMMM') }}</h2>
+        {% if day.figures %}
+            <span class="calendar-day-panel-total num">{{ figures.inline(day.figures) }}</span>
+        {% endif %}
+    </header>
+
+    {% if day.items is empty %}
+        <p class="muted empty">{{ t('calendar.nothing_on_day') }}</p>
+    {% else %}
+        <ul class="plain calendar-items">
+            {% for item in day.items %}
+                {% include 'calendar/_item.twig' %}
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>

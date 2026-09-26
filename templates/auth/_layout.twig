@@ -1,0 +1,46 @@
+{% extends 'layout.twig' %}
+
+{#
+    The card every signed-out page is: an icon tile where the page has one,
+    the page's single <h1>, a line saying what to do, then the page's own
+    content — and, under the card, the secondary links.
+
+    A page sets `card_icon` and fills the blocks:
+
+        card_title  the heading, and the tab's title
+        card_intro  the line beneath it (optional)
+        card_top    above the card's padding: the wizard's progress bar
+        card_body   the form, or whatever the page is
+        card_after  under the card: "Create an account", "Back to sign in"
+
+    `auth_layout` is what puts a signed-in page — the wizard's later steps —
+    in this layout rather than the shell; a signed-out page is in it anyway.
+#}
+{% set auth_layout = true %}
+
+{% block title %}{{ block('card_title') }} — {{ instance_name }}{% endblock %}
+
+{% block content %}
+    {% set intro %}{% block card_intro %}{% endblock %}{% endset %}
+
+    <section class="auth-card" aria-labelledby="auth-title">
+        {% block card_top %}{% endblock %}
+
+        <div class="auth-card-body">
+            {% if card_icon is defined and card_icon %}
+                <span class="auth-icon">{{ icon(card_icon) }}</span>
+            {% endif %}
+
+            <header class="auth-card-head">
+                <h1 id="auth-title">{% block card_title %}{% endblock %}</h1>
+                {% if intro|trim is not empty %}
+                    <p class="auth-intro">{{ intro }}</p>
+                {% endif %}
+            </header>
+
+            {% block card_body %}{% endblock %}
+        </div>
+    </section>
+
+    {% block card_after %}{% endblock %}
+{% endblock %}

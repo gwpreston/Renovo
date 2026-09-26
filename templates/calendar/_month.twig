@@ -1,20 +1,172 @@
 {#
-    The month: the grid and the rail beside it.
+    The month: the grid card, the open day and the month's summary.
 
-    Month navigation swaps this rather than the grid alone, because the rail's
-    insight card describes the month on screen — paging to December and leaving
-    "two trials convert this month" behind from September would be a card that
-    contradicts the grid it sits next to.
+    Month navigation and choosing a day both swap this whole element, not a
+    part of it. The day marked selected in the grid, the panel describing it
+    and the totals describing the month are then always one render — paging
+    to December cannot leave September's heaviest day behind beside it.
 
-    The rail comes after the grid in source order. On a phone the two stack,
-    and a calendar pushed below two cards is not the calendar page; the same
-    order is what a keyboard walks.
+    It lays out through its parent's grid (`display: contents`), so the feed
+    card, which is outside the swap because it holds a link shown only once,
+    still sits in the same column as the panel and the summary.
 #}
-<div id="calendar-month" class="calendar-layout">
-    {% include 'calendar/_grid.twig' %}
+{% import 'calendar/_figures.twig' as figures %}
+{% import 'calendar/_kind.twig' as kind %}
 
-    <aside class="calendar-rail" aria-label="{{ t('calendar.rail') }}">
-        {% include 'calendar/_insight.twig' %}
-        {% include 'calendar/_upcoming.twig' %}
-    </aside>
+{% set mine_query = mine_only ? '&mine=1' : '' %}
+{% set month_key = calendar.month|date('Y-m') %}
+
+<div id="calendar-month" class="calendar-month">
+    <section id="calendar" class="card calendar" aria-labelledby="calendar-heading">
+        <header class="calendar-header">
+            <div>
+                <h2 id="calendar-heading">{{ calendar.month|local_date('MMMM y') }}</h2>
+                <p class="muted calendar-count">
+                    {{ t('calendar.charges_count', {'count': calendar.count}) }}
+                    {%- if calendar.count > 0 %} · <span class="num">{{ figures.inline(calendar.totals) }}</span>{% endif %}
+                </p>
+            </div>
+
+            <nav class="calendar-nav" aria-label="{{ t('calendar.month_navigation') }}">
+                <a class="button button-outline calendar-today"
+                   href="/calendar{{ mine_only ? '?mine=1' : '' }}"
+                   hx-get="/calendar{{ mine_only ? '?mine=1' : '' }}"
+                   hx-target="#calendar-month" hx-swap="outerHTML" hx-push-url="true">{{ t('state.today') }}</a>
+
+                {#
+                    Previous is drawn disabled on the current month rather than
+                    left out, so the control does not jump about as the month
+                    changes. There is no ledger to page back into.
+                #}
+                {% if calendar.previous %}
+                    <a class="icon-button"
+                       href="/calendar?month={{ calendar.previous }}{{ mine_query }}"
+                       hx-get="/calendar?month={{ calendar.previous }}{{ mine_query }}"
+                       hx-target="#calendar-month" hx-swap="outerHTML" hx-push-url="true"
+                       rel="prev">{{ icon('chevron-left', 'icon icon-button-icon') }}<span class="visually-hidden">{{ t('calendar.previous_month') }}</span></a>
+                {% else %}
+                    <button type="button" class="icon-button" disabled>{{ icon('chevron-left', 'icon icon-button-icon') }}<span class="visually-hidden">{{ t('calendar.previous_month') }}</span></button>
+                {% endif %}
+
+                {% if calendar.next %}
+                    <a class="icon-button"
+                       href="/calendar?month={{ calendar.next }}{{ mine_query }}"
+                       hx-get="/calendar?month={{ calendar.next }}{{ mine_query }}"
+                       hx-target="#calendar-month" hx-swap="outerHTML" hx-push-url="true"
+                       rel="next">{{ icon('chevron-right', 'icon icon-button-icon') }}<span class="visually-hidden">{{ t('calendar.next_month') }}</span></a>
+                {% else %}
+                    <button type="button" class="icon-button" disabled>{{ icon('chevron-right', 'icon icon-button-icon') }}<span class="visually-hidden">{{ t('calendar.next_month') }}</span></button>
+                {% endif %}
+            </nav>
+        </header>
+
+        <div class="calendar-wide">
+            <div class="table-scroll">
+            <table class="calendar-grid">
+                <caption class="visually-hidden">
+                    {{ t('calendar.caption', {'month': calendar.month|local_date('MMMM y')}) }}
+                </caption>
+                <thead>
+                <tr>
+                    {% for weekday in calendar.weekdays %}
+                        <th scope="col">
+                            <abbr title="{{ weekday|local_date('EEEE') }}">{{ weekday|local_date('EEE') }}</abbr>
+                        </th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for week in calendar.weeks %}
+                    <tr>
+                        {% for day in week %}
+                            {% if not day.in_month %}
+                                {# A neighbouring month's day: dimmed, and not a link. #}
+                                <td class="calendar-day is-outside">
+                                    <span class="calendar-date" aria-hidden="true">{{ day.date|local_date('d') }}</span>
+                                </td>
+                            {% else %}
+                                <td class="calendar-day{{ day.is_today ? ' is-today' : '' }}{{
+                                    day.is_selected ? ' is-selected' : '' }}{{ day.items ? '' : ' is-quiet' }}">
+                                    <a class="calendar-day-link"
+                                       href="/calendar?month={{ month_key }}&amp;day={{ day.key }}{{ mine_query }}"
+                                       hx-get="/calendar?month={{ month_key }}&amp;day={{ day.key }}{{ mine_query }}"
+                                       hx-target="#calendar-month" hx-swap="outerHTML" hx-push-url="true"
+                                       {{ day.is_today ? 'aria-current="date"' : '' }}>
+                                        <span class="calendar-day-head">
+                                            <span class="calendar-date" data-weekday="{{ day.date|local_date('EEE') }}">
+                                                {{- day.date|local_date('d') -}}
+                                                <span class="visually-hidden"> {{ day.date|local_date('MMMM') }}</span>
+                                                {%- if day.is_today %}<span class="visually-hidden"> ({{ t('state.today') }})</span>{% endif -%}
+                                                {%- if day.is_selected %}<span class="visually-hidden"> ({{ t('calendar.selected') }})</span>{% endif -%}
+                                            </span>
+                                            {% if day.figures %}
+                                                <span class="calendar-day-total num">{{ figures.compact(day.figures) }}</span>
+                                            {% endif %}
+                                        </span>
+                                        {% for chip in day.chips %}
+                                            <span class="calendar-chip is-{{ chip.kind|replace({'_': '-'}) }}">
+                                                {{- kind.icon(chip.kind) -}}
+                                                <span class="visually-hidden">{{ kind.label(chip.kind) }}: </span>
+                                                <span class="calendar-chip-name">{{ chip.subscription.name }}</span>
+                                            </span>
+                                        {% endfor %}
+                                        {% if day.more > 0 %}
+                                            <span class="calendar-more">{{ t('calendar.more', {'count': day.more}) }}</span>
+                                        {% endif %}
+                                    </a>
+                                </td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            <ul class="plain calendar-legend" aria-label="{{ t('calendar.legend') }}">
+                {% for item_kind in ['charge', 'trial', 'cancel_by'] %}
+                    <li class="calendar-chip is-{{ item_kind|replace({'_': '-'}) }}">
+                        {{- kind.icon(item_kind) -}}
+                        <span>{{ kind.label(item_kind) }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {#
+            The phone form: the days with something on them, as a list. Each
+            names its own weekday — there are no column headings to lean on —
+            from the reader's locale.
+        #}
+        <div class="calendar-narrow">
+            {% if calendar.days is empty %}
+                <p class="muted empty">{{ t('calendar.nothing_due') }}</p>
+            {% else %}
+                <ol class="plain calendar-list">
+                    {% for day in calendar.days %}
+                        <li class="calendar-list-day{{ day.is_today ? ' is-today' : '' }}"
+                            data-weekday="{{ day.date|local_date('EEE') }}">
+                            <h3 class="calendar-list-heading">
+                                <span>
+                                    {{- day.date|local_date('EEE d MMM') -}}
+                                    {%- if day.is_today %} <span class="badge badge-ok">{{ t('state.today') }}</span>{% endif -%}
+                                </span>
+                                {% if day.figures %}
+                                    <span class="num">{{ figures.inline(day.figures) }}</span>
+                                {% endif %}
+                            </h3>
+                            <ul class="plain calendar-items">
+                                {% for item in day.items %}
+                                    {% include 'calendar/_item.twig' %}
+                                {% endfor %}
+                            </ul>
+                        </li>
+                    {% endfor %}
+                </ol>
+            {% endif %}
+        </div>
+    </section>
+
+    {% include 'calendar/_day.twig' with {'day': calendar.selected} %}
+    {% include 'calendar/_summary.twig' %}
 </div>

@@ -1,16 +1,17 @@
-{% extends 'layout.twig' %}
+{% extends 'auth/_layout.twig' %}
 
-{% block title %}{{ t('auth.link_expired') }} — {{ instance_name }}{% endblock %}
+{% set card_icon = 'clock' %}
 
-{% block content %}
-    <section class="card narrow">
-        <h1>{{ t('auth_email_change_failed.title') }}</h1>
-        <p class="muted">{{ t('auth_email_change_failed.intro') }}</p>
+{% block card_title %}{{ t('auth_email_change_failed.title') }}{% endblock %}
+{% block card_intro %}{{ t('auth_email_change_failed.intro') }}{% endblock %}
 
-        {% for error in errors %}
-            <p class="field-error">{{ error_message(error) }}</p>
-        {% endfor %}
+{% block card_body %}
+    {% for error in errors %}
+        {% include 'auth/_alert.twig' with {'message': error_message(error)} only %}
+    {% endfor %}
 
-        <p><a class="button" href="/profile">{{ t('auth_email_change_failed.back') }}</a></p>
-    </section>
+    {% set signed_in = signed_in|default(false) %}
+    <a class="button button-primary auth-submit" href="{{ signed_in ? '/profile' : '/login' }}">
+        {{- signed_in ? t('auth_email_change_failed.back') : t('auth_login.title') -}}
+    </a>
 {% endblock %}

@@ -55,6 +55,32 @@ final class NotificationLogRepository extends AbstractRepository
     }
 
     /**
+     * When this user's last digest was delivered, on any channel.
+     *
+     * A digest is one ledger row per period, not one per item in it, so the
+     * ledger cannot stop an event-shaped item — a price change — appearing in
+     * two consecutive digests. Bounding each digest to what happened since the
+     * previous one does.
+     *
+     * Delivered, not merely claimed: a digest that failed on every channel
+     * told nobody anything, and counting it would move the window past the
+     * changes it was carrying — lost for good, since a failed digest is not
+     * retried once its period has passed.
+     */
+    public function lastDigestAt(int $userId): ?DateTimeImmutable
+    {
+        $value = $this->db->fetchValue(
+            'SELECT MAX(' . $this->quote('created_at') . ') FROM ' . $this->quote($this->table())
+            . ' WHERE ' . $this->quote('user_id') . ' = :user'
+            . ' AND ' . $this->quote('subject_type') . ' = :digest'
+            . ' AND ' . $this->quote('status') . ' = :sent',
+            ['user' => $userId, 'digest' => \App\Notification\Alert::SUBJECT_DIGEST, 'sent' => self::STATUS_SENT],
+        );
+
+        return is_string($value) && $value !== '' ? new DateTimeImmutable($value) : null;
+    }
+
+    /**
      * Claim the right to send one notification.
      *
      * Must not be called inside a transaction: the colliding insert is expected,

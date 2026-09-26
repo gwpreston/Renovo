@@ -36,3 +36,19 @@
         </svg>
     {%- endif -%}
 {% endmacro %}
+
+{#
+    The same mark as a tile, for the subscriptions table: the cached logo when
+    there is one, otherwise the service's initial on a tile. A list of thirty
+    rows where every unbranded one is the same brand mark reads as thirty of the
+    same thing; an initial tells them apart at a glance, which is what the
+    table's first column is for. Decorative either way — the name is beside it.
+#}
+{% macro tile(subscription, size = 32) %}
+    {%- if subscription.logoPath -%}
+        <img class="logo service-tile" src="/{{ subscription.logoPath }}" alt=""
+             width="{{ size }}" height="{{ size }}">
+    {%- else -%}
+        <span class="logo service-tile service-initial" aria-hidden="true">{{ subscription.name|trim|first|upper }}</span>
+    {%- endif -%}
+{% endmacro %}

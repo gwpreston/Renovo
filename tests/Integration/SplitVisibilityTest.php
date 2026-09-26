@@ -491,6 +491,7 @@ final class SplitVisibilityTest extends DatabaseTestCase
             new MembershipRepository($this->db),
             $forecast,
             $this->rates(),
+            new InstanceSettingsService(new InstanceSettingsRepository($this->db)),
         );
 
         $budgetId = $budgets->create($bob, [

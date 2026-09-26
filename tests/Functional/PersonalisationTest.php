@@ -337,40 +337,42 @@ final class PersonalisationTest extends DatabaseTestCase
     public function testHidingADashboardCardRemovesItFromThePage(): void
     {
         $withCard = (string) $this->request('GET', '/')->getBody();
-        self::assertStringContainsString('By category', $withCard, 'The card is there to begin with.');
+        self::assertStringContainsString('Where it goes', $withCard, 'The card is there to begin with.');
 
-        $this->savePreferences([
-            'card_position' => ['by_category' => '5', 'totals' => '1'],
-            // by_category is absent from card_visible, which is how an
+        $this->saveDashboardCards([
+            'card_position' => ['overview' => ['where_it_goes' => '5', 'totals' => '1']],
+            // where_it_goes is absent from card_visible, which is how an
             // unticked checkbox arrives.
-            'card_visible' => ['totals' => '1', 'trials' => '1', 'upcoming' => '1'],
+            'card_visible' => ['overview' => ['totals' => '1', 'coming_up' => '1']],
         ]);
 
-        self::assertStringNotContainsString('By category', (string) $this->request('GET', '/')->getBody());
+        self::assertStringNotContainsString('Where it goes', (string) $this->request('GET', '/')->getBody());
     }
 
     public function testReorderingCardsChangesTheirOrderOnThePage(): void
     {
-        $this->savePreferences([
+        $this->saveDashboardCards([
             'card_position' => [
-                'by_category' => '1',
-                'totals' => '2',
-                'trials' => '3',
-                'upcoming' => '4',
+                'overview' => [
+                    'where_it_goes' => '1',
+                    'totals' => '2',
+                    'coming_up' => '3',
+                ],
             ],
             'card_visible' => [
-                'by_category' => '1',
-                'totals' => '1',
-                'trials' => '1',
-                'upcoming' => '1',
+                'overview' => [
+                    'where_it_goes' => '1',
+                    'totals' => '1',
+                    'coming_up' => '1',
+                ],
             ],
         ]);
 
         $body = (string) $this->request('GET', '/')->getBody();
 
         self::assertLessThan(
-            strpos($body, 'Next 7 days') ?: PHP_INT_MAX,
-            strpos($body, 'By category') ?: PHP_INT_MAX,
+            strpos($body, 'Due next 7 days') ?: PHP_INT_MAX,
+            strpos($body, 'Where it goes') ?: PHP_INT_MAX,
             'The card moved to the top should render first.',
         );
     }
@@ -393,7 +395,7 @@ final class PersonalisationTest extends DatabaseTestCase
     {
         $this->savePreferences(['week_start' => '0']);
 
-        $body = (string) $this->request('GET', '/calendar?month=2026-09')->getBody();
+        $body = (string) $this->request('GET', '/calendar')->getBody();
         $heading = substr($body, (int) strpos($body, '<thead>'), 400);
 
         self::assertLessThan(
@@ -404,7 +406,7 @@ final class PersonalisationTest extends DatabaseTestCase
 
         $this->savePreferences(['week_start' => '1']);
 
-        $body = (string) $this->request('GET', '/calendar?month=2026-09')->getBody();
+        $body = (string) $this->request('GET', '/calendar')->getBody();
         $heading = substr($body, (int) strpos($body, '<thead>'), 400);
 
         self::assertLessThan(
@@ -426,13 +428,27 @@ final class PersonalisationTest extends DatabaseTestCase
         $profile = (string) $this->request('GET', '/profile')->getBody();
 
         self::assertStringContainsString('action="/profile/preferences"', $profile);
+        self::assertStringContainsString('action="/profile/dashboard-cards"', $profile);
         self::assertStringContainsString('name="landing_view"', $profile);
-        self::assertStringContainsString('name="card_position[totals]"', $profile, 'The card layout moved too.');
+        self::assertStringContainsString(
+            'name="card_position[overview][totals]"',
+            $profile,
+            'The card layout moved too.',
+        );
+        self::assertStringContainsString(
+            'name="card_position[household][who_pays]"',
+            $profile,
+            'Both views are there.',
+        );
 
         $settings = (string) $this->request('GET', '/settings')->getBody();
 
         self::assertStringNotContainsString('name="landing_view"', $settings, 'A preference is still on Settings.');
-        self::assertStringNotContainsString('name="theme"', $settings);
+        // The page's own content, not the shell: the top bar's light/dark
+        // toggle posts a `theme` on every page, Settings included.
+        $start = (int) strpos($settings, '<main');
+        $content = substr($settings, $start, (int) strpos($settings, '</main>') - $start);
+        self::assertStringNotContainsString('name="theme"', $content);
         self::assertStringContainsString('action="/settings/household"', $settings, 'Settings kept its own.');
     }
 
@@ -498,6 +514,16 @@ final class PersonalisationTest extends DatabaseTestCase
         $response = $this->request('POST', '/profile/preferences', $values);
 
         self::assertSame(302, $response->getStatusCode(), 'The preferences form must have accepted this.');
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    private function saveDashboardCards(array $values): void
+    {
+        $response = $this->request('POST', '/profile/dashboard-cards', $values);
+
+        self::assertSame(302, $response->getStatusCode(), 'The dashboard cards form must have accepted this.');
     }
 
     private function scope(): Scope

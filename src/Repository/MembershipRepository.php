@@ -90,6 +90,25 @@ final class MembershipRepository extends AbstractRepository
         );
     }
 
+    /**
+     * How many people are in a household, for the rail's label.
+     *
+     * Memberships that have been taken up, and only those: somebody invited
+     * and not yet arrived is not a member the reader shares the household
+     * with. A revoked login still is — see `countOwners()` for why the account's
+     * state is not the membership's. A null status is a row from before
+     * provisioning existed, which `MembershipStatus` reads as active.
+     */
+    public function countActiveMembers(int $householdId): int
+    {
+        return (int) $this->db->fetchValue(
+            'SELECT COUNT(*) FROM ' . $this->quote('household_memberships')
+            . ' WHERE ' . $this->quote('household_id') . ' = :household'
+            . ' AND (' . $this->quote('status') . ' IS NULL OR ' . $this->quote('status') . ' <> :pending)',
+            ['household' => $householdId, 'pending' => MembershipStatus::Pending->value],
+        );
+    }
+
     public function findForUserAndHousehold(int $userId, int $householdId): ?Membership
     {
         $row = $this->db->fetchOne(

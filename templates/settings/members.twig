@@ -1,9 +1,40 @@
+{#
+    Members & roles: who is in the household, what each role lets them do, and
+    how much of the household each member can see.
+
+    One screen for everyone in the household. An Owner/Admin manages the
+    people from it; everybody else reads it. What differs between the two —
+    which controls are drawn, whose figures are filled in — arrives decided
+    from MembersScreenService, and the routes behind every control check again.
+
+    Below 768px the table's rows become cards. It is one set of markup either
+    way, restyled, so a form and its label exist once.
+#}
 {% extends 'layout.twig' %}
 {% import 'partials/avatar.twig' as avatar %}
+{% import 'partials/member_share.twig' as share %}
 
-{% block heading %}{{ t('members.title') }}{% endblock %}
+{% set household_name = household ? household.name : t('members.this_household') %}
+
+{% block heading %}{{ t('nav.members') }}{% endblock %}
+{% block page_subtitle %}{{ t('members.subtitle', {'household': household_name, 'count': rows|length}) }}{% endblock %}
 
 {% block content %}
+    {#
+        Inviting is what an Owner/Admin comes here to do, so it wears the
+        accent at the head of the content, as New budget does on Budgets.
+    #}
+    <div class="page-header">
+        <p class="muted note">{{ t('members.intro', {'household': household_name}) }}</p>
+        {% if may_manage %}
+            <a class="button button-primary" href="/settings/members/invite"
+               data-opens-dialog="member-dialog" data-dialog-url="/settings/members/invite"
+               data-dialog-title="{{ t('members.invite_title', {'household': household_name}) }}">
+                {{ icon('user-add') }}<span>{{ t('members.invite') }}</span>
+            </a>
+        {% endif %}
+    </div>
+
     {#
         The one-time password, shown here and nowhere else.
 
@@ -23,129 +54,143 @@
         </section>
     {% endif %}
 
-    <section class="card">
-        <h2>{{ household ? household.name : t('members.this_household') }}</h2>
-        <p class="muted">{{ t('members.intro') }}</p>
+    <section class="card members-card" aria-labelledby="members-heading">
+        <h2 id="members-heading" class="visually-hidden">{{ t('members.table_heading') }}</h2>
 
         <div class="table-scroll">
-            <table class="table">
+            <table class="table members-table">
                 <thead>
                 <tr>
                     <th scope="col">{{ t('field.member') }}</th>
                     <th scope="col">{{ t('field.role') }}</th>
                     <th scope="col">{{ t('field.status') }}</th>
                     <th scope="col">{{ t('members.last_seen') }}</th>
-                    <th scope="col">{{ t('members.actions') }}</th>
+                    <th scope="col">{{ t('members.monthly_share') }}</th>
+                    <th scope="col" class="members-actions-heading">
+                        {%- if may_manage %}{{ t('members.actions') }}{% else %}<span class="visually-hidden">{{ t('members.actions') }}</span>{% endif -%}
+                    </th>
                 </tr>
                 </thead>
                 <tbody>
-                {% for member in members %}
-                    <tr>
-                        <td>
+                {% for row in rows %}
+                    {% set member = row.overview.member %}
+                    <tr class="member-row" data-member="{{ member.userId }}">
+                        <td class="member-cell-identity">
                             <span class="member-identity">
-                                {{ avatar.face(
-                                    member.userId,
-                                    member.displayName,
-                                    member.initials(),
-                                    member.hasAvatar,
-                                    32
-                                ) }}
+                                {{ avatar.face(member.userId, member.displayName, member.hasAvatar, 34) }}
                                 <span class="member-names">
-                                    <strong>{{ member.displayName }}</strong>
-                                    {% if member.canReceiveMail %}
-                                        <span class="hint">{{ member.email }}</span>
-                                    {% else %}
-                                        <span class="hint">{{ t('members.no_mailbox') }}</span>
-                                    {% endif %}
+                                    <strong>
+                                        {{- member.displayName -}}
+                                        {%- if row.overview.is_self %} <span class="member-you">· {{ t('members.you') }}</span>{% endif -%}
+                                    </strong>
+                                    <span class="hint member-email">
+                                        {{- member.canReceiveMail ? member.email : t('members.no_mailbox') -}}
+                                    </span>
                                 </span>
                             </span>
                         </td>
-                        <td>
-                            {% if member.userId == current_user.id %}
-                                {{ role_label(member.role.value) }}
-                                <span class="hint">{{ t('settings.you') }}</span>
-                            {% else %}
-                                <form method="post"
-                                      action="/settings/members/{{ member.userId }}/role"
-                                      class="inline">
+
+                        <td class="member-cell-role">
+                            {% if row.manageable %}
+                                {#
+                                    Submits on change; the button is for a
+                                    browser with no script to do that. The
+                                    last-Owner guard is the service's, so a
+                                    refused change comes back as an error.
+                                #}
+                                <form method="post" action="/settings/members/{{ member.userId }}/role"
+                                      class="inline member-role-form"
+                                      hx-post="/settings/members/{{ member.userId }}/role" hx-trigger="change">
                                     {{ csrf_field() }}
                                     <select name="role"
-                                            aria-label="{{ t('settings.role_for', {
-                                                'name': member.displayName,
-                                            }) }}">
+                                            aria-label="{{ t('settings.role_for', {'name': member.displayName}) }}">
                                         {% for role in roles %}
-                                            <option value="{{ role.value }}"
-                                                    {{ member.role == role ? 'selected' : '' }}>
+                                            <option value="{{ role.value }}" {{ member.role == role ? 'selected' : '' }}>
                                                 {{ role_label(role.value) }}
                                             </option>
                                         {% endfor %}
                                     </select>
-                                    <button type="submit" class="button button-quiet">
-                                        {{ t('members.change_role') }}
-                                    </button>
+                                    <noscript>
+                                        <button type="submit" class="button button-quiet">{{ t('action.save') }}</button>
+                                    </noscript>
                                 </form>
+                            {% else %}
+                                <span class="member-role">{{ role_label(member.role.value) }}</span>
                             {% endif %}
                         </td>
-                        <td>
-                            <span class="badge {{ member.isDisabled ? 'badge-danger' : '' }}">
-                                {{ t(member.statusKey()) }}
-                            </span>
+
+                        <td class="member-cell-status">
+                            <span class="badge badge-{{ member.statusTone() }}">{{ t(member.statusKey()) }}</span>
                         </td>
-                        <td>
-                            {% if member.lastSeenAt %}
-                                {{ member.lastSeenAt|local_date('d MMM y HH:mm') }}
+
+                        <td class="member-cell-seen">
+                            <span class="visually-hidden">{{ t('members.last_seen') }}:</span>
+                            {% if member.lastSeenAt and not member.isPending() %}
+                                <time class="num" datetime="{{ member.lastSeenAt|date('c') }}"
+                                      title="{{ member.lastSeenAt|local_date('d MMM y HH:mm') }}">
+                                    {{- member.lastSeenAt|relative_date -}}
+                                </time>
                             {% else %}
                                 <span class="muted">{{ t('members.never_signed_in') }}</span>
                             {% endif %}
                         </td>
-                        <td>
-                            {% if member.userId != current_user.id %}
+
+                        <td class="member-cell-share">
+                            {% if row.overview.figures_withheld %}
+                                <span class="num" aria-hidden="true">{{ t('common.none_symbol') }}</span>
+                                <span class="visually-hidden">{{ t('household.figures_withheld') }}</span>
+                            {% else %}
+                                <span class="num member-share">
+                                    {%- include 'dashboard/_headline.twig' with {'figures': row.overview.monthly} only -%}
+                                </span>
+                                <span class="hint member-count">{{ share.count(row.overview) }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="member-cell-actions">
+                            {% if row.manageable %}
                                 <div class="row-actions">
-                                    {% if member.status.value == 'pending' and member.canReceiveMail %}
-                                        <form method="post"
-                                              action="/settings/members/{{ member.userId }}/invite"
-                                              class="inline">
+                                    {% if member.isPending() and member.canReceiveMail %}
+                                        <form method="post" action="/settings/members/{{ member.userId }}/invite" class="inline">
                                             {{ csrf_field() }}
-                                            <button type="submit" class="button button-quiet">
-                                                {{ t('members.resend_invite') }}
+                                            <button type="submit" class="button button-quiet member-action">
+                                                {{ icon('send') }}{{ t('members.resend_invite') }}
                                             </button>
                                         </form>
                                     {% endif %}
 
                                     {% if member.canReceiveMail %}
-                                        <form method="post"
-                                              action="/settings/members/{{ member.userId }}/reset-password"
-                                              class="inline">
+                                        <form method="post" action="/settings/members/{{ member.userId }}/reset-password" class="inline">
                                             {{ csrf_field() }}
-                                            <button type="submit" class="button button-quiet">
+                                            <button type="submit" class="button button-outline member-action">
                                                 {{ t('members.send_reset') }}
                                             </button>
                                         </form>
                                     {% endif %}
 
                                     {% if member.isDisabled %}
-                                        <form method="post"
-                                              action="/settings/members/{{ member.userId }}/restore"
-                                              class="inline">
+                                        <form method="post" action="/settings/members/{{ member.userId }}/restore" class="inline">
                                             {{ csrf_field() }}
-                                            <button type="submit" class="button button-quiet">
+                                            <button type="submit" class="button button-quiet member-action">
                                                 {{ t('members.restore_login') }}
                                             </button>
                                         </form>
                                     {% else %}
-                                        <form method="post"
-                                              action="/settings/members/{{ member.userId }}/revoke"
-                                              class="inline">
+                                        <form method="post" action="/settings/members/{{ member.userId }}/revoke" class="inline">
                                             {{ csrf_field() }}
-                                            <button type="submit" class="button button-quiet button-danger">
+                                            <button type="submit" class="button button-outline member-action">
                                                 {{ t('members.revoke_login') }}
                                             </button>
                                         </form>
                                     {% endif %}
 
-                                    <a class="button button-quiet button-danger"
-                                       href="/settings/members/{{ member.userId }}/remove">
-                                        {{ t('members.remove') }}
+                                    <a class="button member-action button-danger"
+                                       href="/settings/members/{{ member.userId }}/remove"
+                                       data-opens-dialog="member-dialog"
+                                       data-dialog-url="/settings/members/{{ member.userId }}/remove"
+                                       data-dialog-title="{{ t('members.remove_heading', {'name': member.displayName}) }}">
+                                        {{- t('members.remove') -}}
+                                        <span class="visually-hidden"> {{ member.displayName }}</span>
                                     </a>
                                 </div>
                             {% endif %}
@@ -155,46 +200,90 @@
                 </tbody>
             </table>
         </div>
+
+        {% if any_withheld %}
+            <p class="hint members-withheld-note">{{ t('members.figures_withheld_note') }}</p>
+        {% endif %}
     </section>
 
-    <section class="card">
-        <h2>{{ t('members.add_heading') }}</h2>
-        <p class="muted">{{ t('members.add_intro') }}</p>
+    <div class="members-panels">
+        {#
+            Every cell is RoleMatrix's answer: PermissionService for whether
+            the role may do it, the scoping layer for whether only to its own
+            rows. Nothing in this table is written by hand.
+        #}
+        <section class="card role-matrix" aria-labelledby="role-matrix-heading">
+            <h2 id="role-matrix-heading">{{ t('members.matrix_heading') }}</h2>
+            <p class="muted">{{ t('members.matrix_caption') }}</p>
 
-        <form method="post" action="/settings/members" class="stack">
-            {{ csrf_field() }}
-
-            <div class="field">
-                <label for="member_name">{{ t('field.name') }}</label>
-                <input type="text" id="member_name" name="display_name" maxlength="100" required
-                       autocomplete="off">
-            </div>
-
-            <div class="field">
-                <label for="member_email">{{ t('field.email') }}</label>
-                <input type="email" id="member_email" name="email" autocomplete="off"
-                       data-requires-unchecked="member_without_email">
-                <p class="hint">{{ t('members.email_hint') }}</p>
-            </div>
-
-            <div class="field">
-                <label class="choice" for="member_without_email">
-                    <input type="checkbox" id="member_without_email" name="without_email" value="1">
-                    <span>{{ t('members.without_email') }}</span>
-                </label>
-                <p class="hint">{{ t('members.without_email_hint') }}</p>
-            </div>
-
-            <div class="field">
-                <label for="member_role">{{ t('field.role') }}</label>
-                <select id="member_role" name="role">
-                    {% for role in roles %}
-                        <option value="{{ role.value }}">{{ role_label(role.value) }}</option>
+            <div class="table-scroll">
+                <table class="table role-matrix-table">
+                    <thead>
+                    <tr>
+                        <th scope="col">{{ t('members.matrix_permission') }}</th>
+                        {% for cell in matrix[0].cells %}
+                            <th scope="col" class="grant-heading">{{ role_label(cell.role.value) }}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in matrix %}
+                        <tr data-capability="{{ row.capability.value }}">
+                            <th scope="row">{{ t(row.capability.labelKey()) }}</th>
+                            {% for cell in row.cells %}
+                                <td class="grant grant-{{ cell.grant.value }}" data-role="{{ cell.role.value }}">
+                                    {{ icon(cell.grant.icon(), 'icon grant-icon') }}
+                                    {#- A tick or a dash says yes or no on its own; the word stays for a screen reader. #}
+                                    <span class="grant-label{% if cell.grant.value != 'own_only' %} visually-hidden{% endif %}">{{ t(cell.grant.labelKey()) }}</span>
+                                </td>
+                            {% endfor %}
+                        </tr>
                     {% endfor %}
-                </select>
+                    </tbody>
+                </table>
             </div>
+        </section>
 
-            <button type="submit" class="button button-primary">{{ t('members.add_button') }}</button>
-        </form>
-    </section>
+        {#
+            What the instance's isolation mode means here, read-only. The mode
+            is the instance's, so the way to change it is an instance
+            administrator's, and only they are shown it.
+        #}
+        <section class="card data-visibility" aria-labelledby="data-visibility-heading">
+            <h2 id="data-visibility-heading">{{ t('members.visibility_heading') }}</h2>
+            <p>
+                <span class="badge badge-info data-visibility-mode">
+                    {{- t('members.visibility_mode_' ~ isolation_mode.value) -}}
+                </span>
+            </p>
+            <p class="muted">{{ t('members.visibility_note_' ~ isolation_mode.value, {'household': household_name}) }}</p>
+            <p class="data-visibility-private">
+                {{ icon('lock') }}
+                <span>{{ t('members.visibility_private') }}</span>
+            </p>
+            {% if may_change_isolation %}
+                <p><a href="/settings/instance#data-isolation">{{ t('members.visibility_change') }}</a></p>
+            {% else %}
+                <p class="hint">{{ t('members.visibility_instance') }}</p>
+            {% endif %}
+        </section>
+    </div>
+
+    {#
+        Invite and Remove in one dialog, each loading the form's own page: the
+        opener names it in data-dialog-url, and without script (or without
+        <dialog>) the same links go to it.
+    #}
+    {% if may_manage %}
+        <dialog id="member-dialog" class="dialog" aria-labelledby="member-dialog-title">
+            <div class="dialog-header">
+                <h2 id="member-dialog-title" data-dialog-title>{{ t('members.invite_title', {'household': household_name}) }}</h2>
+                <button type="button" class="button-icon" data-closes-dialog="member-dialog"
+                        aria-label="{{ t('action.close') }}">×</button>
+            </div>
+            <div class="dialog-body" data-dialog-body data-url="/settings/members/invite">
+                <p class="muted">{{ t('quick_add.loading') }}</p>
+            </div>
+        </dialog>
+    {% endif %}
 {% endblock %}

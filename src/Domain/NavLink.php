@@ -15,15 +15,19 @@ namespace App\Domain;
 final class NavLink
 {
     /**
+     * @param non-empty-string $id
      * @param non-empty-string $labelKey
      * @param non-empty-string $href
      * @param non-empty-string $icon
+     * @param non-empty-string $tabLabelKey The label as a tab draws it.
      */
     public function __construct(
+        public readonly string $id,
         public readonly string $labelKey,
         public readonly string $href,
         public readonly string $icon,
         public readonly bool $active,
+        public readonly string $tabLabelKey,
     ) {
     }
 }

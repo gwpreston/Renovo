@@ -25,10 +25,30 @@ final class PdoSessionHandler implements SessionHandlerInterface, SessionUpdateT
 
     private ?int $userId = null;
 
+    private bool $persistent = true;
+
+    /**
+     * @param int $lifetimeSeconds How long a kept session lasts unused.
+     * @param int $browserLifetimeSeconds How long one that ends with the
+     *     browser lasts unused. Its cookie already dies with the browser; this
+     *     is the server's half, so a browser that is never closed — or a
+     *     cookie that was copied — does not keep it alive for the long lifetime.
+     */
     public function __construct(
         private readonly Database $db,
         private readonly int $lifetimeSeconds,
+        private readonly int $browserLifetimeSeconds = 43200,
     ) {
+    }
+
+    /**
+     * Whether the row being written belongs to a kept session. Set by the
+     * session middleware from the session's own contents just before the
+     * write, exactly as associateUser() is.
+     */
+    public function setPersistent(bool $persistent): void
+    {
+        $this->persistent = $persistent;
     }
 
     /**
@@ -97,7 +117,10 @@ final class PdoSessionHandler implements SessionHandlerInterface, SessionUpdateT
     public function write(string $id, string $data): bool
     {
         $now = $this->now();
-        $expires = date('Y-m-d H:i:s', time() + $this->lifetimeSeconds);
+        $expires = date(
+            'Y-m-d H:i:s',
+            time() + ($this->persistent ? $this->lifetimeSeconds : $this->browserLifetimeSeconds),
+        );
 
         $updated = $this->db->execute(
             'UPDATE ' . $this->table() . ' SET ' . $this->column('payload') . ' = :payload, '

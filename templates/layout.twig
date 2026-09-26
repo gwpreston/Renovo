@@ -8,6 +8,15 @@
 #}
 {% set auth_chrome = auth_chrome is not defined or auth_chrome %}
 {#
+    Whether this page is drawn in the signed-out layout — the brand panel
+    beside a card — rather than inside the shell. Every page with nobody signed
+    in is; so is the handful of pages a signed-in person reaches before the
+    application is theirs to navigate (the setup wizard's later steps, a
+    temporary password that must be replaced), which say so by setting
+    `auth_layout` — see `auth/_layout.twig`.
+#}
+{% set auth_layout = (auth_layout is defined and auth_layout) or not current_user %}
+{#
     Two writers for one attribute, and only one of them per request.
 
     A signed-in page uses the account's own setting, which follows the reader
@@ -16,12 +25,24 @@
     switch writes — the account wins wherever there is an account, and the
     palette is decided before the page paints either way.
 
+    The palette is the account's too, resolved through the `Palette` enum so
+    only one of its five keys can ever be printed here. A signed-out page wears
+    the default, navy; its theme still follows the sign-in screen's switch.
+    Both attributes are in the HTML that arrives, and the generated stylesheet
+    covers every combination of them — including "system" through a media
+    query — so the right colours are on first paint with no script at all.
+
     Density has only the one writer, and says so in the same shape rather than
     leaning on a null reader resolving to the same default by accident.
+
+    `data-icon-sprite` is the hashed URL of the icon sprite, for the one script
+    that builds an icon of its own after the page has loaded.
 #}
 <html lang="{{ locale_tag() }}"
-      data-theme="{{ current_user ? current_user.theme|default('system') : guest_theme|default('system') }}"
-      data-density="{{ current_user ? current_user.density|default('comfortable') : 'comfortable' }}">
+      data-theme="{{ current_user ? current_user.themePreference().value : guest_theme|default('system') }}"
+      data-palette="{{ current_user ? current_user.palettePreference().value : 'navy' }}"
+      data-density="{{ current_user ? current_user.density|default('comfortable') : 'comfortable' }}"
+      data-icon-sprite="{{ icon_sprite() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -39,7 +60,7 @@
         `bundle()` looks a name up in the asset build's manifest and prints the
         content-hashed file the build produced — the design tokens, Tailwind's
         theme and utilities, every rule that dresses the application, and the
-        @font-face rules for the vendored Inter. Until Phase 8 there was a
+        @font-face rules for the vendored Plus Jakarta Sans and JetBrains Mono. Until Phase 8 there was a
         second `<link>` here for a hand-written stylesheet served as written;
         that file moved into the build with the re-skin, because a token can
         only be the single definition of "brand" or "card" if the utility and
@@ -79,7 +100,7 @@
     sidebar, so the offset and the thing being offset around are decided by one
     condition — the same one that draws them.
 #}
-<body class="{{ current_user ? 'has-shell' : 'no-shell' }}"
+<body class="{{ auth_layout ? 'no-shell' : 'has-shell' }}"
       hx-headers='{"X-CSRF-Token": "{{ csrf_token() }}"}'>
 {#
     The strings this page's JavaScript needs, from the same catalogue the
@@ -134,18 +155,25 @@
 
     Sign-in, registration and the setup wizard get none of it. There is nowhere
     to navigate to before there is an account — so what they get instead is the
-    branded header below, which names the instance and nothing else.
+    signed-out layout below: the brand panel beside a card.
 
-    `auth_chrome` is how the third case opts out. An error page is rendered
-    with no user whoever is reading it — HttpErrorHandler cannot know, since
-    the failure may have happened before the account was loaded — so without
-    the flag a signed-in reader's 404 would offer them the sign-in screen's
-    theme switch, a control writing a cookie that none of their pages read.
+    `auth_chrome` is how an error page opts out of that layout's theme switch.
+    An error page is rendered with no user whoever is reading it —
+    HttpErrorHandler cannot know, since the failure may have happened before
+    the account was loaded — so without the flag a signed-in reader's 404
+    would offer them the sign-in screen's theme switch, a control writing a
+    cookie that none of their pages read.
 #}
-{% if current_user %}
+{% if not auth_layout %}
     {% set nav = navigation(scope, current_path) %}
+    {#
+        The shell's three reads — the household label, the Subscriptions
+        badge, the bell's dot — and the rates chip, assembled once for the
+        rail, the top bar and the tab bar to share. See ShellService.
+    #}
+    {% set shell = scope ? shell(scope) : null %}
 
-    {% include 'partials/sidebar.twig' %}
+    {% include 'partials/rail.twig' %}
 
     <header class="topbar">
         <div class="topbar-lead">
@@ -156,7 +184,20 @@
                 </svg>
             </a>
 
-            <h1 class="topbar-title">{% block heading %}{{ instance_name }}{% endblock %}</h1>
+            <div class="topbar-heading">
+                <h1 class="topbar-title">{% block heading %}{{ instance_name }}{% endblock %}</h1>
+
+                {#
+                    A short line under the title, catalogued and static. A
+                    subtitle that carries figures ("12 tracked · £182/mo")
+                    belongs to the page's own rebuild, where the per-currency
+                    rule can be kept; this phase gives each page words only.
+                    Hidden below 900px, where the title needs the room.
+                #}
+                {% if block('page_subtitle') is defined %}
+                    <p class="topbar-subtitle">{{ block('page_subtitle') }}</p>
+                {% endif %}
+            </div>
 
             {#
                 What this particular page offers: editing the thing being
@@ -167,47 +208,25 @@
             <div class="topbar-page-actions">{% block page_actions %}{% endblock %}</div>
         </div>
 
-        {% include 'partials/topbar_actions.twig' %}
-    </header>
-{% elseif auth_chrome %}
-    {#
-        What a page rendered before there is an account gets instead of the
-        shell: the mark and the instance's own name above the card.
-
-        The name is text rather than the logo's wordmark for the reason
-        `partials/brand_sprite.twig` gives — the wordmark is navy, and this
-        page is as likely to be near-black as white — and because the operator
-        may have named the instance something other than Renovo, in which case
-        their name is the one that belongs over their sign-in form.
-    #}
-    <header class="auth-header">
-        <svg class="brand-mark auth-mark" viewBox="0 0 460 427" aria-hidden="true" focusable="false">
-            <use href="#renovo-mark"></use>
-        </svg>
-        <p class="auth-instance">{{ instance_name }}</p>
+        {% include 'partials/topbar.twig' %}
     </header>
 {% endif %}
 
-<main class="container" id="main" tabindex="-1">
-    {% include 'partials/flashes.twig' %}
-    {% block content %}{% endblock %}
-</main>
+{#
+    The signed-out layout: the brand panel, and the card beside it.
 
-<footer class="container footer">
-    {#
-        The instance's name, except on the pages whose header has just said
-        it — twice on one short page is once too many. An error page has no
-        such header, so it keeps the name it always carried.
-    #}
-    {% if current_user or not auth_chrome %}
-        <span>{{ instance_name }}</span>
-    {% endif %}
+    One <main> either way, so the skip link lands in the same place on every
+    page; the panel is outside it, as an <aside>, because it says what this
+    instance is rather than what this page is for — the card's heading is the
+    page's single <h1>.
+#}
+{% if auth_layout %}
+<div class="auth-shell">
+    {% include 'partials/auth_brand.twig' %}
+{% endif %}
 
-    {% if current_user %}
-        <button type="button" class="button-link" data-opens-dialog="shortcut-help">
-            {{ t('shortcuts.title') }}
-        </button>
-    {% elseif auth_chrome %}
+<main class="{{ auth_layout ? 'auth-main' : 'container' }}" id="main" tabindex="-1">
+    {% if auth_layout %}
         {#
             The theme switch: three states, one of which is "whatever this
             machine asks for", so it is a group of three buttons rather than a
@@ -217,25 +236,59 @@
             `<html>` attribute carries, so the control states the truth before
             any script runs. Without a script it does nothing and the page is
             still themed — this changes how the page looks, not what it can do.
+
+            Only with nobody signed in, and not on an error page: a signed-in
+            reader's theme is their account's, and a switch writing a cookie
+            none of their pages read would visibly do nothing.
         #}
-        <div class="theme-switch" role="group" aria-label="{{ t('settings.theme') }}"
-             data-theme-switch>
-            {% for choice, label in {
-                'system': 'theme.system_short',
-                'light': 'theme.light',
-                'dark': 'theme.dark'
-            } %}
-                <button type="button" class="theme-switch-option" data-theme-choice="{{ choice }}"
-                        aria-pressed="{{ (guest_theme|default('system')) == choice ? 'true' : 'false' }}">
-                    {{ t(label) }}
-                </button>
-            {% endfor %}
+        {% if not current_user and auth_chrome %}
+            <div class="auth-theme segmented" role="group" aria-label="{{ t('settings.theme') }}"
+                 data-theme-switch>
+                {% for choice, label in {
+                    'system': 'theme.system_short',
+                    'light': 'theme.light',
+                    'dark': 'theme.dark'
+                } %}
+                    <button type="button" class="segmented-option" data-theme-choice="{{ choice }}"
+                            aria-pressed="{{ (guest_theme|default('system')) == choice ? 'true' : 'false' }}">
+                        {{ t(label) }}
+                    </button>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="auth-column">
+            {% if demo_mode|default(false) %}
+                <p class="auth-demo" role="note">
+                    {{ icon('info') }}
+                    <span>{{ t('auth.demo_banner') }}</span>
+                </p>
+            {% endif %}
+    {% endif %}
+
+    {% include 'partials/flashes.twig' %}
+    {% block content %}{% endblock %}
+
+    {% if auth_layout %}
         </div>
     {% endif %}
-</footer>
+</main>
 
-{% if current_user %}
-    {% include 'partials/mobile_nav.twig' %}
+{% if auth_layout %}
+</div>
+{% else %}
+<footer class="container footer">
+    <span>{{ instance_name }}</span>
+
+    <button type="button" class="button-link" data-opens-dialog="shortcut-help">
+        {{ t('shortcuts.title') }}
+    </button>
+</footer>
+{% endif %}
+
+
+{% if not auth_layout %}
+    {% include 'partials/tabbar.twig' %}
     {% include 'partials/dialogs.twig' %}
 {% endif %}
 </body>

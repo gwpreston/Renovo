@@ -8,6 +8,7 @@ use App\Domain\Allocation;
 use App\Domain\Entity\Subscription;
 use App\Domain\Entity\SubscriptionSplit;
 use App\Domain\Money;
+use App\Domain\Rounding;
 use App\Domain\SplitMode;
 use App\Persistence\Database;
 use App\Repository\MembershipRepository;
@@ -122,6 +123,39 @@ final class SplitService
     }
 
     /**
+     * One member's part of a single charge, at whatever price it was made.
+     *
+     * The share is the proportion a member bears **today**, applied to the
+     * charge — so a member paying a third still pays a third after an
+     * increase, and a charge reconstructed from last year is divided by
+     * today's arrangement, because splits keep no history. Expressed as a ratio
+     * rather than as a stored amount so that an increase is divided the same
+     * way the original was. If the current price is zero — a trial — the
+     * member bears the whole of their converted charge, since there is no
+     * ratio to take.
+     *
+     * Ask `bears()` first: this answers "how much", not "whether".
+     *
+     * @param list<SubscriptionSplit> $participants
+     */
+    public function chargeShare(Money $charge, Subscription $subscription, array $participants, int $userId): Money
+    {
+        $currentPrice = $subscription->price;
+        if ($currentPrice->isZero()) {
+            return $charge;
+        }
+
+        return Money::of(
+            Rounding::multiplyDivide(
+                $charge->amountMinor,
+                $this->shareFor($subscription, $participants, $userId)->amountMinor,
+                $currentPrice->amountMinor,
+            ),
+            $charge->currency,
+        );
+    }
+
+    /**
      * Whether a member bears any of a subscription's cost at all.
      *
      * Deliberately separate from `shareFor()`, and the distinction is not
@@ -175,6 +209,14 @@ final class SplitService
         }
 
         $mode = SplitMode::tryFromString($this->str($input, 'split_mode')) ?? SplitMode::None;
+
+        // A private subscription is paid by one person, and a split is always
+        // visible to everybody in it — the two cannot coexist. The reverse,
+        // making a split row private, is refused by SubscriptionService.
+        if ($mode->isSplit() && $subscription->isPrivate()) {
+            throw new ValidationException(['split_mode' => 'error.split.private']);
+        }
+
         $memberIds = $this->householdMemberIds($scope);
 
         [$participants, $errors] = $this->validateParticipants($input, $mode, $memberIds);

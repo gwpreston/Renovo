@@ -1,0 +1,31 @@
+{#
+    Twelve months back, twelve ahead: the dashboard's chart asked for twelve
+    months a side rather than six, so its thirteen bars are thirteen of these.
+
+    The months behind are reconstructed, and the note beneath says how many
+    subscriptions were left out for having no start date; the months ahead are
+    the forecast, hatched, with trials converting and scheduled price changes
+    applied from their own dates. When a currency has no rate there is no chart
+    at all, and the card names the currency.
+#}
+<section class="card spend-bars-card analytics-months" id="analytics-months"
+         aria-labelledby="analytics-months-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="analytics-months-heading">{{ t('stats.months_heading') }}</h2>
+            <p class="muted">{{ t('stats.months_note') }}</p>
+        </div>
+        {% if chart.is_drawable %}
+            <ul class="chart-legend" aria-hidden="true">
+                <li><span class="chart-key chart-key-actual"></span>{{ t('dashboard.series_actual') }}</li>
+                <li><span class="chart-key chart-key-forecast"></span>{{ t('dashboard.series_forecast') }}</li>
+            </ul>
+        {% endif %}
+    </header>
+
+    {% include 'partials/month_bars.twig' with {
+        chart: chart,
+        caption: t('stats.months_alt', {'currency': chart.currency}),
+        today_label: t('stats.today'),
+    } only %}
+</section>

@@ -25,14 +25,21 @@ use Psr\Http\Server\RequestHandlerInterface;
  * "302 to /setup" would report a healthy instance as broken — or, worse, be
  * followed, and count a redirect as a pass.
  *
- * `/setup/notifications` is the exception, and deliberately so. It is the
- * wizard's second step, it runs *after* the administrator account exists, and
- * it sits inside the authenticated group — it creates no account and grants no
- * access, so the reason the rest of /setup is closed does not apply to it.
+ * The wizard's later steps are the exception, and deliberately so. The
+ * household and reminders steps and the page setup ends on run *after* the
+ * administrator account exists, and they sit inside the authenticated group —
+ * they create no account and grant no access, so the reason the rest of /setup
+ * is closed does not apply to them. They are named one by one: `/setup` as a
+ * prefix is exactly the door this middleware exists to shut.
  */
 final class SetupGuardMiddleware implements MiddlewareInterface
 {
-    public const POST_SETUP_STEP = '/setup/notifications';
+    /**
+     * The signed-in steps, each with everything beneath it.
+     *
+     * @var list<string>
+     */
+    public const POST_SETUP_STEPS = ['/setup/household', '/setup/notifications', '/setup/done'];
 
     public function __construct(
         private readonly SetupService $setup,
@@ -43,13 +50,16 @@ final class SetupGuardMiddleware implements MiddlewareInterface
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         $path = $request->getUri()->getPath();
-        // The whole subtree, not just the page: the step has a form that posts
-        // to /setup/notifications/channels and a finish button that posts to
-        // /setup/notifications/finish, and a guard that let the page through
-        // but bounced its own forms would leave a step that cannot be
-        // completed.
-        $isPostSetupStep = $path === self::POST_SETUP_STEP
-            || str_starts_with($path, self::POST_SETUP_STEP . '/');
+        // The whole subtree, not just the page: the reminders step has forms
+        // that post to /setup/notifications/channels and .../finish, and a
+        // guard that let the page through but bounced its own forms would
+        // leave a step that cannot be completed.
+        $isPostSetupStep = false;
+        foreach (self::POST_SETUP_STEPS as $step) {
+            if ($path === $step || str_starts_with($path, $step . '/')) {
+                $isPostSetupStep = true;
+            }
+        }
         $isSetupRoute = str_starts_with($path, '/setup') && !$isPostSetupStep;
         $isAsset = str_starts_with($path, '/assets');
 

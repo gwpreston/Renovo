@@ -10,6 +10,7 @@ use App\Repository\ExchangeRateRepository;
 use App\Repository\InstanceSettingsRepository;
 use App\Service\ExchangeRate\ExchangeRateProviderRegistry;
 use App\Service\ExchangeRate\FrankfurterProvider;
+use App\Service\ExchangeRate\RateProviderException;
 use App\Service\ExchangeRateService;
 use App\Service\InstanceSettingsService;
 use App\Support\FrozenClock;
@@ -156,6 +157,84 @@ final class ExchangeRateServiceTest extends DatabaseTestCase
         $this->service(new FrankfurterProvider($http, new RequestFactory()))->refreshIfStale();
 
         self::assertCount(2, $http->requestedUrls);
+    }
+
+    /**
+     * Settings' Refresh now (Phase 28) is a person asking, and it goes through
+     * the provider and the shared HTTP client like the scheduled refresh — the
+     * fake client here is that client. What it may not do is click through the
+     * back-off a failed attempt set.
+     */
+    public function testRefreshNowIsRefusedWhileAFailedAttemptIsBackingOff(): void
+    {
+        $http = FakeHttpClient::failing();
+        $service = $this->service(new FrankfurterProvider($http, new RequestFactory()));
+
+        try {
+            $service->refreshNow();
+            self::fail('A failing provider should have thrown.');
+        } catch (RateProviderException) {
+            // The failure is the caller's to report; the page flashes it.
+        }
+        self::assertCount(1, $http->requestedUrls);
+
+        $until = $service->retryAfter();
+        self::assertNotNull($until);
+        self::assertSame('2026-09-14 10:00:00', $until->format('Y-m-d H:i:s'));
+
+        // Inside the window: refused, and nothing is sent.
+        self::assertNull($service->refreshNow());
+        self::assertCount(1, $http->requestedUrls);
+
+        // Once it has passed, the button works again.
+        $this->clock->advanceTo($this->clock->now()->modify('+' . (self::RETRY_SECONDS + 1) . ' seconds'));
+        self::assertNull($service->retryAfter());
+        $this->expectException(RateProviderException::class);
+        $service->refreshNow();
+    }
+
+    public function testRefreshNowIsNotHeldBackByASuccessfulRefresh(): void
+    {
+        $http = $this->workingResponse();
+        $service = $this->service(new FrankfurterProvider($http, new RequestFactory()));
+
+        self::assertSame(4, $service->refreshNow());
+        self::assertNull($service->retryAfter());
+
+        // Asking again straight away is what the button is for.
+        self::assertSame(4, $service->refreshNow());
+        self::assertCount(2, $http->requestedUrls);
+    }
+
+    /**
+     * Changing the base or the provider drops the table. That must drop the
+     * attempt marker with it, or the successful refresh a moment earlier would
+     * look like a failure — an attempt newer than any table — and lock Refresh
+     * now out for an hour just when the administrator wants it.
+     */
+    public function testChangingTheBaseDoesNotTurnAnEarlierSuccessIntoABackOff(): void
+    {
+        $http = $this->workingResponse();
+        $service = $this->service(new FrankfurterProvider($http, new RequestFactory()));
+        $service->refresh();
+
+        $this->settings->setBaseCurrency('EUR');
+        $service->invalidate();
+
+        self::assertNull($service->retryAfter());
+        $service->refreshNow();
+        self::assertCount(2, $http->requestedUrls, 'the refresh was sent, not refused');
+    }
+
+    public function testTheRateTableIsListedAgainstTheBaseWithoutTheBaseItself(): void
+    {
+        $service = $this->service($this->workingProvider());
+        $service->refresh();
+
+        self::assertSame(
+            ['EUR', 'JPY', 'USD'],
+            array_map(static fn (ExchangeRate $rate): string => $rate->quoteCurrency, $service->rates()),
+        );
     }
 
     public function testAFreshCacheIsNotRefetched(): void

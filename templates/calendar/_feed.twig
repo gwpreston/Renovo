@@ -1,0 +1,64 @@
+{#
+    The calendar feed: the address a calendar app subscribes to.
+
+    The address carries a read-only token, and a token's secret is kept only
+    as a hash — so the full address exists once, on the page load right after
+    it is created, and is never shown again. Other visits say when the current
+    link was made and last fetched, which is everything that can honestly be
+    said about it.
+
+    Creating a new link retires the old one at once, and every calendar
+    subscribed to it stops updating. Where there is a link to lose, the button
+    opens a warning first — a disclosure, so it asks without script.
+
+    `feed`  {token: ApiToken|null, url: string|null}
+#}
+<section id="calendar-feed" class="card calendar-feed" aria-labelledby="calendar-feed-heading">
+    <h2 id="calendar-feed-heading" class="calendar-feed-heading">
+        {{ icon('calendar', 'icon') }}{{ t('calendar.feed_title') }}
+    </h2>
+    <p class="muted">{{ t('calendar.feed_intro') }}</p>
+
+    {% if feed.url %}
+        <label class="visually-hidden" for="calendar-feed-url">{{ t('calendar.feed_url') }}</label>
+        <div class="copy-field">
+            <input id="calendar-feed-url" class="copy-field-input num" type="text" readonly
+                   value="{{ feed.url }}" spellcheck="false" autocomplete="off">
+            {# Revealed by the script, which is what makes it work. #}
+            <button type="button" class="icon-button" data-copy="calendar-feed-url" hidden>
+                {{- icon('copy', 'icon icon-button-icon') -}}
+                <span class="visually-hidden">{{ t('calendar.feed_copy') }}</span>
+            </button>
+        </div>
+        <p class="hint" data-copy-status role="status"></p>
+        <p class="hint">{{ t('calendar.feed_shown_once') }}</p>
+    {% elseif feed.token %}
+        <p class="hint calendar-feed-state">
+            {{ t('calendar.feed_created', {'date': feed.token.createdAt|local_date('d MMM y')}) }}
+            {% if feed.token.lastUsedAt %}
+                {{ t('calendar.feed_last_used', {'date': feed.token.lastUsedAt|local_date('d MMM y')}) }}
+            {% else %}
+                {{ t('calendar.feed_never_used') }}
+            {% endif %}
+        </p>
+        <p class="hint">{{ t('calendar.feed_hidden') }}</p>
+    {% else %}
+        <p class="hint calendar-feed-state">{{ t('calendar.feed_none') }}</p>
+    {% endif %}
+
+    {% if feed.token %}
+        <details class="calendar-feed-replace">
+            <summary class="button button-quiet">{{ icon('refresh', 'icon') }}{{ t('calendar.feed_new_link') }}</summary>
+            <p class="calendar-feed-warning">{{ t('calendar.feed_replace_warning') }}</p>
+            <form method="post" action="/calendar/feed-link">
+                {{ csrf_field() }}
+                <button type="submit" class="button button-danger">{{ t('calendar.feed_replace_confirm') }}</button>
+            </form>
+        </details>
+    {% else %}
+        <form method="post" action="/calendar/feed-link">
+            {{ csrf_field() }}
+            <button type="submit" class="button button-outline">{{ icon('link', 'icon') }}{{ t('calendar.feed_create') }}</button>
+        </form>
+    {% endif %}
+</section>

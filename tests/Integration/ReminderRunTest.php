@@ -249,6 +249,85 @@ final class ReminderRunTest extends NotificationTestCase
         self::assertSame(2, $this->budgetAlertCount());
     }
 
+    /**
+     * The Notifications page's budget switch (Phase 28). Off, and the breach
+     * is not sent — but it is still recorded, so turning the switch back on
+     * does not announce a crossing that happened while it was off as though
+     * it were new.
+     */
+    public function testBudgetAlertsTurnedOffAreNotSentButTheBreachIsStillRecorded(): void
+    {
+        $this->addChannel($this->alice);
+        $this->createSubscription('Streaming', 3000, '2026-09-20', $this->alice);
+        $this->budgets->create($this->scope($this->alice), [
+            'name' => 'Monthly',
+            'period' => BudgetPeriod::Monthly->value,
+            'amount' => '20.00',
+            'currency' => 'GBP',
+        ]);
+
+        $this->notificationSettings->savePreferences($this->alice, [
+            'digest_mode' => DigestMode::Immediate->value,
+            'budget_alerts' => '0',
+        ]);
+        $this->runner->run();
+        self::assertSame(0, $this->budgetAlertCount());
+
+        $this->notificationSettings->savePreferences($this->alice, [
+            'digest_mode' => DigestMode::Immediate->value,
+            'budget_alerts' => '1',
+        ]);
+        $this->clock->advanceTo(new DateTimeImmutable('2026-09-16 08:00:00'));
+        $this->runner->run();
+        self::assertSame(0, $this->budgetAlertCount(), 'the breach was already recorded while alerts were off');
+    }
+
+    /**
+     * Several lead times chosen as the page's chips — posted as a list behind
+     * the hidden empty entry — persist, and each fires for every dated alert
+     * alike: a renewal, a trial conversion and a cancel-by deadline, all on 15
+     * October, are each announced fourteen days and three days before.
+     */
+    public function testLeadTimesChosenAsChipsEachFireForEveryDatedAlert(): void
+    {
+        $this->addChannel($this->alice);
+        $this->notificationSettings->savePreferences($this->alice, [
+            'lead_days' => ['', '14', '3'],
+            'digest_mode' => DigestMode::Immediate->value,
+        ]);
+        self::assertSame([14, 3], $this->notificationSettings->preferences($this->alice)->leadDays);
+
+        $this->createSubscription('Netflix', 1099, '2026-10-15', $this->alice);
+        $this->createSubscription('Streaming trial', 0, null, $this->alice, [
+            'is_trial' => true,
+            'trial_end_date' => '2026-10-15',
+            'converts_to_price_minor' => 1299,
+        ]);
+        // Renews 14 November with 30 days' notice: the deadline is 15 October.
+        $this->createSubscription('Gym', 4000, '2026-11-14', $this->alice, [
+            'notice_period_amount' => 30,
+            'notice_period_unit' => 'days',
+        ]);
+
+        $expected = [AlertType::CancelBy->value, AlertType::Renewal->value, AlertType::TrialConversion->value];
+
+        foreach (['2026-10-01', '2026-10-12'] as $day) {
+            $before = count($this->notifier->sent);
+            $this->clock->advanceTo(new DateTimeImmutable($day . ' 08:00:00'));
+            $this->runner->run();
+
+            $types = array_slice($this->notifier->alertTypes(), $before);
+            sort($types);
+            self::assertSame($expected, $types, 'on ' . $day);
+        }
+
+        // And nothing on a day that is neither.
+        $before = count($this->notifier->sent);
+        $this->clock->advanceTo(new DateTimeImmutable('2026-10-08 08:00:00'));
+        $this->runner->run();
+        self::assertCount($before, $this->notifier->sent);
+    }
+
     private function budgetAlertCount(): int
     {
         return count(array_filter(

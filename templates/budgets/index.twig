@@ -1,88 +1,232 @@
+{#
+    The Budgets screen: status tiles, a card per budget, and the household's
+    last six months against its monthly limit.
+
+    Every figure is BudgetScreenService's — a card is the budget read over its
+    calendar period, the history is the dashboard chart's own months — and the
+    template only lays them out. A budget with no honest figure (a currency
+    with no rate, or spending this viewer cannot see whole) says so instead
+    of showing one, and is counted in no tile.
+#}
 {% extends 'layout.twig' %}
 
 {% block heading %}{{ t('nav.budgets') }}{% endblock %}
-
-{% block page_actions %}
-    {% if can(scope, 'budget.manage') %}
-        <a class="button button-primary" href="/budgets/new">{{ t('budgets.new_budget') }}</a>
-    {% endif %}
-{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.budgets') }}{% endblock %}
 
 {% block content %}
-    <p class="muted note">
-        {{ t('budgets.intro') }}
-    </p>
+    {#
+        New budget is what this screen is for, so it wears the accent and
+        sits at the head of the content rather than among the top bar's
+        page actions.
+    #}
+    <div class="page-header">
+        <p class="muted note">{{ t('budgets.intro') }}</p>
+        {% if may_create %}
+            <a class="button button-primary" href="/budgets/new"
+               data-opens-dialog="budget-dialog" data-dialog-url="/budgets/new"
+               data-dialog-title="{{ t('budgets.new_budget') }}">
+                {{ icon('add') }}<span>{{ t('budgets.new_budget') }}</span>
+            </a>
+        {% endif %}
+    </div>
 
-    {% if progress is empty %}
+    <section class="metric-grid budget-tiles" aria-label="{{ t('budgets.tiles') }}">
+        <article class="card stat metric kpi kpi-side">
+            <span class="kpi-icon kpi-icon-ok">{{ icon('ok') }}</span>
+            <div class="kpi-body">
+                <h2 class="stat-label">{{ t('budgets.state_ok') }}</h2>
+                <p class="stat-value num" data-tile="on-track">{{ tiles.on_track|decimal(0) }}</p>
+            </div>
+        </article>
+
+        <article class="card stat metric kpi kpi-side">
+            <span class="kpi-icon kpi-icon-warn">{{ icon('warn') }}</span>
+            <div class="kpi-body">
+                <h2 class="stat-label">{{ t('budgets.state_warn') }}</h2>
+                <p class="stat-value num" data-tile="warning">{{ tiles.warning|decimal(0) }}</p>
+            </div>
+        </article>
+
+        <article class="card stat metric kpi kpi-side">
+            <span class="kpi-icon kpi-icon-bad">{{ icon('alert') }}</span>
+            <div class="kpi-body">
+                <h2 class="stat-label">{{ t('budgets.tile_over') }}</h2>
+                <p class="stat-value num" data-tile="over">{{ tiles.over|decimal(0) }}</p>
+            </div>
+        </article>
+
+        {% if tiles.household_limit is not null %}
+            <article class="card stat metric kpi kpi-side">
+                <span class="kpi-icon kpi-icon-neutral">{{ icon('budget') }}</span>
+                <div class="kpi-body">
+                    <h2 class="stat-label">{{ t('budgets.tile_household_limit') }}</h2>
+                    <p class="stat-value num" data-tile="household-limit">
+                        {{ tiles.household_limit.amountMinor|money(tiles.household_limit.currency) }}<span
+                            class="stat-unit">{{ t('dashboard.per_month_unit') }}</span>
+                    </p>
+                </div>
+            </article>
+        {% endif %}
+    </section>
+
+    {% if cards is empty %}
         <section class="card">
             <p class="muted empty">
                 {{ t('budgets.empty') }}
-                {% if can(scope, 'budget.manage') %}<a href="/budgets/new">{{ t('budgets.set_one_up') }}</a>{% endif %}
+                {% if may_create %}<a href="/budgets/new" data-opens-dialog="budget-dialog"
+                                     data-dialog-url="/budgets/new"
+                                     data-dialog-title="{{ t('budgets.new_budget') }}">{{ t('budgets.set_one_up') }}</a>{% endif %}
             </p>
         </section>
     {% else %}
         <div class="budget-grid">
-            {% for row in progress %}
-                {% set budget = row.budget %}
-                <article class="card budget {{ row.is_over ? 'is-over' : (row.is_warning ? 'is-warning' : '') }}">
-                    <header class="budget-header">
-                        <h2>{{ budget.name }}</h2>
-                        {% if can(scope, 'budget.manage') %}
-                            <a class="button button-quiet" href="/budgets/{{ budget.id }}/edit">{{ t('action.edit') }}</a>
-                        {% endif %}
+            {% for card in cards %}
+                {% set budget = card.budget %}
+                <article class="card budget-card{{ card.state ? ' is-' ~ card.state : '' }}" data-budget="{{ budget.id }}"
+                         aria-labelledby="budget-{{ budget.id }}-name">
+                    <header class="budget-card-head">
+                        <div class="budget-card-title">
+                            <h2 id="budget-{{ budget.id }}-name">{{ budget.name }}</h2>
+                            <p class="budget-meta">
+                                {{ budget_period_label(budget.period.value) }}
+                                · {{ budget.isOverall ? t('budgets.all_categories') : budget.categoryName }}
+                                · {{ budget.isHousehold ? t('budgets.household') : budget.subjectName }}
+                            </p>
+                        </div>
+                        <div class="budget-card-actions">
+                            {% if card.state %}
+                                <span class="badge badge-{{ card.state }}" data-budget-state>{{ t('budgets.state_' ~ card.state) }}</span>
+                            {% endif %}
+                            {% if card.may_edit %}
+                                <a class="button-icon" href="/budgets/{{ budget.id }}/edit"
+                                   data-opens-dialog="budget-dialog" data-dialog-url="/budgets/{{ budget.id }}/edit"
+                                   data-dialog-title="{{ t('budgets.edit_named', {'name': budget.name}) }}"
+                                   aria-label="{{ t('budgets.edit_named', {'name': budget.name}) }}"
+                                   title="{{ t('action.edit') }}">{{ icon('edit') }}</a>
+                            {% endif %}
+                        </div>
                     </header>
 
-                    <p class="muted">
-                        {{ budget_period_label(budget.period.value) }} ·
-                        {{ budget.isOverall ? t('budgets.all_categories') : budget.categoryName }}
-                        {% if budget.ownerName %} · {{ budget.ownerName }}{% endif %}
-                    </p>
-
-                    {% if row.projected is null %}
-                        <p class="stat-value">—</p>
-                        <p class="field-error">
-                            {{ t('budgets.unconvertible', {'currencies': row.unconvertible|join(', ')}) }}
+                    {% if card.note == 'unavailable' %}
+                        <p class="stat-value num">{{ t('common.none_symbol') }}</p>
+                        <p class="muted budget-note" data-budget-unavailable>{{ t('budgets.unavailable') }}</p>
+                    {% elseif card.note == 'unconvertible' %}
+                        <p class="stat-value num">{{ t('common.none_symbol') }}</p>
+                        <p class="budget-note" data-budget-unconvertible>
+                            {{ t('budgets.unconvertible', {'currencies': card.unconvertible|join(', ')}) }}
                         </p>
                     {% else %}
-                        <p class="stat-value">
-                            {{ row.projected.amountMinor|money(row.projected.currency) }}
-                            <span class="stat-unit">
-                                {{ t('budgets.of_limit', {'limit': row.limit.amountMinor|money(row.limit.currency)}) }}
-                            </span>
+                        {% set limit = card.limit.amountMinor|money(card.limit.currency) %}
+                        <p class="budget-figure">
+                            <span class="budget-projected num">{{ card.projected.amountMinor|money(card.projected.currency) }}</span>
+                            <span class="muted">{{ t('budgets.of_limit_projected', {'limit': limit}) }}</span>
                         </p>
 
-                        {# A meter rather than a bar: it carries the value and the limit to a screen reader. #}
-                        <div class="meter" role="img"
-                             aria-label="{{ t('budgets.meter_label', {'percent': row.percent}) }}">
-                            <span class="meter-fill" style="width: {{ min(row.percent, 100) }}%"></span>
+                        {#
+                            Charged so far solid over the projection's wash, on
+                            the limit's scale, with a tick at the warning
+                            threshold. Its name says all of that; the widths
+                            are decoration.
+                        #}
+                        <div class="budget-bar" role="img"
+                             aria-label="{{ t('budgets.bar_label', {
+                                 'charged': card.charged.amountMinor|money(card.charged.currency),
+                                 'projected': card.projected.amountMinor|money(card.projected.currency),
+                                 'limit': limit,
+                             }) }}">
+                            <span class="budget-bar-projected" style="width: {{ card.projected_width }}"></span>
+                            <span class="budget-bar-charged" style="width: {{ card.charged_width }}"></span>
+                            {% if card.warn_left is not null %}
+                                <span class="budget-bar-warn" style="left: {{ card.warn_left }}"
+                                      title="{{ t('budgets.warn_tick', {'percent': budget.warnThresholdPercent}) }}"></span>
+                            {% endif %}
                         </div>
 
-                        <p class="{{ row.is_over ? 'field-error' : 'muted' }}">
-                            {% if row.is_over %}
-                                <strong>{{ t('budgets.over', {
-                                    'percent': row.percent,
-                                    'amount': (row.remaining.amountMinor * -1)|money(row.remaining.currency),
-                                }) }}</strong>
-                            {% elseif row.is_warning %}
-                                {{ t('budgets.warning', {
-                                    'percent': row.percent,
-                                    'threshold': budget.warnThresholdPercent,
-                                    'remaining': row.remaining.amountMinor|money(row.remaining.currency),
-                                }) }}
-                            {% else %}
-                                {{ t('budgets.remaining', {
-                                    'percent': row.percent,
-                                    'remaining': row.remaining.amountMinor|money(row.remaining.currency),
-                                }) }}
+                        {% set difference = card.difference.amountMinor|money(card.difference.currency) %}
+                        <p class="budget-foot">
+                            <span class="budget-note" data-budget-note="{{ card.note }}">
+                                {% if card.note == 'over_if_trials' %}
+                                    {{ t('budgets.note_over_if_trials', {
+                                        'projected': card.projected.amountMinor|money(card.projected.currency),
+                                        'amount': difference,
+                                    }) }}
+                                {% elseif card.note == 'over' %}
+                                    {{ t('budgets.note_over', {'amount': difference}) }}
+                                {% elseif card.note == 'warning' %}
+                                    {{ t('budgets.note_warning', {
+                                        'percent': card.percent,
+                                        'threshold': budget.warnThresholdPercent,
+                                    }) }}
+                                {% else %}
+                                    {{ t('budgets.note_left', {'amount': difference}) }}
+                                {% endif %}
+                            </span>
+                            {% if card.percent is not null %}
+                                <span class="num muted">{{ t('budgets.percent', {'percent': card.percent}) }}</span>
                             {% endif %}
                         </p>
                     {% endif %}
+
+                    <p class="budget-alerts" data-budget-alerts>
+                        {{ icon('bell') }}
+                        <span>
+                            {% if card.alert_channels is empty %}
+                                {{ t('budgets.alerts_off') }}
+                            {% else %}
+                                {{ t('budgets.alerts_on', {'channels': card.alert_channels|join(', ')}) }}
+                            {% endif %}
+                        </span>
+                    </p>
                 </article>
             {% endfor %}
         </div>
-
-        <p class="muted note">
-            {{ t('budgets.alerts_note') }}
-        </p>
     {% endif %}
+
+    {% if history is not null %}
+        {% set history_limit = history.limit.amountMinor|money(history.limit.currency) %}
+        <section class="card spend-bars-card budget-history" aria-labelledby="budget-history-heading">
+            <header class="card-header">
+                <div>
+                    <h2 id="budget-history-heading">{{ t('budgets.history_title') }}</h2>
+                    <p class="muted" data-budget-history-caption>
+                        {% if history.over_count is null %}
+                            {{ t('budgets.history_caption_uncounted', {'limit': history_limit}) }}
+                        {% else %}
+                            {{ t('budgets.history_caption', {
+                                'limit': history_limit,
+                                'count': history.over_count,
+                                'months': history.month_count,
+                            }) }}
+                        {% endif %}
+                    </p>
+                </div>
+            </header>
+
+            {% include 'partials/month_bars.twig' with {
+                chart: history,
+                caption: t('budgets.history_alt', {'currency': history.currency}),
+            } only %}
+        </section>
+    {% endif %}
+
+    {#
+        New and Edit in one dialog, loaded from the form's own page: each
+        opener names the page in data-dialog-url, and without script (or
+        without <dialog>) the same links go to it.
+    #}
+    <dialog id="budget-dialog" class="dialog dialog-sectioned" aria-labelledby="budget-dialog-title"
+            aria-describedby="budget-dialog-subtitle">
+        <div class="dialog-header">
+            <span class="dialog-mark">{{ icon('budget') }}</span>
+            <div class="dialog-heading">
+                <h2 id="budget-dialog-title" data-dialog-title>{{ t('budgets.new_budget') }}</h2>
+                <p class="dialog-subtitle" id="budget-dialog-subtitle">{{ t('subtitle.budget_form') }}</p>
+            </div>
+            <button type="button" class="button-icon" data-closes-dialog="budget-dialog"
+                    aria-label="{{ t('action.close') }}">{{ icon('close') }}</button>
+        </div>
+        <div class="dialog-body" data-dialog-body data-url="/budgets/new">
+            <p class="muted">{{ t('quick_add.loading') }}</p>
+        </div>
+    </dialog>
 {% endblock %}

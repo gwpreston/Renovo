@@ -11,6 +11,7 @@ use App\Domain\Money;
 use App\Domain\NoticePeriod;
 use App\Domain\SplitMode;
 use App\Domain\SubscriptionType;
+use App\Domain\Visibility;
 use DateTimeImmutable;
 
 /**
@@ -55,6 +56,9 @@ final class SubscriptionFactory
         ?int $payerUserId = null,
         int $householdId = 1,
         array $tags = [],
+        ?DateTimeImmutable $cancelledAt = null,
+        Visibility $visibility = Visibility::Household,
+        ?string $plan = null,
     ): Subscription {
         return new Subscription(
             id: $id,
@@ -93,6 +97,9 @@ final class SubscriptionFactory
             tags: $tags,
             createdAt: new DateTimeImmutable('2026-01-01'),
             updatedAt: new DateTimeImmutable('2026-01-01'),
+            visibility: $visibility,
+            cancelledAt: $cancelledAt,
+            plan: $plan,
         );
     }
 }

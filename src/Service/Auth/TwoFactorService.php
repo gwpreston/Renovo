@@ -146,13 +146,28 @@ final class TwoFactorService
     /**
      * Park a user who has proved their password and owes a second factor.
      */
-    public function beginChallenge(User $user, string $next): void
+    public function beginChallenge(User $user, string $next, bool $remember = true): void
     {
         $this->session->set(self::SESSION_KEY, [
             'user_id' => $user->id,
             'issued_at' => $this->clock->now()->getTimestamp(),
             'next' => $next,
+            // The sign-in form's "Keep me signed in", carried to the step that
+            // actually signs the browser in.
+            'remember' => $remember,
         ]);
+    }
+
+    /**
+     * Whether the pending sign-in asked to be kept past the browser closing.
+     * A challenge begun before the choice existed has no answer, and keeps
+     * the lifetime every session had then.
+     */
+    public function pendingRemember(): bool
+    {
+        $pending = $this->session->get(self::SESSION_KEY);
+
+        return !is_array($pending) || ($pending['remember'] ?? true) !== false;
     }
 
     /**

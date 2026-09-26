@@ -72,7 +72,25 @@ final class NotificationSettingsService
         $label = $this->label($input, $notifier->label());
         $config = $notifier->normaliseConfig($input);
 
-        return $this->channels->create($userId, $notifier->key(), $label, $config, $this->isActive($input));
+        $id = $this->channels->create($userId, $notifier->key(), $label, $config, $this->isActive($input));
+
+        // With no routing at all, every channel hears everything and a new one
+        // needs nothing. Once a member has saved routing, though, a channel
+        // with no rows is one they have muted — so a channel added after that
+        // is given every alert type explicitly, or adding it would be adding
+        // a channel that never speaks.
+        $routes = $this->routes->findForUser($userId);
+        if ($routes !== []) {
+            $typed = [];
+            foreach ($routes as $channelId => $types) {
+                $typed[$channelId] = array_values(array_filter(array_map(AlertType::tryFromString(...), $types)));
+            }
+            $typed[$id] = AlertType::all();
+
+            $this->routes->replaceForUser($userId, $typed);
+        }
+
+        return $id;
     }
 
     /**
@@ -102,6 +120,23 @@ final class NotificationSettingsService
         );
     }
 
+    /**
+     * Turn a channel on or off and change nothing else about it — the
+     * Notifications page's switch. Its label and configuration are rewritten
+     * as they are stored, so a secret is never round-tripped through a form.
+     *
+     * @throws ValidationException when the channel is not this user's.
+     */
+    public function setChannelActive(int $userId, int $id, bool $active): void
+    {
+        $existing = $this->channels->find($userId, $id);
+        if ($existing === null) {
+            throw ValidationException::field('channel_type', 'error.channel.missing');
+        }
+
+        $this->channels->update($userId, $id, $existing->label, $existing->config, $active);
+    }
+
     public function deleteChannel(int $userId, int $id): void
     {
         $this->channels->delete($userId, $id);
@@ -120,7 +155,22 @@ final class NotificationSettingsService
     {
         $errors = [];
 
-        $leadDays = $this->parseLeadDays($this->str($input, 'lead_days'), $errors);
+        $stored = $this->preferences->findForUser($userId);
+
+        // The Notifications page posts its chips as a list, behind a hidden
+        // empty entry so that unticking every chip still names the setting.
+        // A comma-separated string is still read, for any caller written
+        // before the chips. A caller that sends neither has not asked, and
+        // keeps what is stored — as with the two switches below.
+        $leadInput = $input['lead_days'] ?? null;
+        $leadDays = match (true) {
+            is_array($leadInput) => $this->parseLeadDays(implode(',', array_filter(
+                array_map(static fn (mixed $day): string => is_scalar($day) ? trim((string) $day) : 'x', $leadInput),
+                static fn (string $day): bool => $day !== '',
+            )), $errors),
+            is_scalar($leadInput) => $this->parseLeadDays((string) $leadInput, $errors),
+            default => $stored->leadDays,
+        };
 
         $mode = DigestMode::tryFromString($this->str($input, 'digest_mode')) ?? DigestMode::Immediate;
 
@@ -142,7 +192,21 @@ final class NotificationSettingsService
             throw new ValidationException($errors);
         }
 
-        $this->preferences->save(new NotificationPreferences($userId, $leadDays, $mode, $day));
+        $this->preferences->save(new NotificationPreferences(
+            $userId,
+            $leadDays,
+            $mode,
+            $day,
+            // The form carries a hidden "0" before each switch, so a post from
+            // it always names the setting. A caller that does not name it has
+            // not asked, and keeps what is stored.
+            array_key_exists('price_change_alerts', $input)
+                ? $this->str($input, 'price_change_alerts') === '1'
+                : $stored->priceChangeAlerts,
+            array_key_exists('budget_alerts', $input)
+                ? $this->str($input, 'budget_alerts') === '1'
+                : $stored->budgetAlerts,
+        ));
     }
 
     /**
@@ -157,9 +221,10 @@ final class NotificationSettingsService
      * Save routing from the settings form.
      *
      * The form submits a checkbox per channel per alert type. A channel with
-     * every box ticked is stored as four rows rather than as "all", so that
-     * adding a fifth alert type in a later phase does not silently subscribe
-     * everybody to it.
+     * every box ticked is stored as a row per type rather than as "all", so
+     * that adding an alert type in a later phase does not silently subscribe
+     * everybody to it. (The one type that arrived on by default — price
+     * changes — did so through a migration copying each renewal route.)
      *
      * @param array<int|string, mixed> $input routes[channelId][] = alertType
      */

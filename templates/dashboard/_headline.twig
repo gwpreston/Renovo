@@ -1,0 +1,20 @@
+{#
+    One headline figure by the per-currency rule, in a single line: the
+    combined total when every currency converts, the subtotals when one does
+    not (with the missing currency named in a title), a dash when empty.
+
+    `figures`  {totals: [{currency, amount_minor}], combined: {currency, amount_minor, unconvertible}}
+    `signed`   optional: prefix a plus sign, for figures that add to spend
+#}
+{% set signed = signed ?? false %}
+{%- if figures.totals is empty -%}
+    {{ t('common.none_symbol') }}
+{%- elseif figures.combined.amount_minor is not null -%}
+    {{ figures.combined.amount_minor|money(figures.combined.currency, signed) }}
+{%- else -%}
+    <span title="{{ t('dashboard.unconvertible', {'currencies': figures.combined.unconvertible|join(', ')}) }}">
+        {%- for total in figures.totals -%}
+            {{ total.amount_minor|money(total.currency, signed) }}{{ not loop.last ? ' · ' : '' }}
+        {%- endfor -%}
+    </span>
+{%- endif -%}

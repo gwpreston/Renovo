@@ -6,8 +6,10 @@ namespace App\Service;
 
 use App\Domain\Currency;
 use App\Domain\Entity\PriceChange;
+use App\Domain\Entity\Subscription;
 use App\Domain\Money;
 use App\Domain\PriceChangeSource;
+use App\Domain\Rounding;
 use App\Persistence\Database;
 use App\Repository\PriceHistoryRepository;
 use App\Repository\SubscriptionRepository;
@@ -32,6 +34,19 @@ use InvalidArgumentException;
  * the same story. `applyDueChanges()` is the repair for the one case the write
  * path cannot cover — a scheduled row becoming current merely because time
  * passed, with nobody editing anything.
+ *
+ * @phpstan-type HouseholdChange array{
+ *     subscription: Subscription,
+ *     change: PriceChange,
+ *     from: Money,
+ *     to: Money,
+ *     kind: 'rise'|'cut'|'unchanged'|'converted',
+ *     is_rise: bool,
+ *     is_scheduled: bool,
+ *     difference_minor: int|null,
+ *     percent_tenths: int|null,
+ *     annual_minor: int|null
+ * }
  */
 final class PriceHistoryService
 {
@@ -89,6 +104,99 @@ final class PriceHistoryService
     public function historyBySubscription(Scope $scope): array
     {
         return $this->history->findAllBySubscription($scope);
+    }
+
+    /**
+     * Every recorded change across the given subscriptions, newest first.
+     *
+     * The analytics screen's household price history. Each row is one price
+     * paired with the one before it in the same subscription's history, in
+     * that subscription's own currency — nothing here is converted.
+     *
+     * Taken over the subscriptions the caller already loaded through the
+     * scoping layer, not over every history row in scope: a row's history is
+     * listed only when the row itself is visible, so a private subscription's
+     * changes reach its payer and nobody else, whatever the history table's
+     * own predicate would allow.
+     *
+     * Three rows are not changes and are left out, or labelled:
+     *
+     *  - the **first** price has nothing before it to have changed from;
+     *  - a **trial conversion** is a trial ending, not a price moving (the
+     *    same guard the insight rules keep);
+     *  - a **currency change** is listed as `converted`, with no difference
+     *    and no percentage, because the price did not change.
+     *
+     * A scheduled change on a cancelled subscription is left out too: it will
+     * never be charged.
+     *
+     * @param list<Subscription> $subscriptions
+     * @return list<HouseholdChange>
+     */
+    public function householdChanges(Scope $scope, array $subscriptions): array
+    {
+        $today = $this->clock->today();
+        $history = $this->historyBySubscription($scope);
+
+        $rows = [];
+        foreach ($subscriptions as $subscription) {
+            $previous = null;
+
+            foreach ($history[$subscription->id] ?? [] as $change) {
+                $before = $previous;
+                $previous = $change;
+
+                if ($before === null || $change->source === PriceChangeSource::TrialConversion) {
+                    continue;
+                }
+
+                $isScheduled = $change->isScheduled($today);
+                if ($isScheduled && $subscription->isCancelled()) {
+                    continue;
+                }
+
+                $converted = $change->isConversionFrom($before);
+                $difference = $converted ? null : $change->differenceFrom($before);
+                $cycle = $subscription->billingCycle;
+
+                $rows[] = [
+                    'subscription' => $subscription,
+                    'change' => $change,
+                    'from' => $before->price,
+                    'to' => $change->price,
+                    'kind' => match (true) {
+                        $converted => 'converted',
+                        $difference > 0 => 'rise',
+                        $difference < 0 => 'cut',
+                        default => 'unchanged',
+                    },
+                    'is_rise' => $change->isRiseFrom($before),
+                    'is_scheduled' => $isScheduled,
+                    'difference_minor' => $difference,
+                    // In tenths of a percent, so "+6.3%" is exact integer
+                    // arithmetic until the formatter prints it.
+                    'percent_tenths' => $difference !== null && $before->price->amountMinor > 0
+                        ? Rounding::multiplyDivide($difference, 1000, $before->price->amountMinor)
+                        : null,
+                    // At the subscription's own cycle, as the insight rules
+                    // state a rise: £2 a month is £24 a year. None for a
+                    // one-off or a lifetime purchase, which has no year.
+                    'annual_minor' => $difference !== null
+                        && $cycle !== null
+                        && $subscription->type->countsTowardsRecurringTotals()
+                            ? $cycle->annualMinor($difference, $subscription->cycleDays)
+                            : null,
+                ];
+            }
+        }
+
+        usort(
+            $rows,
+            static fn (array $a, array $b): int => $b['change']->effectiveFrom <=> $a['change']->effectiveFrom
+                ?: $b['change']->id <=> $a['change']->id,
+        );
+
+        return $rows;
     }
 
     /**

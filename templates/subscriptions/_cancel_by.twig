@@ -1,0 +1,50 @@
+{#
+    Cancel by: the last day notice can still be given, for every subscription
+    with a notice period whose deadline falls inside the near window. The one
+    deadline the rail no longer points at directly, so it stays on this page,
+    compact, and links to the full view.
+
+    Only subscriptions with a notice period: without one the deadline *is* the
+    renewal date, which the table's status already says. Deadlines already
+    missed are listed first.
+#}
+<section class="card cancel-by" id="cancel-by" aria-labelledby="cancel-by-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="cancel-by-heading">{{ t('subscriptions.cancel_by_heading') }}</h2>
+            <p class="muted">{{ t('subscriptions.cancel_by_note') }}</p>
+        </div>
+        <a class="button button-quiet" href="/cancellations">
+            {{ icon('cancellations') }}<span>{{ t('subscriptions.cancel_by_all') }}</span>
+        </a>
+    </header>
+
+    {% if cancel_by.rows is empty %}
+        <p class="muted empty">{{ t('subscriptions.cancel_by_empty') }}</p>
+    {% else %}
+        <ul class="plain deadlines">
+            {% for row in cancel_by.rows %}
+                {% set subscription = row.subscription %}
+                <li class="deadline {{ row.is_passed ? 'is-passed' : (row.is_urgent ? 'is-urgent' : '') }}">
+                    <a href="/subscriptions/{{ subscription.id }}{{ can_edit_row(scope, subscription) and can(scope, 'subscription.update') ? '/edit' : '/money' }}">
+                        {{- subscription.name -}}
+                    </a>
+                    <span class="hint">
+                        <strong class="num">{{ row.date|local_date('d MMM y') }}</strong> ·
+                        {% if row.is_passed %}
+                            <span class="badge badge-bad">{{ t('cancellations.deadline_passed') }}</span>
+                            {{ t('cancellations.passed_days', {'days': row.days * -1}) }}
+                        {% elseif row.days == 0 %}
+                            {{ t('state.today') }}
+                        {% else %}
+                            {{ t('cancellations.days_left', {'days': row.days}) }}
+                        {% endif %}
+                        · {{ t('subscriptions.notice_of', {
+                            'period': notice_label(subscription.noticePeriod.amount, subscription.noticePeriod.unit),
+                        }) }}
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>

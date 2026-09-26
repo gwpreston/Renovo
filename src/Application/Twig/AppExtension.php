@@ -23,13 +23,18 @@ use App\Notification\NotifierRegistry;
 use App\Security\CsrfTokenManager;
 use App\Security\PermissionService;
 use App\Security\Scope;
+use App\Service\AuthService;
 use App\Service\NavigationService;
+use App\Service\ShellService;
 use App\Service\ValidationError;
 use App\Support\AssetVersion;
+use App\Support\AvatarTone;
 use App\Support\BuildManifest;
 use App\Support\DateFormatter;
+use App\Support\IconSprite;
 use App\Support\MoneyFormatter;
 use App\Support\NumberFormat;
+use App\Support\RelativeTime;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Twig\Extension\AbstractExtension;
@@ -64,8 +69,11 @@ final class AppExtension extends AbstractExtension
         private readonly AssetVersion $assets,
         private readonly BuildManifest $build,
         private readonly NavigationService $navigation,
+        private readonly ShellService $shell,
         private readonly DateFormatter $dates,
         private readonly NumberFormat $numbers,
+        private readonly IconSprite $icons,
+        private readonly RelativeTime $relativeTime,
     ) {
     }
 
@@ -75,6 +83,8 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('t', $this->translate(...)),
             new TwigFunction('asset', $this->assets->url(...)),
             new TwigFunction('bundle', $this->build->url(...)),
+            new TwigFunction('icon', $this->icons->render(...), ['is_safe' => ['html']]),
+            new TwigFunction('icon_sprite', $this->icons->url(...)),
             new TwigFunction('locale_tag', fn (): string => $this->locale->tag()),
             new TwigFunction('js_translations', $this->jsTranslations(...)),
             new TwigFunction('error_message', $this->errorMessage(...)),
@@ -83,6 +93,7 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('can', $this->can(...)),
             new TwigFunction('can_edit_row', $this->canEditRow(...)),
             new TwigFunction('navigation', $this->navigationFor(...)),
+            new TwigFunction('shell', $this->shell->forScope(...)),
             new TwigFunction('cycle_label', $this->cycleLabel(...)),
             new TwigFunction('type_label', $this->typeLabel(...)),
             new TwigFunction('role_label', $this->roleLabel(...)),
@@ -94,7 +105,14 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('alert_type_label', $this->alertTypeLabel(...)),
             new TwigFunction('channel_description', $this->channelDescription(...)),
             new TwigFunction('channel_fields', $this->channelFields(...)),
+            new TwigFunction('channel_icon', $this->channelIcon(...)),
+            new TwigFunction('channel_type_label', $this->channelTypeLabel(...)),
+            new TwigFunction('avatar_tone', AvatarTone::of(...)),
             new TwigFunction('percent_symbol', $this->numbers->percentSymbol(...)),
+            new TwigFunction('currency_symbol', $this->money->symbol(...)),
+            // The password meter's thresholds, from the validator that applies
+            // the rule — see AuthService::passwordMeterRules().
+            new TwigFunction('password_rules', AuthService::passwordMeterRules(...)),
         ];
     }
 
@@ -103,11 +121,13 @@ final class AppExtension extends AbstractExtension
         return [
             new TwigFilter('money', $this->formatMoney(...)),
             new TwigFilter('local_date', $this->formatDate(...)),
+            new TwigFilter('relative_date', $this->relativeTime->describe(...)),
             new TwigFilter('percent', $this->numbers->percent(...)),
             new TwigFilter('decimal', $this->numbers->decimal(...)),
             // For the places that have a name and no entity to ask — the owner
             // of a subscription is a display name on the row, not a User.
             new TwigFilter('initials', Initials::of(...)),
+            new TwigFilter('first_initial', Initials::first(...)),
         ];
     }
 
@@ -230,6 +250,30 @@ final class AppExtension extends AbstractExtension
     public function channelFields(NotificationChannel $channel): array
     {
         return $this->notifiers->find($channel->type)?->fields() ?? [];
+    }
+
+    /**
+     * The icon a channel type is drawn with: a letter for email, a hook for a
+     * webhook, a speech bubble for the chat services and a bell for the push
+     * services. Only icons already in the sprite.
+     */
+    public function channelIcon(string $type): string
+    {
+        return match ($type) {
+            'email' => 'mail',
+            'webhook' => 'webhook',
+            'slack', 'discord', 'mattermost', 'telegram' => 'message',
+            default => 'bell',
+        };
+    }
+
+    /**
+     * A channel type's own name — "Slack", "Webhook" — as against the label
+     * its owner gave the channel.
+     */
+    public function channelTypeLabel(string $type): string
+    {
+        return $this->notifiers->find($type)?->label() ?? $type;
     }
 
     public function csrfField(): string

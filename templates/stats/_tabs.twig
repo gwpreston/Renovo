@@ -1,0 +1,22 @@
+{#
+    Analytics' tabs, as links: what has happened (`/stats`) and what is about
+    to (`/forecast`).
+
+    Analytics is one rail item over two screens, and these are what make the
+    second one findable — the model is the Settings page's tabs. Each is a
+    page of its own, so each works without script and can be bookmarked, and
+    the rail lights Analytics on both. `aria-current="page"` marks the one
+    shown, and the underline is drawn from it.
+
+    `tab`  'overview' or 'forecast'
+#}
+<nav class="page-tabs" aria-label="{{ t('stats.tabs_label') }}">
+    <ul class="page-tabs-list">
+        <li>
+            <a href="/stats" {{ tab == 'overview' ? 'aria-current="page"' : '' }}>{{ t('stats.tab_overview') }}</a>
+        </li>
+        <li>
+            <a href="/forecast" {{ tab == 'forecast' ? 'aria-current="page"' : '' }}>{{ t('stats.tab_forecast') }}</a>
+        </li>
+    </ul>
+</nav>

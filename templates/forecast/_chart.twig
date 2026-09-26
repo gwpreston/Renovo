@@ -1,0 +1,98 @@
+{#
+    The next twelve months as bars, each in two parts: charges that come round
+    monthly (or more often) beneath, and the ones that land as a lump —
+    quarterly, yearly, longer custom cycles and one-offs — on top. Almost every
+    month has regular charges in it, so the colour splits each bar rather than
+    marking whole ones; the months a yearly bill lands in are the tall ones.
+
+    A trial is drawn in the part its converted plan belongs to. Drawn on the
+    server with the spend chart's rules and classes; the hidden table beneath
+    gives a screen reader the same figures. When a currency has no rate there
+    is no chart, and the card names the currency.
+
+    Each month opens in the calendar, charge by charge, with "just mine"
+    carried over. The month's label is the link a keyboard reaches; the bar
+    above it is the same link for a pointer, kept out of the tab order so
+    each month is one stop.
+#}
+<section class="card spend-bars-card forecast-chart" id="forecast-chart" aria-labelledby="forecast-chart-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="forecast-chart-heading">{{ t('forecast.chart_heading') }}</h2>
+            <p class="muted">{{ t('forecast.chart_note') }}</p>
+        </div>
+        {% if chart.is_drawable %}
+            <ul class="chart-legend" aria-hidden="true">
+                <li><span class="chart-key chart-key-regular"></span>{{ t('forecast.series_regular') }}</li>
+                <li><span class="chart-key chart-key-long"></span>{{ t('forecast.series_long') }}</li>
+            </ul>
+        {% endif %}
+    </header>
+
+    {% if not chart.is_drawable %}
+        <p class="muted empty">
+            {{ t('dashboard.spend_bars_unconvertible', {'currencies': chart.unconvertible|join(', ')}) }}
+        </p>
+    {% else %}
+        <div class="spend-bars">
+            <div class="spend-bars-axis" aria-hidden="true">
+                {% for tick in chart.ticks|reverse %}
+                    <span class="num">{{ tick.label }}</span>
+                {% endfor %}
+            </div>
+            <div class="spend-bars-body">
+                <div class="spend-bars-plot" aria-hidden="true">
+                    {% for bar in chart.bars %}
+                        <a class="spend-bar{{ bar.is_busiest ? ' is-busiest' : '' }}"
+                           href="/calendar?month={{ bar.key }}{{ mine_only ? '&mine=1' : '' }}" tabindex="-1"
+                           title="{{ bar.long_label }} · {{ bar.total_display }}">
+                            {% if bar.is_busiest %}
+                                <b class="spend-bar-peak num">{{ bar.total_display }}</b>
+                            {% endif %}
+                            {% if bar.long_minor > 0 %}
+                                <span class="spend-bar-long" style="height: {{ bar.long_height }}"></span>
+                            {% endif %}
+                            {% if bar.regular_minor > 0 %}
+                                <span class="spend-bar-regular" style="height: {{ bar.regular_height }}"></span>
+                            {% endif %}
+                        </a>
+                    {% endfor %}
+                </div>
+                <div class="spend-bars-labels">
+                    {% for bar in chart.bars %}
+                        <a class="{{ bar.is_current ? 'is-current' : '' }}"
+                           href="/calendar?month={{ bar.key }}{{ mine_only ? '&mine=1' : '' }}"
+                           aria-label="{{ t('forecast.month_in_calendar', {'month': bar.long_label}) }}">{{ bar.label }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="visually-hidden table-scroll">
+            <table class="table">
+                <caption class="visually-hidden">{{ t('forecast.chart_alt', {'currency': chart.currency}) }}</caption>
+                <thead>
+                <tr>
+                    <th scope="col">{{ t('field.month') }}</th>
+                    <th scope="col" class="numeric">{{ t('forecast.series_regular') }}</th>
+                    <th scope="col" class="numeric">{{ t('forecast.series_long') }}</th>
+                    <th scope="col" class="numeric">{{ t('field.total') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for bar in chart.bars %}
+                    <tr>
+                        <th scope="row">{{ bar.long_label }}</th>
+                        <td class="numeric num">{{ bar.regular_display }}</td>
+                        <td class="numeric num">{{ bar.long_display }}</td>
+                        <td class="numeric num">
+                            {{ bar.total_display }}
+                            {% if bar.is_busiest %}<span class="badge badge-warn">{{ t('dashboard.busiest_month') }}</span>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</section>

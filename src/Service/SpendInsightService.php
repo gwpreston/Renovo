@@ -7,7 +7,7 @@ namespace App\Service;
 use App\Domain\Entity\PriceChange;
 use App\Domain\Entity\Subscription;
 use App\Domain\InsightKind;
-use App\Domain\PriceChangeSource;
+use App\Domain\Money;
 use App\Security\Scope;
 use App\Support\Clock;
 use DateTimeImmutable;
@@ -155,6 +155,78 @@ final class SpendInsightService
     }
 
     /**
+     * The scheduled price rise that takes effect soonest, or null.
+     *
+     * The dashboard's price banner. It is the Phase 13 rule's own scheduled
+     * branch — the same rows, the same "a trial conversion is not a rise", the
+     * same yearly figure at the subscription's own cycle — narrowed to the one
+     * rise that arrives first. Ties on the date go to the lower id so the
+     * banner does not change between page loads.
+     *
+     * `from` and `to` are the price per cycle either side of it; `monthly_minor`
+     * and `annual_minor` the difference it makes over a month and a year.
+     *
+     * @param list<Subscription> $subscriptions
+     * @return array{
+     *     subscription: Subscription,
+     *     date: DateTimeImmutable,
+     *     from: Money,
+     *     to: Money,
+     *     monthly_minor: int,
+     *     annual_minor: int
+     * }|null
+     */
+    public function nextScheduledRise(Scope $scope, array $subscriptions): ?array
+    {
+        $today = $this->clock->today();
+        $history = $this->priceHistory->historyBySubscription($scope);
+        $rises = array_values(array_filter(
+            $this->priceMoves($subscriptions, $history, $today),
+            static fn (array $insight): bool => $insight['kind'] === InsightKind::PriceRising,
+        ));
+
+        if ($rises === []) {
+            return null;
+        }
+
+        usort(
+            $rises,
+            static fn (array $a, array $b): int => $a['date'] <=> $b['date']
+                ?: $a['subscription']->id <=> $b['subscription']->id,
+        );
+
+        $rise = $rises[0];
+        $subscription = $rise['subscription'];
+        $step = (int) $rise['difference_minor'];
+
+        // The rise is the first row not yet in effect, measured against the
+        // one in force — the pair `priceMoves()` compared — so the new price is
+        // that row's and the old one is it less the step.
+        $to = null;
+        foreach ($history[$subscription->id] ?? [] as $row) {
+            if (!$row->hasTakenEffectOn($today)) {
+                $to = $row->price;
+                break;
+            }
+        }
+
+        if ($to === null) {
+            return null;
+        }
+
+        $cycle = $subscription->billingCycle;
+
+        return [
+            'subscription' => $subscription,
+            'date' => $rise['date'] ?? $today,
+            'from' => Money::of($to->amountMinor - $step, $to->currency),
+            'to' => $to,
+            'monthly_minor' => $cycle === null ? 0 : $cycle->monthlyMinor($step, $subscription->cycleDays),
+            'annual_minor' => $rise['annual_minor'],
+        ];
+    }
+
+    /**
      * Trials about to start costing money.
      *
      * Already a notification; here it is the same fact as a decision with its
@@ -271,40 +343,35 @@ final class SpendInsightService
             $current = $effective === [] ? null : $effective[count($effective) - 1];
             $previous = count($effective) > 1 ? $effective[count($effective) - 2] : null;
 
+            // `PriceChange::isRiseFrom()` is the rule — not a trial converting,
+            // not a currency change — shared with the analytics screen's
+            // price-rise count and price history.
             if (
                 $current !== null
-                && $previous !== null
-                && $current->source !== PriceChangeSource::TrialConversion
                 && $current->effectiveFrom > $earliest
+                && $current->isRiseFrom($previous)
             ) {
-                // `differenceFrom` is null across a currency change, which is a
-                // re-denomination rather than a rise — the same judgement the
-                // trend view makes about the same pair of rows.
-                $step = $current->differenceFrom($previous);
-                if ($step !== null && $step > 0) {
-                    $insights[] = $this->insight(
-                        InsightKind::PriceRisen,
-                        $subscription,
-                        $cycle->annualMinor($step, $subscription->cycleDays),
-                        $current->price->currency,
-                        difference: $step,
-                        date: $current->effectiveFrom,
-                    );
-                }
+                $step = (int) $current->differenceFrom($previous);
+                $insights[] = $this->insight(
+                    InsightKind::PriceRisen,
+                    $subscription,
+                    $cycle->annualMinor($step, $subscription->cycleDays),
+                    $current->price->currency,
+                    difference: $step,
+                    date: $current->effectiveFrom,
+                );
             }
 
-            if ($scheduled !== null) {
-                $step = $scheduled->differenceFrom($current);
-                if ($step !== null && $step > 0) {
-                    $insights[] = $this->insight(
-                        InsightKind::PriceRising,
-                        $subscription,
-                        $cycle->annualMinor($step, $subscription->cycleDays),
-                        $scheduled->price->currency,
-                        difference: $step,
-                        date: $scheduled->effectiveFrom,
-                    );
-                }
+            if ($scheduled !== null && $scheduled->isRiseFrom($current)) {
+                $step = (int) $scheduled->differenceFrom($current);
+                $insights[] = $this->insight(
+                    InsightKind::PriceRising,
+                    $subscription,
+                    $cycle->annualMinor($step, $subscription->cycleDays),
+                    $scheduled->price->currency,
+                    difference: $step,
+                    date: $scheduled->effectiveFrom,
+                );
             }
         }
 

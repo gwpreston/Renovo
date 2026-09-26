@@ -1,0 +1,44 @@
+{#
+    The year ahead in four figures: its total, its average month, its busiest
+    month, and the renewals that land as a lump.
+
+    Money figures go through the per-currency partial, so a currency with no
+    rate is shown as its own subtotal rather than folded into a wrong total.
+    The busiest month is the chart's, and is absent whenever the chart is.
+#}
+{% import 'partials/spend.twig' as figure %}
+
+<section class="metric-grid analytics-kpis" id="forecast-kpis" aria-label="{{ t('dashboard.metrics') }}">
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('stats.kpi_ahead') }}</h2>
+        {{ figure.spend(kpis.total, '') }}
+        <p class="kpi-note muted">{{ t('stats.kpi_ahead_note') }}</p>
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('forecast.kpi_average') }}</h2>
+        {{ figure.spend(kpis.average, t('dashboard.per_month_unit')) }}
+        <p class="kpi-note muted">{{ t('forecast.kpi_average_note') }}</p>
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('forecast.kpi_busiest') }}</h2>
+        {% if kpis.busiest is not null %}
+            <p class="stat-value num">{{ kpis.busiest.total_display }}</p>
+            <p class="kpi-note muted">{{ kpis.busiest.label }}</p>
+        {% else %}
+            <p class="stat-value num">{{ t('common.none_symbol') }}</p>
+        {% endif %}
+    </article>
+
+    <article class="card stat metric">
+        <h2 class="stat-label">{{ t('forecast.kpi_long') }}</h2>
+        {% if kpis.long.count == 0 %}
+            <p class="stat-value num">0</p>
+            <p class="kpi-note muted">{{ t('forecast.kpi_long_none') }}</p>
+        {% else %}
+            {{ figure.spend(kpis.long, '') }}
+            <p class="kpi-note muted">{{ t('forecast.kpi_long_note', {'count': kpis.long.count}) }}</p>
+        {% endif %}
+    </article>
+</section>

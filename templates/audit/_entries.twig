@@ -15,7 +15,7 @@
         <tbody>
         {% for entry in entries %}
             <tr class="{{ entry.action.isFailure ? 'row-warning' : '' }}">
-                <td>{{ entry.occurredAt|local_date('d MMM y HH:mm') }}</td>
+                <td class="num">{{ entry.occurredAt|local_date('d MMM y HH:mm') }}</td>
                 <td>{{ t(entry.action.labelKey()) }}</td>
                 <td>
                     {{ entry.actorName }}

@@ -1,39 +1,52 @@
-{% extends 'layout.twig' %}
+{% extends 'auth/_layout.twig' %}
 
-{% block title %}{{ t('auth_register.title') }} — {{ instance_name }}{% endblock %}
+{% set card_icon = 'user-add' %}
 
-{% block content %}
-    <section class="card narrow">
-        <h1>{{ t('auth_register.title') }}</h1>
+{% block card_title %}{{ t('auth_register.title') }}{% endblock %}
+{% block card_intro %}{{ t('auth_register.intro') }}{% endblock %}
 
-        <form method="post" action="/register" class="stack">
-            {{ csrf_field() }}
+{% block card_body %}
+    {% include 'partials/errors.twig' %}
 
-            <label for="display_name">{{ t('field.your_name') }}</label>
-            <input type="text" id="display_name" name="display_name"
-                   value="{{ values.display_name|default('') }}" required autofocus>
-            {% if errors.display_name is defined %}<p class="field-error">{{ error_message(errors.display_name) }}</p>{% endif %}
+    <form method="post" action="/register" class="auth-form">
+        {{ csrf_field() }}
 
-            <label for="email">{{ t('field.email') }}</label>
-            <input type="email" id="email" name="email" value="{{ values.email|default('') }}"
-                   autocomplete="username" required>
-            {% if errors.email is defined %}<p class="field-error">{{ error_message(errors.email) }}</p>{% endif %}
+        {% include 'auth/_input.twig' with {
+            'id': 'display_name',
+            'name': 'display_name',
+            'label': t('field.your_name'),
+            'value': values.display_name|default(''),
+            'autocomplete': 'name',
+            'error': errors.display_name|default(null),
+            'required': true,
+            'autofocus': true,
+        } only %}
 
-            <label for="password">{{ t('field.password') }}</label>
-            <input type="password" id="password" name="password" autocomplete="new-password" required>
-            <p class="hint">{{ t('hint.password_length') }}</p>
-            {% if errors.password is defined %}<p class="field-error">{{ error_message(errors.password) }}</p>{% endif %}
+        {% include 'auth/_input.twig' with {
+            'id': 'email',
+            'name': 'email',
+            'type': 'email',
+            'label': t('field.email'),
+            'value': values.email|default(''),
+            'autocomplete': 'username',
+            'placeholder': t('auth.email_placeholder'),
+            'error': errors.email|default(null),
+            'required': true,
+        } only %}
 
-            <label for="password_confirm">{{ t('field.confirm_password') }}</label>
-            <input type="password" id="password_confirm" name="password_confirm"
-                   autocomplete="new-password" required>
-            {% if errors.password_confirm is defined %}
-                <p class="field-error">{{ error_message(errors.password_confirm) }}</p>
-            {% endif %}
+        {% include 'auth/_new_password.twig' with {
+            'label': t('field.password'),
+            'confirm_label': t('field.confirm_password'),
+            'errors': errors,
+        } only %}
 
-            <button type="submit" class="button button-primary">{{ t('auth_register.create_account') }}</button>
-        </form>
+        <button type="submit" class="button button-primary auth-submit">{{ t('auth_register.create_account') }}</button>
+    </form>
+{% endblock %}
 
-        <p class="muted"><a href="/login">{{ t('auth_register.already_have_an_account') }}</a></p>
-    </section>
+{% block card_after %}
+    <p class="auth-foot">
+        {{ t('auth_register.already_have_an_account') }}
+        <a href="/login">{{ t('auth_login.title') }}</a>
+    </p>
 {% endblock %}

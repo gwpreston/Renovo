@@ -18,6 +18,9 @@ use App\Security\CsrfTokenManager;
 use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Service\CancellationService;
+use App\Service\Import\ImportPreset;
+use App\Service\Import\RowTranslator;
+use App\Service\Import\SourceFile;
 use App\Service\InstanceSettingsService;
 use App\Service\SplitService;
 use App\Service\StatsService;
@@ -231,7 +234,28 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
         ], []);
     }
 
-    public function testTheStripShowsTheFiguresTheStatisticsServiceComputed(): void
+    // ------------------------------------------------------------------ strip
+
+    public function testTheStripCountsEachStatusTheListFiltersBy(): void
+    {
+        $strip = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-strip');
+
+        // Seven running rows, one of them a trial, and two paused. Active is
+        // the Active filter's count, so it leaves the trial beside it out.
+        self::assertSame(['6', '1', '2'], array_slice($this->figures($strip), 0, 3));
+    }
+
+    /** The Budgets screen's tile: the icon leading, the label and figure beside it. */
+    public function testTheStripsTilesAreLedByTheirIcons(): void
+    {
+        $strip = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-strip');
+
+        self::assertSame(4, substr_count($strip, 'class="card stat metric kpi kpi-side"'));
+        self::assertSame(4, substr_count($strip, '<div class="kpi-body">'));
+        self::assertStringNotContainsString('kpi-head', $strip);
+    }
+
+    public function testPerMonthIsTheStatisticsServicesCombinedMonthlyFigure(): void
     {
         $container = $this->container();
         $stats = $container->get(StatsService::class)->dashboard($this->scopeFor($this->ownerId));
@@ -239,38 +263,45 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
 
         $strip = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-strip');
 
-        // The count is the application's own, not a number this test remembers.
-        self::assertStringContainsString('>' . $stats['active_count'] . '<', $strip);
-
-        // Both currencies convert, so the yearly figure is the combined one —
-        // the same rule, and the same partial, as the dashboard's tiles.
-        $combined = $stats['combined_yearly']['amount_minor'];
+        // Both currencies convert, so the figure is the combined one — the same
+        // rule, and the same partial, as the dashboard's tiles.
+        $combined = $stats['combined_monthly']['amount_minor'];
         self::assertNotNull($combined, 'both currencies convert, so there should be a combined total');
         self::assertStringContainsString($money->formatMinor($combined, 'GBP'), $strip);
-
-        $soon = $container->get(SubscriptionService::class)->upcoming($this->scopeFor($this->ownerId), 14);
-        self::assertStringContainsString('>' . count($soon) . '<', $strip);
     }
 
-    public function testTheStripCountsThePausedSubscriptions(): void
+    public function testPerMonthLeavesOutOneOffLifetimePausedAndCancelledRows(): void
     {
-        $strip = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-strip');
+        $container = $this->container();
+        $money = $container->get(MoneyFormatter::class);
+        $before = $container->get(StatsService::class)->dashboard($this->scopeFor($this->ownerId))['combined_monthly'];
 
-        // Two paused rows exist and the instance is SHARED, so the owner sees
-        // both of them counted.
-        self::assertStringContainsString('Paused / inactive', $strip);
-        self::assertStringContainsString('>2<', $strip);
-    }
+        $subscriptions = new SubscriptionRepository($this->db);
+        $owner = $this->scopeFor($this->ownerId);
+        foreach (['one_off', 'lifetime'] as $type) {
+            $subscriptions->create($owner, [
+                'name' => 'A ' . $type . ' purchase',
+                'price_minor' => 99900,
+                'currency' => 'GBP',
+                'subscription_type' => $type,
+                'is_active' => true,
+            ], []);
+        }
+        $container->get(SubscriptionService::class)->cancel($owner, $this->streamingId);
 
-    public function testThePausedFigureIsWhatThoseSubscriptionsWouldCostInAYear(): void
-    {
-        $money = $this->container()->get(MoneyFormatter::class);
-        $strip = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-strip');
+        $page = $this->body($this->get('/subscriptions', $this->ownerId));
 
-        // £7.00 and £3.00 a month, so £120.00 a year between them. Asserted as
-        // the figure rather than the arithmetic, because the point of the line
-        // is that it answers "what would resuming these cost".
-        self::assertStringContainsString($money->formatMinor(12000, 'GBP'), $strip);
+        // The paused rows were never in it; the one-off and the lifetime add
+        // nothing; the cancelled Streaming comes out.
+        $expected = (int) $before['amount_minor'] - 999;
+        self::assertStringContainsString(
+            $money->formatMinor($expected, 'GBP'),
+            $this->section($page, 'subscription-strip'),
+        );
+        self::assertStringContainsString(
+            $money->formatMinor($expected, 'GBP') . '/mo',
+            $this->section($page, 'list-summary'),
+        );
     }
 
     public function testIsolationHidesAnotherMembersPausedSubscriptionFromTheCount(): void
@@ -281,76 +312,252 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
 
         // The Editor owns one paused subscription and may not see the Owner's.
         // A card that counted both would be leaking the existence of a row the
-        // list itself refuses to show — which is exactly the failure a count
-        // computed outside the scoping layer would produce.
-        self::assertStringContainsString('>1<', $strip);
+        // list itself refuses to show.
+        self::assertSame('1', $this->figures($strip)[2]);
     }
 
-    public function testTheSavedViewQueryFieldSurvivesBesideTheCategoryWidget(): void
-    {
-        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+    // ---------------------------------------------------------------- toolbar
 
-        // The card moved into the column beside the category widget. What must
-        // not have moved with it is the id `_list.twig` aims its out-of-band
-        // replacement at — there is exactly one of these on the page, wherever
-        // the card is drawn, and a second would be an id collision that makes
-        // the swap land on the wrong element.
-        self::assertSame(
-            1,
-            substr_count($body, 'id="saved-view-query"'),
-            'the saved-view query field must appear exactly once',
+    public function testTheToolbarOffersCategoryChipsStatusScopeAndTheTools(): void
+    {
+        $toolbar = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'list-filters');
+
+        foreach (['All', 'Active', 'Trials', 'Paused', 'Cancelled', 'Household', 'Mine'] as $word) {
+            self::assertStringContainsString('>' . $word . '<', $toolbar);
+        }
+        self::assertStringContainsString('status=cancelled', $toolbar);
+        self::assertStringContainsString('scope=mine', $toolbar);
+
+        $tools = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'list-tools');
+        self::assertStringContainsString('/subscriptions/export.csv', $tools);
+        self::assertStringContainsString('action="/subscriptions/density"', $tools);
+        self::assertStringContainsString('action="/saved-views"', $tools);
+    }
+
+    public function testEveryFilterControlIsALinkThatSwapsTheListAndWorksWithoutScript(): void
+    {
+        $toolbar = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'list-filters');
+
+        preg_match_all('/<a\b[^>]*>/', $toolbar, $links);
+        self::assertNotEmpty($links[0]);
+        foreach ($links[0] as $link) {
+            self::assertMatchesRegularExpression('/href="\/subscriptions[^"]*"/', $link, 'a filter is not a real link');
+            self::assertStringContainsString('hx-target="#subscription-list"', $link);
+            self::assertStringContainsString('hx-select="#subscription-list"', $link);
+        }
+    }
+
+    public function testTheScopeControlIsNotOfferedWhereTheViewerSeesOnlyTheirOwnRows(): void
+    {
+        $this->container()->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
+
+        $toolbar = $this->section($this->body($this->get('/subscriptions', $this->editorId)), 'list-filters');
+
+        self::assertStringNotContainsString('scope=mine', $toolbar);
+    }
+
+    public function testTheAddButtonBesideTheSearchIsOnlyForThoseWhoMayCreate(): void
+    {
+        $editor = $this->body($this->get('/subscriptions', $this->editorId));
+        self::assertMatchesRegularExpression(
+            '/<a class="button button-primary list-search-add" href="\/subscriptions\/new"\s+data-opens-dialog="quick-add">/',
+            $editor,
+        );
+        self::assertStringNotContainsString(
+            'list-search-add',
+            $this->section($editor, 'list-search'),
+            'the add button is part of the search form',
         );
 
-        // And it is genuinely below the category widget rather than merely
-        // still on the page: the widget's heading comes first in document
-        // order, which is what "below Category spending" means in the one
-        // column the two share.
-        $widget = strpos($body, 'id="category-spending"');
-        $savedViews = strpos($body, 'id="saved-views-heading"');
+        $viewer = $this->body($this->get('/subscriptions', $this->viewerId));
+        self::assertStringNotContainsString('list-search-add', $viewer);
+    }
 
-        self::assertIsInt($widget, 'the category widget must be on the page');
-        self::assertIsInt($savedViews, 'the saved-views card must be on the page');
-        self::assertGreaterThan(
-            $widget,
-            $savedViews,
-            'saved views must come after the category widget',
+    public function testTheSearchFormOffersNeitherCurrencyTypeNorPaused(): void
+    {
+        $search = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'list-search');
+
+        self::assertStringNotContainsString('name="currency"', $search);
+        self::assertStringNotContainsString('name="type"', $search);
+        self::assertStringNotContainsString('name="inactive"', $search);
+        self::assertStringContainsString('name="q"', $search);
+    }
+
+    public function testTheSearchFormCarriesTheRestOfTheFilter(): void
+    {
+        $search = $this->section(
+            $this->body($this->get('/subscriptions?status=trial&scope=mine', $this->ownerId)),
+            'list-search',
+        );
+
+        self::assertStringContainsString('name="status" value="trial"', $search);
+        self::assertStringContainsString('name="scope" value="mine"', $search);
+    }
+
+    public function testTheSummaryLineCountsTheMatchesAgainstTheWholeList(): void
+    {
+        $summary = $this->section(
+            $this->body($this->get('/subscriptions?q=thing', $this->ownerId)),
+            'list-summary',
+        );
+
+        // "European thing", "Editors own thing", "Paused thing" and "Editors
+        // paused thing", of the nine in the list.
+        self::assertStringContainsString('4 of 9', $summary);
+    }
+
+    // ---------------------------------------------------------------- filters
+
+    public function testTheStatusFilterReturnsExactlyEachStatusesRows(): void
+    {
+        $this->container()->get(SubscriptionService::class)
+            ->cancel($this->scopeFor($this->ownerId), $this->editorsOwnId);
+
+        $expected = [
+            'active' => ['Streaming', 'Gym membership', 'Hosting', 'European thing', 'Family plan'],
+            'trial' => ['Trial plan'],
+            'paused' => ['Paused thing', 'Editors paused thing'],
+            'cancelled' => ['Editors own thing'],
+        ];
+
+        foreach ($expected as $status => $names) {
+            $rows = $this->rowNames($this->get('/subscriptions?status=' . $status, $this->ownerId));
+            sort($rows);
+            sort($names);
+            self::assertSame($names, $rows, 'status=' . $status . ' returned the wrong rows');
+        }
+    }
+
+    public function testMineIsWhatTheViewerOwnsOrHasAShareOf(): void
+    {
+        $rows = $this->rowNames($this->get('/subscriptions?scope=mine', $this->editorId));
+        sort($rows);
+
+        // The Editor owns two and helps pay for the Family plan; nothing else
+        // is theirs.
+        self::assertSame(['Editors own thing', 'Editors paused thing', 'Family plan'], $rows);
+    }
+
+    public function testMineNeverOpensAnotherMembersPrivateRow(): void
+    {
+        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
+            'name' => 'Owners secret',
+            'price_minor' => 100,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+            'visibility' => 'payer',
+            'is_active' => true,
+        ], []);
+
+        foreach (['/subscriptions', '/subscriptions?scope=mine'] as $path) {
+            self::assertNotContains('Owners secret', $this->rowNames($this->get($path, $this->editorId)));
+        }
+        self::assertContains('Owners secret', $this->rowNames($this->get('/subscriptions?scope=mine', $this->ownerId)));
+    }
+
+    // ------------------------------------------------------------------ table
+
+    public function testTheStatusBadgeSaysWhatTheRowIs(): void
+    {
+        $list = $this->body($this->get('/subscriptions', $this->ownerId));
+
+        self::assertSame('Renewing soon', $this->badgeOf($list, 'Streaming'));
+        self::assertSame('Active', $this->badgeOf($list, 'Hosting'));
+        self::assertSame('Trial', $this->badgeOf($list, 'Trial plan'));
+        self::assertSame('Paused', $this->badgeOf($list, 'Paused thing'));
+    }
+
+    public function testAForeignPriceShowsItsBaseEquivalentAndItsMonthlyInBase(): void
+    {
+        $money = $this->container()->get(MoneyFormatter::class);
+        $row = $this->rowOf($this->body($this->get('/subscriptions', $this->ownerId)), 'European thing');
+
+        // Ten euros at two euros to the pound.
+        self::assertStringContainsString($money->formatMinor(1000, 'EUR'), $row);
+        self::assertStringContainsString('≈ ' . $money->formatMinor(500, 'GBP'), $row);
+    }
+
+    public function testACurrencyWithNoRateShowsAGapRatherThanAZero(): void
+    {
+        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
+            'name' => 'Unconvertible',
+            'price_minor' => 5000,
+            'currency' => 'XOF',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+            'is_active' => true,
+        ], []);
+
+        $page = $this->body($this->get('/subscriptions', $this->ownerId));
+
+        self::assertStringContainsString('No exchange rate for XOF', $this->rowOf($page, 'Unconvertible'));
+        // And the summary names the currency rather than blending it away.
+        self::assertStringContainsString('XOF', $this->section($page, 'list-summary'));
+    }
+
+    public function testTheSplitIsDescribedBesideWhoPays(): void
+    {
+        $row = $this->rowOf($this->body($this->get('/subscriptions', $this->ownerId)), 'Family plan');
+
+        self::assertStringContainsString('Split equally with Editor', $row);
+    }
+
+    public function testTheNextChargeSaysHowNearItIsOrWhatDeadlineComesFirst(): void
+    {
+        $page = $this->body($this->get('/subscriptions', $this->ownerId));
+
+        self::assertStringContainsString('in 3 days', $this->rowOf($page, 'Streaming'));
+        self::assertStringContainsString('Trial ends', $this->rowOf($page, 'Trial plan'));
+        // The gym's notice falls before its charge, and that is the date to meet.
+        self::assertStringContainsString('Cancel by', $this->rowOf($page, 'Gym membership'));
+        // Two hundred days out is not near, and says nothing.
+        self::assertStringNotContainsString('in 200 days', $this->rowOf($page, 'Hosting'));
+    }
+
+    public function testAPrivateRowCarriesTheLock(): void
+    {
+        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
+            'name' => 'Owners secret',
+            'price_minor' => 100,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+            'visibility' => 'payer',
+            'is_active' => true,
+        ], []);
+
+        self::assertStringContainsString(
+            'private-mark',
+            $this->rowOf($this->body($this->get('/subscriptions', $this->ownerId)), 'Owners secret'),
         );
     }
 
-    public function testFilteringStillReplacesTheSavedViewQueryAfterTheMove(): void
+    public function testOneOffAndLifetimeEntriesSayTheirTypeWhereTheCycleWouldBe(): void
     {
-        $fragment = $this->body($this->get(
-            '/subscriptions?q=Streaming',
-            $this->ownerId,
-            ['HX-Request' => 'true'],
-        ));
+        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
+            'name' => 'Lifetime licence',
+            'price_minor' => 4900,
+            'currency' => 'GBP',
+            'subscription_type' => 'lifetime',
+            'is_active' => true,
+        ], []);
 
-        // The list fragment carries the out-of-band replacement, so a view
-        // saved after filtering stores the filter rather than the query the
-        // page was first loaded with. This is the regression commit 3cad406
-        // fixed, and moving the card across columns is where it would return.
-        self::assertStringContainsString('id="saved-view-query"', $fragment);
-        self::assertStringContainsString('q=Streaming', $fragment);
+        self::assertStringContainsString(
+            'Lifetime',
+            $this->rowOf($this->body($this->get('/subscriptions', $this->ownerId)), 'Lifetime licence'),
+        );
     }
 
-    public function testASubscriptionWithNoLogoFallsBackToTheRenovoMark(): void
+    public function testASubscriptionWithNoLogoFallsBackToItsInitial(): void
     {
-        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+        $row = $this->rowOf($this->body($this->get('/subscriptions', $this->ownerId)), 'Streaming');
 
-        // None of the fixtures uploads a logo, so every row is the fallback.
-        self::assertStringContainsString('logo-fallback', $list);
-        self::assertStringContainsString('#renovo-mark', $list);
-    }
-
-    public function testTheFallbackMarkResolvesAgainstASpriteThePageActuallyEmits(): void
-    {
-        $body = $this->body($this->get('/subscriptions', $this->ownerId));
-
-        // A `<use href="#renovo-mark">` with no matching symbol renders nothing
-        // at all, and renders nothing *silently* — no console error, no broken
-        // image. The sprite is emitted by the shell inside `{% if current_user %}`,
-        // so this is the assertion that keeps the fallback from being invisible.
-        self::assertStringContainsString('id="renovo-mark"', $body);
+        self::assertStringContainsString('service-initial', $row);
+        self::assertMatchesRegularExpression('/service-initial"[^>]*>S</', $row);
     }
 
     public function testAnUploadedLogoIsShownInsteadOfTheFallback(): void
@@ -365,156 +572,184 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
         self::assertStringContainsString('src="/assets/logos/streaming.png"', $list);
     }
 
-    public function testTheCancelByCardIsOnlyForSubscriptionsWithANoticePeriod(): void
+    public function testNarrowScreensGetTheSameRowsAsCards(): void
     {
-        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
 
-        $renewing = $this->section($body, 'renewing-soon');
-        $cancelBy = $this->section($body, 'cancel-by');
-
-        // Streaming renews in three days and gives no notice, so its only
-        // deadline is the renewal — one card, not the same date twice.
-        self::assertStringContainsString('Streaming', $renewing);
-        self::assertStringNotContainsString('Streaming', $cancelBy);
-
-        // The gym takes a week's notice, so it has a deadline of its own.
-        self::assertStringContainsString('Gym membership', $cancelBy);
-
-        // And nothing outside the near window is in either.
-        self::assertStringNotContainsString('Hosting', $renewing);
-        self::assertStringNotContainsString('Hosting', $cancelBy);
+        self::assertSame(9, substr_count($list, 'class="subscription-card '));
     }
 
-    public function testEachCardCountsTheDaysToTheDateItPrints(): void
-    {
-        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+    // ---------------------------------------------------------------- actions
 
-        // Streaming renews in three days and the gym's deadline is five days
-        // out — the one number a deadline screen exists to show, so it is
-        // asserted rather than assumed from the date beside it.
-        self::assertStringContainsString('3 days left', $this->section($body, 'renewing-soon'));
-        self::assertStringContainsString('5 days left', $this->section($body, 'cancel-by'));
-        self::assertStringContainsString('20 days left', $this->section($body, 'free-trials'));
+    public function testAnOwnerIsOfferedEveryActionOnARowTheyMayChange(): void
+    {
+        $row = $this->rowOf($this->body($this->get('/subscriptions', $this->ownerId)), 'Streaming');
+
+        foreach (['/edit', '/toggle', '/cancel', '/delete'] as $action) {
+            self::assertStringContainsString('/subscriptions/' . $this->streamingId . $action, $row);
+        }
+    }
+
+    public function testAViewerIsOfferedNoActionAndIsRefusedEveryEndpoint(): void
+    {
+        $list = $this->section($this->body($this->get('/subscriptions', $this->viewerId)), 'subscription-list');
+
+        $controls = ['/edit', '/toggle', '/cancel', '/uncancel', '/delete', '/subscriptions/bulk', 'name="ids[]"'];
+        foreach ($controls as $control) {
+            self::assertStringNotContainsString($control, $list, 'a Viewer was shown ' . $control);
+        }
+
+        // Hiding the control is not the enforcement; this is.
+        foreach (['toggle', 'cancel', 'uncancel', 'delete'] as $action) {
+            $refused = $this->post('/subscriptions/' . $this->streamingId . '/' . $action, $this->viewerId);
+            self::assertSame(403, $refused->getStatusCode(), $action . ' was not refused');
+        }
+        self::assertSame(403, $this->post('/subscriptions/bulk', $this->viewerId, [
+            'action' => 'deactivate',
+            'ids' => [(string) $this->streamingId],
+        ])->getStatusCode());
+    }
+
+    public function testAContributorIsOfferedActionsOnlyOnTheirOwnRows(): void
+    {
+        $contributorId = (new UserRepository($this->db))->create(
+            'contributor@example.test',
+            'Contributor',
+            'hash',
+            false,
+            new DateTimeImmutable(),
+        );
+        (new MembershipRepository($this->db))->create($this->householdId, $contributorId, Role::Contributor);
+        $ownId = (new SubscriptionRepository($this->db))->create(
+            Scope::forMember($contributorId, false, $this->householdId, Role::Contributor, IsolationMode::Shared),
+            [
+                'name' => 'Contributors own',
+                'price_minor' => 100,
+                'currency' => 'GBP',
+                'subscription_type' => 'recurring',
+                'billing_cycle' => 'monthly',
+                'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+                'is_active' => true,
+            ],
+            [],
+        );
+
+        $page = $this->body($this->get('/subscriptions', $contributorId));
+
+        self::assertStringContainsString(
+            '/subscriptions/' . $ownId . '/toggle',
+            $this->rowOf($page, 'Contributors own'),
+        );
+        self::assertStringNotContainsString('/toggle', $this->rowOf($page, 'Streaming'));
+        self::assertStringNotContainsString('/delete', $this->rowOf($page, 'Streaming'));
+
+        // And a Contributor has no bulk edit, which writes across rows.
+        self::assertStringNotContainsString('/subscriptions/bulk', $this->section($page, 'subscription-list'));
+
+        $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $contributorId);
+        $refused = $this->post('/subscriptions/' . $this->streamingId . '/toggle', $contributorId);
+        self::assertSame(404, $refused->getStatusCode());
+    }
+
+    public function testAnIsolatedParticipantSeesTheRowButIsOfferedNoAction(): void
+    {
+        $this->container()->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
+
+        $page = $this->body($this->get('/subscriptions', $this->editorId));
+
+        // The Editor helps pay for the family plan, so they can see it — but
+        // under ISOLATED isolation the read is wider than the write, so the
+        // button that would be refused is not drawn.
+        $shared = $this->rowOf($page, 'Family plan');
+        self::assertStringNotContainsString('/subscriptions/' . $this->sharedId . '/toggle', $shared);
+        self::assertStringContainsString('/subscriptions/' . $this->sharedId . '/money', $shared);
+        self::assertStringContainsString(
+            '/subscriptions/' . $this->editorsOwnId . '/toggle',
+            $this->rowOf($page, 'Editors own thing'),
+        );
+    }
+
+    public function testTheBulkBarIsBackAndItsCheckboxesJoinItsForm(): void
+    {
+        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+
+        self::assertStringContainsString('id="bulk-form"', $list);
+        self::assertStringContainsString('action="/subscriptions/bulk"', $list);
+        self::assertSame(9, substr_count($list, 'name="ids[]"'));
+        self::assertSame(9, substr_count($list, 'form="bulk-form"'));
+
+        // No form inside another: the row actions are forms of their own, so
+        // the bulk form must close before the table opens.
+        $open = (int) strpos($list, 'id="bulk-form"');
+        $close = strpos($list, '</form>', $open);
+        self::assertIsInt($close);
+        self::assertLessThan((int) strpos($list, '<table'), $close, 'the bulk form wraps the table');
+    }
+
+    public function testTheBulkBarStillPauses(): void
+    {
+        $response = $this->post('/subscriptions/bulk', $this->ownerId, [
+            'action' => 'deactivate',
+            'ids' => [(string) $this->streamingId],
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+        $streaming = $this->container()->get(SubscriptionService::class)
+            ->find($this->scopeFor($this->ownerId), $this->streamingId);
+        self::assertNotNull($streaming);
+        self::assertFalse($streaming->isActive);
+    }
+
+    // --------------------------------------------------------------- cancel-by
+
+    public function testTheCancelByCardIsOnlyForSubscriptionsWithANoticePeriod(): void
+    {
+        $cancelBy = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'cancel-by');
+
+        // Streaming renews in three days and gives no notice, so its only
+        // deadline is the renewal — the table's badge says so already.
+        self::assertStringNotContainsString('Streaming', $cancelBy);
+        self::assertStringContainsString('Gym membership', $cancelBy);
+        self::assertStringNotContainsString('Hosting', $cancelBy);
+        self::assertStringContainsString('href="/cancellations"', $cancelBy);
+    }
+
+    public function testTheCancelByCardCountsTheDaysToTheDateItPrints(): void
+    {
+        self::assertStringContainsString(
+            '5 days left',
+            $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'cancel-by'),
+        );
     }
 
     public function testUrgencyIsTheCancelByViewsOwnJudgement(): void
     {
-        $container = $this->container();
-        $deadlines = $container->get(CancellationService::class)->deadlines(
+        $deadlines = $this->container()->get(CancellationService::class)->deadlines(
             $this->scopeFor($this->ownerId),
             CancellationService::URGENT_DAYS,
         );
 
         self::assertNotSame([], $deadlines);
         foreach ($deadlines as $row) {
-            self::assertTrue(
-                $row['is_urgent'],
-                'the fixture should put every cancel-by row inside the urgent window',
-            );
+            self::assertTrue($row['is_urgent'], 'the fixture should put every cancel-by row inside the urgent window');
         }
 
-        // Marked urgent here because that view calls it urgent — one row must
-        // not be urgent on one screen and ordinary on the other.
         self::assertStringContainsString('deadline is-urgent', $this->section(
             $this->body($this->get('/subscriptions', $this->ownerId)),
             'cancel-by',
         ));
     }
 
-    public function testATrialShowsTheDayItConvertsAndThePriceItConvertsTo(): void
+    public function testTrialsAndTheCategoryWidgetHaveMovedToTheDashboard(): void
     {
-        $trials = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'free-trials');
+        $page = $this->body($this->get('/subscriptions', $this->ownerId));
 
-        self::assertStringContainsString('Trial plan', $trials);
-
-        // The trial's last day is the day of the first charge, so that is the
-        // date shown and the countdown is to it.
-        $convertsOn = $this->container()
-            ->get(DateFormatter::class)
-            ->format(new DateTimeImmutable('+20 days'), 'd MMM y');
-        self::assertStringContainsString($convertsOn, $trials);
-        self::assertStringContainsString('20 days left', $trials);
-
-        // The amount is what it becomes, never the zero it costs today.
-        self::assertStringContainsString('£12.99', $trials);
-        self::assertStringNotContainsString('£0.00', $trials);
+        self::assertStringNotContainsString('id="free-trials"', $page);
+        self::assertStringNotContainsString('id="category-spending"', $page);
+        self::assertStringNotContainsString('id="renewing-soon"', $page);
     }
 
-    public function testTheTrialsSectionIsNotTheNearWindowInDisguise(): void
-    {
-        // The trial converts in twenty days, outside the fourteen-day window
-        // the cards above it are drawn from, and still belongs here.
-        $body = $this->body($this->get('/subscriptions', $this->ownerId));
-
-        self::assertStringContainsString('Trial plan', $this->section($body, 'free-trials'));
-        self::assertStringNotContainsString('Trial plan', $this->section($body, 'renewing-soon'));
-    }
-
-    public function testTheCategoryWidgetIsAShareOfAStatedTotal(): void
-    {
-        $widget = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'category-spending');
-
-        // Every currency converts here, so there is one total and the bars
-        // compare categories across it.
-        self::assertStringContainsString('of ', $widget);
-        self::assertStringContainsString('meter-fill', $widget);
-        self::assertStringNotContainsString('No exchange rate', $widget);
-    }
-
-    public function testACurrencyWithNoRateGetsItsOwnBarsRatherThanABlendedOne(): void
-    {
-        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
-            'name' => 'Unconvertible',
-            'price_minor' => 5000,
-            'currency' => 'XOF',
-            'subscription_type' => 'recurring',
-            'billing_cycle' => 'monthly',
-            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
-            'is_active' => true,
-        ], []);
-
-        $widget = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'category-spending');
-
-        self::assertStringContainsString('No exchange rate for XOF', $widget);
-        // A group per currency, each against its own total: GBP, EUR and XOF
-        // are named rather than one bar standing for all three.
-        self::assertStringContainsString('>XOF<', $widget);
-        self::assertStringContainsString('>GBP<', $widget);
-        self::assertStringContainsString('meter-fill', $widget);
-    }
-
-    public function testAnIsolatedParticipantSeesTheRowButIsOfferedNoTrigger(): void
-    {
-        $this->container()->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
-
-        $body = $this->body($this->get('/subscriptions', $this->editorId));
-        $renewing = $this->section($body, 'renewing-soon');
-
-        // The Editor helps pay for the family plan, so they can see it.
-        self::assertStringContainsString('Family plan', $renewing);
-
-        // But they do not own it, and under ISOLATED isolation the read is
-        // wider than the write — so the button that would be refused is not
-        // drawn, while the one on their own subscription is.
-        self::assertStringNotContainsString(
-            '/subscriptions/' . $this->sharedId . '/toggle',
-            $renewing,
-            'a participant was offered an action the repository would refuse',
-        );
-        self::assertStringContainsString('/subscriptions/' . $this->editorsOwnId . '/toggle', $renewing);
-    }
-
-    public function testAViewerIsOfferedNoTriggerAndIsRefusedTheEndpoint(): void
-    {
-        $body = $this->body($this->get('/subscriptions', $this->viewerId));
-
-        self::assertStringContainsString('Streaming', $this->section($body, 'renewing-soon'));
-        self::assertStringNotContainsString('/toggle', $body, 'a Viewer was shown a mutating control');
-
-        // Hiding the control is not the enforcement; this is.
-        $refused = $this->post('/subscriptions/' . $this->streamingId . '/toggle', $this->viewerId);
-        self::assertSame(403, $refused->getStatusCode());
-    }
+    // ------------------------------------------------------- the htmx fragment
 
     public function testFilteringStillSwapsTheListAloneAndNothingElse(): void
     {
@@ -526,71 +761,250 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
         self::assertStringContainsString('Streaming', $fragment);
         self::assertStringNotContainsString('Hosting', $fragment);
 
-        // None of the sections around the list is in the fragment — they are
-        // not recomputed to answer a question about the table.
+        // The strip and the cancel-by card are not recomputed to answer a
+        // question about the table.
         self::assertStringNotContainsString('id="subscription-strip"', $fragment);
-        self::assertStringNotContainsString('id="renewing-soon"', $fragment);
-        self::assertStringNotContainsString('id="category-spending"', $fragment);
+        self::assertStringNotContainsString('id="cancel-by"', $fragment);
+    }
+
+    public function testTheFragmentRefreshesTheToolbarOutOfBand(): void
+    {
+        $fragment = $this->body($this->get('/subscriptions?status=trial', $this->ownerId, ['HX-Request' => 'true']));
+
+        foreach (['list-filters', 'list-tools', 'list-search-state'] as $id) {
+            self::assertMatchesRegularExpression(
+                '/id="' . $id . '"[^>]*hx-swap-oob="true"/',
+                $fragment,
+                $id . ' is not refreshed alongside the list',
+            );
+        }
+
+        // Redrawn from the new filter: the chips keep the status that was chosen.
+        self::assertStringContainsString('status=trial', $this->section($fragment, 'list-filters'));
+    }
+
+    public function testTheFullPageRendersEachToolbarPartOnce(): void
+    {
+        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+
+        foreach (['saved-view-query', 'list-filters', 'list-tools', 'list-search-state'] as $id) {
+            self::assertSame(1, substr_count($body, 'id="' . $id . '"'), $id . ' must appear exactly once');
+        }
+        self::assertStringNotContainsString('hx-swap-oob', $body);
+    }
+
+    public function testFilteringStillReplacesTheSavedViewQuery(): void
+    {
+        $fragment = $this->body($this->get('/subscriptions?q=Streaming', $this->ownerId, ['HX-Request' => 'true']));
+
+        // So a view saved after filtering stores the filter rather than the
+        // query the page was first loaded with — the regression 3cad406 fixed.
+        self::assertStringContainsString('id="saved-view-query"', $fragment);
+        self::assertStringContainsString('q=Streaming', $this->section($fragment, 'list-tools'));
     }
 
     public function testSavedViewsSurviveTheRestyle(): void
     {
         $this->post('/saved-views', $this->ownerId, ['name' => 'Just streaming', 'query' => 'q=Streaming']);
 
-        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+        $tools = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'list-tools');
 
-        self::assertStringContainsString('Just streaming', $body);
-        self::assertStringContainsString('/subscriptions?q=Streaming', $body);
+        self::assertStringContainsString('Just streaming', $tools);
+        self::assertStringContainsString('/subscriptions?q=Streaming', $tools);
     }
 
-    public function testCompactDensityChangesNoMarkupInTheNewSections(): void
+    // ---------------------------------------------------------------- density
+
+    public function testBothDensitiesRenderTheSameListApartFromTheRootsAttribute(): void
     {
         $comfortable = $this->body($this->get('/subscriptions', $this->ownerId));
 
-        $this->container()->get(UserPreferencesService::class)->update($this->ownerId, [
-            'theme' => 'system',
-            'locale' => '',
-            'week_start' => '1',
-            'density' => 'compact',
-            'landing_view' => 'dashboard',
-        ]);
+        $this->container()->get(UserPreferencesService::class)->updateDensity($this->ownerId, 'compact');
 
         $compact = $this->body($this->get('/subscriptions', $this->ownerId));
 
         self::assertStringContainsString('data-density="compact"', $compact);
-        // Density is padding, not a different page: a screen reader sees the
-        // same sections either way, which is only true if the markup is.
-        foreach (['renewing-soon', 'cancel-by', 'free-trials', 'category-spending'] as $id) {
+        foreach (['subscription-list', 'list-filters', 'list-tools', 'cancel-by'] as $id) {
             self::assertSame(
-                $this->section($comfortable, $id),
-                $this->section($compact, $id),
+                $this->withoutTokens($this->section($comfortable, $id)),
+                $this->withoutTokens($this->section($compact, $id)),
                 $id . ' renders different markup at compact density',
             );
         }
     }
 
+    public function testTheDensityToggleStoresThePreferenceAndReturnsToTheSameFilter(): void
+    {
+        $response = $this->post('/subscriptions/density', $this->ownerId, [
+            'density' => 'compact',
+            'query' => 'status=trial&scope=mine',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+        $location = $response->getHeaderLine('Location');
+        self::assertStringStartsWith('/subscriptions?', $location);
+        self::assertStringContainsString('status=trial', $location);
+        self::assertStringContainsString('scope=mine', $location);
+
+        $user = (new UserRepository($this->db))->findById($this->ownerId);
+        self::assertNotNull($user);
+        self::assertSame('compact', $user->density);
+    }
+
+    public function testTheDensityToggleCannotBeMadeARedirectElsewhere(): void
+    {
+        $response = $this->post('/subscriptions/density', $this->ownerId, [
+            'density' => 'compact',
+            'query' => "https://evil.example/\r\nX: y",
+        ]);
+
+        self::assertStringStartsWith('/subscriptions', $response->getHeaderLine('Location'));
+        self::assertStringNotContainsString('evil', $response->getHeaderLine('Location'));
+    }
+
+    public function testTheDensityToggleNeedsItsToken(): void
+    {
+        $request = (new ServerRequestFactory())
+            ->createServerRequest('POST', '/subscriptions/density')
+            ->withParsedBody(['density' => 'compact']);
+
+        self::assertSame(400, $this->handle($request, $this->ownerId)->getStatusCode());
+    }
+
+    // ------------------------------------------------------------------ export
+
+    public function testTheExportIsTheFilteredListAsCsv(): void
+    {
+        $response = $this->get('/subscriptions/export.csv?q=thing', $this->ownerId);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringStartsWith('text/csv', $response->getHeaderLine('Content-Type'));
+        self::assertStringContainsString('attachment;', $response->getHeaderLine('Content-Disposition'));
+
+        $rows = $this->csvRows($this->body($response));
+        self::assertSame('name', $rows[0][0]);
+        $names = array_column(array_slice($rows, 1), 0);
+        sort($names);
+        self::assertSame(['Editors own thing', 'Editors paused thing', 'European thing', 'Paused thing'], $names);
+
+        // Money leaves as a decimal made from its minor units.
+        $european = array_values(array_filter($rows, static fn (array $row): bool => $row[0] === 'European thing'))[0];
+        self::assertSame('10.00', $european[2]);
+        self::assertSame('EUR', $european[3]);
+    }
+
+    public function testTheExportHoldsNoRowTheListWouldNotShow(): void
+    {
+        $this->container()->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
+
+        $names = array_column(array_slice($this->csvRows($this->body(
+            $this->get('/subscriptions/export.csv', $this->editorId),
+        )), 1), 0);
+        sort($names);
+
+        self::assertSame($this->sorted($this->rowNames($this->get('/subscriptions', $this->editorId))), $names);
+        self::assertNotContains('Streaming', $names);
+    }
+
+    public function testTheExportCannotSmuggleAFormulaIntoASpreadsheet(): void
+    {
+        (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
+            'name' => '=HYPERLINK("https://evil.example")',
+            'price_minor' => 100,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+            'notes' => '@SUM(A1)',
+            'is_active' => true,
+        ], []);
+
+        $csv = $this->body($this->get('/subscriptions/export.csv?q=HYPERLINK', $this->ownerId));
+        $row = $this->csvRows($csv)[1];
+
+        self::assertSame("'=HYPERLINK(\"https://evil.example\")", $row[0]);
+        self::assertSame("'@SUM(A1)", $row[count($row) - 1]);
+    }
+
+    /**
+     * The README's claim, held to account: an exported file is read back by
+     * the importer's automatic preset with no mapping chosen by hand, and every
+     * row passes the same validation a new subscription does.
+     */
+    public function testTheExportReadsBackThroughTheImportersOwnPreset(): void
+    {
+        $subscriptions = new SubscriptionRepository($this->db);
+        $owner = $this->scopeFor($this->ownerId);
+        $subscriptions->create($owner, [
+            'name' => 'Every six weeks',
+            'price_minor' => 4200,
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'custom_days',
+            'cycle_days' => 42,
+            'next_payment_date' => (new DateTimeImmutable('+30 days'))->format('Y-m-d'),
+            'is_active' => true,
+        ], []);
+        $subscriptions->create($owner, [
+            'name' => 'Once only',
+            'price_minor' => 1500,
+            'currency' => 'GBP',
+            'subscription_type' => 'one_off',
+            'is_active' => true,
+        ], []);
+
+        $path = (string) tempnam(sys_get_temp_dir(), 'renovo-export');
+        file_put_contents($path, $this->body($this->get('/subscriptions/export.csv', $this->ownerId)));
+
+        try {
+            $file = SourceFile::parse($path, 'subscriptions.csv');
+        } finally {
+            unlink($path);
+        }
+
+        $mapping = ImportPreset::guess(ImportPreset::AUTOMATIC, $file->headers);
+        $translator = new RowTranslator($mapping, 'GBP');
+        $service = $this->container()->get(SubscriptionService::class);
+
+        $read = [];
+        foreach ($file->rows as $row) {
+            $input = $translator->translate($row);
+            self::assertSame([], $service->validationErrors($owner, $input), 'row "' . $input['name'] . '" fails');
+            $read[(string) $input['name']] = $input;
+        }
+
+        self::assertCount(11, $read);
+        self::assertSame('custom_days', $read['Every six weeks']['billing_cycle']);
+        self::assertSame('42', (string) $read['Every six weeks']['cycle_days']);
+        self::assertSame('one_off', $read['Once only']['subscription_type']);
+        self::assertSame('0', $read['Paused thing']['is_active']);
+        self::assertSame('EUR', $read['European thing']['currency']);
+    }
+
+    public function testAViewerMayExportWhatTheyMayRead(): void
+    {
+        self::assertSame(200, $this->get('/subscriptions/export.csv', $this->viewerId)->getStatusCode());
+    }
+
+    // ------------------------------------------------------------------ order
+
     public function testPausedSubscriptionsAreListedWithoutBeingAskedFor(): void
     {
-        // No query string at all: the checkbox that used to be needed for this
-        // is gone, so the plain page has to show them.
-        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+        $names = $this->rowNames($this->get('/subscriptions', $this->ownerId));
 
-        self::assertStringContainsString('Paused thing', $list);
-        self::assertStringContainsString('Editors paused thing', $list);
+        self::assertContains('Paused thing', $names);
+        self::assertContains('Editors paused thing', $names);
     }
 
     public function testEveryPausedRowSitsBelowEveryActiveOne(): void
     {
-        // The paused fixtures renew in 18 and 19 days, so by the default sort
-        // — next charge, ascending — they would fall in the middle of the
-        // table. Hosting is 200 days out and is the last active row.
-        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+        $names = $this->rowNames($this->get('/subscriptions', $this->ownerId));
 
         foreach (['Paused thing', 'Editors paused thing'] as $paused) {
             foreach (['Streaming', 'Family plan', 'Gym membership', 'Hosting'] as $active) {
                 self::assertLessThan(
-                    (int) strpos($list, $paused),
-                    (int) strpos($list, $active),
+                    array_search($paused, $names, true),
+                    array_search($active, $names, true),
                     sprintf('"%s" is listed above the active "%s"', $paused, $active),
                 );
             }
@@ -599,23 +1013,16 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
 
     public function testPausedRowsStaySunkUnderAHeaderSort(): void
     {
-        // Sorting by name would otherwise put "Editors paused thing" second.
-        $list = $this->section(
-            $this->body($this->get('/subscriptions?sort=name&dir=asc', $this->ownerId)),
-            'subscription-list',
-        );
+        $names = $this->rowNames($this->get('/subscriptions?sort=name&dir=asc', $this->ownerId));
 
-        self::assertGreaterThan((int) strpos($list, 'Streaming'), (int) strpos($list, 'Editors paused thing'));
-        self::assertGreaterThan((int) strpos($list, 'Streaming'), (int) strpos($list, 'Paused thing'));
+        self::assertGreaterThan(
+            array_search('Streaming', $names, true),
+            array_search('Editors paused thing', $names, true),
+        );
     }
 
     public function testASubscriptionWithNoNextChargeSitsBelowTheOnesThatHaveOne(): void
     {
-        // A lifetime licence has no next payment date. Which end of the list
-        // that puts it at is a thing the two engines disagree about by
-        // default — PostgreSQL sorts NULLs last ascending, MySQL sorts them
-        // first — so the ordering asks for NULLS LAST explicitly and this is
-        // what says so.
         (new SubscriptionRepository($this->db))->create($this->scopeFor($this->ownerId), [
             'name' => 'Lifetime licence',
             'price_minor' => 4900,
@@ -625,49 +1032,118 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
             'is_active' => true,
         ], []);
 
-        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+        $names = $this->rowNames($this->get('/subscriptions', $this->ownerId));
 
-        // Below everything still being charged for, and above the paused rows:
-        // switched off is further down than merely finished paying.
-        self::assertGreaterThan((int) strpos($list, 'Hosting'), (int) strpos($list, 'Lifetime licence'));
-        self::assertLessThan((int) strpos($list, 'Paused thing'), (int) strpos($list, 'Lifetime licence'));
+        self::assertGreaterThan(array_search('Hosting', $names, true), array_search('Lifetime licence', $names, true));
+        self::assertLessThan(
+            array_search('Paused thing', $names, true),
+            array_search('Lifetime licence', $names, true),
+        );
     }
 
     public function testThePausedRowsAreCountedByTheListTheyAppearIn(): void
     {
-        // Nine subscriptions exist in this household, two of them paused. The
-        // table is what the pager and the total are computed from, so a row
-        // shown but not counted would page wrongly.
-        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
-
-        // Body rows only: every one of them carries a class, the header row
-        // does not.
-        self::assertSame(9, substr_count($list, '<tr class='));
+        self::assertCount(9, $this->rowNames($this->get('/subscriptions', $this->ownerId)));
     }
 
-    public function testTheSearchFormOffersNeitherCurrencyTypeNorPaused(): void
+    /**
+     * The figures in the strip's tiles, in order.
+     *
+     * @return list<string>
+     */
+    private function figures(string $strip): array
     {
-        $body = $this->body($this->get('/subscriptions', $this->ownerId));
+        preg_match_all('/<p class="stat-value num">\s*([^<]+?)\s*</', $strip, $matches);
 
-        self::assertStringNotContainsString('name="currency"', $body);
-        self::assertStringNotContainsString('name="type"', $body);
-        self::assertStringNotContainsString('name="inactive"', $body);
-
-        // What is left of the form still works.
-        self::assertStringContainsString('name="q"', $body);
-        self::assertStringContainsString('name="category"', $body);
-        self::assertStringContainsString('name="owner"', $body);
+        return $matches[1];
     }
 
-    public function testTheListHasNoBulkControlsLeftBehind(): void
+    /**
+     * The names in the table's rows, in order.
+     *
+     * @return list<string>
+     */
+    private function rowNames(ResponseInterface $response): array
     {
-        $list = $this->section($this->body($this->get('/subscriptions', $this->ownerId)), 'subscription-list');
+        $document = new DOMDocument();
+        $document->loadHTML(
+            '<?xml encoding="utf-8" ?>' . $this->body($response),
+            LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET,
+        );
 
-        // The bar went, and so did the checkboxes it collected — a checkbox
-        // posting nowhere would be worse than either.
-        self::assertStringNotContainsString('/subscriptions/bulk', $list);
-        self::assertStringNotContainsString('name="ids[]"', $list);
-        self::assertStringNotContainsString('bulk-bar', $list);
+        $names = [];
+        foreach ((new DOMXPath($document))->query('//table//tbody//span[@class="cell-title"]/a') ?: [] as $link) {
+            $names[] = trim($link->textContent);
+        }
+
+        return $names;
+    }
+
+    /**
+     * One table row, found by the subscription's name.
+     */
+    private function rowOf(string $html, string $name): string
+    {
+        $document = new DOMDocument();
+        $document->loadHTML(
+            '<?xml encoding="utf-8" ?>' . $html,
+            LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET,
+        );
+
+        $row = (new DOMXPath($document))->query(sprintf(
+            '//table//tbody/tr[.//span[@class="cell-title"]/a[normalize-space(.)=%s]]',
+            $this->xpathLiteral($name),
+        ))?->item(0);
+
+        if (!$row instanceof DOMElement) {
+            self::fail(sprintf('The table has no row for "%s".', $name));
+        }
+
+        return (string) $document->saveHTML($row);
+    }
+
+    private function badgeOf(string $html, string $name): string
+    {
+        preg_match('/<span class="badge[^"]*"\s+data-status="[^"]+">([^<]+)</', $this->rowOf($html, $name), $match);
+
+        return trim($match[1] ?? '');
+    }
+
+    /**
+     * @return list<list<string>>
+     */
+    private function csvRows(string $csv): array
+    {
+        $rows = [];
+        $handle = fopen('php://memory', 'r+');
+        self::assertNotFalse($handle);
+        fwrite($handle, $csv);
+        rewind($handle);
+        while (($row = fgetcsv($handle, escape: '')) !== false) {
+            if ($row !== [null]) {
+                $rows[] = array_map(static fn ($cell): string => (string) $cell, $row);
+            }
+        }
+        fclose($handle);
+
+        return $rows;
+    }
+
+    /**
+     * @param list<string> $values
+     * @return list<string>
+     */
+    private function sorted(array $values): array
+    {
+        sort($values);
+
+        return $values;
+    }
+
+    /** The CSRF token differs per render and is not what density is about. */
+    private function withoutTokens(string $html): string
+    {
+        return (string) preg_replace('/name="_csrf" value="[^"]*"/', '', $html);
     }
 
     /**
@@ -693,7 +1169,7 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
 
     private function xpathLiteral(string $value): string
     {
-        return "'" . $value . "'";
+        return str_contains($value, "'") ? '"' . $value . '"' : "'" . $value . "'";
     }
 
     private function container(): ContainerInterface
@@ -738,7 +1214,7 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
     }
 
     /**
-     * @param array<string, string> $body
+     * @param array<string, string|list<string>> $body
      */
     private function post(string $path, int $userId, array $body = []): ResponseInterface
     {

@@ -1,0 +1,15 @@
+{#
+    The subscriptions table: optional on Overview and hidden until somebody
+    turns it on, because the list is the Subscriptions page's own subject.
+
+    Every row comes through the repository the list page uses, so the scoping
+    layer decides what is in it exactly as it does there.
+#}
+<section class="card recent-card" aria-labelledby="recent-card-heading">
+    <header class="card-header">
+        <h2 id="recent-card-heading">{{ t('dashboard.recent') }}</h2>
+        <a class="button button-quiet" href="/subscriptions">{{ t('dashboard.see_all') }}</a>
+    </header>
+
+    {% include 'dashboard/_recent_table.twig' %}
+</section>

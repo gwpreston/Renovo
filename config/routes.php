@@ -45,7 +45,6 @@ use App\Controller\CategoryController;
 use App\Controller\PaymentMethodController;
 use App\Controller\DashboardController;
 use App\Controller\ForecastController;
-use App\Controller\HouseholdController;
 use App\Controller\ImportController;
 use App\Controller\MemberController;
 use App\Controller\NotificationController;
@@ -121,6 +120,10 @@ return static function (App $app): void {
     $app->post('/register', [RegisterController::class, 'submit']);
 
     $app->get('/verify-email', [VerifyEmailController::class, 'verify'])->setName('verify-email');
+    // "Send the confirmation again", from the page registration ends on. Shaped
+    // like the reset request: the same answer whether or not the address has
+    // an account waiting, under a rate limit of its own.
+    $app->post('/verify-email/resend', [VerifyEmailController::class, 'resend']);
 
     $app->get('/forgot-password', [PasswordResetController::class, 'showRequestForm'])->setName('forgot-password');
     $app->post('/forgot-password', [PasswordResetController::class, 'submitRequest']);
@@ -145,6 +148,10 @@ return static function (App $app): void {
     $app->group('', function (RouteCollectorProxy $group) use ($requires): void {
         $group->get('/', [DashboardController::class, 'index'])->setName('dashboard');
 
+        // Which dashboard the account opens on. A personal preference, like the
+        // theme and palette under /profile, so it needs no permission.
+        $group->post('/dashboard/view', [DashboardController::class, 'updateView']);
+
         // Inside the authenticated group, unlike the login routes: signing out
         // is something a signed-in user does, and the audit entry needs to know
         // who did it.
@@ -153,6 +160,27 @@ return static function (App $app): void {
         $group->get('/subscriptions', [SubscriptionController::class, 'index'])
             ->setName('subscriptions')
             ->add($requires(Permission::ViewSubscriptions));
+
+        // The list as a CSV file: the same filter and the same scoped query, so
+        // it holds no row the list itself would not show.
+        $group->get('/subscriptions/export.csv', [SubscriptionController::class, 'export'])
+            ->setName('subscriptions-export')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        // The same rows as JSON, under the same headings, for Settings' Export
+        // section (Phase 28).
+        $group->get('/subscriptions/export.json', [SubscriptionController::class, 'exportJson'])
+            ->setName('subscriptions-export-json')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        // The form's "≈ base at today's rate" note. It discloses an exchange
+        // rate and nothing about any subscription.
+        $group->get('/subscriptions/conversion-note', [SubscriptionController::class, 'conversionNote'])
+            ->add($requires(Permission::ViewSubscriptions));
+
+        // The list's density toggle — a personal preference, like the theme,
+        // so it needs no permission.
+        $group->post('/subscriptions/density', [SubscriptionController::class, 'density']);
 
         $group->get('/subscriptions/new', [SubscriptionController::class, 'createForm'])
             ->setName('subscription-new')
@@ -169,6 +197,12 @@ return static function (App $app): void {
             ->add($requires(Permission::UpdateSubscription));
 
         $group->post('/subscriptions/{id:[0-9]+}/toggle', [SubscriptionController::class, 'toggle'])
+            ->add($requires(Permission::UpdateSubscription));
+
+        $group->post('/subscriptions/{id:[0-9]+}/cancel', [SubscriptionController::class, 'cancel'])
+            ->add($requires(Permission::UpdateSubscription));
+
+        $group->post('/subscriptions/{id:[0-9]+}/uncancel', [SubscriptionController::class, 'uncancel'])
             ->add($requires(Permission::UpdateSubscription));
 
         $group->post('/subscriptions/{id:[0-9]+}/delete', [SubscriptionController::class, 'delete'])
@@ -239,6 +273,11 @@ return static function (App $app): void {
             ->setName('calendar')
             ->add($requires(Permission::ViewSubscriptions));
 
+        // Phase 25: the calendar feed's link. Like the API-token routes it acts
+        // only on the member's own read-only token, so it names no permission.
+        $group->post('/calendar/feed-link', [CalendarController::class, 'replaceFeed'])
+            ->setName('calendar-feed-link');
+
         // A saved view is one account's way of looking at the list. It names
         // no permission for the same reason a theme does not — but it is still
         // a list of subscriptions, so seeing the page it points at needs the
@@ -257,9 +296,12 @@ return static function (App $app): void {
             ->setName('stats')
             ->add($requires(Permission::ViewSubscriptions));
 
-        $group->get('/categories', [CategoryController::class, 'index'])
-            ->setName('categories')
-            ->add($requires(Permission::ViewSubscriptions));
+        // Categories, tags and payment methods are sections of Settings'
+        // General tab since Phase 28. The two screens they had redirect there
+        // for bookmarks, asking for nothing themselves: the page they land on
+        // asks for its own. Every write stays where it was, and returns to
+        // its section.
+        $group->get('/categories', [CategoryController::class, 'moved'])->setName('categories');
 
         $group->post('/categories', [CategoryController::class, 'create'])
             ->add($requires(Permission::ManageCategories));
@@ -270,14 +312,18 @@ return static function (App $app): void {
         $group->post('/categories/{id:[0-9]+}/delete', [CategoryController::class, 'delete'])
             ->add($requires(Permission::ManageCategories));
 
+        $group->post('/tags', [CategoryController::class, 'createTag'])
+            ->add($requires(Permission::ManageTags));
+
+        $group->post('/tags/{id:[0-9]+}', [CategoryController::class, 'renameTag'])
+            ->add($requires(Permission::ManageTags));
+
         $group->post('/tags/{id:[0-9]+}/delete', [CategoryController::class, 'deleteTag'])
             ->add($requires(Permission::ManageTags));
 
         // Payment methods are the same kind of household metadata as
         // categories, and the same people look after them.
-        $group->get('/payment-methods', [PaymentMethodController::class, 'index'])
-            ->setName('payment-methods')
-            ->add($requires(Permission::ViewSubscriptions));
+        $group->get('/payment-methods', [PaymentMethodController::class, 'moved'])->setName('payment-methods');
 
         $group->post('/payment-methods', [PaymentMethodController::class, 'create'])
             ->add($requires(Permission::ManageCategories));
@@ -300,10 +346,14 @@ return static function (App $app): void {
         // everything that is needs somebody's authority.
         $group->get('/profile', [ProfileController::class, 'index'])->setName('profile');
         $group->post('/profile/theme', [ProfileController::class, 'updateTheme']);
+        // Theme, palette, density, week start, language and landing page, as
+        // one form: with script it posts on each change and restyles the page
+        // in place, without it one button sends the lot.
         $group->post('/profile/preferences', [ProfileController::class, 'updatePreferences']);
+        $group->post('/profile/dashboard-cards', [ProfileController::class, 'updateDashboardCards']);
 
         // Phase 15: account self-service. No permission on any of them, by the
-        // same rule as the preferences above and the security screen below —
+        // same rule as the preferences above and the security routes below —
         // each acts on the id in the session and takes no argument that could
         // point it at another account.
         //
@@ -315,8 +365,9 @@ return static function (App $app): void {
         // browser for as long as it likes, which is a long time to commit to
         // for a layout decision.
         $group->get('/profile/account', [AccountController::class, 'moved'])->setName('account');
-        $group->post('/profile/name', [AccountController::class, 'updateName']);
-        $group->post('/profile/email', [AccountController::class, 'requestEmailChange']);
+        // Name and address together, as the page draws them (Phase 27).
+        $group->post('/profile/details', [AccountController::class, 'updateDetails']);
+        $group->post('/profile/email/resend', [AccountController::class, 'resendEmailChange']);
         $group->post('/profile/email/cancel', [AccountController::class, 'cancelEmailChange']);
         $group->post('/profile/password', [AccountController::class, 'updatePassword']);
         $group->post('/profile/avatar', [AccountController::class, 'uploadAvatar']);
@@ -327,39 +378,61 @@ return static function (App $app): void {
         // service answers 404 for anybody outside it.
         $group->get('/avatars/{id:[0-9]+}', [AccountController::class, 'avatar'])->setName('avatar');
 
-        // ------------------------------------------------------------------
-        // The household, read-only
-        //
-        // Not under /settings, and not behind ManageHousehold: it administers
-        // nothing. What it shows is each member's share of what the household
-        // spends, which is why it asks for a writer's permission rather than a
-        // reader's — a Viewer has been given sight of the subscriptions, not of
-        // what everybody else pays for them. Managing the people themselves is
-        // /settings/members, which this links to for whoever may use it.
-        // ------------------------------------------------------------------
-        $group->get('/household', [HouseholdController::class, 'index'])
-            ->setName('household')
-            ->add($requires(Permission::ViewHousehold));
+        // The household's read-only overview became Members & roles in Phase
+        // 26. The path stays as a redirect for anybody who bookmarked it; the
+        // screen it lands on asks for its own permission.
+        $group->get('/household', [MemberController::class, 'householdMoved']);
 
-        $group->get('/settings', [SettingsController::class, 'index'])->setName('settings');
+        // ------------------------------------------------------------------
+        // Phase 28: Settings, as three tabs
+        //
+        // General and Data & integrations open for every member, and gate each
+        // section where it is drawn and again at the route its form posts to.
+        // The Instance tab is the instance's, so its page asks for instance
+        // administration and answers 403 to everybody else.
+        //
+        // The base currency and the rate provider are drawn on General but
+        // belong to the instance: their posts take instance administration,
+        // whoever else can see them.
+        // ------------------------------------------------------------------
+        $group->get('/settings', [SettingsController::class, 'general'])->setName('settings');
+
+        $group->get('/settings/data', [SettingsController::class, 'data'])->setName('settings-data');
+
+        $group->get('/settings/instance', [SettingsController::class, 'instance'])
+            ->setName('settings-instance')
+            ->add($requires(Permission::ManageInstance));
 
         $group->post('/settings/household', [SettingsController::class, 'updateHousehold'])
             ->add($requires(Permission::ManageHousehold));
+
+        $group->post('/settings/currency', [SettingsController::class, 'updateCurrency'])
+            ->add($requires(Permission::ManageInstance));
+
+        $group->post('/settings/rates/refresh', [SettingsController::class, 'refreshRates'])
+            ->add($requires(Permission::ManageInstance));
 
         $group->post('/settings/instance', [SettingsController::class, 'updateInstance'])
             ->add($requires(Permission::ManageInstance));
 
         // ------------------------------------------------------------------
-        // Phase 15: household members
+        // Phase 15: household members; Phase 26: Members & roles
         //
-        // Managing other people is household management, so every one of these
-        // names the permission an Owner/Admin has and an Editor or Viewer does
-        // not — including the list, which shows who has been invited, who has
-        // been revoked and when each of them was last here. The service asks
-        // the scope the same question again before it acts.
+        // The list is every member's to read: who is in the household with
+        // them and what each role may do. What it shows of anybody else's
+        // spending is decided row by row in HouseholdOverviewService, so the
+        // route asks only that the reader belongs here.
+        //
+        // Managing other people is household management, so every other route
+        // names the permission an Owner/Admin has and nobody else does. The
+        // service asks the scope the same question again before it acts.
         // ------------------------------------------------------------------
         $group->get('/settings/members', [MemberController::class, 'index'])
             ->setName('members')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->get('/settings/members/invite', [MemberController::class, 'inviteForm'])
+            ->setName('member-invite')
             ->add($requires(Permission::ManageHousehold));
 
         $group->post('/settings/members', [MemberController::class, 'add'])
@@ -415,6 +488,12 @@ return static function (App $app): void {
             [NotificationController::class, 'updateChannel'],
         );
 
+        // The switch beside a channel: on or off, and nothing else about it.
+        $group->post(
+            '/settings/notifications/channels/{id:[0-9]+}/active',
+            [NotificationController::class, 'setActive'],
+        );
+
         $group->post(
             '/settings/notifications/channels/{id:[0-9]+}/delete',
             [NotificationController::class, 'deleteChannel'],
@@ -426,30 +505,39 @@ return static function (App $app): void {
         );
 
         // ------------------------------------------------------------------
-        // Phase 4: account security
+        // Phase 4: account security, on /profile since Phase 27
         //
         // Every route here acts on the signed-in user's own account, so none of
         // them names a permission: the id comes from the session and cannot be
         // pointed at anybody else. A Viewer may harden their own sign-in for
         // the same reason they may configure their own reminders.
+        //
+        // None of these is in PasswordChangeRequiredMiddleware's allowlist,
+        // which names its /profile paths one at a time: a member still on a
+        // temporary password cannot enrol a factor before choosing their own.
+        //
+        // The screen these lived on was `/settings/security`; it redirects to
+        // the section of the profile that replaced it, for bookmarks. The
+        // posts moved outright — nothing outside this application's own forms
+        // submits to them, and a redirected POST is not a POST.
         // ------------------------------------------------------------------
-        $group->get('/settings/security', [SecurityController::class, 'index'])->setName('security');
+        $group->get('/settings/security', [SecurityController::class, 'moved'])->setName('security');
 
-        $group->post('/settings/security/totp', [SecurityController::class, 'startTotp']);
-        $group->post('/settings/security/totp/confirm', [SecurityController::class, 'confirmTotp']);
-        $group->post('/settings/security/totp/cancel', [SecurityController::class, 'cancelTotp']);
-        $group->post('/settings/security/totp/disable', [SecurityController::class, 'disableTotp']);
+        $group->post('/profile/two-step/totp', [SecurityController::class, 'startTotp']);
+        $group->post('/profile/two-step/totp/confirm', [SecurityController::class, 'confirmTotp']);
+        $group->post('/profile/two-step/totp/cancel', [SecurityController::class, 'cancelTotp']);
+        $group->post('/profile/two-step/totp/disable', [SecurityController::class, 'disableTotp']);
         // Not under /totp: recovery codes cover whichever second factor the
         // account has, including a passkey with no authenticator app.
-        $group->post('/settings/security/recovery-codes', [SecurityController::class, 'regenerateRecoveryCodes']);
+        $group->post('/profile/two-step/recovery-codes', [SecurityController::class, 'regenerateRecoveryCodes']);
 
-        $group->post('/settings/security/passkeys/options', [SecurityController::class, 'passkeyOptions']);
-        $group->post('/settings/security/passkeys', [SecurityController::class, 'registerPasskey']);
-        $group->post('/settings/security/passkeys/{id:[0-9]+}/rename', [SecurityController::class, 'renamePasskey']);
-        $group->post('/settings/security/passkeys/{id:[0-9]+}/delete', [SecurityController::class, 'revokePasskey']);
+        $group->post('/profile/two-step/passkeys/options', [SecurityController::class, 'passkeyOptions']);
+        $group->post('/profile/two-step/passkeys', [SecurityController::class, 'registerPasskey']);
+        $group->post('/profile/two-step/passkeys/{id:[0-9]+}/rename', [SecurityController::class, 'renamePasskey']);
+        $group->post('/profile/two-step/passkeys/{id:[0-9]+}/delete', [SecurityController::class, 'revokePasskey']);
 
-        $group->post('/settings/security/sessions/revoke', [SecurityController::class, 'revokeSession']);
-        $group->post('/settings/security/sessions/revoke-others', [SecurityController::class, 'revokeOtherSessions']);
+        $group->post('/profile/sessions/revoke', [SecurityController::class, 'revokeSession']);
+        $group->post('/profile/sessions/revoke-others', [SecurityController::class, 'revokeOtherSessions']);
 
         // The log is a read, but not one every member may make: an instance
         // administrator sees the instance, a household Owner sees their
@@ -474,8 +562,9 @@ return static function (App $app): void {
         // an export is the whole household in one file and a restore adds rows
         // wholesale, so both take the household-management role.
         // ------------------------------------------------------------------
-        $group->get('/settings/api-tokens', [ApiTokenController::class, 'index'])
-            ->setName('api-tokens');
+        // The tokens and backup screens are sections of Settings' Data &
+        // integrations tab since Phase 28; their paths redirect there.
+        $group->get('/settings/api-tokens', [ApiTokenController::class, 'moved'])->setName('api-tokens');
 
         $group->post('/settings/api-tokens', [ApiTokenController::class, 'create']);
 
@@ -503,9 +592,7 @@ return static function (App $app): void {
         $group->post('/import/cancel', [ImportController::class, 'cancel'])
             ->add($requires(Permission::ImportData));
 
-        $group->get('/settings/backup', [BackupController::class, 'index'])
-            ->setName('backup')
-            ->add($requires(Permission::ManageBackups));
+        $group->get('/settings/backup', [BackupController::class, 'moved'])->setName('backup');
 
         $group->post('/settings/backup/export', [BackupController::class, 'export'])
             ->add($requires(Permission::ManageBackups));
@@ -529,15 +616,30 @@ return static function (App $app): void {
             [AttachmentController::class, 'delete'],
         )->add($requires(Permission::ManageAttachments));
 
-        // The wizard's second step. Inside the authenticated group because it
-        // runs after the administrator account exists — see
-        // SetupGuardMiddleware for why this one /setup path stays open.
+        // The wizard's second and third steps, and the page it ends on. Inside
+        // the authenticated group because they run after the administrator
+        // account exists — see SetupGuardMiddleware for why these /setup paths
+        // stay open, and SetupWizardService::isOpenTo() for who they are open to.
+        // The household step renames the household and sets instance-wide
+        // settings, so it takes both permissions, whoever the wizard is open to.
+        $group->get('/setup/household', [SetupController::class, 'showHousehold'])
+            ->setName('setup-household')
+            ->add($requires(Permission::ManageHousehold))
+            ->add($requires(Permission::ManageInstance));
+        $group->post('/setup/household', [SetupController::class, 'saveHousehold'])
+            ->add($requires(Permission::ManageHousehold))
+            ->add($requires(Permission::ManageInstance));
+
         $group->get('/setup/notifications', [SetupController::class, 'showNotifications'])
             ->setName('setup-notifications');
 
         $group->post('/setup/notifications/channels', [SetupController::class, 'addNotificationChannel']);
 
+        $group->post('/setup/notifications/test-email', [SetupController::class, 'sendTestEmail']);
+
         $group->post('/setup/notifications/finish', [SetupController::class, 'finishNotifications']);
+
+        $group->get('/setup/done', [SetupController::class, 'done'])->setName('setup-done');
         // Added to the group and therefore runs on every route in it, which is
         // the point: a member still on the temporary password an administrator
         // gave them is sent to the account page until they replace it, and a
@@ -591,6 +693,12 @@ return static function (App $app): void {
 
         $group->delete('/subscriptions/{id:[0-9]+}', [SubscriptionApiController::class, 'delete'])
             ->add($requires(Permission::DeleteSubscription));
+
+        $group->post('/subscriptions/{id:[0-9]+}/cancel', [SubscriptionApiController::class, 'cancel'])
+            ->add($requires(Permission::UpdateSubscription));
+
+        $group->post('/subscriptions/{id:[0-9]+}/uncancel', [SubscriptionApiController::class, 'uncancel'])
+            ->add($requires(Permission::UpdateSubscription));
 
         $group->post('/subscriptions/{id:[0-9]+}/logo', [SubscriptionApiController::class, 'uploadLogo'])
             ->add($requires(Permission::UpdateSubscription));

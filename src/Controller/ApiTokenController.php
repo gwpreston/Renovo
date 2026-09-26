@@ -25,11 +25,22 @@ use App\Security\SessionInterface;
  *
  * The full token is put in a one-shot flash rather than held in the page model,
  * so a refresh of the settings page does not redisplay it and it never reaches
- * a template through a route that could be linked to.
+ * a template through a route that could be linked to. The page that reads it
+ * is `SettingsController::data()`.
  */
 final class ApiTokenController extends Controller
 {
-    private const FLASH_NEW_TOKEN = 'new_api_token';
+    /** Read, once, by the Data & integrations tab the issue lands on. */
+    public const FLASH_NEW_TOKEN = 'new_api_token';
+
+    private const SECTION = SettingsController::DATA . '#api-tokens';
+
+    /**
+     * Where an issue or a reissue lands: the callout at the top of the tab
+     * that holds the one copy of the secret, not the tokens section further
+     * down, which on a phone would scroll the reader straight past it.
+     */
+    private const NEW_TOKEN = SettingsController::DATA . '#new-token';
 
     public function __construct(
         Twig $view,
@@ -40,18 +51,14 @@ final class ApiTokenController extends Controller
         parent::__construct($view, $session, $translator);
     }
 
-    public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    /**
+     * The page these lived on became a section of Settings' Data &
+     * integrations tab in Phase 28. The path stays as a redirect for anybody
+     * who bookmarked it.
+     */
+    public function moved(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $issued = $this->session->get(self::FLASH_NEW_TOKEN);
-        $this->session->remove(self::FLASH_NEW_TOKEN);
-
-        return $this->render($request, $response, 'tokens/index.twig', [
-            'tokens' => $this->tokens->listFor($this->user($request)),
-            'issued_token' => is_string($issued) ? $issued : null,
-            'abilities' => TokenAbility::cases(),
-            'feed_url' => rtrim((string) $request->getUri()->withPath('')->withQuery(''), '/')
-                . '/api/v1/calendar.ics',
-        ]);
+        return $this->redirect($response, self::SECTION);
     }
 
     public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -70,13 +77,13 @@ final class ApiTokenController extends Controller
         } catch (ValidationException $exception) {
             $this->flashErrors($exception);
 
-            return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
+            return $this->redirectAfterWrite($request, $response, self::SECTION);
         }
 
         $this->session->set(self::FLASH_NEW_TOKEN, $token);
         $this->flash('success', 'flash.token_created');
 
-        return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
+        return $this->redirectAfterWrite($request, $response, self::NEW_TOKEN);
     }
 
     /**
@@ -98,13 +105,13 @@ final class ApiTokenController extends Controller
         } catch (ValidationException $exception) {
             $this->flashErrors($exception);
 
-            return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
+            return $this->redirectAfterWrite($request, $response, self::SECTION);
         }
 
         $this->session->set(self::FLASH_NEW_TOKEN, $token);
         $this->flash('success', 'flash.token_reissued');
 
-        return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
+        return $this->redirectAfterWrite($request, $response, self::NEW_TOKEN);
     }
 
     public function revoke(
@@ -119,7 +126,7 @@ final class ApiTokenController extends Controller
             $revoked ? 'flash.token_revoked' : 'flash.token_revoke_failed',
         );
 
-        return $this->redirectAfterWrite($request, $response, '/settings/api-tokens');
+        return $this->redirectAfterWrite($request, $response, self::SECTION);
     }
 
     /**

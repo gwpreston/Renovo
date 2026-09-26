@@ -94,16 +94,17 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
     {
         $this->signIn($this->ownerId);
 
-        $page = $this->body($this->request('GET', '/payment-methods'));
+        $page = $this->body($this->request('GET', '/settings'));
         self::assertStringContainsString('action="/payment-methods/defaults"', $page);
 
         self::assertSame(302, $this->request('POST', '/payment-methods/defaults')->getStatusCode());
         self::assertSame(302, $this->request('POST', '/payment-methods/defaults')->getStatusCode());
         self::assertCount(10, $this->methods());
 
-        $page = $this->body($this->request('GET', '/payment-methods'));
+        $page = $this->body($this->request('GET', '/settings'));
         self::assertStringNotContainsString('action="/payment-methods/defaults"', $page);
-        self::assertStringContainsString('data-icon="payment-bank"', $page);
+        // The generic icon, drawn by the server from the sprite.
+        self::assertMatchesRegularExpression('~<use href="/build/sprite-[^"]+\.svg#payment-bank">~', $page);
     }
 
     public function testAMemberAddsAMethodWithALogoThenRenamesAndRemovesIt(): void
@@ -131,6 +132,12 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
             'colour_auto' => '1',
         ]);
         $renamed = $this->methods()[0];
+
+        // Listed as a chip that opens to edit it, above the form that adds one.
+        $page = $this->body($this->request('GET', '/settings'));
+        $chip = strpos($page, '<details class="setting-chip"');
+        self::assertNotFalse($chip);
+        self::assertGreaterThan($chip, strpos($page, 'action="/payment-methods" enctype'));
         self::assertSame('Joint account', $renamed->name);
         self::assertNull($renamed->colour);
         self::assertSame($method->logoPath, $renamed->logoPath);
@@ -163,11 +170,12 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
         (new PaymentMethodRepository($this->db))->create($this->ownerScope(), 'Joint card', null, 'payment-card', null);
 
         $this->signIn($this->viewerId);
-        $response = $this->request('GET', '/payment-methods');
+        $response = $this->request('GET', '/settings');
 
         self::assertSame(200, $response->getStatusCode());
         $page = $this->body($response);
         self::assertStringContainsString('Joint card', $page);
+        self::assertStringContainsString('<span class="setting-chip is-static">', $page);
         self::assertStringNotContainsString('<form method="post" action="/payment-methods', $page);
 
         self::assertSame(403, $this->request('POST', '/payment-methods', ['name' => 'Nope'])->getStatusCode());
@@ -218,7 +226,7 @@ final class PaymentMethodScreenTest extends DatabaseTestCase
         $edit = $this->body($this->request('GET', '/subscriptions/' . $id . '/edit'));
         $edit = (string) preg_replace('/\s+/', ' ', $edit);
         self::assertMatchesRegularExpression('#<option value="' . $card . '"[^>]*selected[^>]*>Joint card#', $edit);
-        self::assertStringContainsString('data-icon="payment-card"', $edit);
+        self::assertMatchesRegularExpression('~<use href="/build/sprite-[^"]+\.svg#payment-card">~', $edit);
     }
 
     /**

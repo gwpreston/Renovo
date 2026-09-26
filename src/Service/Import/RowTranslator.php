@@ -99,6 +99,7 @@ final class RowTranslator
             'next_payment_date' => $this->date($this->value($row, ImportField::NextPaymentDate)),
             'start_date' => $this->date($this->value($row, ImportField::StartDate)),
             'notes' => $this->value($row, ImportField::Notes),
+            'plan' => $this->value($row, ImportField::Plan),
             'tags' => $this->tags($this->value($row, ImportField::Tags)),
             'notice_period_amount' => $this->digits($this->value($row, ImportField::NoticePeriodAmount)),
             'notice_period_unit' => $this->noticeUnit($this->value($row, ImportField::NoticePeriodUnit)),

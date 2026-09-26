@@ -21,6 +21,7 @@ use App\I18n\Translator;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Slim\App;
+use App\Security\SessionInterface;
 use Slim\Views\Twig;
 
 return static function (App $app, array $settings): void {
@@ -76,6 +77,7 @@ return static function (App $app, array $settings): void {
         $container->get(Translator::class),
         (bool) $settings['app']['debug'],
         $container->get(LoggerInterface::class),
+        $container->get(SessionInterface::class),
     ));
 
     // -1. Request counters, outside even the error handler — and only when an

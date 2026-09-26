@@ -1,7 +1,8 @@
 # Renovo
 
 A self-hosted tracker for subscriptions and recurring bills. Multi-user,
-permission-scoped, with multi-currency totals, budgets, a twelve-month forecast,
+permission-scoped, with an Overview and a Household dashboard, multi-currency
+totals, budgets, a twelve-month forecast,
 price history, free-trial tracking, shared-cost splitting, upcoming-renewal
 windows, notice periods, a versioned JSON API, CSV/JSON import, whole-household
 backups, a calendar feed and a calendar view, attached invoices, saved views,
@@ -96,7 +97,8 @@ Built in phases:
   dashboard somebody has arranged keeps its arrangement and finds them
   appended. It adds no figure the application did not already produce — and it
   no longer repeats the subscriptions list, which is the Subscriptions page's
-  own subject.
+  own subject. *Phase 21 replaced this card set with the prototype's two
+  dashboards; see below.*
 
 - **Phase 11 — my subscriptions — complete.** The subscriptions screen in the
   design's arrangement: a stats strip across the top, the list itself, the two
@@ -106,7 +108,8 @@ Built in phases:
   alongside. The list is the same list, so saved views, density, scope and
   permissions are unchanged by the restyle; the figures are the ones the
   Statistics page and the cancel-by view already produce. It adds no data and no
-  new query path. See [My subscriptions](#my-subscriptions).
+  new query path. *Phase 22 rearranged this screen to the prototype and moved
+  trials and the category widget to the dashboard; see below.*
 
 - **Phase 12 — analytics and insights — complete.** The Statistics page
   restyled to the design's layout: a KPI row, the twelve-month spending
@@ -120,6 +123,7 @@ Built in phases:
   a single whole exists; where a currency has no rate the screen shows the
   per-currency figures instead of a centre label standing for a number nobody
   computed. It introduces no new computation and the route is still `/stats`.
+  *Phase 23 rebuilt this screen to the prototype; see below.*
 
 - **Phase 13 — spend insights — complete.** The one phase in the re-skin that
   adds capability rather than restyling it, built as rules over data the
@@ -205,13 +209,149 @@ Built in phases:
   cannot clear it — and backups carry the list, its logos and every
   assignment, matched by name on the way back in.
 
+- **Phase 18 — the Renovo theme — complete.** The visual language from the
+  Claude Design prototype as the foundation later screens build on: colours
+  authored once in `assets/theme/tokens.json` and generated into five palettes
+  (navy & emerald by default, light & emerald, midnight & teal, light & ocean
+  blue, forest & mint), each in light, dark and "system"; Plus Jakarta Sans for
+  text and JetBrains Mono for every figure; a server-rendered Lucide sprite;
+  and one vocabulary of cards, buttons, controls, badges and tables. Each
+  member picks their own palette under Profile → Appearance — a Viewer
+  included — and it is rendered into the page before first paint. Every
+  palette × theme is held to WCAG AA by a test that reads the same JSON the
+  build does. No screen was rebuilt. See [The design system](#the-design-system).
+- **Phase 19 — the shell, rebuilt to the prototype — complete.** The rail, top
+  bar and narrow tab bar rebuilt on the Phase 18 tokens; no page's content
+  changed. The rail carries the brand, a household label ("N members · you're
+  Editor" — a label, not a switcher), Dashboard, Subscriptions with a count of
+  the active rows the viewer can actually see, Analytics, a "Household tools"
+  group, a secondary add button and a user card with sign-out. The top bar
+  gains a static subtitle per page, a rates chip that reads the cache and never
+  fetches, a light/dark toggle any member (a Viewer included) can use with or
+  without script, and a bell that links to the Calendar and shows a dot when a
+  trial conversion or cancel-by deadline is close. Destinations that lost their
+  rail row are claimed by one that kept one — Settings gains an interim row of
+  links until its own rebuild — and a test still proves every route is
+  reachable from a phone. No migration. See
+  [The application shell](#the-application-shell).
+- **Phase 20 — the data-model additions the new screens need — complete.** Six
+  behaviours the prototype assumes, built before any screen is rebuilt, on the
+  current pages in their current style:
+  - **Only me.** A subscription private to its payer, hidden from every other
+    member in either isolation mode (Owner/Admins included) and out of their
+    totals. The scoping layer enforces it on reads and writes.
+  - **Paused and Cancelled** are separate states. Cancelling a trial stops its
+    conversion, and undoing a cancel lands on Paused.
+  - **Plan** is a free-text tier.
+  - **Budgets** can measure a named member or, in SHARED mode, the whole
+    household.
+  - **Price change** is a new alert: once per change, on by default, and routed
+    like renewals.
+
+  Six migrations. The API, OpenAPI, `docs/api.md`, backup and the importer
+  carry every new field. A backup leaves out other members' private
+  subscriptions and says how many. See
+  [Paused, cancelled, and only me](#paused-cancelled-and-only-me),
+  [Budgets](#budgets) and [Notifications](#notifications).
+- **Phase 21 — the dashboard: Overview and Household — complete.** The
+  prototype's two dashboards on one page, with a toggle between them that is
+  remembered on the account and a card layout of their own for each.
+  **Overview** shows what the month and the year cost, what is coming, and where
+  the money goes. **Household** shows how this month is going, who pays what,
+  and how the year compares with its budget pace. Past spend is reconstructed
+  from start dates and price history, and says so. The reconstruction now lives
+  in one service, which year-over-year shares, and it stops counting a
+  cancelled subscription at its cancellation date. **Upgrading resets every
+  saved dashboard layout once** (see [Upgrading](#upgrading)). Three
+  migrations. See [The dashboard](#the-dashboard).
+- **Phase 22 — subscriptions: the list and the form — complete.** The list and
+  the add/edit form rebuilt to the prototype with every existing capability
+  kept: a strip of Active, Trials, Paused and Per month; a toolbar of category
+  and tag chips, status, Household/Mine scope, saved views, density and a CSV
+  export of the filtered list; a table with logos, split notes, base-currency
+  equivalents and status badges, cards below 768px, and the bulk bar back. The
+  form shows the prototype's fields, keeps the rest under More details, saves
+  the split with the row and computes its currency note on the server. No
+  migrations. See [My subscriptions](#my-subscriptions).
+- **Phase 23 — analytics — complete.** The Analytics screen rebuilt to the
+  prototype: a year-to-date KPI row, twelve months back and twelve ahead in one
+  chart (the dashboard's chart is a window of it), this year against last month
+  by month, who pays what, the five most expensive subscriptions, the
+  household's price history and the insights as a list. The breakdown donuts,
+  the per-period figures and the cost-per-use ranking are kept beneath them. No
+  new computation and no migrations. See [Analytics](#analytics).
+- **Phase 24 — budgets — complete.** The Budgets screen rebuilt to the
+  prototype: tiles for On track, Warning, Projected over and the household
+  limit; a card per budget with the month or year charged so far and
+  projected, a tick at its warning threshold, a note that says whether it is
+  trials that push it over, and the owner's real alert routing; and the
+  household's last six months against its monthly limit. New and Edit open one
+  dialog, which is the full-page form without script. No migrations. See
+  [Budgets](#budgets).
+- **Phase 25 — the calendar — complete.** The Calendar rebuilt to the
+  prototype: a month grid from the account's first weekday with a chip per
+  charge, trial ending and cancel-by deadline (each named in a word and an
+  icon, not colour alone), the open day beside it, the month's total, count and
+  heaviest day, a list by day on a phone, and the calendar feed's card — copy
+  the link, or create a new one and retire the old. No migrations. See
+  [Calendar](#calendar).
+- **Phase 26 — members & roles — complete.** One Members & roles screen for
+  every member of the household, replacing the Owner-only member list and the
+  read-only `/household` overview (which now redirects to it). A row per
+  member with their status in words, when they were last here and their
+  monthly share as far as the reader may see it; an Owner/Admin changes roles
+  inline and invites and removes people through a dialog. A table of what each
+  role can do, generated from `PermissionService` and the scoping layer, and a
+  read-only statement of the instance's isolation mode. Nobody can be invited
+  as an Owner, and a removal that would dispose of rows nobody else has seen
+  must say how. No migrations. See [Households and people](#households-and-people).
+- **Phase 27 — profile — complete.** Every account setting on one page,
+  `/profile`, for every role: name, email (with the pending change's resend and
+  cancel), picture, password with "sign out my other sessions", the
+  authenticator app, passkeys and recovery codes, where you're signed in (device,
+  address and last seen — no location), and appearance and preferences, which
+  save as you change them. `/settings/security` and `/profile/account` redirect
+  to their sections. No migrations. See [Signing in](#signing-in).
+- **Phase 28 — settings and notifications — complete.** Settings is three
+  tabs, each a page of its own. **General** holds the household's name, the
+  base currency and exchange rates (with **Refresh now**, which respects the
+  failure back-off), and the household's categories, tags and payment methods
+  as sections, with inline rename. **Data & integrations** holds import,
+  backup and restore, a CSV or JSON export, API tokens, the five latest audit
+  entries and a link to the calendar feed. **Instance**, for instance
+  administrators only, holds registration, isolation, trusted hosts, demo mode
+  and the server's mail, metrics and scheduler status. **Notifications** is
+  each person's own page: channels with an on/off switch, one set of lead
+  times chosen as chips, delivery, budget and price-change switches, and a
+  routing grid with a column for every channel. The interim link row is gone;
+  `/categories`, `/payment-methods`, `/settings/backup` and
+  `/settings/api-tokens` redirect to their sections. One migration (the
+  budget-alert switch). This completes the re-skin begun in Phase 18. See
+  [Notifications](#notifications).
+- **Phase 29 — the signed-out screens — complete.** Every page before you are
+  inside the application — sign in, the two-step challenge, forgotten
+  password and the reset, registration, email confirmation, invitations,
+  email-change links, the forced password change, error pages and the setup
+  wizard — shares one split layout: the brand panel beside a card, collapsing
+  to a slim header on a narrow screen. Sign in gains **Keep me signed in**, a
+  show/hide on the password, and the passkey button only where the browser
+  can use one; every new-password field has a strength meter, and the
+  lifetimes and minimums on screen are read from the code that enforces them.
+  Email confirmation can be sent again, under a rate limit of its own. The
+  setup wizard is three steps — the owner account, the household (currency,
+  isolation, rate provider and invitations), and reminders (mail relay and
+  channels, each with a test) — then a done page. Otherwise no authentication
+  rule, token or lifetime changed, and there are no migrations. See
+  [Signing in](#signing-in).
+
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
 see the end of `PHASE.md` for what was deferred and why.
 
-See `PHASE.md` for what was in scope for the last phase and `SPEC.md` for the
-conventions every phase followed.
+The current phase is **Phase 29 — the signed-out screens**.
+`PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
+archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
 ---
 
@@ -284,8 +424,11 @@ printf 'SESSION_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
 docker compose up
 ```
 
-Then open **http://localhost:9090** and complete the first-run wizard. The
-account you create there is the instance administrator.
+Then open **http://localhost:9090** and complete the first-run wizard: the
+owner account, then the household (name and currency, isolation and the
+rate provider under More options, and anyone to invite), then reminders (the mail
+relay and any other channels, each with a test). The account you create there
+is the instance administrator.
 
 The `migrate` container applies the schema and then exits — seeing it as
 `Exited (0)` in `docker compose ps` is correct, not a failure.
@@ -403,6 +546,15 @@ failed migration rolls back completely; MySQL does not, so migrations are kept
 small and the applied version is tracked in `phinxlog` — `phinx status` will
 show a partially applied set.
 
+One exception, and it is deliberate. **Upgrading to Phase 21 clears every saved
+dashboard layout once** (`20261101000003_reset_saved_dashboard_layouts`),
+because the card set was replaced wholesale. A kept layout would have put the
+new cards behind the positions of cards that no longer exist. Everyone starts
+from the new default arrangement and can rearrange it from their profile.
+Nothing else is touched. The migration's `down()` does nothing, because a
+deletion cannot be undone. The backup you took first is the only way back to
+the old arrangements.
+
 ---
 
 ## Configuration
@@ -416,6 +568,7 @@ list. `.env` is never committed. The ones that matter most:
 | `DB_DRIVER`                 | `pgsql` or `mysql`.                                           |
 | `DB_HOST`                   | Host-side value for CLI tools; containers always use `database`. |
 | `APP_URL`                   | Used to build links in emails — set it to the real URL.       |
+| `SESSION_BROWSER_LIFETIME_SECONDS` | How long a sign-in with **Keep me signed in** unticked survives unused. 12 hours by default; a ticked one lasts `SESSION_LIFETIME_SECONDS` (14 days). |
 | `SESSION_COOKIE_SECURE`     | Leave `true` unless you are serving plain HTTP on a trusted network. |
 | `AUTH_MAX_ATTEMPTS_PER_*`   | Login, reset and second-factor throttling, per account and per IP. |
 | `TOTP_ENCRYPTION_KEY`       | Optional. Encrypts stored two-factor secrets; falls back to `SESSION_KEY`. |
@@ -653,7 +806,9 @@ npm run watch      # rebuild on change
 | `assets/css/*.css`    | `public/build/app-<hash>.css`    | `{{ bundle('app.css') }}`    |
 | `assets/js/app.js`    | `public/build/app-<hash>.js`     | `{{ bundle('app.js') }}`     |
 | Chart.js              | `public/build/chart-<hash>.js`   | fetched on first chart only  |
-| Inter (Fontsource)    | `public/build/inter-*.woff2`     | `@font-face` in the built CSS |
+| Plus Jakarta Sans, JetBrains Mono (Fontsource) | `public/build/<family>-*.woff2` | `@font-face` in the built CSS |
+| `assets/theme/tokens.json` | part of `app-<hash>.css`    | the palettes, generated at build start |
+| `assets/theme/icons.json`  | `public/build/sprite-<hash>.svg` + `icons.json` | `{{ icon('name') }}` |
 
 Every filename contains a hash of the file's own contents, and
 `public/build/manifest.json` maps a logical name to the current one. A template
@@ -700,32 +855,39 @@ immediately, but one you *delete* lingers in the compiled stylesheet until the
 watcher restarts. A one-shot `npm run build` is always exact, which is what
 production and CI use.
 
-### The webfont
+### The webfonts
 
-Inter comes from **Fontsource** — Google Fonts' families repackaged for
-self-hosting and installed from npm. The build copies the `.woff2` files into
-the web root and rewrites the `@font-face` rules to point at them, so "use a
-Google font" and "load nothing from Google" are both true at once. The SIL Open
-Font License is copied out of the package alongside it, as
-`public/build/inter-OFL.txt`.
+Plus Jakarta Sans (text) and JetBrains Mono (figures) come from **Fontsource**
+— Google Fonts' families repackaged for self-hosting and installed from npm.
+The build copies the `.woff2` files into the web root and rewrites the
+`@font-face` rules to point at them, so "use a Google font" and "load nothing
+from Google" are both true at once. Each family's SIL Open Font License is
+copied out of its package alongside, as `public/build/plus-jakarta-sans-OFL.txt`
+and `public/build/jetbrains-mono-OFL.txt`. See [Typography](#typography).
 
-Phase 8 applies it. The deciding reason for Inter specifically is narrow: its
-subset carries the `tnum` OpenType feature, so a column of currency lines up
-digit under digit. See [The design system](#the-design-system).
+### The icons
+
+`assets/theme/icons.json` maps what a thing is called here (`budget`,
+`payment-card`) to the Lucide drawing that shows it. The build reads only those
+drawings out of the npm package and writes one SVG sprite, plus an index PHP
+reads. A template draws one with `{{ icon('budget', 'nav-icon') }}`, which
+prints an `<svg aria-hidden="true"><use href="/build/sprite-….svg#budget">` — so
+icons are server-rendered and work with JavaScript off. An unknown name throws
+outside production and is logged and omitted in it.
 
 ### The JavaScript
 
 The bundle is deliberately small. Keyboard shortcuts, the quick-add dialog and
 passkey registration stay in `public/assets/`, hand-written and served
 directly, along with htmx — none of them needed bundling, so none of them were
-moved. What the bundle provides is the two things that did:
+moved. What the bundle provides is what did:
 
 ```js
 // Chart.js, in a chunk of its own: fetched the first time this is called, and
 // never by a page that does not call it.
 await window.Renovo.chart(canvas, { type: 'line', data: … });
 
-// Lucide icons, tree-shaken down to the handful listed in assets/js/icons.js.
+// An icon from the same sprite the server uses, for markup a script builds.
 element.append(window.Renovo.icon('calendar'));
 ```
 
@@ -751,132 +913,101 @@ temporarily. If a URL is an identifier rather than an address (`xmlns` on an
 
 ## The design system
 
-The colour, type and spacing every screen is built from. Phase 7 decided how
-assets are compiled and served; this is what they express.
+The colour, type and shape every screen is built from — since Phase 18, the
+visual language of the Claude Design prototype. Phase 7 decided how assets are
+compiled and served; this is what they express.
 
-### One stylesheet, one definition of each token
+### Colours are data
 
-`assets/css/` compiles to the single stylesheet each page links:
+Every colour is written once, in `assets/theme/tokens.json`: a base set (the
+surfaces, text, the four status pairs, chart series) in light and dark, and
+five palettes that each set the rail and the accent in light and dark. At the
+start of every build `assets/theme/build-tokens.js` resolves each
+palette × theme — base light, base dark, palette light, palette dark, later
+wins — and writes the result to `assets/css/generated/theme.css` (generated,
+gitignored). `tests/Unit/ThemeContrastTest.php` resolves the same file the
+same way, so what ships and what is checked cannot drift apart.
 
-| File             | Holds                                                        |
-|------------------|--------------------------------------------------------------|
-| `tokens.css`     | every colour, radius and type size, and both theme sets       |
-| `base.css`       | element defaults, re-established after Preflight              |
-| `components.css` | the shell, cards, tables, forms, buttons, badges, dialogs     |
-| `screens.css`    | the calendar, budget meters, price timeline, density          |
+| File                        | Holds                                               |
+|-----------------------------|-----------------------------------------------------|
+| `assets/theme/tokens.json`  | every colour, per palette and theme                 |
+| `assets/css/tokens.css`     | shape, the type scale, and the bridge to Tailwind   |
+| `assets/css/base.css`       | element defaults, `.num`, the focus ring            |
+| `assets/css/components.css` | the shell, cards, buttons, controls, badges, tables |
+| `assets/css/screens.css`    | the calendar, meters, charts, the palette picker    |
 
-Nothing downstream writes a colour literal. Tokens are declared twice: once as
-semantic custom properties (`--surface`, `--text`, `--accent`), and once in an
-`@theme inline` block that hands the same properties to Tailwind. That is what
-makes `bg-surface` in a template and `.card { background: var(--surface) }` in
-a stylesheet the same colour by construction rather than by agreement.
+No stylesheet and no chart writes a colour literal. Tailwind's `@theme inline`
+maps its keys onto the custom properties (`--color-surface: var(--surface)`),
+so switching palette or theme is an attribute change on `<html>`, never a
+recompilation.
 
-The `inline` keyword matters: without it Tailwind resolves a theme value at
-build time and bakes it into the utility, freezing every utility to whichever
-theme compiled first. Note also that every `@theme` key is spelled differently
-from the property it points at — a key assigned its own name compiles to
-`--x: var(--x)`, which is circular and resolves to nothing.
+### Palettes, themes, and no flash
 
-### The brand, and why there are two gradients
+The server renders the account's choice into the root element:
 
-The logo is a **teal-green → blue** gradient mark, kept in the repository at
-`assets/brand/renovo-logo.png`. `--brand-from` (`#0daa9c`) and `--brand-to`
-(`#1069bb`) are the only place those stops are written down, so re-sampling the
-logo is a two-line edit. They are the mark's real colours: Phase 9 projected
-every pixel of it onto the 135° axis the gradient runs along and averaged the
-first and last twentieth.
-
-They are used where nothing sits on top of them — the brand mark, the active
-nav item, a featured card's wash. **A filled button is a flat colour, not a
-gradient**: `--accent`, the same action colour a link and a focus ring use,
-with `--accent-text` as its ink. Both are assigned per theme, so the button
-follows light and dark like everything else, and the ink has one contrast ratio
-to clear rather than a range of them. White text on the real mark would be
-2.9:1 at the teal stop, which is why a button was never painted with the logo's
-own colours.
-
-Brand and urgency are deliberately **different hues**. Teal-green is "this is
-the action"; amber→orange is "money is about to move" — renewing soon, a
-cancel-by deadline, a budget projected over; a muted red is a genuine problem.
-A single-accent palette cannot say two of those at once.
-
-### One filled button per screen
-
-The accent fill means "this is the thing to do here", so a screen carries at
-most one of it. Two of them says it twice, which is the same as not saying it:
-a reader scanning for the action finds a pair and has to read both.
-
-That is why the top bar's **quick-add is outlined rather than filled**. It is
-the one control on every single screen, and a global shortcut that is filled
-everywhere leaves no accent for the action a particular screen is about. It
-keeps the accent in its edge and its ink — still the strongest thing in the
-bar, never the strongest thing on the page. A screen with nothing to do on it —
-the dashboard, the calendar — then has no filled button at all, which is
-honest.
-
-`ShellTest` counts the accent on every rendered screen and
-`TemplateConventionsTest` counts it in every template, including the screens
-that are not rendered in a test. `.card-featured`, the brand wash, is counted
-the same way: one card per screen.
-
-### Dark is a theme, not the application
-
-Three states, not two. An account picks system, light or dark under
-Settings → Appearance, and an explicit choice beats the browser:
-
-```css
-:root { /* light */ }
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) { /* dark */ }
-}
-:root[data-theme='dark'] { /* dark */ }
+```html
+<html data-theme="system|light|dark" data-palette="navy|paper|midnight|ocean|forest">
 ```
 
-The `:not([data-theme='light'])` guard is the whole trick. Without it, someone
-who chose light on a machine set to dark gets repainted dark — breaking the
-setting for exactly the person who bothered to change it. This is also why the
-token layer uses no `dark:` variants: Tailwind's default `dark:` understands
-only the media query, so it would disagree with the setting in that same case.
+The generated stylesheet has a block for every combination, including
+"system" through a media query guarded by `:not([data-theme='light'])` — so an
+explicit "light" on a machine set to dark stays light. The right colours are on
+first paint with JavaScript off. Signed-out pages wear navy; their theme still
+follows the sign-in screen's switch.
+
+The palette is per account, saved from Profile → Appearance to its own
+CSRF-protected endpoint. The value is checked against the `App\Domain\Palette`
+allowlist and an unknown one is refused with nothing written. Null means navy,
+decided in `Palette::fromNullable()` and nowhere else.
+
+### The accent rule
+
+A filled accent surface carries `--accent-ink`; accent-coloured text is always
+`--accent-text`. White on the default emerald is 2.0:1, so it never appears.
+The logo's gradient (`--brand-from` → `--brand-to`) is the mark's alone — no
+interface element wears it.
+
+One **primary** button per screen (accent fill). Notable actions that are not
+the screen's main one — quick-add in the top bar — take the **secondary** ink
+fill. Everything else is **quiet**; destructive actions are **danger**.
+`ShellTest` and `TemplateConventionsTest` count the accent per screen.
+
+Status colours mean one thing each: **ok** on track, **warn** renewing soon or
+past a threshold, **bad** over budget or an error, **info** a trial. A badge
+always carries its word.
 
 ### Typography
 
-Inter, self-hosted, with **tabular figures on every number**. That is the
-deciding reason for the family: proportional digits are different widths, so a
-column of amounts shifts as its values change. Switched on with
-`font-variant-numeric: tabular-nums` rather than `font-feature-settings: "tnum"`,
-which would switch off the other features in the font, and left off for running
-prose.
+**Plus Jakarta Sans** for text; **JetBrains Mono** with tabular digits for
+every figure — amounts, counts, KPIs, dates in tables, chart labels. A figure
+gets that face only through the `.num` class, so a later screen cannot forget
+it. Running prose keeps the text face.
 
-| Role            | Size / weight             |
-|-----------------|---------------------------|
-| KPI value       | 2.5rem, 700, tabular      |
-| Section heading | 1.25rem, 600              |
-| Body / table    | 0.9375rem, 400–500        |
-| Label / caption | 0.8125rem, 500, muted     |
+| Role              | Size / weight               |
+|-------------------|-----------------------------|
+| KPI value         | 22px, 700, mono             |
+| Page title        | 18px, 700                   |
+| Section heading   | 16px, 700                   |
+| Body / table      | 14px (13px dense), 400–500  |
+| Label             | 12px, 600                   |
+| Caption / eyebrow | 11px, 600                   |
 
 ### Contrast is tested, not eyeballed
 
-`tests/Unit/DesignTokensTest.php` reads the compiled stylesheet and asserts
-every text token clears WCAG AA (4.5:1) on the surface it is used against, in
-both themes, and that control borders clear 3:1. The palette decides whether
-the application is readable, so a token nudged darker to "look better" fails
-the build rather than shipping.
-
-The matrix is the point, not the threshold. Checking each ink against `--surface`
-alone proves the card and nothing else, and the places contrast quietly fails
-are the ones nobody pictures while choosing a colour: the quiet text in the
-footer, which sits on the page rather than on a card; the same text in a hovered
-row, which is a lighter surface than the one it was chosen against; and ordinary
-text in a row tinted for urgency, where the background was picked to carry the
-warning colour and then has to carry a subscription's name as well. Every pair
-in the test is one a rule actually produces.
+`ThemeContrastTest` asserts, for every palette × theme, that text clears 4.5:1
+on every ground a rule puts it on — the page, a card, a hovered row, each
+status tint, the accent's wash, the rail and its hover and active fills — and
+that the focus ring, field edges and chart series clear 3:1. Translucent
+colours are composited onto what they sit on before they are measured. Where
+the prototype failed, the value was adjusted in the JSON keeping its hue;
+thresholds are never loosened. `DesignTokensTest` checks the compiled
+stylesheet carries every palette and applies the faces.
 
 ### A note for operators
 
-Changing how Renovo looks now needs `npm install && npm run build` rather than
-an editor and a reload — the cost of having one compilation own both the
-utilities and the rules. Most of what you would want to change is a handful of
-custom properties at the top of `assets/css/tokens.css`.
+Changing how Renovo looks needs `npm install && npm run build` rather than an
+editor and a reload. Colours are in `assets/theme/tokens.json`; run the tests
+after changing one.
 
 ## The application shell
 
@@ -885,27 +1016,59 @@ content and nothing else.
 
 ### What it is made of
 
-- A fixed **240px rail** on the left: the mark, the primary destinations, and a
-  tools group pinned to the bottom. Each item is an existing route with a
-  tree-shaken Lucide icon.
-- A **top bar**: the page's `<h1>`, whatever that page offers (edit this, back
-  to the list), a search that goes to the subscriptions list, quick-add, and who
-  is signed in.
-- Below **768px** the rail becomes a **bottom tab bar** of the four most-used
-  destinations with the rest behind a `<details>` drawer. It is a disclosure
-  element rather than a scripted panel, so it opens with JavaScript off: a
-  narrow screen loses the layout and none of the reach.
+- A fixed **240px rail** on the left, top to bottom: the mark and instance
+  name; the **household label** (its name, the member count and your own role —
+  a label, not a menu, because there is no household switcher); Dashboard,
+  Subscriptions and Analytics; the **Household tools** group (Budgets, Calendar,
+  Members & roles, Notifications, Settings); a secondary **Add subscription**
+  button; and a **user card** linking to your profile, with sign-out beside it.
+  The Subscriptions item carries a badge counting the active subscriptions *you*
+  can see — in ISOLATED mode that is your own rows plus splits you share, never
+  the household's total.
+- A **top bar**: the page's `<h1>` with a short static subtitle beneath (from
+  the `page_subtitle` block), whatever that page offers, a search that goes to
+  the subscriptions list, the **rates chip**, the **theme toggle**, the
+  **bell**, and **Add new**.
+- Below **768px** the rail becomes a **bottom tab bar** — Home, Subs, a raised
+  Add, Analytics and More — with the rest, the household label and the user
+  card in a `<details>` sheet behind More. It is a disclosure element rather
+  than a scripted panel, so it opens with JavaScript off: a narrow screen loses
+  the layout and none of the reach.
+
+The rail has fewer rows than there are destinations, so the rest are
+**claimed**: Forecast lights Analytics, Cancel by lights Subscriptions (and is
+linked from that page), and Categories, Payment methods, Import, Backup, Audit
+log and API tokens light Settings, whose three tabs carry each of them as a
+section or a link. Members & roles is one screen for every member:
+an Owner/Admin manages the people from it and everybody else reads it.
+
+The top bar's pieces are reads, assembled by `ShellService` so no controller
+or template computes them:
+
+- **Rates chip** — the base currency and when rates were last refreshed, or a
+  warning when they are stale or unavailable. It reads the cache and never
+  triggers a fetch; for an instance admin it links to the rate settings.
+- **Theme toggle** — flips your own account between light and dark (an account
+  on "system" moves to the opposite of what it is showing). It is a
+  CSRF-protected form, swapped in place by htmx when script is running; any
+  member, a Viewer included, may use it.
+- **Bell** — a link to the Calendar, not an inbox. A dot, with a text
+  equivalent for screen readers, shows when a trial converts or a cancel-by
+  deadline falls within the urgent window. Plain renewals do not light it, or
+  it would never be dark.
 
 Two things from the design mock are deliberately absent. There is no **Upgrade
 Plan** card — Renovo is self-hosted and there is no plan to sell — and no
 **Manage Balance** pill, because the application tracks what is due rather than
-a balance. Quick-add takes the prominent-action slot instead.
+a balance. **Add new** takes the prominent-action slot instead, in the ink fill
+rather than the accent, because the one accent button on a screen is that
+page's own action.
 
 ### One definition of the navigation
 
 `src/Service/NavigationService.php` declares every destination once: its label
 key, route, icon, the permission it needs, and the paths it claims. The rail,
-the tab bar and the drawer are three projections of that one list, so a page
+the tab bar and the More sheet are three projections of that one list, so a page
 cannot be reachable on a desktop and missing on a phone — a test asserts the
 two sets are equal.
 
@@ -950,10 +1113,10 @@ wrapper that scrolls. Every screen was then walked at 1440px, 390px and 320px
 in both themes, which is where the `<pre>` was found.
 
 The calendar is the one screen that changes shape rather than reflowing: below
-720px the seven-column grid becomes a list of the days that actually have
+768px the seven-column grid becomes a list of the days that actually have
 something due, and because the column headings are gone, each day names its own
-weekday from `data-weekday` — filled from the reader's locale like every other
-date on the page.
+weekday — in its heading and in `data-weekday` — from the reader's locale like
+every other date on the page.
 
 ### Density is a coat of paint
 
@@ -965,59 +1128,189 @@ property is easy to lose the first time somebody tidies a compact list by
 dropping a column, and losing it would turn a visual preference into a
 different page.
 
+## The dashboard
+
+One page with two views and a toggle between them. The choice is remembered on
+your account, and each view has its own card order and hiding.
+
+- **Overview**: monthly spend (with "N% of budget" when the household has a
+  monthly overall budget), the yearly run-rate at today's prices, what is due
+  in the next seven days, and the active count with trials and paused beneath.
+  Below that: a thirteen-bar chart of six months behind, this month split into
+  already charged and still due, and six forecast months; where the money goes;
+  the next 30 days of charges; this month's budgets; running trials, with
+  Cancel trial for whoever may change the row; and the next scheduled price
+  rise. The subscriptions table is an optional card.
+- **Household**: this month so far, as already charged of everything due; year
+  to date against the same stretch last year; the next twelve months; what the
+  running trials will add; the next 30 days on a timeline; a card per member
+  for who pays what after splits; the last twelve full months as lines, by
+  category or by member, beside spending by category; and the year's spend
+  against an even pace of the household budget.
+
+Every figure comes from a service the rest of the application already uses. The
+chart's forecast months are the Forecast page's months, and its past months
+come from the same reconstruction year-over-year uses. Renovo keeps no ledger,
+so past spend is **reconstructed** from start dates, billing cycles and price
+history. The cards say so, and say how many subscriptions were left out for
+having no start date. "Already charged" means the charge's date has passed.
+Nothing confirms that it was paid.
+
+Money follows the usual rule: a combined total only when every currency
+converts, otherwise per-currency figures with the missing rate named. The
+budget line, the month's marker and the pace card use the household's own
+budget, never a member's, because they sit against household-wide totals. With
+no such budget they are left out; in ISOLATED mode there is never one. Under
+ISOLATED, Who pays shows only your own share, and Spend over time offers no
+member view. There is no time-of-day greeting,
+because dates are UTC.
+
 ## My subscriptions
 
-The subscriptions screen carries the list and, around it, the four things a
-person opens it to find out.
+The subscriptions screen is the list, arranged to the prototype: four figures,
+a toolbar, the table, and the cancel-by deadlines beneath it. Free trials and
+the category breakdown live on [the dashboard](#the-dashboard).
 
 ### The strip
 
-Active count, yearly spend and renewals in the near window. The yearly figure
-follows the rule the rest of the application follows — per-currency subtotals,
-with a combined total only when every currency in play converts — through the
-same partial the dashboard's tiles use, so the two screens cannot come to
-different conclusions about the same money. A single clean number is the common
-case, not the only one.
+**Active**, **Trials** and **Paused** are the list's own statuses — each is the
+number of rows the status filter of the same name would page through, so Active
+leaves the trials beside it out. **Per month** is the recurring monthly total,
+by the rule the rest of the application follows: per-currency subtotals, with a
+combined figure only when every currency in play converts, drawn by the same
+partial as the dashboard's tiles. One-off, lifetime, paused and cancelled rows
+add nothing to it.
+
+### The toolbar
+
+- **Search**, **category chips**, **tag chips**, **Status** (All, Active,
+  Trials, Paused, Cancelled) and **Scope** — Household or Mine, where *Mine* is
+  what you own or have a share of a split in. Scope is not offered when you can
+  only see your own rows anyway.
+- **Saved views**, **density** and **Export** at the end. Export is a CSV of the
+  list as filtered — every matched row, through the same query, so it holds
+  nothing the list would not show. Its headings are the importer's own, so the
+  file imports elsewhere without mapping, and a cell that a spreadsheet would
+  read as a formula is written as text.
+- A summary line above the table: *N of M · £X/mo*, the monthly figure over
+  every matched row rather than the page on screen.
+
+Every control is a link or a GET form. With script, htmx swaps only
+`#subscription-list` and pushes the query string; without, it is an ordinary
+page load. The list fragment carries fresh copies of the toolbar's
+filter-dependent parts out of band, so a chip clicked after a search still
+links to the search.
 
 ### The list is the list
 
-It is the existing list fragment, restyled and rearranged rather than rebuilt,
-which is why **saved views** still store the query the list itself produced,
-**density** still tightens the same markup, and scope and permissions are
-exactly what the repository and the middleware already enforced. Filtering,
-sorting and paging still swap that fragment alone: the sections around it are
-computed for a whole page and not for a keystroke.
+It is the existing list fragment, rearranged rather than rebuilt, which is why
+**saved views** still store the query the list itself produced, **density**
+still tightens the same markup (the toggle's current option is drawn from the
+root's `data-density`, not written into the buttons), and scope and
+permissions are exactly what the repository and the middleware already
+enforce. Each row shows the service with its plan and payment method, who pays
+and how it is split, the price with its base-currency equivalent, the monthly
+figure in the base currency (a gap, never a zero, when there is no rate), the
+next charge — with "in N days", "Trial ends", or the cancel-by date when that is
+the deadline to meet — and a status badge in words. Below 768px the table is a
+list of cards with the same actions in a menu.
 
-### Two deadlines, not one
+Edit, Pause/Resume, Cancel/Undo cancel and Delete are drawn only where the role
+allows them **and** the row is one you may change: under ISOLATED isolation a
+member can see a shared cost they contribute to without being able to change
+it, and a Contributor changes only their own rows. Each endpoint refuses on its
+own either way. Ticking rows brings up the **bulk bar**, which is its own form
+the row checkboxes join, so no form ever sits inside another.
 
-- **Renewing soon** — a charge falling inside the near window, which is the
-  cancel-by view's fourteen days, referenced rather than re-chosen.
-- **Cancel by** — the last day notice can be given, shown only for a
-  subscription that *has* a notice period. Without one that deadline is the
-  renewal date, and a second card repeating it would be noise. A deadline
-  already missed is kept and marked: nothing can be done about it, but being
-  committed to another period is worth knowing.
+### Cancel by
 
-Each row offers Pause only to a member who could actually use it — their role
-may change a subscription **and** the isolation mode leaves that row writable.
-Under ISOLATED isolation a member can see a shared cost they contribute to
-without being able to change it, so the button that would be refused is not
-drawn. The refusal itself still lives in the repository.
+The last day notice can be given, for every subscription with a notice period
+whose deadline falls inside the near window — the cancel-by view's fourteen
+days, referenced rather than re-chosen. Without a notice period that deadline
+*is* the renewal date, which the table's "Renewing soon" badge already says. A
+deadline already missed is kept and marked.
 
-### Free trials
+### Paused, cancelled, and only me
 
-Every trial that has not converted yet, not a window of them. **The last day of
-a trial is the day of its first charge**, so the countdown runs to that day and
-the amount shown is the price it converts to. A trial is the subscription it
-will become, so pausing it here pauses the subscription.
+- **Paused** is a subscription switched off that may be switched back on. It
+  stays in the list, sunk to the bottom, and out of every total.
+- **Cancelled** is finished. Cancelling records the day and switches it off in
+  one step; on a trial it is what stops the conversion — a cancelled trial never
+  becomes a paid subscription. A cancelled row leaves the default list and is
+  found under the **Status** filter, where **Undo cancel** returns it to
+  *Paused*, never straight to Active, so a slip corrected cannot quietly restart
+  the charges. The status the interface shows is derived in one place, in the
+  order Cancelled, Paused, Trial, Active.
+- **Only me** keeps a subscription to the member who pays it. Nobody else in the
+  household sees it — in either isolation mode, Owner/Admins included — and it
+  is left out of their totals, forecast, budgets, calendar and feed, so its cost
+  cannot be worked out by subtraction. It is applied in the scoping layer, on
+  writes as well as reads, so another member cannot pause or delete it by
+  guessing its id either. A private subscription is paid by one person and so
+  cannot be split; a split one cannot be made private.
+- **Plan** is the tier a subscription is on — "Standard", "Family" — free text
+  on the form, the list, the API, the importer and the backup.
 
-### Category spending
+### The form
 
-The Statistics page's category breakdown as proportion bars. What each bar is a
-share *of* is stated rather than assumed: the combined monthly total when every
-currency converts, and otherwise one group per currency against that currency's
-own total. Two currencies with no rate between them are never blended into one
-bar, because comparing them is precisely the claim a bar makes.
+One definition of a subscription: the quick-add dialog, the full page and the
+edit screen all render it. The prototype's fields are always shown — name and
+plan, price and currency (every ISO currency) with an "≈ base at today's rate"
+note the server computes as you type, category, type, billing cycle (Custom
+reveals "every N days"), next charge, payment method, **Remind me** (your
+defaults, never, or chosen days), **Paid by**, **Cost split** (payer only, split
+equally, or custom shares), **Visible to**, and the free trial with what it
+converts to. Everything the application had besides sits under **More details**
+— notice period, tags, website and logo, start date, who actually pays if that
+is someone else, notes — which opens by itself when one of those fields comes
+back with an error.
+
+The split is saved with the row, in one transaction, so a save is both or
+neither. "Only me" and a split cannot both be chosen; whichever is set rules the
+other out on the form, and the server refuses the pair regardless. A reminder
+day set before the chips existed (60, say) gets a chip of its own, so an edit
+cannot drop it.
+
+The edit page adds the price history, newest first, with **Schedule a price
+change**; invoices and receipts; and Cancel or Undo cancel, and Delete. Each is
+a form of its own after the main one, and comes back to the edit page. The cost
+page stays as the read-only view of a subscription and is where usage is
+recorded.
+
+## Analytics
+
+`/stats`, arranged to the prototype. Nothing on it is computed for it: every
+figure is one another screen already shows.
+
+- **The KPI row.** Spent this year, from 1 January to yesterday, against the
+  same stretch of last year. The average month, which is that figure divided by
+  the months so far. The next twelve months, which are the Forecast page's
+  months added up. The price rises dated this year, recorded or scheduled, with
+  what they add over a year in each currency. A trial converting and a currency
+  conversion are not counted as rises.
+- **Twelve months back, twelve ahead.** The dashboard's chart asked for twelve
+  months either side instead of six, so its thirteen bars are thirteen of these
+  twenty-five. The past half is reconstructed. The forecast half, hatched,
+  includes trials converting and scheduled price changes.
+- **This year against last.** Same-month bars from last January to this month,
+  reconstructed. The rest of this year is the forecast. Beneath them, the
+  rolling comparison: the last twelve months against the twelve before.
+- **Who pays what.** The household dashboard's card, scoped the same way.
+  Under ISOLATED you see only your own share.
+- **Most expensive.** The top five by cost per month converted into the base
+  currency, each shown in its own currency. Anything with no rate is left out
+  and counted. One-off, lifetime, running trials, paused and cancelled rows are
+  not ranked.
+- **Price history.** Every recorded change across the household, newest first,
+  twenty to a page. A future change carries a Scheduled badge. A currency change
+  shows as Converted with no percentage, and a trial ending is not listed. A
+  private subscription's history is visible only to its payer.
+- **Insights.** The Phase 13 rules as a list, each naming its subscriptions and
+  linking to them. When no rule fires there is no list.
+
+Beneath those: the category and payment-method donuts, the same cost by period,
+and the cost-per-use ranking with its "Used it" button. The Forecast page is one
+click away from the page header.
 
 ## Money features
 
@@ -1032,8 +1325,10 @@ cached instance-wide.
 | exchangerate.host  | Yes        | Wider currency list; free account required.    |
 | Fixer              | Yes        | Never the default. Free tier is EUR-based; other bases are derived. |
 
-The provider is chosen in the first-run wizard and can be changed in
-**Settings → Instance**. A key may be entered there, but `EXCHANGE_RATE_API_KEY`
+The provider is chosen in the first-run wizard and can be changed by an
+instance administrator in **Settings → General → Exchange rates**, which also
+lists the rates for the currencies in use and offers **Refresh now** — refused
+while a failed attempt is inside its one-hour back-off. A key may be entered there, but `EXCHANGE_RATE_API_KEY`
 in the environment takes precedence — an operator who keeps the key out of the
 database is not overridden by anything typed into the UI.
 
@@ -1069,13 +1364,32 @@ trend as the step it is.
 
 ### Budgets
 
-A budget belongs to a member and measures **that member's own share** — their
-subscriptions, plus their portion of anything split. The trigger is **projected**
+A budget measures **one member's share** — their subscriptions, plus their
+portion of anything split — or, in SHARED mode, **the whole household**. Whoever
+sets it owns it; the member it measures is chosen under *Whose spending*. An
+Owner/Admin or Editor may set one for anybody in a SHARED household; a
+Contributor, and everybody in ISOLATED mode, only for themselves, since nobody
+there can see anybody else's spending. The figure is always computed from what
+the viewer can see, so another member's private subscription is never in it. A
+breach is announced to the owner and, when it is somebody else, to the member
+it measures. The trigger is **projected**
 spend, taken from the same forecast the Forecast page shows, so the two can
-never disagree. Both periods are rolling windows from today ("the next month",
-"the next 12 months") rather than calendar periods, because this application
-tracks what is *due* rather than keeping a ledger of what has been *paid*, and a
-calendar month would have to leave out whatever was charged earlier in it.
+never disagree.
+
+The Budgets screen reads each budget over its **calendar period** — this month,
+or this calendar year — as charged so far (reconstructed from start dates and
+price history, to yesterday) plus the forecast to the period's end, which is how
+the dashboard's budget card reads the month. A budget is **Over** when that
+projection, trials converting included, passes its limit, and the card says when
+it is only the trials. It shows **Warning** once the projection reaches its
+warning threshold; only a projected breach sends an alert, and the card's alert
+line names the channel types its owner routes that alert to. A budget whose
+spending includes a currency with no rate shows no figure and counts as nothing.
+The alert itself still projects a rolling window from today (the next month,
+the next 12 months), so a card can turn Over on a different day from the alert.
+
+New budgets are in the base currency; one set in another currency earlier keeps
+it.
 
 ### Forecast
 
@@ -1106,7 +1420,7 @@ spending that may never have happened. The page says how many were excluded.
 
 ## Notifications
 
-Renovo tells you before money moves, not after. Four things are worth an
+Renovo tells you before money moves, not after. Five things are worth an
 interruption and nothing else is:
 
 | Alert | Fires when |
@@ -1115,11 +1429,19 @@ interruption and nothing else is:
 | **Trial about to convert** | A free trial is about to start charging, quoting what it will cost. |
 | **Cancellation deadline** | The last day to give notice and avoid the next charge — only when a subscription has a notice period, since otherwise the deadline *is* the renewal date. |
 | **Budget projected to be exceeded** | A budget's projection crosses its limit. |
+| **Price change** | A price is edited or a future one is scheduled — once, when it is recorded, naming the old and new price, the date and the effect over a year. Not for a first price, a trial converting or a currency conversion. |
 
-Everything is configured per user under **Settings → Alerts**; each member of a
-household sets their own. You are notified about the subscriptions you own and
+Everything is configured per user on the **Notifications** page; each member of
+a household sets their own. One set of lead times (any of 1, 3, 7, 14 and 30
+days) applies to renewals, trial conversions and cancel-by deadlines alike;
+budget alerts and price changes each have a switch; and the routing grid has a
+column for every channel, with a channel that is switched off greyed out but
+keeping its choices. You are notified about the subscriptions you own and
 the ones you pay for, not about everything in the household — a household of
-four would otherwise quadruple everybody's notifications.
+four would otherwise quadruple everybody's notifications. Price changes are the
+exception: everybody who can see the subscription hears about one, and it can
+be switched off with its own toggle. Upgrading routes it wherever renewals
+already go.
 
 ### Channels
 
@@ -1186,8 +1508,8 @@ service holding the machine's credentials. So:
   whoever asked for it.
 
 That default refuses the most common self-hosted setup there is: a Gotify on
-your LAN, or one reachable only over a Tailscale address. **Settings → Trusted
-hosts** is how you allow it, and it needs instance administration. Add a host
+your LAN, or one reachable only over a Tailscale address. **Settings → Instance →
+Trusted hosts** is how you allow it, and it needs instance administration. Add a host
 (`gotify.lan`), a suffix (`.lan`), an address, or a range (`100.64.0.0/10` for
 Tailscale), and that destination becomes reachable — over plain `http` as well,
 since a LAN service usually has no certificate. Each entry is an exception you
@@ -1202,7 +1524,7 @@ Three ways in, and they interlock rather than sitting side by side.
 **Password.** Always available, argon2id-hashed, throttled per account and per
 IP.
 
-**Authenticator app (TOTP).** Turn it on from **Settings → Account security**:
+**Authenticator app (TOTP).** Turn it on from **Profile → Two-step verification & passkeys**:
 scan the QR code and type the six-digit code it shows, to prove the app received
 the key. Turning two-step verification off requires your password, so a stolen
 but still-signed-in session cannot quietly remove it.
@@ -1226,9 +1548,16 @@ working, not a fault.
 **Recovery codes.** Ten of them, issued the first time you set up *either*
 factor — an authenticator app or a passkey — and shown once. Each works once.
 They are hashed like passwords, so nobody can read them back to you; regenerate
-a set from **Settings → Account security** (it invalidates the old one) and
+a set from **Profile → New recovery codes** (it invalidates the old one) and
 store them somewhere other than the device they are protecting. Removing your
 last second factor clears them, because there is then nothing to recover into.
+
+**Keep me signed in.** Ticked, which is the default, a sign-in lasts
+`SESSION_LIFETIME_SECONDS` (14 days). Unticked, the cookie ends when the
+browser closes and the server forgets the session after
+`SESSION_BROWSER_LIFETIME_SECONDS` unused (12 hours). The choice carries
+through the second factor and a passkey sign-in, and revoking a session works
+the same either way.
 
 **The order of a sign-in.** Once *either* second factor is set up, a correct
 password alone is not a sign-in: it parks the browser on a two-step verification
@@ -1257,9 +1586,8 @@ history. `maintenance:prune` removes entries older than
 
 ### Active sessions
 
-**Settings → Account security** lists every browser signed in as you — device,
-address, when it started and when it was last seen — with the current one
-marked. Revoking one deletes its session row, so that browser is anonymous on
+**Profile → Where you're signed in** lists every browser signed in as you —
+device, address and when it was last seen — with the current one marked. Revoking one deletes its session row, so that browser is anonymous on
 its very next request; there is no window in which a revoked session still
 works. A completed password reset revokes every session on the account, since
 the reset may well have been prompted by somebody else having one.
@@ -1276,7 +1604,7 @@ through.
 
 ### Tokens
 
-Issue one under **Settings → API tokens**. A token looks like
+Issue one under **Settings → Data & integrations → API tokens**. A token looks like
 `rnv_<public id>_<secret>`; only a hash of the secret is stored, so it is shown
 once and cannot be recovered. Choose **read-only** unless something genuinely
 needs to make changes.
@@ -1365,13 +1693,15 @@ you had typed them in.
 
 ## Backup and restore
 
-**Settings → Backup and restore** downloads a ZIP of everything the household
+**Settings → Data & integrations → Backup & restore** downloads a ZIP of everything the household
 has: subscriptions, categories, tags, budgets, logos and attached invoices, as
 JSON plus the original files. Nothing in it needs a database to read.
 
 It is built through the scoping layer rather than by dumping tables, which means
 it contains what *you* can see — on an ISOLATED instance, your own subscriptions
-and not other members'. Deliberately **not** included: user accounts, passwords,
+and not other members', and in either mode not another member's "only me"
+subscriptions. The export screen says how many of those it is leaving out, and
+the archive's manifest records the count. Deliberately **not** included: user accounts, passwords,
 API tokens, the audit log and instance-wide settings. Those belong to the server
 rather than to the household, and a household Owner who could round-trip them
 would be able to reconfigure the instance through the backup screen. Members are
@@ -1406,7 +1736,14 @@ day to cancel each subscription before its notice period makes that impossible.
 The third is the one a calendar is genuinely better at than a notification: it
 is a deadline, and seeing it a fortnight out is the whole point.
 
-The URL is shown, ready to copy, under **Settings → API tokens**.
+Get the link from the **Calendar feed** card on the Calendar screen. **Create
+a link** issues a read-only token for it and shows the full address, with a
+Copy button, **once**: like every token, its secret is stored only as a hash,
+so the card afterwards says when the link was made and last fetched, and
+nothing more. **Create a new link** retires the old one immediately — every
+calendar subscribed to it stops updating — which is why it asks first. It
+replaces only the token that card issued; a read-only token you made yourself
+under **Settings → Data & integrations** works just as well and is left alone.
 
 Every event is a whole-day event — a billing date is a date, not an instant —
 and its identifier is stable, so a client that refetches on a timer recognises
@@ -1450,16 +1787,32 @@ location with `ATTACHMENT_DIRECTORY`.
 ## Households and people
 
 A household is what Renovo scopes everything to, and an **Owner/Admin** is the
-person who decides who is in it. **Settings → Members** lists everybody, with
-their role, whether they have taken up their invitation, and when they were last
-here; the controls beside each row are drawn only for an Owner, and an Editor or
-Viewer reaching one of those routes directly gets a 403 rather than a hidden
+person who decides who is in it. **Members & roles** lists everybody, with
+their role, whether they have taken up their invitation, when they were last
+here and their monthly share after splits. Every member of the household may
+read it; the controls beside each row are drawn only for an Owner, and anybody
+else reaching one of those routes directly gets a 403 rather than a hidden
 button.
+
+What a share shows depends on who is looking. A Viewer sees their own and a
+dash for everybody else, because what other people spend is not an onlooker's
+business; on an ISOLATED instance everybody sees only their own, because
+anybody else's would be a fraction of the truth; and a member's "only me"
+subscriptions count in nobody's view but their own.
+
+Beneath the list, **What each role can do** is a table generated from the
+permissions the server enforces and the scoping rules — Yes, Own only or No,
+each in a word and an icon — so it cannot claim something a route would refuse.
+On an ISOLATED instance every role's view and edit cells read Own only, an
+Owner's included. **Data visibility** states the instance's mode; only an
+instance administrator is shown the way to the setting that changes it.
 
 Adding somebody creates an account and a membership **of this household** —
 never a second household, which is the one thing that separates this from open
-sign-up. They are sent a link, and they choose their own password: an
-administrator never sets one and never sees one.
+sign-up. They are sent a link that lasts seven days, and they choose their own
+password: an administrator never sets one and never sees one. Nobody is invited
+as an Owner — invite them as an Editor, Contributor or Viewer and promote them
+once they are here.
 
 The exception is a member with no mailbox of their own — a child, in practice.
 Tick **this member has no email address** and Renovo creates the account with a
@@ -1473,8 +1826,9 @@ has, everywhere, at once — and remove them from the household. Two things are
 refused however they are attempted: acting on the household's **last Owner**, so
 it cannot lock itself out, and leaving a row behind that belongs to nobody. On
 removal, what the departing member owned is handed to the Owner doing the
-removing; on an ISOLATED instance, where those rows were private, you are asked
-first whether to reassign or delete them.
+removing. Where they own rows nobody else has seen — everything on an ISOLATED
+instance, their "only me" subscriptions on a SHARED one — you must choose
+whether to reassign or delete them, and a removal that does not say is refused.
 
 Everything an Owner does to somebody else's account is written to the audit log
 with both the actor and the target.
@@ -1507,7 +1861,7 @@ messages, reminder emails, the calendar feed, even the handful of messages its
 JavaScript can produce — comes from a catalogue keyed by name. `en` is the base
 and the only one that ships.
 
-Each account chooses its own language under **Settings → Appearance**, or
+Each account chooses its own language under **Profile → Appearance & preferences**, or
 follows the instance (`APP_LOCALE`). Somebody who is not signed in gets the best
 match for their browser's `Accept-Language`, and the instance default when there
 is no match. Dates and money follow the same choice: they are formatted by ICU,
@@ -1569,23 +1923,40 @@ of files in `translations/`.
 
 ## Calendar
 
-**Calendar** shows the month: every renewal on the day it falls, and the day
-each free trial starts charging. The figures come from the same forecast the
-budgets and the twelve-month view use, so a scheduled price rise shows the
-amount that will actually be taken rather than today's price.
+**Calendar** shows the month: every renewal on the day it falls, the day each
+free trial starts charging, and the last day to cancel anything with a notice
+period. The figures come from the same forecast the budgets and the
+twelve-month view use, so a scheduled price rise shows the amount that will
+actually be taken rather than today's price.
+
+Each day draws up to three chips — **Charge**, **Trial ends** and **Cancel
+by**, each with its own icon and word as well as its colour — then "+N more",
+and the day's total. Choose a day and the panel beside the grid lists
+everything on it: what it is, whose it is, and the amount in its own currency
+with roughly what that is in the base currency. It is a link, so it works
+without script (`?day=`). Beside it are the month's total, its number of
+charges and its heaviest day. Totals follow the per-currency rule: a combined
+figure only when every currency has a rate, and the heaviest day is left out
+when one of them does not, rather than naming the wrong day. A deadline is on
+the grid but in no total — it is a date, not a charge.
+
+Paused and cancelled subscriptions are not on it, and a private one only for
+the member it is private to — the same rows as the forecast, on the calendar
+and in the feed alike.
 
 It pages forward as far as the forecast goes and no further back than this
 month — this application tracks what is due, not a ledger of what was paid, so
-a calendar of last year would be an invention.
+a calendar of last year would be an invention. Previous is disabled on this
+month, and an address for a month outside that range answers 404.
 
-Weeks start on Monday or Sunday, per account, under **Settings → Appearance**.
+Weeks start on Monday or Sunday, per account, under **Profile → Appearance & preferences**.
 It is a preference rather than a property of the locale on purpose: `en_GB` and
 `en_US` disagree, and plenty of people read a Monday-first calendar in an
 American locale because that is how their working week runs.
 
 ## Making it yours
 
-All of this is per account, under **Settings → Appearance**, and none of it
+All of this is per account, under **Profile → Appearance & preferences**, and none of it
 needs any permission: it changes what one person sees and nothing that anybody
 else does.
 
@@ -1598,8 +1969,11 @@ else does.
 - **Open on** — the page you land on when you open Renovo. The dashboard,
   the subscriptions list, the calendar, budgets, the forecast or the statistics.
 - **Dashboard cards** — reorder them by number and untick the ones you do not
-  want. A card added by a later version appears in its default place rather
-  than silently going missing.
+  want, separately for the Overview and the Household dashboard. A card added by
+  a later version appears in its default place rather than silently going
+  missing. The subscriptions table is listed but off until you tick it.
+  Which of the two dashboards you open on is remembered from the toggle at the
+  top of the dashboard itself.
 
 ### Saved views
 
@@ -1692,9 +2066,9 @@ password for each, once:
 
 The second account is what makes the demonstration a household rather than a
 list. A **Contributor** reads everything and changes only their own part of it,
-so signing in as Rowan is the only way to see that role; the per-member
-breakdown on the dashboard and the Household screen need somebody to compare
-against before they draw anything at all; and the four budgets between them
+so signing in as Rowan is the only way to see that role; Who pays on the
+Household dashboard and the Household screen need somebody to compare against
+before they draw anything at all; and the four budgets between them
 land comfortable, near their limit and over it, which is every state the budget
 card has.
 

@@ -1,0 +1,73 @@
+{#
+    Tags: the same pattern as categories, without the colour.
+
+    Tags are usually made by typing one on a subscription; this section can
+    make one first, rename one everywhere it is used, or delete one — which
+    takes it off every subscription and deletes none of them. Managing them is
+    `tag.manage`.
+#}
+{% set may_manage = can(scope, 'tag.manage') %}
+
+<section class="card" id="tags" aria-labelledby="tags-heading">
+    <h2 id="tags-heading">{{ t('field.tags') }}</h2>
+    <p class="muted">{{ t('settings.tags_intro') }}</p>
+
+    {% if tags is empty %}
+        <p class="muted empty">{{ t('categories.no_tags_yet') }}</p>
+    {% else %}
+        <ul class="setting-chips">
+            {% for entry in tags %}
+                {% set tag = entry.item %}
+                {% set is_failed = failed.section == 'tags' and failed.id == tag.id %}
+                <li>
+                    {% if may_manage %}
+                        <details class="setting-chip" {{ is_failed ? 'open' : '' }}>
+                            <summary>
+                                <span class="setting-chip-name">{{ tag.name }}</span>
+                                <span class="setting-chip-count num">{{ entry.count }}<span class="visually-hidden"> {{ t('settings.subscriptions_count', {'count': entry.count}) }}</span></span>
+                                {{ icon('edit', 'setting-chip-icon') }}
+                            </summary>
+
+                            <div class="setting-chip-panel">
+                                <form method="post" action="/tags/{{ tag.id }}" class="inline-form">
+                                    {{ csrf_field() }}
+                                    <input type="text" name="name" maxlength="50" required
+                                           value="{{ is_failed ? values.name|default(tag.name) : tag.name }}"
+                                           aria-label="{{ t('settings.rename_tag', {'name': tag.name}) }}">
+                                    <button type="submit" class="button button-outline">{{ t('action.save') }}</button>
+                                </form>
+                                {% if is_failed and errors.name is defined %}<p class="field-error">{{ error_message(errors.name) }}</p>{% endif %}
+
+                                <form method="post" action="/tags/{{ tag.id }}/delete" class="inline"
+                                      onsubmit="return confirm('{{ t('confirm.delete_tag', {'name': tag.name})|e('js') }}')">
+                                    {{ csrf_field() }}
+                                    <button type="submit" class="button button-danger">
+                                        {{ icon('delete') }}{{ t('settings.delete_named', {'name': tag.name}) }}
+                                    </button>
+                                </form>
+                            </div>
+                        </details>
+                    {% else %}
+                        <span class="setting-chip is-static">
+                            <span class="setting-chip-name">{{ tag.name }}</span>
+                            <span class="setting-chip-count num">{{ entry.count }}<span class="visually-hidden"> {{ t('settings.subscriptions_count', {'count': entry.count}) }}</span></span>
+                        </span>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if may_manage %}
+        {% set new_failed = failed.section == 'tags' and failed.id is null %}
+        <form method="post" action="/tags" class="setting-add">
+            {{ csrf_field() }}
+            <label for="new_tag" class="visually-hidden">{{ t('settings.new_tag') }}</label>
+            <input type="text" id="new_tag" name="name" maxlength="50" required
+                   placeholder="{{ t('settings.new_tag') }}"
+                   value="{{ new_failed ? values.name|default('') : '' }}">
+            <button type="submit" class="button button-outline">{{ icon('add') }}{{ t('action.add') }}</button>
+        </form>
+        {% if new_failed and errors.name is defined %}<p class="field-error">{{ error_message(errors.name) }}</p>{% endif %}
+    {% endif %}
+</section>

@@ -32,6 +32,25 @@ final class SubscriptionFilter
         public readonly string $direction = 'asc',
         public readonly int $page = 1,
         public readonly int $perPage = self::DEFAULT_PER_PAGE,
+        /**
+         * One state only, from the status filter. Null is "every state the
+         * rest of the filter admits".
+         */
+        public readonly ?SubscriptionStatus $status = null,
+        /**
+         * Whether cancelled rows come along with the paused ones when no
+         * status is chosen. True by default so the API's `inactive=1` keeps
+         * meaning "everything switched off"; the web list turns it off, and a
+         * cancelled row is found there under its own filter.
+         */
+        public readonly bool $includeCancelled = true,
+        /**
+         * "Mine": the rows the viewer owns or has a share of a split in. A
+         * narrowing of what the scope already admits, never a widening — the
+         * repository applies it inside the scoped query, so it cannot reach a
+         * row the viewer could not have paged to anyway.
+         */
+        public readonly bool $mine = false,
     ) {
     }
 
@@ -70,23 +89,29 @@ final class SubscriptionFilter
             direction: ($query['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc',
             page: max(1, (int) ($query['page'] ?? 1)),
             perPage: self::DEFAULT_PER_PAGE,
+            status: SubscriptionStatus::tryFrom(is_string($query['status'] ?? null) ? $query['status'] : ''),
+            mine: ($query['scope'] ?? '') === 'mine',
         );
     }
 
     /**
-     * The same filter with paused subscriptions included.
+     * The same filter as the web list reads it: paused subscriptions included,
+     * cancelled ones left to their own filter.
      *
      * The web list has no "include paused" control any more: it always shows
-     * them, sunk to the bottom by the repository's ordering. The API keeps the
+     * them, sunk to the bottom by the repository's ordering. A cancelled row is
+     * finished rather than resting, and showing it among them would make the
+     * list read as a history of everything ever tracked. The API keeps the
      * `inactive` parameter and its default, which is why this is a wither the
      * web controller applies rather than a new default on the constructor.
      */
     public function withIncludeInactive(): self
     {
-        if ($this->includeInactive) {
-            return $this;
-        }
+        return $this->copy(includeInactive: true, includeCancelled: false);
+    }
 
+    private function copy(bool $includeInactive, bool $includeCancelled): self
+    {
         return new self(
             search: $this->search,
             categoryId: $this->categoryId,
@@ -94,12 +119,45 @@ final class SubscriptionFilter
             ownerUserId: $this->ownerUserId,
             currency: $this->currency,
             type: $this->type,
-            includeInactive: true,
+            includeInactive: $includeInactive,
             sort: $this->sort,
             direction: $this->direction,
             page: $this->page,
             perPage: $this->perPage,
+            status: $this->status,
+            includeCancelled: $includeCancelled,
+            mine: $this->mine,
         );
+    }
+
+    /**
+     * The same filter with no paging, for the callers that need every row it
+     * matches rather than one page of them: the summary line's monthly total
+     * and the CSV export.
+     */
+    public function unpaged(): self
+    {
+        return new self(
+            search: $this->search,
+            categoryId: $this->categoryId,
+            tagIds: $this->tagIds,
+            ownerUserId: $this->ownerUserId,
+            currency: $this->currency,
+            type: $this->type,
+            includeInactive: $this->includeInactive,
+            sort: $this->sort,
+            direction: $this->direction,
+            page: 1,
+            perPage: 0,
+            status: $this->status,
+            includeCancelled: $this->includeCancelled,
+            mine: $this->mine,
+        );
+    }
+
+    public function isPaged(): bool
+    {
+        return $this->perPage > 0;
     }
 
     /**
@@ -119,7 +177,9 @@ final class SubscriptionFilter
             || $this->tagIds !== []
             || $this->ownerUserId !== null
             || $this->currency !== null
-            || $this->type !== null;
+            || $this->type !== null
+            || $this->status !== null
+            || $this->mine;
     }
 
     /**
@@ -127,8 +187,10 @@ final class SubscriptionFilter
      * headers and pager links so they keep the rest of the filter intact.
      *
      * @param array<string, string|int|null> $overrides
+     * @param list<int>|null $tagIds The tag chips to carry instead of this
+     *        filter's own, for a chip link that toggles one of them.
      */
-    public function toQueryString(array $overrides = []): string
+    public function toQueryString(array $overrides = [], ?array $tagIds = null): string
     {
         $params = array_filter([
             'q' => $this->search !== '' ? $this->search : null,
@@ -136,6 +198,8 @@ final class SubscriptionFilter
             'owner' => $this->ownerUserId,
             'currency' => $this->currency,
             'type' => $this->type?->value,
+            'status' => $this->status?->value,
+            'scope' => $this->mine ? 'mine' : null,
             'inactive' => $this->includeInactive ? '1' : null,
             'sort' => $this->sort,
             'dir' => $this->direction,
@@ -151,11 +215,25 @@ final class SubscriptionFilter
         }
 
         $query = http_build_query($params);
-        foreach ($this->tagIds as $tagId) {
+        foreach ($tagIds ?? $this->tagIds as $tagId) {
             $query .= ($query === '' ? '' : '&') . 'tag[]=' . $tagId;
         }
 
         return $query;
+    }
+
+    /**
+     * The query a tag chip links to: this filter with that tag switched —
+     * added when it is not chosen, taken away when it is — and back to the
+     * first page, since the set of rows has changed under the pager.
+     */
+    public function queryTogglingTag(int $tagId): string
+    {
+        $tagIds = in_array($tagId, $this->tagIds, true)
+            ? array_values(array_filter($this->tagIds, static fn (int $id): bool => $id !== $tagId))
+            : [...$this->tagIds, $tagId];
+
+        return $this->toQueryString(['page' => null], $tagIds);
     }
 
     private static function positiveIntOrNull(mixed $value): ?int

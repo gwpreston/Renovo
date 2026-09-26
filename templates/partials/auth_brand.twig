@@ -1,0 +1,51 @@
+{#
+    The signed-out layout's brand panel: the mark, the instance's name, and
+    what Renovo does.
+
+    The name is `instance_name` rather than a wordmark, as in the rail: the
+    operator may have called the instance something else, and theirs is the
+    name that belongs over their sign-in form.
+
+    The pitch is careful not to promise what the application does not keep. It
+    names no channel — there are eleven, and the list will change — and it
+    says the data stays on this server, not that nothing leaves it: exchange
+    rates are fetched and reminders are sent.
+
+    Below 900px the stylesheet reduces the panel to the mark and the name, so
+    on a phone the form is the first thing on the screen; the pitch is still in
+    the page for a screen reader, which reads the panel as a complementary
+    landmark before the form.
+#}
+<aside class="auth-brand" aria-label="{{ instance_name }}">
+    <div class="auth-brand-head">
+        <svg class="brand-mark auth-mark" viewBox="0 0 460 427" aria-hidden="true" focusable="false">
+            <use href="#renovo-mark"></use>
+        </svg>
+        <div>
+            <p class="auth-instance">{{ instance_name }}</p>
+            <p class="auth-tagline">{{ t('shell.tagline') }}</p>
+        </div>
+    </div>
+
+    <div class="auth-pitch">
+        <p class="auth-pitch-title">{{ t('auth_brand.pitch') }}</p>
+
+        <ul class="auth-points">
+            {% for point in [
+                {'icon': 'household', 'key': 'household'},
+                {'icon': 'currency', 'key': 'currency'},
+                {'icon': 'notifications', 'key': 'reminders'}
+            ] %}
+                <li class="auth-point">
+                    <span class="auth-point-icon">{{ icon(point.icon) }}</span>
+                    <span>
+                        <span class="auth-point-title">{{ t('auth_brand.' ~ point.key ~ '_title') }}</span>
+                        <span class="auth-point-body">{{ t('auth_brand.' ~ point.key ~ '_body') }}</span>
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <p class="auth-brand-foot">{{ t('auth_brand.footer') }}</p>
+</aside>

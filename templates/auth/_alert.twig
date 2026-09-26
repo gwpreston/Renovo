@@ -1,0 +1,10 @@
+{#
+    A failure the reader has to act on, above the form: the `bad` pair, an
+    icon, and `role="alert"` so a screen reader announces it as the page loads.
+
+    `message` is a finished sentence — pass it through error_message() or t().
+#}
+<div class="auth-alert" role="alert">
+    {{ icon('alert') }}
+    <p>{{ message }}</p>
+</div>

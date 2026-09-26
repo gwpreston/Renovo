@@ -29,7 +29,15 @@ final class AuthService
 {
     public const MIN_PASSWORD_LENGTH = 10;
 
-    private const VERIFICATION_TOKEN_TTL = '+2 days';
+    /**
+     * The length the password meter treats as comfortably long. Not a rule —
+     * validatePassword() has only the minimum — but where the meter's second
+     * bar starts, derived from the minimum so the two cannot drift apart.
+     */
+    private const LONG_PASSWORD_EXTRA = 4;
+
+    /** How long a confirmation link works; stated on the pages that send one. */
+    private const VERIFICATION_LIFETIME_DAYS = 2;
 
     public function __construct(
         private readonly UserRepository $users,
@@ -101,7 +109,7 @@ final class AuthService
         $token = $this->tokens->issue(
             $user->id,
             TokenRepository::PURPOSE_VERIFY_EMAIL,
-            $this->clock->now()->modify(self::VERIFICATION_TOKEN_TTL),
+            $this->clock->now()->modify(sprintf('+%d days', self::VERIFICATION_LIFETIME_DAYS)),
         );
 
         $link = rtrim($this->appUrl, '/') . '/verify-email?token=' . urlencode($token);
@@ -116,6 +124,60 @@ final class AuthService
             $this->translator->trans('mail.verify.subject', ['instance' => $this->settings->instanceName()], $locale),
             $this->translator->trans('mail.verify.body', ['name' => $user->displayName, 'link' => $link], $locale),
         );
+    }
+
+    /**
+     * Send the confirmation link again, to an address that is waiting for one.
+     *
+     * Shaped like a password-reset request, for the same reason: the page that
+     * follows is identical whether the address has an account, has one already
+     * confirmed, or has none, and every request counts against the same kind
+     * of limit — so the form cannot be used to learn which addresses exist.
+     *
+     * @throws ValidationException when the request is being throttled.
+     */
+    public function resendVerification(string $email, string $ipAddress): void
+    {
+        $email = $this->users->normaliseEmail($email);
+
+        $remaining = $this->rateLimiter->remainingLockoutSeconds(
+            AuthAttemptRepository::KIND_VERIFY_RESEND,
+            $email,
+            $ipAddress,
+        );
+
+        if ($remaining > 0) {
+            throw ValidationException::field(
+                'email',
+                'error.verify.throttled',
+                ['minutes' => max(1, (int) ceil($remaining / 60))],
+            );
+        }
+
+        $this->rateLimiter->recordFailure(AuthAttemptRepository::KIND_VERIFY_RESEND, $email, $ipAddress);
+
+        $user = $this->users->findByEmail($email);
+        if ($user === null || $user->isVerified()) {
+            return;
+        }
+
+        $this->sendVerificationEmail($user);
+    }
+
+    public function verificationLifetimeDays(): int
+    {
+        return self::VERIFICATION_LIFETIME_DAYS;
+    }
+
+    /**
+     * What became of a confirmation link that did not confirm anything — spent
+     * (the address is confirmed already) or run out (a new one is needed).
+     *
+     * @return TokenRepository::STATE_*
+     */
+    public function verificationLinkState(string $token): string
+    {
+        return $this->tokens->state($token, TokenRepository::PURPOSE_VERIFY_EMAIL);
     }
 
     /**
@@ -228,6 +290,24 @@ final class AuthService
         $this->rateLimiter->recordSuccess(AuthAttemptRepository::KIND_LOGIN, $email, $ipAddress);
 
         return $user;
+    }
+
+    /**
+     * What the meter under every new-password field is drawn from.
+     *
+     * The meter is a hint, not a second set of rules: `min` is the rule this
+     * class applies, and below it the meter says "Too short" — the only verdict
+     * the server shares. Above it, `long` and the mix of characters decide how
+     * many bars light, and the server accepts all of them alike.
+     *
+     * @return array{min: int, long: int}
+     */
+    public static function passwordMeterRules(): array
+    {
+        return [
+            'min' => self::MIN_PASSWORD_LENGTH,
+            'long' => self::MIN_PASSWORD_LENGTH + self::LONG_PASSWORD_EXTRA,
+        ];
     }
 
     /**

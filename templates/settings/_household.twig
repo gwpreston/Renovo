@@ -1,0 +1,64 @@
+{#
+    Household: its name, and the currency everything is totalled in.
+
+    The name is the household's, changed by its Owner/Admin. The base
+    currency is the instance's — every household on the server is totalled in
+    it — so it is changed only by an instance administrator. Somebody who may
+    change both gets one form and one button, posting to the household route,
+    which asks for instance administration too when a currency is posted. An
+    instance administrator who may not rename the household gets the currency
+    alone, posting to an instance-administration route. Everybody else is told
+    what each is and who sets it. There is no rounding option (decision 14).
+#}
+{% set may_rename = household and can(scope, 'household.manage') %}
+{% set may_set_currency = can(scope, 'instance.manage') %}
+
+<section class="card" id="household" aria-labelledby="household-heading">
+    <h2 id="household-heading">{{ t('settings.household') }}</h2>
+
+    {% if household and not may_rename %}
+        <dl class="settings-facts">
+            <dt>{{ t('settings.household_name') }}</dt>
+            <dd>{{ household.name }}</dd>
+        </dl>
+        <p class="hint">{{ t('settings.household_permission_note') }}</p>
+    {% endif %}
+
+    {% if may_rename or may_set_currency %}
+        <form method="post" action="{{ may_rename ? '/settings/household' : '/settings/currency' }}"
+              class="stack{{ household and not may_rename ? ' settings-subform' }}">
+            {{ csrf_field() }}
+
+            {% if may_rename %}
+                <label for="household_name">{{ t('settings.household_name') }}</label>
+                <input type="text" id="household_name" name="name" value="{{ household.name }}" maxlength="100" required>
+            {% endif %}
+
+            {% if may_set_currency %}
+                <label for="base_currency">{{ t('settings.base_currency') }}</label>
+                <select id="base_currency" name="base_currency" aria-describedby="base_currency_hint">
+                    {% for code in currencies %}
+                        <option value="{{ code }}" {{ base_currency == code ? 'selected' : '' }}>{{ t('currency.option', { 'code': code, 'name': t('currency.name.' ~ code) }) }}</option>
+                    {% endfor %}
+                </select>
+                <p class="hint" id="base_currency_hint">
+                    {{ t('settings.base_currency_hint') }} {{ t('settings.base_currency_instance_note') }}
+                </p>
+            {% endif %}
+
+            <div class="form-actions">
+                <button type="submit" class="button button-outline">{{ t(may_rename ? 'settings.save_household' : 'settings.save_currency') }}</button>
+            </div>
+        </form>
+    {% endif %}
+
+    {% if not may_set_currency %}
+        <dl class="settings-facts{{ household ? ' settings-subform' }}">
+            <dt>{{ t('settings.base_currency') }}</dt>
+            <dd class="num">{{ base_currency }}</dd>
+        </dl>
+        <p class="hint">
+            {{ t('settings.base_currency_hint') }} {{ t('settings.set_by_instance_admin') }}
+        </p>
+    {% endif %}
+</section>

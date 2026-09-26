@@ -81,9 +81,18 @@ abstract class Controller
         return $this->view->render($response, $template, $this->decorate($request, $data));
     }
 
+    /**
+     * Whether htmx asked for a fragment.
+     *
+     * Not when it is restoring history: after a `hx-push-url` swap, going
+     * Back to a page htmx has no snapshot of makes it re-fetch the URL with
+     * both headers and put the response in place of the whole body. A
+     * fragment there would leave the page as one card.
+     */
     protected function isHtmx(ServerRequestInterface $request): bool
     {
-        return $request->getHeaderLine('HX-Request') === 'true';
+        return $request->getHeaderLine('HX-Request') === 'true'
+            && $request->getHeaderLine('HX-History-Restore-Request') !== 'true';
     }
 
     protected function redirect(ResponseInterface $response, string $location): ResponseInterface
@@ -105,6 +114,27 @@ abstract class Controller
         }
 
         return $this->redirect($response, $location);
+    }
+
+    /**
+     * Where an action on one subscription sends the member back to: its edit
+     * page when the form said it came from there, otherwise its cost page.
+     *
+     * The price-change, attachment and cancel controls appear on both pages.
+     * Only these two exact paths are honoured — never an arbitrary one — so
+     * the field can never become a redirect to somewhere unexpected.
+     */
+    protected function subscriptionReturn(ServerRequestInterface $request, int $id, string $fallback = ''): string
+    {
+        $body = $this->body($request);
+        $target = is_scalar($body['return_to'] ?? null) ? (string) $body['return_to'] : '';
+        $edit = '/subscriptions/' . $id . '/edit';
+        $money = '/subscriptions/' . $id . '/money';
+
+        return match ($target) {
+            $edit, $money => $target,
+            default => $fallback !== '' ? $fallback : $money,
+        };
     }
 
     protected function user(ServerRequestInterface $request): User

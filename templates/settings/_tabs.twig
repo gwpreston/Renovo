@@ -1,0 +1,28 @@
+{#
+    The Settings page's tabs, as links.
+
+    Each tab is a page of its own — `/settings`, `/settings/data`,
+    `/settings/instance` — so each works without script, can be bookmarked,
+    and is answered by its own route: the Instance tab's 403 is the server's,
+    not a hidden panel's. The rail lights Settings on all three.
+
+    `aria-current="page"` marks the one being shown; the underline is drawn
+    from it, so what the eye sees and what a screen reader is told are one
+    fact. The Instance tab is offered only to an instance administrator,
+    which is also who its route admits.
+#}
+<nav class="page-tabs" aria-label="{{ t('settings.tabs_label') }}">
+    <ul class="page-tabs-list">
+        <li>
+            <a href="/settings" {{ tab == 'general' ? 'aria-current="page"' : '' }}>{{ t('settings.tab_general') }}</a>
+        </li>
+        <li>
+            <a href="/settings/data" {{ tab == 'data' ? 'aria-current="page"' : '' }}>{{ t('settings.tab_data') }}</a>
+        </li>
+        {% if can(scope, 'instance.manage') %}
+            <li>
+                <a href="/settings/instance" {{ tab == 'instance' ? 'aria-current="page"' : '' }}>{{ t('settings.tab_instance') }}</a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>

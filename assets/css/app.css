@@ -14,9 +14,8 @@
  * is now one stylesheet on the page.
  *
  * The cost of that, stated plainly: changing how Renovo looks now needs
- * `npm install && npm run build` rather than an editor and a reload. The
- * tokens in `tokens.css` are arranged so that most of what an operator would
- * want to change is a handful of custom properties at the top of one file.
+ * `npm install && npm run build` rather than an editor and a reload. Every
+ * colour is in `assets/theme/tokens.json`; shape and type are in `tokens.css`.
  */
 
 /*
@@ -51,7 +50,8 @@
 @source '../../src/Application/Twig';
 
 /*
- * Inter, installed from npm and served from this instance.
+ * The two typefaces, installed from npm and served from this instance: Plus
+ * Jakarta Sans for text, JetBrains Mono for every figure.
  *
  * Fontsource is Google Fonts' families repackaged for self-hosting, so "use a
  * Google font" and "load nothing from Google" are both satisfied: the import
@@ -59,12 +59,12 @@
  * copies into the web root. Nothing is fetched from fonts.googleapis.com, at
  * build time or after it.
  *
- * `wght.css` is the upright weight axis — one variable file covering 100–900,
- * which is every weight the interface needs without the italic axis nobody has
- * asked for. Its subset carries the `tnum` feature, which is the whole reason
- * the typeface is Inter; `base.css` switches it on for figures.
+ * `wght.css` is the upright weight axis — one variable file per script subset
+ * covering every weight the interface needs (400–800 for text, 400–700 for
+ * figures), without the italic axis nobody has asked for.
  */
-@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource-variable/plus-jakarta-sans/wght.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
 
 /*
  * The application's own styles, in cascade order: what things are, then what
@@ -76,7 +76,9 @@
  * added to a template in a later phase adjusts a component rather than
  * silently losing to one.
  */
+@import './generated/theme.css';
 @import './tokens.css';
 @import './base.css';
 @import './components.css';
 @import './screens.css';
+@import './auth.css';

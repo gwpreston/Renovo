@@ -434,8 +434,8 @@ fi
 step "Building front-end assets"
 # ---------------------------------------------------------------------------
 # The `assets` container started with the rest of the stack: it installs the JS
-# dependencies, compiles Tailwind, bundles the JavaScript, vendors the Inter
-# webfont, and then watches for changes. Every page needs the manifest that
+# dependencies, compiles Tailwind, bundles the JavaScript, vendors the
+# webfonts, and then watches for changes. Every page needs the manifest that
 # build writes — the layout asks it for the stylesheet's hashed name — so wait
 # for it rather than letting the next step report a 500.
 #
@@ -553,9 +553,14 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
             # post_form <path to read the token from> <path to post to> [curl args...]
             local form_path="$1" action="$2" t
             shift 2
+            # Called inside $(...), so the warning goes to stderr to be seen at
+            # all, and the failure is a status code rather than a non-zero
+            # return: under set -e a failed substitution would end the script
+            # without a word.
             if ! t="$(csrf "$BASE_URL$form_path")"; then
-                warn "could not load $form_path — is the session still valid?"
-                return 1
+                warn "could not read a form from $form_path — has the page moved?" >&2
+                printf '000'
+                return 0
             fi
             curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" \
                 -d "_csrf=$t" "$@" "$BASE_URL$action" || echo 000
@@ -574,8 +579,8 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
         CATEGORIES=0
         add_category() {
             local status
-            status="$(post_form "/categories" "/categories" -d "name=$1" -d "colour=$2")"
-            [ "$status" = "302" ] && CATEGORIES=$((CATEGORIES + 1))
+            status="$(post_form "/settings" "/categories" -d "name=$1" -d "colour=$2")"
+            if [ "$status" = "302" ]; then CATEGORIES=$((CATEGORIES + 1)); fi
         }
 
         add_category "Streaming"  "#e0516b"
@@ -814,7 +819,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
         add_budget() {
             local status
             status="$(post_form "/budgets/new" "/budgets" "$@")"
-            [ "$status" = "302" ] && BUDGETS=$((BUDGETS + 1))
+            if [ "$status" = "302" ]; then BUDGETS=$((BUDGETS + 1)); fi
         }
 
         # One overall budget and one scoped to a category, which is what makes
@@ -877,7 +882,7 @@ if [ "$SAMPLE_DATA" -eq 1 ]; then
         }
 
         MEMBER_READY=0
-        member_status="$(post_form "/settings/members" "/settings/members" \
+        member_status="$(post_form "/settings/members/invite" "/settings/members" \
             -d "display_name=Rowan" -d "email=$MEMBER_EMAIL" -d "role=contributor")"
 
         if [ "$member_status" != "302" ]; then

@@ -7,7 +7,6 @@ namespace App\Service;
 use App\Domain\Entity\HouseholdMember;
 use App\Domain\Entity\Subscription;
 use App\Domain\Entity\SubscriptionSplit;
-use App\Domain\HouseholdCapability;
 use App\Domain\Permission;
 use App\Domain\Rounding;
 use App\Security\PermissionService;
@@ -16,12 +15,13 @@ use App\Security\Scope;
 /**
  * The household as a list of people, each with what they carry.
  *
- * Three questions per member — how many subscriptions are theirs, what they
- * cost by month and by year, and what their role lets them do — and every one
- * of them is answered from something that already exists. The rows come from
- * the scoped subscription query, the shares from `SplitService`, the money
- * from `StatsService::combine()`, and the permissions from `PermissionService`
- * itself. Nothing here decides anything a second time.
+ * Two questions per member — how many subscriptions are theirs, and what they
+ * cost by month and by year — and both are answered from something that
+ * already exists. The rows come from the scoped subscription query, the shares
+ * from `SplitService` and the money from `StatsService::combine()`. Nothing
+ * here decides anything a second time. What each member's *role* lets them do
+ * is not per member at all; it is the members screen's role table, from
+ * `RoleMatrix`.
  *
  * **A member's figures are their share, not their inventory.** A subscription
  * they own outright counts in full; one they have split counts at their portion
@@ -40,7 +40,7 @@ use App\Security\Scope;
  * total a minor unit or two away from the household's own figure: £10 a year
  * split three ways is 83p a month for the household and 28p each on three
  * cards. Every individual figure is right to the minor unit; their sum is not
- * re-derived from the household's. This is what `ForecastService::proportion()`
+ * re-derived from the household's. This is what `SplitService::chargeShare()`
  * already does with a projected charge, and making it exact would mean
  * allocating against the normalised figure — a change to the split machinery
  * rather than to this screen.
@@ -55,9 +55,14 @@ use App\Security\Scope;
  * failure than a wrong one, which is the same judgement `StatsService` makes
  * about a currency it cannot convert.
  *
+ * **A Viewer is shown their own figures and nobody else's.** The roster is
+ * every member's to read, but what everybody else spends is the household's
+ * business rather than an onlooker's — that is `Permission::ViewHousehold`,
+ * which a Viewer does not hold. Their own share is not somebody else's
+ * spending, so it is the one figure they get.
+ *
  * @phpstan-import-type Combined from StatsService
  * @phpstan-type Figures array{totals: list<array{currency: string, amount_minor: int}>, combined: Combined}
- * @phpstan-type Rung array{capability: HouseholdCapability, held: bool}
  * @phpstan-type MemberOverview array{
  *     member: HouseholdMember,
  *     is_self: bool,
@@ -65,8 +70,7 @@ use App\Security\Scope;
  *     subscription_count: int,
  *     one_off_count: int,
  *     monthly: Figures,
- *     yearly: Figures,
- *     capabilities: list<Rung>
+ *     yearly: Figures
  * }
  */
 final class HouseholdOverviewService
@@ -84,16 +88,15 @@ final class HouseholdOverviewService
     /**
      * Every member of the household, with their share of it.
      *
-     * Empty for anybody whose role does not reach the screen, and empty for a
-     * user with no household. The caller renders what it is given, so a Viewer
-     * asking the dashboard for this gets a card with nothing in it rather than
-     * a card that has to remember to hide itself.
+     * Empty for a user with no household. Every member gets the roster; whose
+     * figures are filled in is decided here, row by row, so the caller renders
+     * what it is given and never asks.
      *
      * @return list<MemberOverview>
      */
     public function members(Scope $scope): array
     {
-        if (!$this->permissions->allows($scope, Permission::ViewHousehold)) {
+        if (!$this->permissions->allows($scope, Permission::ViewSubscriptions)) {
             return [];
         }
 
@@ -110,7 +113,12 @@ final class HouseholdOverviewService
 
         $subscriptions = $this->subscriptions->allForStats($scope);
         $splits = $this->splits->allInScope($scope);
-        $withheld = $scope->restrictsReadsToOwner();
+        // Two reasons for a blank, one outcome. In ISOLATED the figures that
+        // could be computed are a fraction of the truth; for a Viewer they are
+        // somebody else's spending. Either way the reader's own are complete
+        // and theirs to see.
+        $withheld = $scope->restrictsReadsToOwner()
+            || !$this->permissions->allows($scope, Permission::ViewHousehold);
 
         $overview = [];
         foreach ($members as $member) {
@@ -119,16 +127,72 @@ final class HouseholdOverviewService
             $overview[] = $this->forMember(
                 $member,
                 $isSelf,
-                // In ISOLATED the caller's own figures are the one complete
-                // answer available, so they are the one that is shown.
                 $withheld && !$isSelf,
                 $subscriptions,
                 $splits,
-                $scope,
             );
         }
 
         return $overview;
+    }
+
+    /**
+     * The dashboard's Who pays: each member's monthly share, and the part of
+     * the household's spend it is.
+     *
+     * In SHARED mode, every member whose figures are shown, with their share
+     * as a percentage of the members' shares added together — which is the
+     * household's spend, divided by who carries it. The percentages are
+     * withheld, not estimated, when any member's monthly figure cannot be
+     * totalled in one currency.
+     *
+     * **In ISOLATED mode only the viewer's own share**, and no percentage: the
+     * viewer cannot see the household's total, so a share *of* it would be
+     * invented, and listing the other members with blank figures would still
+     * say who has how many subscriptions. The card retitles itself "Your
+     * share" on `own_share_only`.
+     *
+     * Private rows are already absent from any viewer who is not their payer,
+     * because the scoped query never returned them; they count for the payer,
+     * in the payer's own view.
+     *
+     * A Viewer gets nothing: the card is a comparison of who carries what,
+     * and a Viewer is not shown what anybody else carries.
+     *
+     * @return array{rows: list<MemberOverview>, percents: array<int, int|null>, own_share_only: bool}
+     */
+    public function whoPays(Scope $scope): array
+    {
+        $members = $this->permissions->allows($scope, Permission::ViewHousehold) ? $this->members($scope) : [];
+        $ownOnly = $scope->restrictsReadsToOwner();
+
+        $rows = array_values(array_filter(
+            $members,
+            static fn (array $row): bool => $ownOnly ? $row['is_self'] : !$row['figures_withheld'],
+        ));
+
+        $percents = [];
+        if (!$ownOnly) {
+            $total = 0;
+            $complete = true;
+            foreach ($rows as $row) {
+                $amount = $row['monthly']['combined']['amount_minor'];
+                if ($amount === null) {
+                    $complete = false;
+                    break;
+                }
+                $total += $amount;
+            }
+
+            foreach ($rows as $row) {
+                $amount = $row['monthly']['combined']['amount_minor'];
+                $percents[$row['member']->userId] = $complete && $total > 0 && $amount !== null
+                    ? Rounding::multiplyDivide($amount, 100, $total)
+                    : null;
+            }
+        }
+
+        return ['rows' => $rows, 'percents' => $percents, 'own_share_only' => $ownOnly];
     }
 
     /**
@@ -167,7 +231,6 @@ final class HouseholdOverviewService
         bool $withheld,
         array $subscriptions,
         array $splits,
-        Scope $scope,
     ): array {
         $monthly = [];
         $yearly = [];
@@ -225,7 +288,6 @@ final class HouseholdOverviewService
             'one_off_count' => $oneOff,
             'monthly' => $this->figures($monthly),
             'yearly' => $this->figures($yearly),
-            'capabilities' => $this->capabilitiesOf($member, $scope),
         ];
     }
 
@@ -270,57 +332,5 @@ final class HouseholdOverviewService
         }
 
         return ['totals' => $totals, 'combined' => $this->stats->combine($byCurrency)];
-    }
-
-    /**
-     * Each rung of the ladder, and whether this member is on it.
-     *
-     * Every question is put to `PermissionService` with a scope carrying their
-     * role, so a card cannot claim something the routes would refuse. The
-     * instance-admin flag is deliberately false: this says what a *household
-     * role* confers, and the flag would quietly light rows on everybody's card
-     * that have nothing to do with the household.
-     *
-     * The two rungs that mention other people's rows ask the isolation mode as
-     * well. In ISOLATED the scoping layer restricts every read and write to the
-     * rows a member owns, whatever their role — so "see every line" and "add
-     * and edit anything" are false for an Owner there just as they are for
-     * everybody else, and saying otherwise would describe a power the
-     * repository does not grant.
-     *
-     * @return list<Rung>
-     */
-    private function capabilitiesOf(HouseholdMember $member, Scope $scope): array
-    {
-        $theirs = Scope::forMember(
-            $member->userId,
-            false,
-            (int) $scope->householdId,
-            $member->role,
-            $scope->isolationMode,
-        );
-
-        $mayWrite = $this->permissions->allows($theirs, Permission::UpdateSubscription);
-
-        $held = [
-            HouseholdCapability::SeeEverything->value =>
-                $this->permissions->allows($theirs, Permission::ViewSubscriptions)
-                && !$theirs->restrictsReadsToOwner(),
-            HouseholdCapability::EditOwn->value => $mayWrite,
-            // Two different questions, and a Contributor is the reason they
-            // cannot be one: they see every line and change only their own.
-            HouseholdCapability::EditAnything->value => $mayWrite && !$theirs->restrictsWritesToOwner(),
-            HouseholdCapability::SetBudgets->value =>
-                $this->permissions->allows($theirs, Permission::ManageBudgets),
-            HouseholdCapability::ManageMembers->value =>
-                $this->permissions->allows($theirs, Permission::ManageHousehold),
-        ];
-
-        $rungs = [];
-        foreach (HouseholdCapability::ladder() as $capability) {
-            $rungs[] = ['capability' => $capability, 'held' => $held[$capability->value]];
-        }
-
-        return $rungs;
     }
 }

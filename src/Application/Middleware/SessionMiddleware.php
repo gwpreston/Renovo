@@ -67,6 +67,7 @@ final class SessionMiddleware implements MiddlewareInterface
             if ($this->session->isStarted()) {
                 $userId = $this->session->get(AuthenticationMiddleware::SESSION_USER_ID);
                 $this->handler->associateUser(is_int($userId) ? $userId : null);
+                $this->handler->setPersistent($this->session->isPersistent());
 
                 // Write and close before the response goes out so the row is
                 // not held open across a slow client.

@@ -1,0 +1,31 @@
+{#
+    The next price rise: the soonest scheduled increase the Phase 13 rule
+    reports, old price to new, and what it adds over a month and a year.
+    Absent when there is none — never a placeholder, never a made-up one.
+#}
+{% if price_change %}
+    {% set rise = price_change %}
+    <section class="card price-banner" aria-labelledby="price-banner-heading">
+        <span class="kpi-icon kpi-icon-warn">{{ icon('trend-up') }}</span>
+        <div>
+            <h2 id="price-banner-heading" class="stat-label price-banner-label">{{ t('dashboard.price_change') }}</h2>
+            <p class="price-banner-title">
+                {{ t('dashboard.price_rises', {
+                    'name': rise.subscription.name,
+                    'from': rise.from.amountMinor|money(rise.from.currency),
+                    'to': rise.to.amountMinor|money(rise.to.currency),
+                    'date': rise.date|local_date('d MMMM'),
+                }) }}
+            </p>
+            <p class="muted">
+                {{ t('dashboard.price_rise_difference', {
+                    'monthly': rise.monthly_minor|money(rise.to.currency, true),
+                    'yearly': rise.annual_minor|money(rise.to.currency, true),
+                }) }}
+            </p>
+            <a class="button button-quiet" href="/subscriptions/{{ rise.subscription.id }}/money">
+                {{ t('dashboard.see_price_history') }}{{ icon('arrow-right') }}
+            </a>
+        </div>
+    </section>
+{% endif %}

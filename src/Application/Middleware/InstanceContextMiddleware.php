@@ -50,6 +50,10 @@ final class InstanceContextMiddleware implements MiddlewareInterface
         $environment->addGlobal('base_currency', $this->settings->baseCurrency());
         $environment->addGlobal('is_htmx', $request->getHeaderLine('HX-Request') === 'true');
         $environment->addGlobal('guest_theme', $this->guestTheme($request)->value);
+        // For the banner above a signed-out page's card: a visitor about to
+        // sign in to a demonstration is told it is one before they try to
+        // change anything.
+        $environment->addGlobal('demo_mode', $this->settings->isDemoMode());
 
         return $handler->handle($request);
     }

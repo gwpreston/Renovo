@@ -25,6 +25,8 @@ use Slim\Views\Twig;
  */
 final class BackupController extends Controller
 {
+    private const SECTION = SettingsController::DATA . '#backup';
+
     public function __construct(
         Twig $view,
         SessionInterface $session,
@@ -36,11 +38,13 @@ final class BackupController extends Controller
         parent::__construct($view, $session, $translator);
     }
 
-    public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    /**
+     * The backup screen became a section of Settings' Data & integrations tab
+     * in Phase 28; the path redirects there for bookmarks.
+     */
+    public function moved(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        return $this->render($request, $response, 'backup/index.twig', [
-            'format_version' => BackupService::FORMAT_VERSION,
-        ]);
+        return $this->redirect($response, self::SECTION);
     }
 
     public function export(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -59,7 +63,7 @@ final class BackupController extends Controller
         if ($handle === false) {
             $this->flash('error', 'flash.backup_failed');
 
-            return $this->redirectAfterWrite($request, $response, '/settings/backup');
+            return $this->redirectAfterWrite($request, $response, self::SECTION);
         }
 
         return $response
@@ -82,14 +86,14 @@ final class BackupController extends Controller
         if (!$file instanceof UploadedFileInterface || $file->getError() !== UPLOAD_ERR_OK) {
             $this->flash('error', 'flash.backup_file_required');
 
-            return $this->redirectAfterWrite($request, $response, '/settings/backup');
+            return $this->redirectAfterWrite($request, $response, self::SECTION);
         }
 
         $temporary = tempnam(sys_get_temp_dir(), 'renovo-upload');
         if ($temporary === false) {
             $this->flash('error', 'flash.backup_unreadable');
 
-            return $this->redirectAfterWrite($request, $response, '/settings/backup');
+            return $this->redirectAfterWrite($request, $response, self::SECTION);
         }
 
         $file->moveTo($temporary);
@@ -99,7 +103,7 @@ final class BackupController extends Controller
         } catch (ValidationException $exception) {
             $this->flashErrors($exception);
 
-            return $this->redirectAfterWrite($request, $response, '/settings/backup');
+            return $this->redirectAfterWrite($request, $response, self::SECTION);
         } finally {
             @unlink($temporary);
         }
@@ -117,6 +121,6 @@ final class BackupController extends Controller
             $this->flash('warning', 'flash.restore_skipped', ['count' => $summary['skipped']]);
         }
 
-        return $this->redirectAfterWrite($request, $response, '/settings/backup');
+        return $this->redirectAfterWrite($request, $response, self::SECTION);
     }
 }
