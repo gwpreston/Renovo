@@ -1,0 +1,39 @@
+{#
+    The price changes already announced for the next twelve months: the price
+    it was, the price it will be, and the day it changes. The forecast already
+    counts each from its date; this says which ones it is counting.
+
+    Absent when there are none — silence is a result.
+#}
+{% if price_changes is not empty %}
+    {% import 'partials/logo.twig' as logo %}
+
+    <section class="card forecast-changes" id="forecast-price-changes" aria-labelledby="forecast-changes-heading">
+        <header class="card-header">
+            <h2 id="forecast-changes-heading">{{ t('forecast.changes_heading') }}</h2>
+        </header>
+
+        <ul class="plain forecast-list">
+            {% for row in price_changes %}
+                <li class="forecast-list-row">
+                    <span class="forecast-row-name">
+                        {{ logo.mark(row.subscription, 20) }}
+                        <a href="/subscriptions/{{ row.subscription.id }}/money">{{ row.subscription.name }}</a>
+                    </span>
+                    <span class="forecast-row-detail muted">
+                        {{ t('forecast.change_from', {'date': row.change.effectiveFrom|local_date('d MMM y')}) }}
+                    </span>
+                    <span class="forecast-row-figure num">
+                        {{ row.previous.amountMinor|money(row.previous.currency) }}
+                        → {{ row.price.amountMinor|money(row.price.currency) }}
+                        {% if row.difference_minor is not null and row.difference_minor != 0 %}
+                            <span class="{{ row.difference_minor > 0 ? 'is-increase' : 'is-decrease' }}">
+                                {{ row.difference_minor|money(row.price.currency, true) }}
+                            </span>
+                        {% endif %}
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    </section>
+{% endif %}

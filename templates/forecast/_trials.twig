@@ -1,0 +1,44 @@
+{#
+    The trials that convert inside the next twelve months, soonest first: the
+    day it starts costing money, its first charge, the plan it moves to, and
+    what keeping it costs from then to the end of the horizon.
+
+    Read from the forecast's own conversion charges rather than the trials
+    ending soon, so "just mine" shows the member's share of each.
+#}
+{% import 'partials/logo.twig' as logo %}
+
+<section class="card forecast-trials" id="forecast-trials" aria-labelledby="forecast-trials-heading">
+    <header class="card-header">
+        <h2 id="forecast-trials-heading">{{ t('forecast.trials_heading') }}</h2>
+    </header>
+
+    {% if trials is empty %}
+        <p class="muted empty">{{ t('forecast.trials_empty') }}</p>
+    {% else %}
+        <ul class="plain forecast-list">
+            {% for trial in trials %}
+                <li class="forecast-list-row">
+                    <span class="forecast-row-name">
+                        {{ logo.mark(trial.subscription, 20) }}
+                        <a href="/subscriptions/{{ trial.subscription.id }}/money">{{ trial.subscription.name }}</a>
+                    </span>
+                    <span class="forecast-row-detail muted">
+                        {{ t('forecast.trial_converts_on', {'date': trial.date|local_date('d MMM')}) }}
+                        {% if trial.cycle_key is not null %}
+                            · {{ t(trial.cycle_key, {'days': trial.cycle_days}) }}
+                        {% endif %}
+                    </span>
+                    <span class="forecast-row-figure">
+                        <span class="num">{{ trial.amount.amountMinor|money(trial.amount.currency) }}</span>
+                        <span class="hint">
+                            {% for kept in trial.kept %}
+                                {{ t('forecast.trial_kept', {'amount': kept.amount_minor|money(kept.currency)}) }}{{ not loop.last ? ' · ' : '' }}
+                            {% endfor %}
+                        </span>
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+</section>

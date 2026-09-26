@@ -276,7 +276,7 @@ final class SpendChartService
      * One, two or five times a power of ten — the steps a person would choose
      * — so the axis reads 0/£300/£600 rather than 0/£287.50/£575.
      */
-    private function axisMax(int $max): int
+    public function axisMax(int $max): int
     {
         if ($max <= 0) {
             return 0;
@@ -304,7 +304,7 @@ final class SpendChartService
      *
      * @return list<ChartTick>
      */
-    private function ticks(int $axisMax, string $currency): array
+    public function ticks(int $axisMax, string $currency): array
     {
         if ($axisMax <= 0) {
             return [];

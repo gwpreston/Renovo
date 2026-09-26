@@ -264,7 +264,7 @@ final class MoneyPagesTest extends DatabaseTestCase
     {
         $body = (string) $this->get('/forecast', $this->ownerId)->getBody();
 
-        self::assertStringContainsString('Trial converts', $body);
+        self::assertMatchesRegularExpression('~id="forecast-trials".*?Converts .*?</section>~s', $body);
     }
 
     public function testTheCancellationsPageShowsTheNoticeDeadline(): void

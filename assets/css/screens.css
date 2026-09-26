@@ -622,18 +622,139 @@
 
 /* --------------------------------------------------------------- forecast */
 
-.forecast-events {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: var(--size-body);
+/*
+ * The Forecast page's chart: the spend bars, each in two parts — regular
+ * charges beneath in the first series colour, lump renewals on top in the
+ * second. A hairline of the card's own surface between the two keeps them
+ * apart where the colours sit close in a palette.
+ */
+.spend-bar-regular {
+    background: var(--s1);
 }
 
-.forecast-events li {
-    display: flex;
-    flex-wrap: wrap;
+.spend-bar-long {
+    background: var(--s2);
+    border-bottom: 1px solid var(--surface);
+}
+
+.chart-key-regular,
+.chart-key-long,
+.cadence-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-top: 0;
+    border-radius: 3px;
+}
+
+.chart-key-regular,
+.cadence-regular {
+    background: var(--s1);
+}
+
+.chart-key-long,
+.cadence-long {
+    background: var(--s2);
+}
+
+/* The same key beside each row of the cards. */
+.cadence-dot {
+    display: inline-block;
+    flex-shrink: 0;
+    align-self: center;
+}
+
+/*
+ * Each month is a link to it in the calendar: the bar for a pointer, the
+ * label for a keyboard. A label reads as the axis text it replaces until it
+ * is pointed at or focused.
+ */
+.forecast-chart .spend-bar:hover {
+    opacity: 0.85;
+}
+
+.forecast-chart .spend-bars-labels a {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    font-size: var(--size-caption);
+    color: var(--faint);
+    text-decoration: none;
+}
+
+.forecast-chart .spend-bars-labels a.is-current {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+}
+
+.forecast-chart .spend-bars-labels a:hover,
+.forecast-chart .spend-bars-labels a:focus-visible {
+    color: var(--text);
+    text-decoration: underline;
+}
+
+/* Twelve bars: labels fit down to a phone, where every other one shows. */
+@media (max-width: 479px) {
+    .forecast-chart .spend-bars-labels a:nth-child(even):not(.is-current) {
+        visibility: hidden;
+    }
+}
+
+/* A card's rows: name, a detail beneath it, the figure on the right. */
+.forecast-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.5rem 0 0;
+}
+
+.forecast-list-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.125rem 0.75rem;
     align-items: baseline;
+}
+
+.forecast-row-name {
+    display: flex;
+    flex: 1;
+    align-items: center;
     gap: 0.5rem;
+    min-width: 0;
+    font-weight: var(--weight-semibold);
+}
+
+.forecast-row-name .logo {
+    flex-shrink: 0;
+}
+
+.forecast-row-name .hint {
+    font-weight: var(--weight-normal);
+}
+
+.forecast-row-detail {
+    grid-column: 1;
+    font-size: var(--size-label);
+}
+
+.forecast-row-figure {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    font-weight: var(--weight-semibold);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.forecast-row-figure .hint {
+    display: block;
+    font-weight: var(--weight-normal);
+}
+
+.forecast-cancel .top-row {
+    align-items: center;
+}
+
+.forecast-cancel .top-figure {
+    text-align: right;
 }
 
 /* -------------------------------------------------------------- cancel-by */

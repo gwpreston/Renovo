@@ -3,18 +3,15 @@
 {% block heading %}{{ t('stats.title') }}{% endblock %}
 {% block page_subtitle %}{{ t('subtitle.stats') }}{% endblock %}
 
-{#
-    Analytics is one rail item covering two screens: this one, which says what
-    has happened, and the forecast, which says what is about to. The forecast
-    has no rail entry of its own — the design gives Analytics one row — so this
-    is the link that keeps it one click away, and the keyboard's `g f` and this
-    button reach the same page.
-#}
-{% block page_actions %}
-    <a class="button button-quiet" href="/forecast">{{ t('nav.forecast') }}</a>
-{% endblock %}
-
 {% block content %}
+    {#
+        Analytics is one rail item covering two screens: this one, which says
+        what has happened, and the forecast, which says what is about to. The
+        tabs are what keep the forecast one click away; the keyboard's `g f`
+        reaches the same page.
+    #}
+    {% include 'stats/_tabs.twig' with {tab: 'overview'} only %}
+
     {#
         The prototype's arrangement: the KPI row; twelve months back and twelve
         ahead; this year against last beside who pays and the most expensive;

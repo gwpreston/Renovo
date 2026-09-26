@@ -1,0 +1,47 @@
+{#
+    If you cancelled: the recurring subscriptions that will cost the most over
+    the next twelve months, and so what cancelling each today would save.
+
+    The figure is the sum of the charges the forecast expects — a price rise
+    already announced counts from its date, a trial only once it converts — in
+    the currency actually charged. Ranked on that sum in the base currency; a
+    subscription whose currency has no rate cannot be ranked, and is counted
+    beneath instead. It links to the subscription and changes nothing.
+#}
+{% import 'partials/logo.twig' as logo %}
+
+<section class="card analytics-top forecast-cancel" id="forecast-if-cancelled" aria-labelledby="forecast-cancel-heading">
+    <header class="card-header">
+        <div>
+            <h2 id="forecast-cancel-heading">{{ t('forecast.cancel_heading') }}</h2>
+            <p class="muted">{{ t('forecast.cancel_note') }}</p>
+        </div>
+    </header>
+
+    {% if if_cancelled.rows is empty %}
+        <p class="muted empty">{{ t('forecast.cancel_empty') }}</p>
+    {% else %}
+        <ol class="plain top-list">
+            {% for row in if_cancelled.rows %}
+                <li class="top-row">
+                    <span class="top-rank num">{{ loop.index }}</span>
+                    <span class="forecast-row-name">
+                        {{ logo.mark(row.subscription, 20) }}
+                        <a href="/subscriptions/{{ row.subscription.id }}/money">{{ row.subscription.name }}</a>
+                        <span class="cadence-dot cadence-{{ row.cadence }}" aria-hidden="true"></span>
+                        <span class="hint">{{ t('forecast.cancel_charges', {'count': row.charge_count}) }}</span>
+                    </span>
+                    <span class="top-figure num">
+                        {% for amount in row.amounts %}
+                            {{ amount.amount_minor|money(amount.currency) }}{{ not loop.last ? ' · ' : '' }}
+                        {% endfor %}
+                    </span>
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+
+    {% if if_cancelled.excluded_count > 0 %}
+        <p class="hint">{{ t('stats.notable_excluded', {'count': if_cancelled.excluded_count}) }}</p>
+    {% endif %}
+</section>

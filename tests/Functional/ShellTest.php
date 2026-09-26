@@ -48,8 +48,9 @@ final class ShellTest extends DatabaseTestCase
      * Where a shortcut goes that the shell itself does not link to.
      *
      * Analytics is one rail item over two screens, so the forecast is linked
-     * from the statistics page rather than from the navigation — see the design
-     * table in PHASE.md. Anything else a shortcut reaches must be in the shell.
+     * from the statistics page's tabs rather than from the navigation — see the
+     * design table in PHASE.md. Anything else a shortcut reaches must be in the
+     * shell.
      */
     private const LINKED_FROM = ['/forecast' => '/stats'];
 

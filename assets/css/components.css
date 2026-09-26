@@ -1274,12 +1274,10 @@ a.rates-chip:hover {
 }
 
 /*
- * The compact lists — the dashboard's renewals and the forecast's months — put
- * the mark inline with the name rather than in a column of its own, so it needs
- * the gap a flex row would have given it.
+ * The dashboard's renewals put the mark inline with the name rather than in a
+ * column of its own, so it needs the gap a flex row would have given it.
  */
-.renewal-name .logo,
-.forecast-events .logo {
+.renewal-name .logo {
     vertical-align: -0.2em;
     margin-right: 0.4rem;
 }

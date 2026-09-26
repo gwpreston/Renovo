@@ -2,7 +2,7 @@
 
 {% block title %}{{ t('nav.forecast') }} — {{ instance_name }}{% endblock %}
 
-{% block heading %}{{ t('forecast.next_12_months') }}{% endblock %}
+{% block heading %}{{ t('stats.title') }}{% endblock %}
 {% block page_subtitle %}{{ t('subtitle.forecast') }}{% endblock %}
 
 {% block page_actions %}
@@ -12,68 +12,32 @@
 {% endblock %}
 
 {% block content %}
-    {% import 'partials/logo.twig' as logo %}
-    <p class="muted note">
-        {{ t('forecast.intro') }}
-    </p>
+    {#
+        The second of Analytics' two tabs: what the next twelve months will
+        cost. The KPI row; the months as bars, regular charges beneath and lump
+        renewals on top; what cancelling would save beside the trials about to
+        start costing money; and the price changes already announced. A month's
+        charges one by one are the calendar's, which each bar links to.
 
-    <section class="card">
-        <div class="table-scroll">
-            <table class="table">
-                <thead>
-                <tr>
-                    <th scope="col">{{ t('field.month') }}</th>
-                    <th scope="col">{{ t('field.due') }}</th>
-                    <th scope="col" class="numeric">{{ t('field.total') }}</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for month in months %}
-                    <tr>
-                        <th scope="row">{{ month.label }}</th>
-                        <td>
-                            {% if month.events is empty %}
-                                <span class="muted">{{ t('forecast.nothing_due') }}</span>
-                            {% else %}
-                                <ul class="plain forecast-events">
-                                    {% for event in month.events %}
-                                        <li>
-                                            {{ logo.mark(event.subscription, 20) }}
-                                            <a href="/subscriptions/{{ event.subscription.id }}/money">{{
-                                                event.subscription.name }}</a>
-                                            <span class="muted">{{ event.date|local_date('d MMM') }}</span>
-                                            {% if event.reason == 'trial_conversion' %}
-                                                <span class="badge badge-warn">{{ t('state.trial_converts') }}</span>
-                                            {% elseif event.reason == 'one_off' %}
-                                                <span class="badge">{{ t('type.one_off') }}</span>
-                                            {% endif %}
-                                            <span class="renewal-amount num">{{
-                                                event.amount.amountMinor|money(event.amount.currency) }}</span>
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
-                        </td>
-                        <td class="numeric num">
-                            {% if month.combined_minor is not null %}
-                                {{ month.combined_minor|money(base_currency) }}
-                                {% if peak_minor > 0 and month.combined_minor > 0 %}
-                                    <div class="meter" role="presentation">
-                                        <span class="meter-fill"
-                                              style="width: {{ (month.combined_minor * 100) // peak_minor }}%"></span>
-                                    </div>
-                                {% endif %}
-                            {% else %}
-                                {% for currency, amount in month.by_currency %}
-                                    <div>{{ amount|money(currency) }}</div>
-                                {% endfor %}
-                                <div class="hint">{{ t('forecast.no_rate') }}</div>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+        Every figure is a sum over the same forecast charges — see
+        `ForecastScreenService` — so the cards and the chart agree, and "just
+        mine" narrows all of them at once.
+    #}
+    {% include 'stats/_tabs.twig' with {tab: 'forecast'} only %}
+
+    {% if mine_only %}
+        <p class="muted note">{{ t('forecast.mine_note') }}</p>
+    {% endif %}
+
+    {% include 'forecast/_kpis.twig' %}
+
+    {% include 'forecast/_chart.twig' %}
+
+    <div class="analytics-pair">
+        {% include 'forecast/_if_cancelled.twig' %}
+        <div class="analytics-stack">
+            {% include 'forecast/_trials.twig' %}
+            {% include 'forecast/_price_changes.twig' %}
         </div>
-    </section>
+    </div>
 {% endblock %}

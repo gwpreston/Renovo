@@ -1227,6 +1227,7 @@ return [
     'dashboard.see_price_history' => 'See price history',
     'dashboard.series_actual' => 'Actual',
     'dashboard.series_budget' => 'Budget {budget}',
+    'dashboard.see_forecast' => 'See the forecast',
     'dashboard.series_forecast' => 'Forecast',
     'dashboard.share_of_spend' => '{name}: {percent}% of monthly spend',
     // The year ahead is no longer a dashboard card, but these three keep their
@@ -1292,7 +1293,6 @@ return [
     'field.currency' => 'Currency',
     'field.cycle' => 'Cycle',
     'field.detail' => 'Detail',
-    'field.due' => 'Due',
     'field.email' => 'Email address',
     'field.event' => 'Event',
     'field.file' => 'File',
@@ -1328,15 +1328,31 @@ return [
     'field.your_name' => 'Your name',
 
     // forecast
-    'forecast.intro' =>
-        'Each renewal is shown in the month it actually falls, rather than spread evenly — a yearly bill '
-        . 'is a bill in one month. Scheduled price changes and trial conversions are applied from their '
-        . 'own dates, so a figure here does not move when the change eventually happens.',
-    'forecast.next_12_months' => 'Next 12 months',
+    'forecast.cancel_charges' => '{count, plural, one {# charge} other {# charges}}',
+    'forecast.cancel_empty' => 'Nothing recurring is due in the next 12 months.',
+    'forecast.cancel_heading' => 'If you cancelled',
+    'forecast.cancel_note' => 'What cancelling today would save over the next 12 months',
+    'forecast.change_from' => 'From {date}',
+    'forecast.changes_heading' => 'Price changes ahead',
+    'forecast.chart_alt' => 'Forecast spend for each of the next 12 months, in {currency}',
+    'forecast.chart_heading' => 'The next 12 months',
+    'forecast.chart_note' => 'Renewals in the month they fall, trials from the day they convert',
+    'forecast.kpi_average' => 'Average month',
+    'forecast.kpi_average_note' => 'The next 12 months, evenly spread',
+    'forecast.kpi_busiest' => 'Busiest month',
+    'forecast.kpi_long' => 'Yearly & longer renewals',
+    'forecast.kpi_long_none' => 'None in the next 12 months',
+    'forecast.kpi_long_note' => '{count, plural, one {# renewal} other {# renewals}} in the next 12 months',
+    'forecast.mine_note' => 'Showing only your share of each charge.',
+    'forecast.month_in_calendar' => '{month} in the calendar',
+    'forecast.series_long' => 'Yearly & longer',
+    'forecast.series_regular' => 'Monthly & more often',
+    'forecast.trial_converts_on' => 'Converts {date}',
+    'forecast.trial_kept' => '{amount} in the next 12 months if kept',
+    'forecast.trials_empty' => 'No trials convert in the next 12 months.',
+    'forecast.trials_heading' => 'Trials converting',
     'forecast.show_only_my_share' => 'Show only my share',
     'forecast.show_whole_household' => 'Show the whole household',
-    'forecast.no_rate' => 'No rate to combine these.',
-    'forecast.nothing_due' => 'Nothing due',
 
     // form
     'form.has_errors' => 'Check the highlighted fields and try again.',
@@ -1763,6 +1779,9 @@ return [
         . 'excluded.',
     'stats.rarely_used' => 'Rarely used',
     'stats.rating_label' => '{rating} out of {max}',
+    'stats.tab_forecast' => 'Forecast',
+    'stats.tab_overview' => 'Overview',
+    'stats.tabs_label' => 'Analytics sections',
     'stats.title' => 'Analytics',
     'stats.unconvertible' =>
         'These cannot be combined into {currency}: no exchange rate is available for {currencies}. The '

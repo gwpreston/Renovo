@@ -27,6 +27,13 @@
                 {% endif %}
             </ul>
         {% endif %}
+        {#
+            The hatched months are the Forecast page's own, so the card is the
+            way in to it from the dashboard.
+        #}
+        <a class="button button-quiet" href="/forecast">
+            {{ t('dashboard.see_forecast') }}{{ icon('arrow-right') }}
+        </a>
     </header>
 
     {% include 'partials/month_bars.twig' with {
