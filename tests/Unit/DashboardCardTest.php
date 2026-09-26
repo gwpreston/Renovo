@@ -69,7 +69,7 @@ final class DashboardCardTest extends TestCase
             $this->keys(DashboardCard::defaultOrder(DashboardView::Overview)),
         );
         self::assertSame(
-            ['month_so_far', 'next_30_days', 'who_pays', 'by_category', 'budget_pace'],
+            ['month_so_far', 'next_30_days', 'who_pays', 'spend_trend', 'by_category', 'budget_pace'],
             $this->keys(DashboardCard::defaultOrder(DashboardView::Household)),
         );
     }
@@ -87,14 +87,16 @@ final class DashboardCardTest extends TestCase
 
     /**
      * The prototype's rows: the chart beside the donut, Coming up beside the
-     * three narrow cards stacked in the column next to it, Who pays beside By
-     * category. Asserted as sums because that is the claim — a row that adds
+     * three narrow cards stacked in the column next to it, Who pays on a row of
+     * its own (it lays out a card per member inside), and Spend over time
+     * beside By category. Asserted as sums because that is the claim — a row that adds
      * up to seven silently becomes two rows.
      */
     public function testTheDefaultRowsAddUpToTheGrid(): void
     {
         self::assertSame(6, DashboardCard::SpendChart->columnSpan() + DashboardCard::WhereItGoes->columnSpan());
-        self::assertSame(6, DashboardCard::WhoPays->columnSpan() + DashboardCard::ByCategory->columnSpan());
+        self::assertSame(6, DashboardCard::WhoPays->columnSpan());
+        self::assertSame(6, DashboardCard::SpendTrend->columnSpan() + DashboardCard::ByCategory->columnSpan());
 
         $beside = [DashboardCard::Budgets, DashboardCard::FreeTrials, DashboardCard::PriceChange];
         self::assertCount(DashboardCard::ComingUp->rowSpan(), $beside);
@@ -117,7 +119,8 @@ final class DashboardCardTest extends TestCase
         self::assertSame(
             [
                 'totals', 'spend_chart', 'where_it_goes', 'coming_up', 'budgets', 'free_trials', 'price_change',
-                'recent', 'month_so_far', 'next_30_days', 'who_pays', 'by_category', 'budget_pace',
+                'recent', 'month_so_far', 'next_30_days', 'who_pays', 'spend_trend', 'by_category',
+                'budget_pace',
             ],
             $this->keys(DashboardCard::cases()),
         );

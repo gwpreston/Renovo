@@ -11,6 +11,7 @@ use App\Security\SessionInterface;
 use App\Service\DashboardLayoutService;
 use App\Service\DashboardService;
 use App\Service\HouseholdDashboardService;
+use App\Service\SpendTrendService;
 use App\Service\UserPreferencesService;
 use App\Support\Clock;
 use Psr\Http\Message\ResponseInterface;
@@ -26,6 +27,7 @@ final class DashboardController extends Controller
         private readonly DashboardService $dashboard,
         private readonly HouseholdDashboardService $household,
         private readonly DashboardLayoutService $layout,
+        private readonly SpendTrendService $trend,
         private readonly UserPreferencesService $preferences,
         private readonly Clock $clock,
     ) {
@@ -49,6 +51,17 @@ final class DashboardController extends Controller
             ]);
         }
 
+        // Spend over time's two views are links, and htmx asks for the card
+        // alone, for the same reason as the table's chips: switching lines
+        // should not recompute the rest of the Household view.
+        $trendBy = $request->getQueryParams()['trend'] ?? null;
+        $trendBy = is_string($trendBy) ? $trendBy : SpendTrendService::BY_CATEGORY;
+        if ($this->isHtmx($request) && isset($request->getQueryParams()['trend']) && $scope->hasHousehold()) {
+            return $this->render($request, $response, 'dashboard/cards/household/spend_trend.twig', [
+                'trend' => $this->trend->trend($scope, $trendBy),
+            ]);
+        }
+
         // No "Open on" redirect here. That preference is about where a *session*
         // begins, so it is applied once, when the browser signs in — see
         // SignInService::landingFor(). Applied on this route it behaved as a
@@ -61,7 +74,7 @@ final class DashboardController extends Controller
         $data = [];
         if ($scope->hasHousehold()) {
             $data = $view === DashboardView::Household
-                ? $this->household->household($scope)
+                ? $this->household->household($scope, $trendBy)
                 : $this->dashboard->overview($scope);
 
             // The table is opt-in, so its query runs only for somebody who

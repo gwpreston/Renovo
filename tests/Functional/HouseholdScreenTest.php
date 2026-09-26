@@ -501,7 +501,7 @@ final class HouseholdScreenTest extends DatabaseTestCase
     /** The Who pays card's markup, or '' when it was not drawn. */
     private function whoPaysCard(string $html): string
     {
-        $start = strpos($html, 'class="card who-pays-card"');
+        $start = strpos($html, 'class="who-pays-group"');
         if ($start === false) {
             return '';
         }

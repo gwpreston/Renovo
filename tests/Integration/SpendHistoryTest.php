@@ -404,6 +404,41 @@ final class SpendHistoryTest extends DatabaseTestCase
     }
 
     /**
+     * The months per category are one walk grouped, not a second
+     * reconstruction: each category carries its own name and colour, the
+     * uncategorised sit under `0`, and the sets add up to `history()` month
+     * by month.
+     */
+    public function testTheMonthsByCategoryPartitionTheHistory(): void
+    {
+        $streaming = (new CategoryRepository($this->db))->create($this->scope(), 'Streaming', '#aa3366');
+        $films = $this->createMonthly('Films', 1000, '2023-06-15');
+        $this->db->execute('UPDATE subscriptions SET category_id = :category WHERE id = :id', [
+            'category' => $streaming,
+            'id' => $films,
+        ]);
+        $this->createMonthly('Gym', 2500, '2026-01-15');
+
+        $grouped = $this->history->historyByCategory($this->scope());
+
+        self::assertSame(['Streaming', null], [
+            $grouped['categories'][$streaming]['name'],
+            $grouped['categories'][0]['name'],
+        ]);
+        self::assertSame('#aa3366', $grouped['categories'][$streaming]['colour']);
+
+        $total = $this->byMonth($this->history->monthly($this->scope()));
+        $streamingMonths = $this->byMonth($grouped['categories'][$streaming]['months']);
+        $uncategorised = $this->byMonth($grouped['categories'][0]['months']);
+        foreach ($total as $month => $amount) {
+            self::assertSame($amount, $streamingMonths[$month] + $uncategorised[$month], $month);
+        }
+        self::assertSame(1000, $streamingMonths['2025-07']);
+        self::assertSame(0, $uncategorised['2025-07']);
+        self::assertSame(2500, $uncategorised['2026-06']);
+    }
+
+    /**
      * @param list<array<string, mixed>> $months
      * @return array<string, int|null>
      */

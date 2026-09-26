@@ -1242,6 +1242,16 @@ return [
         'The monthly spend chart is not drawn: no exchange rate is available for {currencies}, and a month '
         . 'missing one of its currencies would look like a cheap month rather than an unknown one.',
     'dashboard.spend_chart_note' => 'What was charged each month, and the forecast for the next six',
+    'dashboard.spend_trend' => 'Spend over time',
+    'dashboard.spend_trend_by_category' => 'By category',
+    'dashboard.spend_trend_by_member' => 'By member',
+    'dashboard.spend_trend_choice' => 'Draw a line for each',
+    'dashboard.spend_trend_empty' => 'Nothing was charged in the last {count} months.',
+    'dashboard.spend_trend_latest' => 'The figure beside each name is last month’s.',
+    'dashboard.spend_trend_note' => 'The last {count} full months, in {currency}',
+    'dashboard.spend_trend_unconvertible' =>
+        'No exchange rate for {currencies}, so these months cannot be added up in one currency.',
+    'dashboard.spend_trend_uncategorised' => 'Uncategorised',
     // Said rather than implied: the application records what is due, not a
     // ledger of payments taken, so these months were rebuilt from start dates,
     // billing cycles and price history. A reader comparing them with a bank
@@ -2194,6 +2204,7 @@ return [
     'dashboard_card.price_change' => 'Next price change',
     'dashboard_card.recent' => 'Subscriptions table',
     'dashboard_card.spend_chart' => 'Monthly spend chart',
+    'dashboard_card.spend_trend' => 'Spend over time',
     'dashboard_card.totals' => 'Spending at a glance',
     'dashboard_card.where_it_goes' => 'Where it goes',
     'dashboard_card.who_pays' => 'Who pays what',

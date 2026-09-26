@@ -20,6 +20,7 @@ use App\Service\CategoryService;
 use App\Service\ForecastService;
 use App\Service\HouseholdDashboardService;
 use App\Service\InstanceSettingsService;
+use App\Service\SpendTrendService;
 use App\Service\SplitService;
 use App\Support\AvatarTone;
 use App\Support\Clock;
@@ -256,7 +257,7 @@ final class HouseholdDashboardTest extends DatabaseTestCase
 
     public function testWhoPaysDrawsEachMembersBarInTheirTone(): void
     {
-        $card = $this->card($this->page($this->adaId), 'class="card who-pays-card"');
+        $card = $this->card($this->page($this->adaId), 'class="who-pays-group"');
 
         foreach ([$this->adaId, $this->bramId] as $userId) {
             self::assertStringContainsString('meter-fill avatar-tone-' . AvatarTone::of($userId) . '"', $card);
@@ -320,7 +321,177 @@ final class HouseholdDashboardTest extends DatabaseTestCase
         $body = $this->page($this->cleoId);
 
         self::assertStringContainsString('June so far', $body);
-        self::assertStringNotContainsString('who-pays-card', $body);
+        self::assertStringNotContainsString('who-pays-group', $body);
+    }
+
+    /**
+     * Twelve complete months, June 2025 to May 2026: June itself is not over
+     * and is left off. Everything is uncategorised, so one line — £20 and £40
+     * every month, and £7 more from January.
+     */
+    public function testSpendOverTimeIsTwelveCompleteMonthsByCategory(): void
+    {
+        $trend = $this->trend($this->adaId, 'category');
+
+        self::assertSame('category', $trend['by']);
+        self::assertTrue($trend['is_drawable']);
+        self::assertCount(12, $trend['months']);
+        self::assertSame('2025-06', $trend['months'][0]->format('Y-m'));
+        self::assertSame('2026-05', $trend['months'][11]->format('Y-m'));
+
+        self::assertCount(1, $trend['series']);
+        self::assertNull($trend['series'][0]['name'], 'The uncategorised line.');
+        self::assertSame(
+            [...array_fill(0, 7, 6000), ...array_fill(0, 5, 6700)],
+            $trend['series'][0]['points'],
+        );
+        self::assertSame(6700, $trend['series'][0]['latest_minor']);
+        self::assertSame('var(--s1)', $trend['series'][0]['colour']);
+    }
+
+    /**
+     * The five biggest categories are lines of their own and the rest share
+     * one. A category's own colour is kept; the colourless take the palette in
+     * turn.
+     */
+    public function testSpendOverTimeDrawsTheTopCategoriesAndGathersTheRest(): void
+    {
+        $categories = $this->container()->get(CategoryService::class);
+        $scope = $this->scopeFor($this->adaId);
+
+        $streaming = $categories->create($scope, 'Streaming', '#AA3366');
+        $this->monthly($this->adaId, 'Films', 9000, '2026-06-22', '2025-01-22', ['category_id' => $streaming]);
+        foreach (['Aa', 'Bb', 'Cc', 'Dd', 'Ee', 'Ff'] as $index => $name) {
+            $id = $categories->create($scope, $name, null);
+            $this->monthly($this->adaId, $name . ' plan', 100 * ($index + 1), '2026-06-10', '2025-01-10', [
+                'category_id' => $id,
+            ]);
+        }
+
+        $series = $this->trend($this->adaId, 'category')['series'];
+        $names = array_map(static fn (array $line): ?string => $line['name'], $series);
+
+        // Streaming £90, Uncategorised ~£60, then Ff, Ee, Dd; Cc, Bb and Aa gathered.
+        self::assertSame(['Streaming', null, 'Ff', 'Ee', 'Dd', null], $names);
+        self::assertSame('#aa3366', strtolower((string) $series[0]['colour']));
+        self::assertSame('var(--s1)', $series[1]['colour']);
+        self::assertSame('var(--s2)', $series[2]['colour']);
+        self::assertTrue($series[5]['is_other']);
+        self::assertSame(3, $series[5]['other_count']);
+        self::assertSame('var(--s-other)', $series[5]['colour']);
+        self::assertSame(300 + 200 + 100, $series[5]['latest_minor']);
+    }
+
+    /**
+     * By member, each line is that member's share: Ada's £20 + £7 + £30 and
+     * Bram's £10 of the split plan. His private £6 is his own, counted in his
+     * view and not in Ada's.
+     */
+    public function testSpendOverTimeByMemberIsEachMembersShare(): void
+    {
+        $latest = static function (array $trend): array {
+            $figures = [];
+            foreach ($trend['series'] as $line) {
+                $figures[$line['name']] = $line['latest_minor'];
+            }
+
+            return $figures;
+        };
+
+        $trend = $this->trend($this->adaId, 'member');
+        self::assertSame('member', $trend['by']);
+        self::assertTrue($trend['is_member_available']);
+
+        $figures = $latest($trend);
+        self::assertSame(5700, $figures['Ada Lovelace']);
+        self::assertSame(1000, $figures['Bram']);
+
+        foreach ($trend['series'] as $line) {
+            self::assertNotNull($line['tone'], 'A member line is drawn in their avatar tone.');
+        }
+
+        self::assertSame(1600, $latest($this->trend($this->bramId, 'member'))['Bram']);
+    }
+
+    /**
+     * A Viewer is not shown who carries what, so there is no member view to
+     * offer; asking for it, or for anything else, is the category view.
+     */
+    public function testSpendOverTimeFallsBackToCategories(): void
+    {
+        self::assertSame('category', $this->trend($this->adaId, 'nonsense')['by']);
+
+        $viewer = $this->trend($this->cleoId, 'member');
+        self::assertFalse($viewer['is_member_available']);
+        self::assertSame('category', $viewer['by']);
+        self::assertStringNotContainsString('?trend=member', $this->page($this->cleoId));
+    }
+
+    public function testSpendOverTimeIsNotDrawnWhenAMonthCannotBeTotalled(): void
+    {
+        $this->monthly($this->adaId, 'Exotic', 5000, '2026-06-20', '2025-01-20', ['currency' => 'XOF']);
+
+        $trend = $this->trend($this->adaId, 'category');
+
+        self::assertFalse($trend['is_drawable']);
+        self::assertSame(['XOF'], $trend['unconvertible']);
+        self::assertStringContainsString(
+            'No exchange rate for XOF, so these months cannot be added up in one currency.',
+            $this->page($this->adaId),
+        );
+    }
+
+    /**
+     * The two views are links: without script the page comes back on the one
+     * chosen; with htmx the card comes back alone.
+     */
+    public function testSpendOverTimeSwitchesViewsByLink(): void
+    {
+        $card = $this->card($this->page($this->adaId, '/?trend=member'), 'id="spend-trend"');
+        self::assertMatchesRegularExpression('/href="\/\?trend=member#spend-trend"[^>]*aria-current="true"/s', $card);
+        self::assertStringContainsString('Bram', $card);
+        self::assertStringContainsString('class="trend-line avatar-tone-', $card);
+
+        $partial = $this->page($this->adaId, '/?trend=member', ['HX-Request' => 'true']);
+        self::assertStringStartsWith('<section class="card trend-card" id="spend-trend"', ltrim($partial));
+        self::assertStringNotContainsString('June so far', $partial);
+
+        // Back to a pushed URL htmx has no snapshot of: it re-fetches, and puts
+        // the answer in place of the whole body, so the answer is the page.
+        $restored = $this->page($this->adaId, '/?trend=member', [
+            'HX-Request' => 'true',
+            'HX-History-Restore-Request' => 'true',
+        ]);
+        self::assertStringContainsString('June so far', $restored);
+    }
+
+    /**
+     * In ISOLATED mode Ada's lines are drawn from her own rows alone, and with
+     * only her own share to show there is no member view to offer.
+     */
+    public function testSpendOverTimeUnderIsolationIsYourOwnRows(): void
+    {
+        $this->container()->get(InstanceSettingsService::class)->setIsolationMode(IsolationMode::Isolated);
+        $this->monthly($this->bramId, 'Bram shared', 5000, '2026-06-12', '2025-01-12');
+
+        $scope = Scope::forMember($this->adaId, false, $this->householdId, Role::OwnerAdmin, IsolationMode::Isolated);
+        $trend = $this->container()->get(SpendTrendService::class)->trend($scope, 'member');
+
+        self::assertSame('category', $trend['by']);
+        self::assertFalse($trend['is_member_available']);
+        // The rows Ada can see at their full cost — £20, £7 and the £40 plan
+        // she owns — as without isolation; none of Bram's £50.
+        self::assertSame(6700, $trend['series'][0]['latest_minor']);
+    }
+
+    /** Each member gets a card of their own. */
+    public function testWhoPaysIsACardPerMember(): void
+    {
+        $group = $this->card($this->page($this->adaId), 'class="who-pays-group"');
+
+        self::assertStringContainsString('id="member-card-' . $this->adaId . '"', $group);
+        self::assertStringContainsString('id="member-card-' . $this->bramId . '"', $group);
+        self::assertGreaterThanOrEqual(2, substr_count($group, '<article class="card member-card"'));
     }
 
     /** The card whose opening tag carries `$marker`, up to its close. */
@@ -383,15 +554,29 @@ final class HouseholdDashboardTest extends DatabaseTestCase
         return $this->container()->get(HouseholdDashboardService::class)->household($this->scopeFor($userId));
     }
 
-    private function page(int $userId): string
+    /**
+     * @return array<string, mixed>
+     */
+    private function trend(int $userId, string $by): array
+    {
+        return $this->container()->get(SpendTrendService::class)->trend($this->scopeFor($userId), $by);
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    private function page(int $userId, string $path = '/', array $headers = []): string
     {
         $this->session->set(AuthenticationMiddleware::SESSION_USER_ID, $userId);
         $this->session->set(AuthenticationMiddleware::SESSION_HOUSEHOLD_ID, $this->householdId);
 
-        $response = $this->app->handle(
-            (new ServerRequestFactory())
-                ->createServerRequest('GET', 'http://localhost/', ['REMOTE_ADDR' => '127.0.0.1']),
-        );
+        $request = (new ServerRequestFactory())
+            ->createServerRequest('GET', 'http://localhost' . $path, ['REMOTE_ADDR' => '127.0.0.1']);
+        foreach ($headers as $name => $value) {
+            $request = $request->withHeader($name, $value);
+        }
+
+        $response = $this->app->handle($request);
         self::assertSame(200, $response->getStatusCode());
 
         return (string) $response->getBody();

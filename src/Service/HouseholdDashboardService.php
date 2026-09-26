@@ -67,6 +67,7 @@ final class HouseholdDashboardService
         private readonly SubscriptionService $subscriptions,
         private readonly HouseholdOverviewService $household,
         private readonly CategoryBreakdownService $breakdown,
+        private readonly SpendTrendService $trend,
         private readonly ExchangeRateService $rates,
         private readonly InstanceSettingsService $settings,
         private readonly Clock $clock,
@@ -76,9 +77,12 @@ final class HouseholdDashboardService
     /**
      * The whole Household view.
      *
+     * `$trendBy` is which lines Spend over time draws — by category or by
+     * member — and is only ever a choice of view, never a write.
+     *
      * @return array<string, mixed>
      */
-    public function household(Scope $scope): array
+    public function household(Scope $scope, string $trendBy = SpendTrendService::BY_CATEGORY): array
     {
         // First, as on the Overview: it applies due price changes, converts
         // ended trials and advances overdue dates, so nothing below is priced
@@ -87,6 +91,7 @@ final class HouseholdDashboardService
 
         $monthlyBudget = $this->budgets->householdOverall($scope, BudgetPeriod::Monthly);
         $breakdown = $this->breakdown->fromStats($stats);
+        $whoPays = $this->household->whoPays($scope);
 
         return [
             'month' => $this->monthSoFar($scope, $monthlyBudget),
@@ -96,7 +101,8 @@ final class HouseholdDashboardService
                 'trials' => $this->trialsConverting($scope),
             ],
             'timeline' => $this->timeline($scope),
-            'who_pays' => $this->household->whoPays($scope),
+            'who_pays' => $whoPays,
+            'trend' => $this->trend->trend($scope, $trendBy, $whoPays),
             'pace' => $this->pace($scope, $monthlyBudget),
             'by_category' => $breakdown,
             'base_currency' => $this->settings->baseCurrency(),

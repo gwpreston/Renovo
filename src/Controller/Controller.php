@@ -81,9 +81,18 @@ abstract class Controller
         return $this->view->render($response, $template, $this->decorate($request, $data));
     }
 
+    /**
+     * Whether htmx asked for a fragment.
+     *
+     * Not when it is restoring history: after a `hx-push-url` swap, going
+     * Back to a page htmx has no snapshot of makes it re-fetch the URL with
+     * both headers and put the response in place of the whole body. A
+     * fragment there would leave the page as one card.
+     */
     protected function isHtmx(ServerRequestInterface $request): bool
     {
-        return $request->getHeaderLine('HX-Request') === 'true';
+        return $request->getHeaderLine('HX-Request') === 'true'
+            && $request->getHeaderLine('HX-History-Restore-Request') !== 'true';
     }
 
     protected function redirect(ResponseInterface $response, string $location): ResponseInterface

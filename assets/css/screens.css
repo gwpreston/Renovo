@@ -601,7 +601,6 @@
 
 /* A meter inside a row or a table cell sits flush against its figures. */
 .distribution-row .meter,
-.who-pays-row .meter,
 .table .meter {
     margin: 0;
 }
@@ -3997,28 +3996,35 @@ a.segmented-option {
     white-space: nowrap;
 }
 
-.who-pays-rows {
-    display: flex;
-    flex-direction: column;
+/*
+ * Who pays: a card per member, as many to a row as fit the width, so three
+ * members share a row and a fourth wraps rather than squeezing the others.
+ */
+.who-pays-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
     gap: 1rem;
 }
 
-.who-pays-row {
+.member-card-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.75rem;
 }
 
-.who-pays-body {
-    flex: 1;
-    min-width: 0;
+.member-card-head h3 {
+    margin: 0;
 }
 
-.who-pays-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-    margin: 0 0 0.3rem;
+.member-card-head p {
+    margin: 0.1rem 0 0;
+    font-size: var(--size-label);
+}
+
+.member-card-figure {
+    margin: 0.875rem 0 0.5rem;
+    font-size: var(--size-kpi);
+    font-weight: var(--weight-semibold);
 }
 
 /*
@@ -4026,16 +4032,12 @@ a.segmented-option {
  * avatar is drawn in, which holds its own against the meter's track where the
  * disc's soft fill would not.
  */
-.who-pays-row .meter-fill[class*='avatar-tone-'] {
+.member-card .meter-fill[class*='avatar-tone-'] {
     background: var(--avatar-ink);
 }
 
-.who-pays-figure {
-    font-weight: var(--weight-semibold);
-}
-
-.who-pays-body .hint {
-    margin: 0.3rem 0 0;
+.member-card .hint {
+    margin: 0.5rem 0 0;
 }
 
 /* The pace chart: an SVG stretched to its box, its strokes kept to width. */
@@ -4101,6 +4103,101 @@ a.segmented-option {
 .pace-figures .is-under {
     color: var(--accent-text);
     font-weight: var(--weight-bold);
+}
+
+/*
+ * Spend over time: lines in an SVG stretched to its box, like the pace chart,
+ * with the axis labels laid over its left edge at the gridlines' heights.
+ */
+.trend-chart {
+    position: relative;
+    height: 12.5rem;
+    /* Room for the top axis label, which sits above its gridline. */
+    margin-top: 1.25rem;
+}
+
+.trend-chart svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.trend-grid {
+    stroke: var(--border);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+}
+
+.trend-line {
+    fill: none;
+    stroke: var(--accent-text);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+/* A member's line in their tone's ink, as their bar is. */
+.trend-line[class*='avatar-tone-'] {
+    stroke: var(--avatar-ink);
+}
+
+.trend-axis {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.trend-axis li {
+    position: absolute;
+    left: 0;
+    transform: translateY(-110%);
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.trend-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: var(--size-caption);
+    color: var(--faint);
+}
+
+.trend-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+    gap: 0.4rem 1rem;
+    margin: 0.875rem 0 0.25rem;
+    font-size: var(--size-label);
+}
+
+.trend-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.trend-legend-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trend-key {
+    flex-shrink: 0;
+    width: 0.75rem;
+    height: 0.2rem;
+    border-radius: 999px;
+    background: var(--accent-text);
+}
+
+.trend-key[class*='avatar-tone-'] {
+    background: var(--avatar-ink);
 }
 
 /* ---------------------------------------------------------------- density */

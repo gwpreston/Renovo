@@ -1143,9 +1143,10 @@ your account, and each view has its own card order and hiding.
   rise. The subscriptions table is an optional card.
 - **Household**: this month so far, as already charged of everything due; year
   to date against the same stretch last year; the next twelve months; what the
-  running trials will add; the next 30 days on a timeline; who pays what after
-  splits; spending by category; and the year's spend against an even pace of
-  the household budget.
+  running trials will add; the next 30 days on a timeline; a card per member
+  for who pays what after splits; the last twelve full months as lines, by
+  category or by member, beside spending by category; and the year's spend
+  against an even pace of the household budget.
 
 Every figure comes from a service the rest of the application already uses. The
 chart's forecast months are the Forecast page's months, and its past months
@@ -1160,7 +1161,8 @@ converts, otherwise per-currency figures with the missing rate named. The
 budget line, the month's marker and the pace card use the household's own
 budget, never a member's, because they sit against household-wide totals. With
 no such budget they are left out; in ISOLATED mode there is never one. Under
-ISOLATED, Who pays shows only your own share. There is no time-of-day greeting,
+ISOLATED, Who pays shows only your own share, and Spend over time offers no
+member view. There is no time-of-day greeting,
 because dates are UTC.
 
 ## My subscriptions

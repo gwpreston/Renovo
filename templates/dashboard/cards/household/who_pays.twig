@@ -1,57 +1,60 @@
 {#
-    Who pays what: each member's monthly share after splits, how many
-    subscriptions that is, and the part of the household's spend it makes up.
-    Each bar is in the member's own tone, the one their avatar is drawn in.
+    Who pays what, as a card per member: each member's monthly share after
+    splits, how many subscriptions that is, and the part of the household's
+    spend it makes up. Each bar is in the member's own tone, the one their
+    avatar is drawn in.
 
-    In ISOLATED mode the viewer cannot see the household, so the card says
-    only what they can: their own share, retitled "Your share", with no
+    One layout entry drawing several cards: the grid fits as many to a row as
+    the width allows, and on a phone they stack. The group keeps a heading of
+    its own for assistive technology, and each card is headed by its member.
+
+    In ISOLATED mode the viewer cannot see the household, so the group says
+    only what they can: their own share, titled "Your share", with no
     percentage of a total they cannot see. Nothing here is drawn for a role
     that cannot view the household.
 #}
 {% import 'partials/avatar.twig' as avatar %}
 {% import 'partials/member_share.twig' as share %}
-{% import 'partials/spend.twig' as figure %}
 
 {% if who_pays.rows is not empty %}
-    <section class="card who-pays-card" aria-labelledby="who-pays-heading">
-        <header class="card-header">
-            <div>
-                <h2 id="who-pays-heading">{{ who_pays.own_share_only ? t('dashboard.your_share') : t('dashboard.who_pays') }}</h2>
-                <p class="muted">{{ t('dashboard.who_pays_note') }}</p>
-            </div>
-        </header>
+    <section class="who-pays-group" aria-labelledby="who-pays-heading">
+        <h2 id="who-pays-heading" class="visually-hidden">{{ who_pays.own_share_only ? t('dashboard.your_share') : t('dashboard.who_pays') }}</h2>
 
-        <ul class="plain who-pays-rows">
+        <div class="who-pays-grid">
             {% for row in who_pays.rows %}
                 {% set member = row.member %}
                 {% set percent = who_pays.percents[member.userId] ?? null %}
-                <li class="who-pays-row">
-                    {{ avatar.face(member.userId, member.displayName, member.hasAvatar, 32) }}
-                    <div class="who-pays-body">
-                        <p class="who-pays-head">
-                            <strong>{{ member.displayName }}</strong>
-                            <span class="num who-pays-figure">
-                                {% if row.monthly.totals is empty %}
-                                    {{ t('common.none_symbol') }}
-                                {% else %}
-                                    {% include 'dashboard/_headline.twig' with {'figures': row.monthly} only %}
-                                {% endif %}
-                            </span>
-                        </p>
-                        {% if percent is not null %}
-                            <div class="meter" role="img"
-                                 aria-label="{{ t('dashboard.share_of_spend', {'name': member.displayName, 'percent': percent}) }}">
-                                {% set tone = avatar_tone(member.userId) %}
-                                <span class="meter-fill{{ tone ? ' avatar-tone-' ~ tone : '' }}" style="width: {{ min(percent, 100) }}%"></span>
-                            </div>
+                <article class="card member-card" aria-labelledby="member-card-{{ member.userId }}">
+                    <header class="member-card-head">
+                        {{ avatar.face(member.userId, member.displayName, member.hasAvatar, 40) }}
+                        <div>
+                            <h3 id="member-card-{{ member.userId }}">{{ member.displayName }}</h3>
+                            <p class="muted">{{ t('dashboard.who_pays_note') }}</p>
+                        </div>
+                    </header>
+
+                    <p class="member-card-figure num">
+                        {% if row.monthly.totals is empty %}
+                            {{ t('common.none_symbol') }}
+                        {% else %}
+                            {% include 'dashboard/_headline.twig' with {'figures': row.monthly} only %}
                         {% endif %}
-                        <p class="hint">
-                            {{ share.count(row) }}
-                            {% if percent is not null %} · {{ t('dashboard.of_household_spend', {'percent': percent}) }}{% endif %}
-                        </p>
-                    </div>
-                </li>
+                    </p>
+
+                    {% if percent is not null %}
+                        <div class="meter" role="img"
+                             aria-label="{{ t('dashboard.share_of_spend', {'name': member.displayName, 'percent': percent}) }}">
+                            {% set tone = avatar_tone(member.userId) %}
+                            <span class="meter-fill{{ tone ? ' avatar-tone-' ~ tone : '' }}" style="width: {{ min(percent, 100) }}%"></span>
+                        </div>
+                    {% endif %}
+
+                    <p class="hint">
+                        {{ share.count(row) }}
+                        {% if percent is not null %} · {{ t('dashboard.of_household_spend', {'percent': percent}) }}{% endif %}
+                    </p>
+                </article>
             {% endfor %}
-        </ul>
+        </div>
     </section>
 {% endif %}

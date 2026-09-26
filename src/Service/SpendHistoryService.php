@@ -201,17 +201,92 @@ final class SpendHistoryService
      * `monthly()` for a card that also states what it left out — the count a
      * reconstructed figure owes its reader.
      *
+     * With `$forUserId`, only that member's share of each charge — the rule
+     * `charges()` states — which is what a line per member is drawn from.
+     *
      * @return array{months: list<MonthTotals>, excluded_count: int}
      */
-    public function history(Scope $scope, int $months = self::MONTHS, ?DateTimeImmutable $through = null): array
+    public function history(
+        Scope $scope,
+        int $months = self::MONTHS,
+        ?DateTimeImmutable $through = null,
+        ?int $forUserId = null,
+    ): array {
+        $windowStart = $this->windowStart($months);
+        $walk = $this->charges($scope, $windowStart->modify('-1 day'), $through ?? $this->clock->today(), $forUserId);
+
+        return [
+            'months' => $this->bucket($walk['charges'], $windowStart, $months),
+            'excluded_count' => $walk['excluded_count'],
+        ];
+    }
+
+    /**
+     * The same months, one set per category, from a single walk.
+     *
+     * Keyed by category id, with `0` for the uncategorised, and each set
+     * carrying the name and colour the subscription row joined — so a line per
+     * category can be drawn in the colour its bar is drawn in on the card
+     * beside it. The sets partition the charges: added together, month by
+     * month, they are `history()`'s.
+     *
+     * @return array{
+     *     categories: array<int, array{name: string|null, colour: string|null, months: list<MonthTotals>}>,
+     *     excluded_count: int
+     * }
+     */
+    public function historyByCategory(
+        Scope $scope,
+        int $months = self::MONTHS,
+        ?DateTimeImmutable $through = null,
+    ): array {
+        $windowStart = $this->windowStart($months);
+        $walk = $this->charges($scope, $windowStart->modify('-1 day'), $through ?? $this->clock->today());
+
+        $grouped = [];
+        $meta = [];
+        foreach ($walk['charges'] as $charge) {
+            $subscription = $charge['subscription'];
+            $key = $subscription->categoryId ?? 0;
+            $grouped[$key][] = $charge;
+            $meta[$key] ??= [
+                'name' => $subscription->categoryId === null ? null : $subscription->categoryName,
+                'colour' => $subscription->categoryId === null ? null : $subscription->categoryColour,
+            ];
+        }
+
+        $categories = [];
+        foreach ($grouped as $key => $charges) {
+            $categories[$key] = $meta[$key] + ['months' => $this->bucket($charges, $windowStart, $months)];
+        }
+
+        return ['categories' => $categories, 'excluded_count' => $walk['excluded_count']];
+    }
+
+    /**
+     * The first day of the oldest of `$months` buckets, counted back from
+     * today — always from today, so ending a window early leaves this month's
+     * bucket short rather than shifting the whole window back.
+     */
+    private function windowStart(int $months): DateTimeImmutable
     {
-        $today = $this->clock->today();
+        return $this->clock->today()
+            ->modify('first day of this month')
+            ->modify(sprintf('-%d months', $months - 1));
+    }
+
+    /**
+     * Charges into month buckets, each totalled per currency and combined.
+     *
+     * @param list<HistoricCharge> $charges
+     * @return list<MonthTotals>
+     */
+    private function bucket(array $charges, DateTimeImmutable $windowStart, int $months): array
+    {
         $baseCurrency = $this->settings->baseCurrency();
 
         $buckets = [];
-        $cursor = $today->modify('first day of this month')->modify(sprintf('-%d months', $months - 1));
-        $windowStart = $cursor;
-
+        $cursor = $windowStart;
         for ($i = 0; $i < $months; $i++) {
             $key = $cursor->format('Y-m');
             $buckets[$key] = [
@@ -224,9 +299,7 @@ final class SpendHistoryService
             $cursor = $cursor->modify('+1 month');
         }
 
-        $walk = $this->charges($scope, $windowStart->modify('-1 day'), $through ?? $today);
-
-        foreach ($walk['charges'] as $charge) {
+        foreach ($charges as $charge) {
             $key = $charge['date']->format('Y-m');
             if (!isset($buckets[$key])) {
                 continue;
@@ -249,7 +322,7 @@ final class SpendHistoryService
             $buckets[$key] = $bucket;
         }
 
-        return ['months' => array_values($buckets), 'excluded_count' => $walk['excluded_count']];
+        return array_values($buckets);
     }
 
     /**

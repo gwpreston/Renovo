@@ -16,8 +16,9 @@ namespace App\Domain;
  * the prototype's variant A: the four figures, then the months behind and
  * ahead beside where the money goes, then what is coming with the budgets, the
  * trials and the next price rise stacked beside it. **Household** is variant
- * B: how this month is going, the next thirty days, who carries what beside
- * where it goes, and the year against its budget.
+ * B: how this month is going, the next thirty days, a card per member for who
+ * carries what, the last twelve months as lines beside where it goes, and the
+ * year against its budget.
  *
  * Phase 21 replaced the Phase 10 set wholesale, and a migration cleared every
  * saved layout once so nobody's arrangement points at cards that have gone.
@@ -46,6 +47,7 @@ enum DashboardCard: string
     case MonthSoFar = 'month_so_far';
     case NextThirtyDays = 'next_30_days';
     case WhoPays = 'who_pays';
+    case SpendTrend = 'spend_trend';
     case ByCategory = 'by_category';
     case BudgetPace = 'budget_pace';
 
@@ -60,6 +62,7 @@ enum DashboardCard: string
             self::MonthSoFar,
             self::NextThirtyDays,
             self::WhoPays,
+            self::SpendTrend,
             self::ByCategory,
             self::BudgetPace => DashboardView::Household,
             default => DashboardView::Overview,
@@ -80,7 +83,10 @@ enum DashboardCard: string
      * The grid collapses to one column on a narrow screen, so these describe
      * the wide arrangement only. The chart takes two thirds beside the donut's
      * third, as Coming up does beside the narrow cards stacked next to it.
-     * Who pays and By category share a Household row by halves.
+     * Who pays is the full width, because it lays out a card per member of
+     * its own, as many to a row as fit; Spend over time and By category share
+     * the Household row beneath it by halves — the lines and the split they
+     * arrived at, side by side.
      *
      * Budget pace is full width rather than paired, because it is the card
      * most often absent — it exists only where a household budget does — and
@@ -95,7 +101,7 @@ enum DashboardCard: string
         return match ($this) {
             self::SpendChart, self::ComingUp => 4,
             self::WhereItGoes, self::Budgets, self::FreeTrials, self::PriceChange => 2,
-            self::WhoPays, self::ByCategory => 3,
+            self::SpendTrend, self::ByCategory => 3,
             default => 6,
         };
     }
