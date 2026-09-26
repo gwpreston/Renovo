@@ -121,6 +121,7 @@ return [
 
     // currency — the name beside each code in a currency select
     'currency.option' => '{code} - {name}',
+    'currency.option_symbol' => '{code} · {symbol}',
     'currency.name.AED' => 'United Arab Emirates Dirham',
     'currency.name.AFN' => 'Afghan Afghani',
     'currency.name.ALL' => 'Albanian Lek',
@@ -1873,6 +1874,7 @@ return [
     'subscriptions_form.paid_by_someone_else' => 'Paid by someone else',
     'subscriptions_form.paid_by_someone_else_hint' =>
         'Who actually pays, if it is not the member above. It changes nobody’s view of it.',
+    'subscriptions_form.name_placeholder' => 'Netflix, Octopus Energy…',
     'subscriptions_form.plan_placeholder' => 'Standard, Family, Premium…',
     'subscriptions_form.remind_me' => 'Remind me',
     'subscriptions_form.remind_me_hint' => 'Days before each charge, and before a trial converts. Your defaults are the schedule in',

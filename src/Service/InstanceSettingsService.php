@@ -70,7 +70,7 @@ final class InstanceSettingsService
 
     public function registrationAllowed(): bool
     {
-        return $this->get(self::KEY_ALLOW_REGISTRATION, '1') === '1';
+        return $this->get(self::KEY_ALLOW_REGISTRATION, '0') === '1';
     }
 
     public function setRegistrationAllowed(bool $allowed): void

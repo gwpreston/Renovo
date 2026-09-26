@@ -26,7 +26,7 @@
 {#
     The heading and the action are blocks the shell renders, so the dialog —
     which extends `bare.twig` and renders neither — gets the form and only the
-    form. It draws its own title, and this template adds the subtitle.
+    form. It draws its own title and subtitle.
 #}
 {% block heading %}{{ is_edit ? t('subscriptions_form.edit_name', {'name': subscription.name ?? values.name|default('')}) : t('subscriptions.add_subscription') }}{% endblock %}
 {% block page_subtitle %}{{ t('subtitle.subscription_form') }}{% endblock %}
@@ -39,10 +39,6 @@
 {% endblock %}
 
 {% block content %}
-    {% if is_htmx %}
-        <p class="muted dialog-subtitle">{{ t('subtitle.subscription_form') }}</p>
-    {% endif %}
-
     {% include 'partials/errors.twig' %}
 
     <form class="card form-layout subscription-form"
@@ -61,6 +57,7 @@
                 <div class="field">
                     <label for="name">{{ t('subscriptions_form.service_name') }}</label>
                     <input type="text" id="name" name="name" value="{{ values.name|default('') }}" required autofocus
+                           placeholder="{{ t('subscriptions_form.name_placeholder') }}"
                            {% if errors.name is defined %}aria-describedby="name-error"{% endif %}>
                     {% if errors.name is defined %}
                         <p class="field-error" id="name-error">{{ error_message(errors.name) }}</p>
@@ -77,8 +74,55 @@
                     {% endif %}
                 </div>
             </div>
+        </fieldset>
 
-            <div class="field-grid">
+        {# ------------------------------------------------------------------ #}
+        <fieldset class="form-section">
+            <legend>{{ t('subscriptions_form.section_cost') }}</legend>
+
+            {#
+                Price, currency and category in one row, as the prototype has
+                them. The currency is a field of its own, with its own label,
+                but still drives the price's conversion note: htmx asks for it
+                again as either changes, so no money is multiplied by a rate in
+                the browser.
+            #}
+            <div class="field-grid field-grid-3">
+                <div class="field">
+                    <label for="price">{{ t('field.price') }}</label>
+                    <input type="text" id="price" name="price" inputmode="decimal" class="num"
+                           value="{{ values.price|default('') }}" placeholder="{{ 0|decimal(2) }}" required
+                           aria-describedby="price-conversion{% if errors.price is defined %} price-error{% endif %}"
+                           hx-get="/subscriptions/conversion-note"
+                           hx-trigger="input changed delay:400ms"
+                           hx-include="#price, #currency"
+                           hx-target="#price-conversion"
+                           hx-swap="outerHTML">
+                    {% include 'subscriptions/_conversion_note.twig' with {'note': base_currency_note} %}
+                    {% if errors.price is defined %}
+                        <p class="field-error" id="price-error">{{ error_message(errors.price) }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="field">
+                    <label for="currency">{{ t('field.currency') }}</label>
+                    <select id="currency" name="currency"
+                            {% if errors.currency is defined %}aria-describedby="currency-error"{% endif %}
+                            hx-get="/subscriptions/conversion-note"
+                            hx-trigger="change"
+                            hx-include="#price, #currency"
+                            hx-target="#price-conversion"
+                            hx-swap="outerHTML">
+                        {% for code in currencies %}
+                            <option value="{{ code }}"
+                                    {{ values.currency|default(base_currency) == code ? 'selected' : '' }}>{{ t('currency.option_symbol', {'code': code, 'symbol': currency_symbol(code)}) }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if errors.currency is defined %}
+                        <p class="field-error" id="currency-error">{{ error_message(errors.currency) }}</p>
+                    {% endif %}
+                </div>
+
                 <div class="field">
                     <label for="category_id">{{ t('field.category') }}</label>
                     <select id="category_id" name="category_id"
@@ -93,86 +137,6 @@
                         <p class="field-error" id="category_id-error">{{ error_message(errors.category_id) }}</p>
                     {% endif %}
                 </div>
-
-                {#
-                    What it is paid with. A native select, so the option text is
-                    the method's name and nothing else — a browser cannot draw a
-                    picture inside an <option>. The badge beneath shows the
-                    chosen method's logo or icon, and `payment-method-field.js`
-                    keeps it in step with the select from the data attributes
-                    each option carries.
-                #}
-                <div class="field">
-                    <label for="payment_method_id">{{ t('field.payment_method') }}</label>
-                    <select id="payment_method_id" name="payment_method_id"
-                            data-payment-method-select="payment_method_id-preview"
-                            aria-describedby="payment_method_id-preview{% if errors.payment_method_id is defined %} payment_method_id-error{% endif %}">
-                        <option value="">{{ t('state.none') }}</option>
-                        {% for method in payment_methods %}
-                            <option value="{{ method.id }}" data-icon-name="{{ method.icon ?: 'payment-card' }}"
-                                    data-logo="{{ method.logoPath ? '/' ~ method.logoPath : '' }}"
-                                    {{ values.payment_method_id|default('') == method.id ? 'selected' : '' }}>{{ method.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <p class="hint payment-method-preview" id="payment_method_id-preview" aria-live="polite">
-                        {%- for method in payment_methods -%}
-                            {%- if values.payment_method_id|default('') == method.id -%}
-                                {{ payment_method.badge(method.name, method.icon, method.logoPath) }}
-                            {%- endif -%}
-                        {%- endfor -%}
-                    </p>
-                    {% if errors.payment_method_id is defined %}
-                        <p class="field-error" id="payment_method_id-error">{{ error_message(errors.payment_method_id) }}</p>
-                    {% endif %}
-                </div>
-            </div>
-        </fieldset>
-
-        {# ------------------------------------------------------------------ #}
-        <fieldset class="form-section">
-            <legend>{{ t('subscriptions_form.section_cost') }}</legend>
-
-            <div class="field">
-                <label for="price">{{ t('field.price') }}</label>
-                <div class="input-group">
-                    {#
-                        The currency select is part of this field, so its error
-                        is described against the input the field is labelled
-                        by. Both are listed when both are wrong — naming only
-                        the first would leave the other announced by nothing
-                        but the alert at the top of the form.
-
-                        The conversion note beneath is the server's: htmx asks
-                        for it again as the price or the currency changes, so
-                        no money is multiplied by a rate in the browser.
-                    #}
-                    <input type="text" id="price" name="price" inputmode="decimal"
-                           value="{{ values.price|default('') }}" placeholder="{{ 9.99|decimal(2) }}" required
-                           aria-describedby="price-conversion{% if errors.price is defined %} price-error{% endif %}{% if errors.currency is defined %} currency-error{% endif %}"
-                           hx-get="/subscriptions/conversion-note"
-                           hx-trigger="input changed delay:400ms"
-                           hx-include="#price, #currency"
-                           hx-target="#price-conversion"
-                           hx-swap="outerHTML">
-                    <select id="currency" name="currency" aria-label="{{ t('field.currency') }}"
-                            hx-get="/subscriptions/conversion-note"
-                            hx-trigger="change"
-                            hx-include="#price, #currency"
-                            hx-target="#price-conversion"
-                            hx-swap="outerHTML">
-                        {% for code in currencies %}
-                            <option value="{{ code }}"
-                                    {{ values.currency|default(base_currency) == code ? 'selected' : '' }}>{{ code }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% include 'subscriptions/_conversion_note.twig' with {'note': base_currency_note} %}
-                {% if errors.price is defined %}
-                    <p class="field-error" id="price-error">{{ error_message(errors.price) }}</p>
-                {% endif %}
-                {% if errors.currency is defined %}
-                    <p class="field-error" id="currency-error">{{ error_message(errors.currency) }}</p>
-                {% endif %}
             </div>
 
             {% set type = values.subscription_type|default('recurring') %}
@@ -227,14 +191,54 @@
         <fieldset class="form-section">
             <legend>{{ t('subscriptions_form.section_billing') }}</legend>
 
-            <div class="field recurring-only">
-                <label for="next_payment_date">{{ t('field.next_charge') }}</label>
-                <input type="date" id="next_payment_date" name="next_payment_date"
-                       value="{{ values.next_payment_date|default('') }}"
-                       {% if errors.next_payment_date is defined %}aria-describedby="next_payment_date-error"{% endif %}>
-                {% if errors.next_payment_date is defined %}
-                    <p class="field-error" id="next_payment_date-error">{{ error_message(errors.next_payment_date) }}</p>
-                {% endif %}
+            {#
+                When, and with what — a pair. A one-off has no next charge; its
+                cell goes and the payment method moves up to fill it. How far
+                ahead to say so has a row of its own beneath: its chips need the
+                width a third of the row cannot give them.
+            #}
+            <div class="field-grid">
+                <div class="field recurring-only">
+                    <label for="next_payment_date">{{ t('field.next_charge') }}</label>
+                    <input type="date" id="next_payment_date" name="next_payment_date"
+                           value="{{ values.next_payment_date|default('') }}"
+                           {% if errors.next_payment_date is defined %}aria-describedby="next_payment_date-error"{% endif %}>
+                    {% if errors.next_payment_date is defined %}
+                        <p class="field-error" id="next_payment_date-error">{{ error_message(errors.next_payment_date) }}</p>
+                    {% endif %}
+                </div>
+
+                {#
+                    What it is paid with. A native select, so the option text is
+                    the method's name and nothing else — a browser cannot draw a
+                    picture inside an <option>. The badge beneath shows the
+                    chosen method's logo or icon, and `payment-method-field.js`
+                    keeps it in step with the select from the data attributes
+                    each option carries.
+                #}
+                <div class="field">
+                    <label for="payment_method_id">{{ t('field.payment_method') }}</label>
+                    <select id="payment_method_id" name="payment_method_id"
+                            data-payment-method-select="payment_method_id-preview"
+                            aria-describedby="payment_method_id-preview{% if errors.payment_method_id is defined %} payment_method_id-error{% endif %}">
+                        <option value="">{{ t('state.none') }}</option>
+                        {% for method in payment_methods %}
+                            <option value="{{ method.id }}" data-icon-name="{{ method.icon ?: 'payment-card' }}"
+                                    data-logo="{{ method.logoPath ? '/' ~ method.logoPath : '' }}"
+                                    {{ values.payment_method_id|default('') == method.id ? 'selected' : '' }}>{{ method.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="hint payment-method-preview" id="payment_method_id-preview" aria-live="polite">
+                        {%- for method in payment_methods -%}
+                            {%- if values.payment_method_id|default('') == method.id -%}
+                                {{ payment_method.badge(method.name, method.icon, method.logoPath) }}
+                            {%- endif -%}
+                        {%- endfor -%}
+                    </p>
+                    {% if errors.payment_method_id is defined %}
+                        <p class="field-error" id="payment_method_id-error">{{ error_message(errors.payment_method_id) }}</p>
+                    {% endif %}
+                </div>
             </div>
 
             {#
@@ -279,112 +283,114 @@
         </fieldset>
 
         {# ------------------------------------------------------------------ #}
-        <fieldset class="form-section">
+        <fieldset class="form-section form-section-ruled">
             <legend>{{ t('subscriptions_form.section_ownership') }}</legend>
 
-            {#
-                Paid by: the member the cost belongs to — the owner, which is
-                the column isolation keys on. Somebody confined to their own
-                rows may only own what they make, so for them the choice is
-                drawn and cannot be made, and the hint says why.
-            #}
-            {% set owner = values.owner_user_id|default(current_user.id) %}
-            {% set confined = scope.restrictsWritesToOwner %}
-            <div class="field" role="radiogroup" aria-labelledby="owner_user_id-label"
-                 {% if confined or errors.owner_user_id is defined %}
-                     aria-describedby="{% if confined %}owner_user_id-hint{% endif %}{% if errors.owner_user_id is defined %} owner_user_id-error{% endif %}"
-                 {% endif %}>
-                <span class="group-label" id="owner_user_id-label">{{ t('subscriptions_form.paid_by') }}</span>
-                <div class="chip-choices">
-                    {% for member in members %}
-                        {% if not confined or member.id == current_user.id %}
-                            <label class="filter-chip member-chip">
-                                <input type="radio" name="owner_user_id" value="{{ member.id }}"
-                                       {% if loop.first or member.id == current_user.id and confined %}id="owner_user_id"{% endif %}
-                                       {% if confined %}disabled aria-describedby="owner_user_id-hint"{% endif %}
-                                       {{ owner == member.id ? 'checked' : '' }}>
-                                {% set tone = avatar_tone(member.id) %}<span class="member-initials{{ tone ? ' avatar-tone-' ~ tone : '' }}" aria-hidden="true">{{ member.display_name|first_initial }}</span>
-                                <span>{{ member.display_name }}</span>
-                            </label>
-                        {% endif %}
-                    {% endfor %}
-                </div>
+            <div class="field-grid ownership-row">
                 {#
-                    The hint is drawn on exactly the condition that disables the
-                    choice, because the group names it in `aria-describedby` — a
-                    note gated on anything narrower would leave a description
-                    pointing at an id that is not on the page. Which of the two
-                    it says depends on where the restriction came from: the
-                    instance, or the role.
+                    Paid by: the member the cost belongs to — the owner, which is
+                    the column isolation keys on. Somebody confined to their own
+                    rows may only own what they make, so for them the choice is
+                    drawn and cannot be made, and the hint says why.
                 #}
-                {% if confined %}
-                    <p class="hint" id="owner_user_id-hint">
-                        {{ scope.restrictsReadsToOwner
-                            ? t('subscriptions_form.isolated_owner_note')
-                            : t('subscriptions_form.own_rows_owner_note') }}
-                    </p>
-                {% endif %}
-                {% if errors.owner_user_id is defined %}
-                    <p class="field-error" id="owner_user_id-error">{{ error_message(errors.owner_user_id) }}</p>
+                {% set owner = values.owner_user_id|default(current_user.id) %}
+                {% set confined = scope.restrictsWritesToOwner %}
+                <div class="field" role="radiogroup" aria-labelledby="owner_user_id-label"
+                     {% if confined or errors.owner_user_id is defined %}
+                         aria-describedby="{% if confined %}owner_user_id-hint{% endif %}{% if errors.owner_user_id is defined %} owner_user_id-error{% endif %}"
+                     {% endif %}>
+                    <span class="group-label" id="owner_user_id-label">{{ t('subscriptions_form.paid_by') }}</span>
+                    <div class="chip-choices">
+                        {% for member in members %}
+                            {% if not confined or member.id == current_user.id %}
+                                <label class="filter-chip member-chip">
+                                    <input type="radio" name="owner_user_id" value="{{ member.id }}"
+                                           {% if loop.first or member.id == current_user.id and confined %}id="owner_user_id"{% endif %}
+                                           {% if confined %}disabled aria-describedby="owner_user_id-hint"{% endif %}
+                                           {{ owner == member.id ? 'checked' : '' }}>
+                                    {% set tone = avatar_tone(member.id) %}<span class="member-initials{{ tone ? ' avatar-tone-' ~ tone : '' }}" aria-hidden="true">{{ member.display_name|first_initial }}</span>
+                                    <span>{{ member.display_name }}</span>
+                                </label>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {#
+                        The hint is drawn on exactly the condition that disables the
+                        choice, because the group names it in `aria-describedby` — a
+                        note gated on anything narrower would leave a description
+                        pointing at an id that is not on the page. Which of the two
+                        it says depends on where the restriction came from: the
+                        instance, or the role.
+                    #}
+                    {% if confined %}
+                        <p class="hint" id="owner_user_id-hint">
+                            {{ scope.restrictsReadsToOwner
+                                ? t('subscriptions_form.isolated_owner_note')
+                                : t('subscriptions_form.own_rows_owner_note') }}
+                        </p>
+                    {% endif %}
+                    {% if errors.owner_user_id is defined %}
+                        <p class="field-error" id="owner_user_id-error">{{ error_message(errors.owner_user_id) }}</p>
+                    {% endif %}
+                </div>
+
+                {#
+                    Cost split, saved with the form in one transaction. Drawn only
+                    for somebody who could save it and only where there is anybody
+                    to split with; otherwise the arrangement is left exactly as it
+                    is. Shares are weights, and the money is allocated from them by
+                    largest remainder, so the parts always add up to the whole.
+                #}
+                {% if offers_split %}
+                    {% set split_mode = values.split_mode|default('none') %}
+                    {% set split_with = values.split_with|default(members|map(m => m.id)) %}
+                    {% set shares = values.shares|default({}) %}
+                    <div class="field" role="radiogroup" aria-labelledby="split_mode-label"
+                         aria-describedby="split_mode-hint{% if errors.split_mode is defined %} split_mode-error{% endif %}{% if errors.shares is defined %} shares-error{% endif %}">
+                        <span class="group-label" id="split_mode-label">{{ t('subscriptions_form.cost_split') }}</span>
+                        <div class="segmented">
+                            {% for mode in ['none', 'equal', 'custom'] %}
+                                <label class="segmented-option">
+                                    <input type="radio" name="split_mode" value="{{ mode }}"
+                                           {% if loop.first %}id="split_mode"{% endif %}
+                                           {{ mode != 'none' and values.visibility|default('household') == 'payer' ? 'disabled' : '' }}
+                                           {{ split_mode == mode ? 'checked' : '' }}>
+                                    <span>{{ t('subscriptions_form.split_' ~ mode) }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+
+                        <div class="chip-choices reveal reveal-split-equal">
+                            {% for member in members %}
+                                <label class="filter-chip member-chip">
+                                    <input type="checkbox" name="split_with[]" value="{{ member.id }}"
+                                           {{ member.id in split_with ? 'checked' : '' }}>
+                                    {% set tone = avatar_tone(member.id) %}<span class="member-initials{{ tone ? ' avatar-tone-' ~ tone : '' }}" aria-hidden="true">{{ member.display_name|first_initial }}</span>
+                                    <span>{{ member.display_name }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+
+                        <div class="share-grid reveal reveal-split-custom">
+                            {% for member in members %}
+                                <label class="share-field">
+                                    <span>{{ member.display_name }}</span>
+                                    <input type="number" name="shares[{{ member.id }}]" min="0" max="10000"
+                                           value="{{ shares[member.id] ?? (split_mode == 'none' ? 1 : 0) }}">
+                                </label>
+                            {% endfor %}
+                        </div>
+
+                        <p class="hint" id="split_mode-hint">{{ t('subscriptions_form.split_hint') }}</p>
+                        {% if errors.split_mode is defined %}
+                            <p class="field-error" id="split_mode-error">{{ error_message(errors.split_mode) }}</p>
+                        {% endif %}
+                        {% if errors.shares is defined %}
+                            <p class="field-error" id="shares-error">{{ error_message(errors.shares) }}</p>
+                        {% endif %}
+                    </div>
                 {% endif %}
             </div>
-
-            {#
-                Cost split, saved with the form in one transaction. Drawn only
-                for somebody who could save it and only where there is anybody
-                to split with; otherwise the arrangement is left exactly as it
-                is. Shares are weights, and the money is allocated from them by
-                largest remainder, so the parts always add up to the whole.
-            #}
-            {% if offers_split %}
-                {% set split_mode = values.split_mode|default('none') %}
-                {% set split_with = values.split_with|default(members|map(m => m.id)) %}
-                {% set shares = values.shares|default({}) %}
-                <div class="field" role="radiogroup" aria-labelledby="split_mode-label"
-                     aria-describedby="split_mode-hint{% if errors.split_mode is defined %} split_mode-error{% endif %}{% if errors.shares is defined %} shares-error{% endif %}">
-                    <span class="group-label" id="split_mode-label">{{ t('subscriptions_form.cost_split') }}</span>
-                    <div class="segmented">
-                        {% for mode in ['none', 'equal', 'custom'] %}
-                            <label class="segmented-option">
-                                <input type="radio" name="split_mode" value="{{ mode }}"
-                                       {% if loop.first %}id="split_mode"{% endif %}
-                                       {{ mode != 'none' and values.visibility|default('household') == 'payer' ? 'disabled' : '' }}
-                                       {{ split_mode == mode ? 'checked' : '' }}>
-                                <span>{{ t('subscriptions_form.split_' ~ mode) }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-
-                    <div class="chip-choices reveal reveal-split-equal">
-                        {% for member in members %}
-                            <label class="filter-chip member-chip">
-                                <input type="checkbox" name="split_with[]" value="{{ member.id }}"
-                                       {{ member.id in split_with ? 'checked' : '' }}>
-                                {% set tone = avatar_tone(member.id) %}<span class="member-initials{{ tone ? ' avatar-tone-' ~ tone : '' }}" aria-hidden="true">{{ member.display_name|first_initial }}</span>
-                                <span>{{ member.display_name }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-
-                    <div class="share-grid reveal reveal-split-custom">
-                        {% for member in members %}
-                            <label class="share-field">
-                                <span>{{ member.display_name }}</span>
-                                <input type="number" name="shares[{{ member.id }}]" min="0" max="10000"
-                                       value="{{ shares[member.id] ?? (split_mode == 'none' ? 1 : 0) }}">
-                            </label>
-                        {% endfor %}
-                    </div>
-
-                    <p class="hint" id="split_mode-hint">{{ t('subscriptions_form.split_hint') }}</p>
-                    {% if errors.split_mode is defined %}
-                        <p class="field-error" id="split_mode-error">{{ error_message(errors.split_mode) }}</p>
-                    {% endif %}
-                    {% if errors.shares is defined %}
-                        <p class="field-error" id="shares-error">{{ error_message(errors.shares) }}</p>
-                    {% endif %}
-                </div>
-            {% endif %}
 
             {#
                 Who sees it. "Only me" hides it from everybody else in the
@@ -430,13 +436,14 @@
             <legend>{{ t('subscriptions_form.free_trial') }}</legend>
 
             <input type="hidden" name="is_trial" value="0">
+            {# A switch at the end of its row, the words before it. #}
             <label class="choice toggle">
-                <input type="checkbox" id="is_trial" name="is_trial" value="1"
-                       {{ values.is_trial|default('0') == '1' ? 'checked' : '' }}>
                 <span>
                     <span class="choice-title">{{ t('subscriptions_form.is_trial') }}</span>
                     <span class="choice-note">{{ t('subscriptions_form.is_trial_note') }}</span>
                 </span>
+                <input type="checkbox" class="toggle" role="switch" id="is_trial" name="is_trial" value="1"
+                       {{ values.is_trial|default('0') == '1' ? 'checked' : '' }}>
             </label>
 
             <div class="reveal reveal-trial">
@@ -657,11 +664,16 @@
             </div>
         </details>
 
+        {#
+            Cancel, then the action, at the end of the row as the prototype has
+            them. In the dialog Cancel closes it; on the page, and without
+            script, it is a link back to the list.
+        #}
         <div class="form-actions">
+            <a class="button button-quiet" href="/subscriptions" data-closes-dialog="quick-add">{{ t('action.cancel') }}</a>
             <button type="submit" class="button button-primary">
                 {{ is_edit ? t('subscriptions_form.save_changes') : t('subscriptions.add_subscription') }}
             </button>
-            <a class="button button-quiet" href="/subscriptions">{{ t('action.cancel') }}</a>
         </div>
     </form>
 

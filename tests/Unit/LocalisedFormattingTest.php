@@ -119,6 +119,20 @@ final class LocalisedFormattingTest extends TestCase
         self::assertSame('£0.00', $this->money('en_GB')->format(Money::of(0, 'GBP'), true));
     }
 
+    /**
+     * The sign alone, for a label beside the code. A locale that shares "$"
+     * between currencies qualifies it, and a currency with no sign at all
+     * falls back to its code rather than ICU's "¤".
+     */
+    public function testACurrencysSignIsTheOneTheReaderWrites(): void
+    {
+        self::assertSame('£', $this->money('en_GB')->symbol('GBP'));
+        self::assertSame('€', $this->money('en_GB')->symbol('EUR'));
+        self::assertSame('US$', $this->money('en_GB')->symbol('USD'));
+        self::assertSame('£', $this->money('en_GB')->symbol('GBP'), 'The cached formatter changed its currency.');
+        self::assertSame('XXX', $this->money('en_GB')->symbol('XXX'));
+    }
+
     public function testAPercentageIsWrittenTheWayTheReaderWritesPercentages(): void
     {
         self::assertSame('50%', $this->numbers('en_GB')->percent(50));

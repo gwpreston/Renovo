@@ -2105,7 +2105,7 @@ a.segmented-option {
 
 @media (min-width: 30rem) {
     .cancel-by .deadline {
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) fit-content(20rem);
     }
 }
 
@@ -2136,8 +2136,80 @@ a.segmented-option {
     display: grid;
 }
 
+/* Chips are revealed as the row of chips they are, not a column. */
+.subscription-form:has(input[name='reminder_mode'][value='days']:checked) .reveal-reminder-days,
+.subscription-form:has(input[name='split_mode'][value='equal']:checked) .reveal-split-equal {
+    display: flex;
+}
+
 .subscription-form .reveal-trial {
     gap: 0.75rem;
+}
+
+/*
+ * The prototype draws this form flat: rows of fields, one rule above who it is
+ * for, and no boxes. The sections stay fieldsets, because their legends are
+ * what a screen reader announces with each field; they are simply not drawn.
+ */
+.subscription-form .form-section {
+    border: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.subscription-form .form-section > legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.subscription-form .form-section-ruled {
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+}
+
+/*
+ * Who pays beside how it is split. The split takes the width its three
+ * options need, so they stay on one line, and no more — its hint and the
+ * custom shares wrap within that. The members' chips have the rest.
+ */
+@container form (min-width: 34rem) {
+    .subscription-form .ownership-row {
+        grid-template-columns: minmax(0, 1fr) fit-content(20rem);
+    }
+}
+
+.subscription-form .field > label,
+.subscription-form .group-label {
+    font-weight: var(--weight-semibold);
+}
+
+/* A required field says so beside its label; the input already tells a
+   screen reader, so the mark is drawn and not read. */
+.subscription-form .field > label:has(+ [required])::after {
+    content: ' *' / '';
+}
+
+/* A choice of a few is as wide as its options, not the row. */
+.subscription-form .segmented {
+    align-self: flex-start;
+}
+
+/* The member who pays: the accent's soft wash and its edge when chosen. */
+.subscription-form .member-chip:has(input:checked) {
+    color: var(--text);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+
+.subscription-form .form-actions {
+    justify-content: flex-end;
 }
 
 /* A one-off or a lifetime purchase has no cycle, no next charge and no trial. */
@@ -2202,10 +2274,13 @@ a.segmented-option {
 }
 
 .choice.toggle {
-    align-items: flex-start;
-    padding: 0.75rem;
-    background: var(--surface-2);
-    border-radius: var(--radius-control);
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.875rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
 }
 
 .choice-title {
@@ -2233,10 +2308,6 @@ a.segmented-option {
     display: grid;
     gap: 1rem;
     margin-top: 1rem;
-}
-
-.dialog-subtitle {
-    margin: 0 0 0.75rem;
 }
 
 .edit-sections {
@@ -2794,7 +2865,7 @@ a.segmented-option {
 
     .members-table .member-row {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) fit-content(20rem);
         grid-template-areas:
             "identity status"
             "role share"

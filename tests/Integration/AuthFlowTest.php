@@ -124,6 +124,20 @@ final class AuthFlowTest extends DatabaseTestCase
         );
     }
 
+    /**
+     * A new instance is invitation-only until its administrator says
+     * otherwise: the setup wizard makes the first account, so nobody needs the
+     * sign-up form to get in, and a stranger should not find it open.
+     */
+    public function testRegistrationIsClosedUntilAnAdministratorOpensIt(): void
+    {
+        $settings = new InstanceSettingsService(new InstanceSettingsRepository($this->db));
+        self::assertFalse($settings->registrationAllowed());
+
+        $settings->setRegistrationAllowed(true);
+        self::assertTrue($settings->registrationAllowed());
+    }
+
     public function testSignUpVerifyAndSignIn(): void
     {
         $user = $this->auth->register('New@Example.test', 'New User', self::PASSWORD, self::PASSWORD);

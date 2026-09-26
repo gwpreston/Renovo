@@ -109,6 +109,7 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('channel_type_label', $this->channelTypeLabel(...)),
             new TwigFunction('avatar_tone', AvatarTone::of(...)),
             new TwigFunction('percent_symbol', $this->numbers->percentSymbol(...)),
+            new TwigFunction('currency_symbol', $this->money->symbol(...)),
             // The password meter's thresholds, from the validator that applies
             // the rule — see AuthService::passwordMeterRules().
             new TwigFunction('password_rules', AuthService::passwordMeterRules(...)),

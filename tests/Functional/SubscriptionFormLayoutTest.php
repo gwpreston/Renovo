@@ -381,6 +381,127 @@ final class SubscriptionFormLayoutTest extends DatabaseTestCase
     }
 
     /**
+     * The prototype's row of three — price, currency and category — then when
+     * and with what as a pair. Each row is one grid, so its fields sit side by
+     * side wherever the form is wide enough for them.
+     *
+     * @dataProvider forms
+     */
+    public function testTheFieldsSitInThePrototypesRows(string $path): void
+    {
+        $form = $this->form($this->get($path));
+        $rows = $this->query($form, './/div[contains(concat(" ", @class, " "), " field-grid-3 ")]');
+        self::assertCount(1, $rows, $path . ' does not draw the one row of three.');
+        foreach (['price', 'currency', 'category_id'] as $id) {
+            self::assertCount(
+                1,
+                $this->query($rows[0], sprintf('.//*[@id="%s"]', $id)),
+                sprintf('%s is not in the row of three on %s.', $id, $path),
+            );
+        }
+
+        $pair = $this->query($form, './/div[@class="field-grid"][.//*[@id="next_payment_date"]]');
+        self::assertCount(1, $pair, $path . ' does not pair the next charge with anything.');
+        self::assertCount(
+            1,
+            $this->query($pair[0], './/*[@id="payment_method_id"]'),
+            'The payment method is not beside the next charge on ' . $path . '.',
+        );
+    }
+
+    /**
+     * Remind me is a row of its own: its segmented control and day chips need
+     * the form's full width, which a cell of a grid cannot give them.
+     *
+     * @dataProvider forms
+     */
+    public function testRemindMeHasARowOfItsOwn(string $path): void
+    {
+        $form = $this->form($this->get($path));
+        self::assertCount(1, $this->query($form, './/*[@id="reminder_days"]'));
+        self::assertCount(
+            0,
+            $this->query($form, './/div[contains(concat(" ", @class, " "), " field-grid ")]//*[@id="reminder_days"]'),
+            'Remind me sits in a grid on ' . $path . ' rather than on a row of its own.',
+        );
+    }
+
+    /**
+     * The currency is a field of its own now, not a select tucked inside the
+     * price's box, so it is named by a label of its own rather than an
+     * `aria-label` — and each option shows the sign beside the code.
+     */
+    public function testTheCurrencyIsAFieldWithALabelOfItsOwn(): void
+    {
+        $form = $this->form($this->get('/subscriptions/new'));
+
+        self::assertCount(1, $this->query($form, './/label[@for="currency"]'), 'The currency has no label.');
+
+        $chosen = $this->query($form, './/select[@id="currency"]/option[@selected]')[0] ?? null;
+        self::assertInstanceOf(DOMElement::class, $chosen);
+        self::assertSame('GBP · £', trim($chosen->textContent));
+    }
+
+    /**
+     * "This is a free trial" is a switch — still the checkbox that posts, with
+     * the role that says on/off — and the reveal beneath keys on its id.
+     */
+    public function testTheFreeTrialIsASwitch(): void
+    {
+        $trial = $this->query($this->form($this->get('/subscriptions/new')), './/input[@id="is_trial"]')[0] ?? null;
+        self::assertInstanceOf(DOMElement::class, $trial);
+
+        self::assertSame('checkbox', $trial->getAttribute('type'));
+        self::assertSame('switch', $trial->getAttribute('role'));
+        self::assertStringContainsString('toggle', $trial->getAttribute('class'));
+    }
+
+    /**
+     * Cancel comes first and closes the dialog; on the page it is still a link
+     * back to the list, which is what it does with no script.
+     *
+     * @dataProvider forms
+     */
+    public function testCancelLeadsTheActionsAndClosesTheDialog(string $path): void
+    {
+        $actions = $this->query($this->form($this->get($path)), './/div[@class="form-actions"]/*');
+        self::assertGreaterThanOrEqual(2, count($actions));
+
+        self::assertSame('a', $actions[0]->tagName, $path . ' does not lead its actions with Cancel.');
+        self::assertSame('/subscriptions', $actions[0]->getAttribute('href'));
+        self::assertSame('quick-add', $actions[0]->getAttribute('data-closes-dialog'));
+        self::assertSame('submit', $actions[1]->getAttribute('type'));
+    }
+
+    /**
+     * The dialog draws the header the form no longer does: the mark, the
+     * title, and the subtitle it is described by.
+     */
+    public function testTheQuickAddDialogCarriesItsMarkAndSubtitle(): void
+    {
+        $document = new DOMDocument();
+        $document->loadHTML(
+            '<?xml encoding="utf-8" ?>' . $this->get('/subscriptions'),
+            LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET,
+        );
+        $xpath = new DOMXPath($document);
+
+        $dialog = $xpath->query('//dialog[@id="quick-add"]')?->item(0);
+        self::assertInstanceOf(DOMElement::class, $dialog);
+        self::assertStringContainsString('dialog-sectioned', $dialog->getAttribute('class'));
+        self::assertSame('quick-add-subtitle', $dialog->getAttribute('aria-describedby'));
+
+        self::assertSame(1, $xpath->query('.//*[@id="quick-add-subtitle"]', $dialog)?->length);
+        self::assertSame(1, $xpath->query('.//*[@class="dialog-mark"]', $dialog)?->length);
+
+        // And the fragment it loads does not draw a second subtitle.
+        self::assertStringNotContainsString(
+            'dialog-subtitle',
+            $this->get('/subscriptions/new', ['HX-Request' => 'true']),
+        );
+    }
+
+    /**
      * @return list<DOMElement>
      */
     private function query(DOMElement $context, string $expression): array

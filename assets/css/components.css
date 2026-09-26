@@ -1784,9 +1784,18 @@ legend {
     gap: 0.85rem;
 }
 
+/*
+ * Three to a row, where the prototype seats three short controls together — a
+ * price, its currency and its category. The same container width as a pair:
+ * each third is still wider than a date input needs.
+ */
 @container form (min-width: 34rem) {
     .field-grid {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .field-grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
@@ -2150,6 +2159,11 @@ legend {
 .dialog-sectioned {
     width: min(32.5rem, calc(100vw - 2rem));
     padding: 0;
+}
+
+/* A sectioned dialog wide enough for a form's rows of three. */
+.dialog-sectioned.dialog-wide {
+    width: min(42rem, calc(100vw - 2rem));
 }
 
 .dialog-sectioned .dialog-header {

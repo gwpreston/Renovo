@@ -20,6 +20,9 @@ final class MoneyFormatter
     /** @var array<string, NumberFormatter> */
     private array $formatters = [];
 
+    /** @var array<string, NumberFormatter> */
+    private array $symbols = [];
+
     /**
      * The locale is read per call rather than fixed at construction: a user
      * who reads the application in German sees German thousands separators,
@@ -66,6 +69,28 @@ final class MoneyFormatter
     public function formatMinor(int $amountMinor, string $currency, bool $signed = false): string
     {
         return $this->format(Money::of($amountMinor, $currency), $signed);
+    }
+
+    /**
+     * The currency's sign as the reader's locale writes it — "£", "€", or
+     * "US$" in a locale where a bare "$" would be ambiguous — for a label
+     * beside the code. The code itself when ICU has no sign for it.
+     */
+    public function symbol(string $currency): string
+    {
+        $locale = $this->locale->get();
+
+        // A formatter of its own: setting the currency on the shared one
+        // would change what every later format() call printed.
+        $formatter = $this->symbols[$locale . '|' . $currency] ??= new NumberFormatter(
+            $locale . '@currency=' . $currency,
+            NumberFormatter::CURRENCY,
+        );
+        $symbol = $formatter->getSymbol(NumberFormatter::CURRENCY_SYMBOL);
+
+        // "¤" is ICU's placeholder for a currency it has no sign for, which
+        // tells a reader less than the code beside it already does.
+        return $symbol === false || $symbol === '' || $symbol === '¤' ? $currency : $symbol;
     }
 
     private function formatter(string $locale): NumberFormatter
