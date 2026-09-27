@@ -358,7 +358,7 @@ archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 ## Requirements
 
 - **Docker** and the Compose plugin (the supported way to run it), or
-- **PHP 8.2+** with `pdo_pgsql` or `pdo_mysql`, `intl`, `curl`, `zip`, `gd`,
+- **PHP 8.4+** with `pdo_pgsql` or `pdo_mysql`, `intl`, `curl`, `zip`, `gd`,
   `openssl` and `sodium` (the last two are bundled with most builds; they
   encrypt stored two-factor secrets and verify passkeys, and `gd` re-encodes
   uploaded avatars), plus Composer and a

@@ -13,7 +13,7 @@ below before adding anything.
 
 ## Tech stack (fixed — do not substitute without asking)
 
-- **PHP 8.2+**, **Slim Framework 4** + **PHP-DI**.
+- **PHP 8.4+**, **Slim Framework 4** + **PHP-DI**.
 - **Twig** templates; **htmx** for filter/sort/pagination without full reloads.
   Responsive, mobile-first CSS. No SPA framework.
 - **Vite** builds the front-end assets: **Tailwind CSS 4**, a small JS bundle
