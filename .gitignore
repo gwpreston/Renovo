@@ -2,7 +2,7 @@
 # Dependencies
 #
 # composer.lock is NOT ignored: it pins the exact versions the Docker image and
-# CI install, and the platform is pinned to PHP 8.2 so it resolves for the
+# CI install, and the platform is pinned to PHP 8.4 so it resolves for the
 # minimum supported version rather than whatever a developer happens to run.
 # ---------------------------------------------------------------------------
 /vendor/

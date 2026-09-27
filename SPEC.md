@@ -7,7 +7,7 @@ sketch or stub. Where a detail is genuinely ambiguous, pick a sensible default,
 state the assumption in a comment or the README, and keep going.
 
 TECH STACK (fixed — do not substitute without asking)
-- PHP 8.2+, Slim Framework 4 with PHP-DI.
+- PHP 8.4+, Slim Framework 4 with PHP-DI.
 - Twig templates; htmx for filter/sort/pagination without full reloads.
   Responsive, mobile-first CSS. No heavy JS SPA.
 - Data access through a thin PDO-based abstraction so the app runs on BOTH
