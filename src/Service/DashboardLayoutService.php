@@ -32,15 +32,27 @@ final class DashboardLayoutService
      */
     public function visibleFor(int $userId, DashboardView $view): array
     {
+        return self::visibleOf($this->forUser($userId, $view));
+    }
+
+    /**
+     * The shown cards of a layout `forUser()` returned, in order — for a
+     * caller that needs the whole layout as well and should not read it twice.
+     *
+     * @param list<array{card: DashboardCard, position: int, visible: bool}> $layout
+     * @return list<DashboardCard>
+     */
+    public static function visibleOf(array $layout): array
+    {
         return array_values(array_map(
             static fn (array $entry): DashboardCard => $entry['card'],
-            array_filter($this->forUser($userId, $view), static fn (array $entry): bool => $entry['visible']),
+            array_filter($layout, static fn (array $entry): bool => $entry['visible']),
         ));
     }
 
     /**
      * Every card of one view with its position and whether it is shown — what
-     * the settings form renders.
+     * the dashboard draws while it is being customised.
      *
      * @return list<array{card: DashboardCard, position: int, visible: bool}>
      */
@@ -71,49 +83,96 @@ final class DashboardLayoutService
     }
 
     /**
-     * Every view's layout, for the settings form.
+     * Save a view in the order it was dragged into.
      *
-     * @return list<array{view: DashboardView, cards: list<array{card: DashboardCard, position: int, visible: bool}>}>
+     * Only the order comes from the request; whether each card is shown is
+     * kept as it was. Keys that name no card of this view are passed over,
+     * and a card the list leaves out keeps its place after the ones it names,
+     * so a stale page cannot lose a card by not knowing about it.
+     *
+     * @param list<string> $keys Card keys, first to last.
      */
-    public function allFor(int $userId): array
+    public function reorder(int $userId, DashboardView $view, array $keys): void
     {
-        return array_map(
-            fn (DashboardView $view): array => ['view' => $view, 'cards' => $this->forUser($userId, $view)],
-            DashboardView::cases(),
-        );
-    }
+        $current = $this->forUser($userId, $view);
 
-    /**
-     * Save one view's layout, as submitted by the settings form.
-     *
-     * Positions arrive as whatever numbers the user typed; they are sorted and
-     * renumbered here, so "3, 3, 1" is a legitimate way of saying "that one
-     * first and I do not care about the other two".
-     *
-     * @param array<array-key, mixed> $positions Card key => position.
-     * @param array<array-key, mixed> $visible   Card key => anything truthy.
-     */
-    public function update(int $userId, DashboardView $view, array $positions, array $visible): void
-    {
-        $ordered = [];
-        foreach (DashboardCard::defaultOrder($view) as $index => $card) {
-            $raw = $positions[$card->value] ?? null;
-
-            $ordered[] = [
-                'card' => $card,
-                'requested' => is_numeric($raw) ? (int) $raw : $index,
-                'visible' => array_key_exists($card->value, $visible),
-            ];
+        $rank = array_flip(array_values(array_unique($keys)));
+        $count = count($rank);
+        foreach ($current as $index => $entry) {
+            $current[$index]['requested'] = $rank[$entry['card']->value] ?? $count + $index;
         }
 
         usort(
-            $ordered,
-            static fn (array $a, array $b): int => $a['requested'] <=> $b['requested']
-                ?: strcmp($a['card']->value, $b['card']->value),
+            $current,
+            static fn (array $a, array $b): int => $a['requested'] <=> $b['requested'],
         );
 
+        $this->save($userId, $view, $current);
+    }
+
+    /**
+     * Move one card a place up (-1) or down (+1), swapping it with its
+     * neighbour. At either end there is no neighbour, and nothing changes.
+     */
+    public function move(int $userId, DashboardView $view, DashboardCard $card, int $offset): void
+    {
+        $current = $this->forUser($userId, $view);
+
+        foreach ($current as $index => $entry) {
+            if ($entry['card'] !== $card) {
+                continue;
+            }
+
+            $target = $index + $offset;
+            if (!isset($current[$target])) {
+                return;
+            }
+
+            [$current[$index], $current[$target]] = [$current[$target], $current[$index]];
+            $this->save($userId, $view, $current);
+
+            return;
+        }
+    }
+
+    /**
+     * Show or hide one card. Said outright rather than toggled, so a form
+     * sent twice leaves the card as the member asked for, not back as it was.
+     */
+    public function setVisible(int $userId, DashboardView $view, DashboardCard $card, bool $visible): void
+    {
+        $current = $this->forUser($userId, $view);
+
+        foreach ($current as $index => $entry) {
+            if ($entry['card'] === $card) {
+                $current[$index]['visible'] = $visible;
+            }
+        }
+
+        $this->save($userId, $view, $current);
+    }
+
+    /**
+     * Put one view back as it ships: its stored rows are removed, so it reads
+     * as the default order and visibility again — and goes on following the
+     * default, cards added by later versions included, until it is next
+     * rearranged.
+     */
+    public function reset(int $userId, DashboardView $view): void
+    {
+        $this->repository->replaceFor($userId, $view->value, []);
+    }
+
+    /**
+     * Write a view's cards back in the order given, positions renumbered from
+     * nought so they stay contiguous.
+     *
+     * @param list<array{card: DashboardCard, visible: bool}> $entries
+     */
+    private function save(int $userId, DashboardView $view, array $entries): void
+    {
         $rows = [];
-        foreach ($ordered as $position => $entry) {
+        foreach (array_values($entries) as $position => $entry) {
             $rows[] = [
                 'card_key' => $entry['card']->value,
                 'position' => $position,
@@ -122,32 +181,5 @@ final class DashboardLayoutService
         }
 
         $this->repository->replaceFor($userId, $view->value, $rows);
-    }
-
-    /**
-     * Save whichever views the form actually submitted.
-     *
-     * A view is saved only when its positions came with the request. A
-     * checkbox left unticked is simply absent from a form, so "no visibility
-     * fields" cannot be told apart from "every card hidden" — only the
-     * positions, which are always sent, say that a view's section was on the
-     * page. Without this, a form that drew one view would silently hide every
-     * card on the other.
-     *
-     * @param array<array-key, mixed> $positions View => card key => position.
-     * @param array<array-key, mixed> $visible   View => card key => anything truthy.
-     */
-    public function updateSubmitted(int $userId, array $positions, array $visible): void
-    {
-        foreach (DashboardView::cases() as $view) {
-            $viewPositions = $positions[$view->value] ?? null;
-            if (!is_array($viewPositions) || $viewPositions === []) {
-                continue;
-            }
-
-            $viewVisible = $visible[$view->value] ?? [];
-
-            $this->update($userId, $view, $viewPositions, is_array($viewVisible) ? $viewVisible : []);
-        }
     }
 }

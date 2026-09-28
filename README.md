@@ -1956,8 +1956,9 @@ American locale because that is how their working week runs.
 
 ## Making it yours
 
-All of this is per account, under **Profile → Appearance & preferences**, and none of it
-needs any permission: it changes what one person sees and nothing that anybody
+All of this is per account, under **Profile → Appearance & preferences** (the
+dashboard's cards are arranged on the dashboard itself), and none of it needs
+any permission: it changes what one person sees and nothing that anybody
 else does.
 
 - **Theme** — system, light or dark.
@@ -1968,10 +1969,13 @@ else does.
   reader sees no difference.
 - **Open on** — the page you land on when you open Renovo. The dashboard,
   the subscriptions list, the calendar, budgets, the forecast or the statistics.
-- **Dashboard cards** — reorder them by number and untick the ones you do not
-  want, separately for the Overview and the Household dashboard. A card added by
-  a later version appears in its default place rather than silently going
-  missing. The subscriptions table is listed but off until you tick it.
+- **Dashboard cards** — press **Customise** on the dashboard, then drag a card
+  by its handle (or use its arrows) to move it, and hide the ones you do not
+  want. Each of the Overview and Household dashboards has its own arrangement;
+  **Reset layout** puts the one on screen back to its default.
+  A card added by a later version appears in its default place rather than
+  silently going missing. The subscriptions table is listed but hidden until
+  you show it.
   Which of the two dashboards you open on is remembered from the toggle at the
   top of the dashboard itself.
 

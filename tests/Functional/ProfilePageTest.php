@@ -108,10 +108,6 @@ final class ProfilePageTest extends DatabaseTestCase
             'week_start' => '0',
             'landing_view' => 'calendar',
         ]));
-        $this->assertLandsOn('/profile#dashboard-cards', $this->request('POST', '/profile/dashboard-cards', [
-            'card_position' => ['overview' => ['totals' => '1']],
-            'card_visible' => ['overview' => ['totals' => '1']],
-        ]));
         $this->assertLandsOn('/profile', $this->request('POST', '/profile/password', [
             'current_password' => self::PASSWORD,
             'password' => 'a-brand-new-password',

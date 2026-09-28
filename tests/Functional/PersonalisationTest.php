@@ -339,33 +339,16 @@ final class PersonalisationTest extends DatabaseTestCase
         $withCard = (string) $this->request('GET', '/')->getBody();
         self::assertStringContainsString('Where it goes', $withCard, 'The card is there to begin with.');
 
-        $this->saveDashboardCards([
-            'card_position' => ['overview' => ['where_it_goes' => '5', 'totals' => '1']],
-            // where_it_goes is absent from card_visible, which is how an
-            // unticked checkbox arrives.
-            'card_visible' => ['overview' => ['totals' => '1', 'coming_up' => '1']],
-        ]);
+        $this->saveDashboardLayout(['view' => 'overview', 'card' => 'where_it_goes', 'action' => 'hide']);
 
         self::assertStringNotContainsString('Where it goes', (string) $this->request('GET', '/')->getBody());
     }
 
     public function testReorderingCardsChangesTheirOrderOnThePage(): void
     {
-        $this->saveDashboardCards([
-            'card_position' => [
-                'overview' => [
-                    'where_it_goes' => '1',
-                    'totals' => '2',
-                    'coming_up' => '3',
-                ],
-            ],
-            'card_visible' => [
-                'overview' => [
-                    'where_it_goes' => '1',
-                    'totals' => '1',
-                    'coming_up' => '1',
-                ],
-            ],
+        $this->saveDashboardLayout([
+            'view' => 'overview',
+            'order' => ['where_it_goes', 'totals', 'coming_up'],
         ]);
 
         $body = (string) $this->request('GET', '/')->getBody();
@@ -428,17 +411,11 @@ final class PersonalisationTest extends DatabaseTestCase
         $profile = (string) $this->request('GET', '/profile')->getBody();
 
         self::assertStringContainsString('action="/profile/preferences"', $profile);
-        self::assertStringContainsString('action="/profile/dashboard-cards"', $profile);
         self::assertStringContainsString('name="landing_view"', $profile);
-        self::assertStringContainsString(
-            'name="card_position[overview][totals]"',
+        self::assertStringNotContainsString(
+            'card_position[',
             $profile,
-            'The card layout moved too.',
-        );
-        self::assertStringContainsString(
-            'name="card_position[household][who_pays]"',
-            $profile,
-            'Both views are there.',
+            'The card layout is arranged on the dashboard now, not here.',
         );
 
         $settings = (string) $this->request('GET', '/settings')->getBody();
@@ -519,11 +496,11 @@ final class PersonalisationTest extends DatabaseTestCase
     /**
      * @param array<string, mixed> $values
      */
-    private function saveDashboardCards(array $values): void
+    private function saveDashboardLayout(array $values): void
     {
-        $response = $this->request('POST', '/profile/dashboard-cards', $values);
+        $response = $this->request('POST', '/dashboard/layout', $values);
 
-        self::assertSame(302, $response->getStatusCode(), 'The dashboard cards form must have accepted this.');
+        self::assertSame(302, $response->getStatusCode(), 'The dashboard layout must have accepted this.');
     }
 
     private function scope(): Scope

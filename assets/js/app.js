@@ -24,6 +24,7 @@
  */
 
 import { enhanceAuthForms } from './auth-forms.js';
+import { enhanceCardLayouts } from './card-layout.js';
 import { onThemeChange, renderChart } from './charts.js';
 import { drawCategoryDonuts } from './category-donut.js';
 import { enhanceCopyFields } from './copy-field.js';
@@ -69,6 +70,7 @@ function hydrate() {
     enhanceSubscriptionForms(document);
     enhanceSubscriptionLists(document);
     enhanceCopyFields(document);
+    enhanceCardLayouts(document);
     drawCharts();
 }
 
@@ -89,6 +91,7 @@ function enhanceArrived(event) {
     enhanceTagFields(root);
     enhancePaymentMethodFields(root);
     enhanceSubscriptionForms(root);
+    enhanceCardLayouts(root);
     // The list fragment replaces `#subscription-list` whole, so its bulk bar
     // arrives drawn open again and needs hiding until something is chosen.
     // The whole document rather than the event's target: an outerHTML swap's

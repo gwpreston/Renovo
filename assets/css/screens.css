@@ -1150,31 +1150,6 @@ tr.is-passed > td {
     margin-top: 0.5rem;
 }
 
-/* --------------------------------------------------- dashboard card layout */
-
-.card-layout {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 0.4rem;
-}
-
-.card-layout-row {
-    display: grid;
-    grid-template-columns: 1fr 4.5rem auto;
-    gap: 0.75rem;
-    align-items: center;
-}
-
-.card-layout-name {
-    font-weight: var(--weight-normal);
-}
-
-.card-layout-row input[type='number'] {
-    width: 100%;
-}
-
 /* --------------------------------------------------------------- calendar */
 
 /*
@@ -3250,6 +3225,107 @@ a.segmented-option {
 
 .coming-up-more {
     margin: 0.75rem 0 0;
+}
+
+/* ------------------------------------------------ customising the dashboard */
+
+/* The view switch and Customise, side by side on the right of the greeting. */
+.dashboard-head-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dashboard-customise {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dashboard-layout-hint {
+    margin: -0.5rem 0 0.5rem;
+    font-size: var(--size-label);
+}
+
+.dashboard-layout-status {
+    margin: 0 0 0.75rem;
+    font-size: var(--size-label);
+    color: var(--muted);
+}
+
+.dashboard-layout-status:empty {
+    display: none;
+}
+
+/*
+ * Each card's controls: the handle, the card's name, and the buttons, on a
+ * strip above it. The strip is what keeps a card that has nothing to say in
+ * the grid while customising, so it can still be moved.
+ */
+.card-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.4rem;
+    padding: 0.3rem;
+    border: 1px dashed var(--border-control);
+    border-radius: var(--radius-control);
+    background: var(--surface-2);
+}
+
+.card-controls-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--size-label);
+    color: var(--muted);
+}
+
+.card-controls .icon-button {
+    width: 2rem;
+    height: 2rem;
+}
+
+.card-drag {
+    cursor: grab;
+    touch-action: none;
+}
+
+.card-drag:active {
+    cursor: grabbing;
+}
+
+/*
+ * A hidden card is only its name, set back on the quieter surface so the
+ * view's shape is still clear. Not faded with opacity: that would take its
+ * muted text under the contrast the palette is held to.
+ */
+.is-hidden-card .card-placeholder {
+    border-style: dashed;
+    box-shadow: none;
+    background: var(--surface-2);
+}
+
+.card-placeholder p {
+    margin: 0.25rem 0 0;
+}
+
+/* Where a dragged card will land, and the card being carried. */
+.is-drag-ghost {
+    opacity: 0.4;
+}
+
+.is-drag-ghost .card {
+    outline: 2px dashed var(--focus-ring);
+    outline-offset: 2px;
+}
+
+.is-drag-chosen .card-controls {
+    border-style: solid;
+    border-color: var(--focus-ring);
 }
 
 @media (max-width: 767px) {

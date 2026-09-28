@@ -9,8 +9,9 @@ namespace App\Repository;
  * order.
  *
  * Per user and per view, like the other preference tables, and written a view
- * at a time as a whole: the settings form submits that view's entire layout,
- * so a save replaces its rows rather than trying to reconcile a diff. That keeps the position values contiguous
+ * at a time as a whole: every change made while customising the dashboard
+ * saves that view's entire layout, so a save replaces its rows rather than
+ * trying to reconcile a diff. That keeps the position values contiguous
  * and means a card added in a later version appears for everybody instead of
  * being invisible to whoever had saved a layout before it existed.
  */
