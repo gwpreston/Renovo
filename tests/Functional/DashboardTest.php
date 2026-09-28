@@ -559,6 +559,67 @@ final class DashboardTest extends DatabaseTestCase
         self::assertContains(DashboardCard::Totals, $layout->visibleFor($this->ownerId, DashboardView::Overview));
     }
 
+    /**
+     * Reset puts the view on screen back to its default layout and leaves
+     * the other view's arrangement alone.
+     */
+    public function testResetPutsOneViewBackToItsDefault(): void
+    {
+        $layout = $this->container()->get(DashboardLayoutService::class);
+        $default = $this->overviewOrder($this->ownerId);
+
+        $layout->reorder($this->ownerId, DashboardView::Overview, ['where_it_goes', 'totals']);
+        $layout->setVisible($this->ownerId, DashboardView::Overview, DashboardCard::Totals, false);
+        $layout->setVisible($this->ownerId, DashboardView::Household, DashboardCard::WhoPays, false);
+
+        self::assertStringContainsString('Reset layout', $this->body($this->get('/?layout=edit', $this->ownerId)));
+
+        $response = $this->post('/dashboard/layout', $this->ownerId, ['view' => 'overview', 'action' => 'reset']);
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/?layout=edit', $response->getHeaderLine('Location'));
+        self::assertSame($default, $this->overviewOrder($this->ownerId));
+        self::assertSame([], (new DashboardCardRepository($this->db))->layoutFor($this->ownerId, 'overview'));
+        self::assertNotSame(
+            [],
+            (new DashboardCardRepository($this->db))->layoutFor($this->ownerId, 'household'),
+            'The other view keeps its arrangement.',
+        );
+    }
+
+    /**
+     * Switching views while customising is choosing to arrange the other one
+     * next, so it stays in the mode; outside it, it goes to the dashboard.
+     */
+    public function testSwitchingViewsWhileCustomisingStaysInTheMode(): void
+    {
+        self::assertStringContainsString(
+            '<input type="hidden" name="layout" value="edit">',
+            $this->body($this->get('/?layout=edit', $this->ownerId)),
+        );
+
+        $editing = $this->post('/dashboard/view', $this->ownerId, ['view' => 'household', 'layout' => 'edit']);
+        self::assertSame('/?layout=edit', $editing->getHeaderLine('Location'));
+
+        $plain = $this->post('/dashboard/view', $this->ownerId, ['view' => 'overview']);
+        self::assertSame('/', $plain->getHeaderLine('Location'));
+    }
+
+    /**
+     * A demonstration refuses every write, so customising is not offered
+     * there at all rather than offered and then refused.
+     */
+    public function testCustomisingIsNotOfferedOnADemonstration(): void
+    {
+        $this->container()->get(InstanceSettingsService::class)->setDemoMode(true);
+
+        $body = $this->body($this->get('/?layout=edit', $this->ownerId));
+
+        self::assertStringNotContainsString('data-card-layout', $body);
+        self::assertStringNotContainsString('class="card-controls"', $body);
+        self::assertStringNotContainsString('href="/?layout=edit"', $body);
+    }
+
     public function testMovingPastEitherEndChangesNothing(): void
     {
         $layout = $this->container()->get(DashboardLayoutService::class);

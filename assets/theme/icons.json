@@ -78,6 +78,7 @@
         "profile": "circle-user-round",
         "rarely-used": "battery-low",
         "refresh": "refresh-cw",
+        "reset": "rotate-ccw",
         "search": "search",
         "security": "shield-check",
         "send": "send",

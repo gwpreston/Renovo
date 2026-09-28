@@ -1971,7 +1971,8 @@ else does.
   the subscriptions list, the calendar, budgets, the forecast or the statistics.
 - **Dashboard cards** — press **Customise** on the dashboard, then drag a card
   by its handle (or use its arrows) to move it, and hide the ones you do not
-  want. Each of the Overview and Household dashboards has its own arrangement.
+  want. Each of the Overview and Household dashboards has its own arrangement;
+  **Reset layout** puts the one on screen back to its default.
   A card added by a later version appears in its default place rather than
   silently going missing. The subscriptions table is listed but hidden until
   you show it.

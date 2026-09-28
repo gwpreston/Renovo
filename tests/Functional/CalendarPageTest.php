@@ -405,7 +405,9 @@ final class CalendarPageTest extends DatabaseTestCase
             ['Sun', 'Tue'],
             array_map(static fn (DOMElement $day): string => $day->getAttribute('data-weekday'), $days),
         );
-        self::assertStringStartsWith('Sun 20 Sept', $this->text($days[0], 'calendar-list-heading'));
+        // The heading is an ICU skeleton, so the locale data decides the
+        // punctuation: newer ICU writes "Sun, 20 Sept", older "Sun 20 Sept".
+        self::assertMatchesRegularExpression('/^Sun,? 20 Sept/', $this->text($days[0], 'calendar-list-heading'));
     }
 
     public function testAnEmptyMonthSaysSoInThePhoneList(): void

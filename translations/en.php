@@ -727,6 +727,8 @@ return [
     'flash.signed_out' => 'You have been signed out.',
     'flash.password_changed' => 'Your password has been changed. Sign in with it now.',
     'flash.two_factor_expired' => 'That sign-in attempt expired. Start again.',
+    'flash.dashboard_layout_reset' => 'This dashboard is back to its default layout.',
+    'flash.dashboard_layout_saved' => 'Your dashboard layout has been saved.',
     'flash.preferences_saved' => 'Your preferences have been saved.',
     'flash.details_saved' => 'Your details have been saved.',
     'flash.email_change_resent' =>
@@ -1191,6 +1193,7 @@ return [
     'dashboard.layout_move_down' => 'Move {card} down',
     'dashboard.layout_move_up' => 'Move {card} up',
     'dashboard.layout_moved' => '{card} moved to position {position}',
+    'dashboard.layout_reset' => 'Reset layout',
     'dashboard.layout_show' => 'Show {card}',
     'dashboard.metrics' => 'Spending at a glance',
     'dashboard.month_bar_label' => '{charged} already charged, {due} still due',

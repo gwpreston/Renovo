@@ -37,6 +37,7 @@
             <form method="post" action="/dashboard/view" class="segmented dashboard-views"
                   aria-label="{{ t('dashboard.view_choice') }}">
                 {{ csrf_field() }}
+                {% if editing %}<input type="hidden" name="layout" value="edit">{% endif %}
                 {% for choice in dashboard_views %}
                     <button type="submit" name="view" value="{{ choice.value }}" class="segmented-option"
                             aria-pressed="{{ choice == dashboard_view ? 'true' : 'false' }}">
@@ -51,10 +52,22 @@
                 in and a link out: entering and leaving change nothing stored.
             #}
             {% if editing %}
+                {#
+                    Resets only the view on screen: each view has its own
+                    layout. A form, because it is a write; it reloads the
+                    page, since every card may have moved or reappeared.
+                #}
+                <form method="post" action="/dashboard/layout">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="view" value="{{ dashboard_view.value }}">
+                    <button type="submit" name="action" value="reset" class="button button-outline dashboard-customise">
+                        {{- icon('reset') }} {{ t('dashboard.layout_reset') -}}
+                    </button>
+                </form>
                 <a href="/" class="button button-primary dashboard-customise">
                     {{- icon('check') }} {{ t('dashboard.layout_done') -}}
                 </a>
-            {% else %}
+            {% elseif not demo_mode|default(false) %}
                 <a href="/?layout=edit" class="button button-outline dashboard-customise">
                     {{- icon('edit') }} {{ t('dashboard.layout_customise') -}}
                 </a>

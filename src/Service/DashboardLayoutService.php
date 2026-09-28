@@ -32,9 +32,21 @@ final class DashboardLayoutService
      */
     public function visibleFor(int $userId, DashboardView $view): array
     {
+        return self::visibleOf($this->forUser($userId, $view));
+    }
+
+    /**
+     * The shown cards of a layout `forUser()` returned, in order — for a
+     * caller that needs the whole layout as well and should not read it twice.
+     *
+     * @param list<array{card: DashboardCard, position: int, visible: bool}> $layout
+     * @return list<DashboardCard>
+     */
+    public static function visibleOf(array $layout): array
+    {
         return array_values(array_map(
             static fn (array $entry): DashboardCard => $entry['card'],
-            array_filter($this->forUser($userId, $view), static fn (array $entry): bool => $entry['visible']),
+            array_filter($layout, static fn (array $entry): bool => $entry['visible']),
         ));
     }
 
@@ -138,6 +150,17 @@ final class DashboardLayoutService
         }
 
         $this->save($userId, $view, $current);
+    }
+
+    /**
+     * Put one view back as it ships: its stored rows are removed, so it reads
+     * as the default order and visibility again — and goes on following the
+     * default, cards added by later versions included, until it is next
+     * rearranged.
+     */
+    public function reset(int $userId, DashboardView $view): void
+    {
+        $this->repository->replaceFor($userId, $view->value, []);
     }
 
     /**

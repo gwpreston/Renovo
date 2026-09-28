@@ -360,7 +360,8 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
     {
         $editor = $this->body($this->get('/subscriptions', $this->editorId));
         self::assertMatchesRegularExpression(
-            '/<a class="button button-primary list-search-add" href="\/subscriptions\/new"\s+data-opens-dialog="quick-add">/',
+            '/<a class="button button-primary list-search-add" href="\/subscriptions\/new"'
+                . '\s+data-opens-dialog="quick-add">/',
             $editor,
         );
         self::assertStringNotContainsString(

@@ -128,7 +128,10 @@ final class MoneyPagesTest extends DatabaseTestCase
             'currency' => 'XOF',
             'subscription_type' => 'recurring',
             'billing_cycle' => 'monthly',
-            'next_payment_date' => (new \DateTimeImmutable('+5 days'))->format('Y-m-d'),
+            // The last day of this month: never in the past, and never in the
+            // next month, which "+5 days" was for the last five days of every
+            // month — leaving this month's budget nothing it could not convert.
+            'next_payment_date' => (new \DateTimeImmutable('last day of this month'))->format('Y-m-d'),
             'is_active' => true,
         ], []);
 
