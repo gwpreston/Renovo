@@ -18,7 +18,6 @@ use App\Service\Auth\TotpService;
 use App\Service\Auth\TwoFactorService;
 use App\Service\Auth\WebAuthnService;
 use App\Service\AvatarStorage;
-use App\Service\DashboardLayoutService;
 use App\Service\UserPreferencesService;
 use App\Service\ValidationException;
 use Psr\Http\Message\ResponseInterface;
@@ -52,7 +51,6 @@ final class ProfileController extends Controller
         SessionInterface $session,
         Translator $translator,
         private readonly UserPreferencesService $preferences,
-        private readonly DashboardLayoutService $dashboard,
         private readonly Locales $locales,
         // For the picture card's size hint. The uploads themselves are
         // AccountController's, and so is every other write this page's forms
@@ -98,7 +96,6 @@ final class ProfileController extends Controller
             // is that same catalogue — is not a choice, so the control is not
             // drawn until a second language exists.
             'locale_choices' => count($locales) > 1 ? $locales : [],
-            'dashboard_layouts' => $this->dashboard->allFor($user->id),
             'avatar_max_kilobytes' => max(1, intdiv($this->avatarStorage->maxBytes(), 1024)),
             'totp' => [
                 'enabled_since' => $this->totp->enabledSince($user->id),
@@ -186,28 +183,6 @@ final class ProfileController extends Controller
         $this->flash('success', 'flash.preferences_saved');
 
         return $this->redirectAfterWrite($request, $response, self::APPEARANCE);
-    }
-
-    /**
-     * Which cards each dashboard view shows, and in what order. A form of its
-     * own: it is a set of numbers typed one after another, which saving on
-     * every change would save half-way through.
-     */
-    public function updateDashboardCards(
-        ServerRequestInterface $request,
-        ResponseInterface $response,
-    ): ResponseInterface {
-        $body = $this->body($request);
-
-        $this->dashboard->updateSubmitted(
-            $this->user($request)->id,
-            is_array($body['card_position'] ?? null) ? $body['card_position'] : [],
-            is_array($body['card_visible'] ?? null) ? $body['card_visible'] : [],
-        );
-
-        $this->flash('success', 'flash.dashboard_cards_saved');
-
-        return $this->redirectAfterWrite($request, $response, '/profile#dashboard-cards');
     }
 
     /**

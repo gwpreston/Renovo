@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Application\Middleware\AuthenticationMiddleware;
+use App\Domain\DashboardCard;
 use App\Domain\DashboardView;
 use App\Domain\ExchangeRate;
 use App\Domain\IsolationMode;
@@ -471,7 +472,9 @@ final class DashboardTest extends DatabaseTestCase
     public function testHidingACardInOneViewLeavesTheOtherAlone(): void
     {
         $layout = $this->container()->get(DashboardLayoutService::class);
-        $layout->update($this->ownerId, DashboardView::Household, ['by_category' => 1], []);
+        foreach (DashboardCard::defaultOrder(DashboardView::Household) as $card) {
+            $layout->setVisible($this->ownerId, DashboardView::Household, $card, false);
+        }
 
         self::assertStringContainsString('Where it goes', $this->body($this->get('/', $this->ownerId)));
         self::assertSame([], (new DashboardCardRepository($this->db))->layoutFor($this->ownerId, 'overview'));
@@ -479,37 +482,189 @@ final class DashboardTest extends DatabaseTestCase
         self::assertSame(
             [],
             $layout->visibleFor($this->ownerId, DashboardView::Household),
-            'Every Household card was left unticked.',
+            'Every Household card was hidden.',
         );
         self::assertNotSame([], $layout->visibleFor($this->ownerId, DashboardView::Overview));
     }
 
     /**
-     * Saving the dashboard cards form with only one view's fields leaves the other
-     * view's layout exactly as it was — an absent section is not a section
-     * with every card unticked.
+     * Rearranging one view writes that view's rows and leaves the other's
+     * exactly as they were.
      */
     public function testSavingOneViewsLayoutDoesNotHideTheOthersCards(): void
     {
-        $this->post('/profile/dashboard-cards', $this->ownerId, [
-            'card_position' => ['overview' => ['totals' => '1', 'coming_up' => '2']],
-            'card_visible' => ['overview' => ['totals' => '1']],
+        $this->post('/dashboard/layout', $this->ownerId, [
+            'view' => 'overview',
+            'order' => ['coming_up', 'totals'],
         ]);
 
         self::assertNotSame([], (new DashboardCardRepository($this->db))->layoutFor($this->ownerId, 'overview'));
         self::assertSame([], (new DashboardCardRepository($this->db))->layoutFor($this->ownerId, 'household'));
     }
 
+    /**
+     * Customising draws every card of the view with its controls, and a
+     * hidden card as a placeholder that can be shown again. The dashboard as
+     * normally seen draws neither.
+     */
+    public function testCustomisingShowsHiddenCardsAsPlaceholders(): void
+    {
+        $this->container()->get(DashboardLayoutService::class)
+            ->setVisible($this->ownerId, DashboardView::Overview, DashboardCard::WhereItGoes, false);
+
+        $plain = $this->body($this->get('/', $this->ownerId));
+        self::assertStringNotContainsString('data-card-layout', $plain);
+        self::assertStringNotContainsString('id="card-where_it_goes"', $plain);
+        self::assertStringContainsString('href="/?layout=edit"', $plain, 'Customise is offered.');
+
+        $editing = $this->body($this->get('/?layout=edit', $this->ownerId));
+        self::assertStringContainsString('data-card-layout data-view="overview"', $editing);
+        self::assertMatchesRegularExpression(
+            '~class="bento-item[^"]*is-hidden-card"\s+id="card-where_it_goes"~',
+            $editing,
+        );
+        self::assertStringContainsString('Show Where it goes', $editing);
+        self::assertStringContainsString('id="card-recent"', $editing, 'The table, off by default, is listed too.');
+        self::assertStringNotContainsString('id="dashboard-recent"', $editing, 'But not drawn while hidden.');
+        self::assertStringContainsString('href="/"', $editing, 'Done leaves the mode.');
+    }
+
+    public function testTheButtonsMoveAndHideACardAndComeBackToIt(): void
+    {
+        $response = $this->post('/dashboard/layout', $this->ownerId, [
+            'view' => 'overview',
+            'card' => 'spend_chart',
+            'action' => 'up',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode());
+        self::assertSame('/?layout=edit#card-spend_chart', $response->getHeaderLine('Location'));
+        self::assertSame(
+            ['spend_chart', 'totals'],
+            array_slice($this->overviewOrder($this->ownerId), 0, 2),
+        );
+
+        $hide = ['view' => 'overview', 'card' => 'totals', 'action' => 'hide'];
+        $this->post('/dashboard/layout', $this->ownerId, $hide);
+        $this->post('/dashboard/layout', $this->ownerId, $hide);
+
+        $layout = $this->container()->get(DashboardLayoutService::class);
+        self::assertNotContains(
+            DashboardCard::Totals,
+            $layout->visibleFor($this->ownerId, DashboardView::Overview),
+            'Hide sent twice is still hidden, not toggled back.',
+        );
+
+        $this->post('/dashboard/layout', $this->ownerId, ['action' => 'show'] + $hide);
+        self::assertContains(DashboardCard::Totals, $layout->visibleFor($this->ownerId, DashboardView::Overview));
+    }
+
+    public function testMovingPastEitherEndChangesNothing(): void
+    {
+        $layout = $this->container()->get(DashboardLayoutService::class);
+        $before = $this->overviewOrder($this->ownerId);
+
+        $layout->move($this->ownerId, DashboardView::Overview, DashboardCard::from($before[0]), -1);
+        $layout->move($this->ownerId, DashboardView::Overview, DashboardCard::from($before[count($before) - 1]), 1);
+
+        self::assertSame($before, $this->overviewOrder($this->ownerId));
+    }
+
+    /**
+     * A drag sends the whole order. The script has already moved the card,
+     * so it is answered with an empty 204 rather than a redirect. Keys that
+     * are not this view's cards are passed over, and a card the list leaves
+     * out keeps a place after the ones it names — and every card keeps
+     * whether it was shown.
+     */
+    public function testADraggedOrderIsSavedAndKeepsVisibility(): void
+    {
+        $response = $this->postHtmx('/dashboard/layout', $this->ownerId, [
+            'view' => 'overview',
+            'order' => ['recent', 'nonsense', 'who_pays', 'where_it_goes', 'totals'],
+        ]);
+
+        self::assertSame(204, $response->getStatusCode());
+
+        $order = $this->overviewOrder($this->ownerId);
+        self::assertSame(['recent', 'where_it_goes', 'totals'], array_slice($order, 0, 3));
+        self::assertNotContains('who_pays', $order, 'A Household card cannot be put on Overview.');
+        self::assertCount(count(DashboardCard::defaultOrder(DashboardView::Overview)), $order, 'No card was lost.');
+        self::assertNotContains(
+            DashboardCard::Recent,
+            $this->container()->get(DashboardLayoutService::class)->visibleFor($this->ownerId, DashboardView::Overview),
+            'Moving the table to the top did not turn it on.',
+        );
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function badLayoutRequests(): iterable
+    {
+        yield 'unknown view' => [['view' => 'sideways', 'order' => ['totals']]];
+        yield 'unknown card' => [['view' => 'overview', 'card' => 'nonsense', 'action' => 'up']];
+        yield "the other view's card" => [['view' => 'overview', 'card' => 'who_pays', 'action' => 'up']];
+        yield 'unknown action' => [['view' => 'overview', 'card' => 'totals', 'action' => 'spin']];
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('badLayoutRequests')]
+    public function testANonsenseLayoutChangeIsRefused(array $body): void
+    {
+        self::assertSame(400, $this->post('/dashboard/layout', $this->ownerId, $body)->getStatusCode());
+        self::assertSame([], (new DashboardCardRepository($this->db))->layoutFor($this->ownerId, 'overview'));
+    }
+
+    public function testALayoutChangeWithoutItsTokenIsRefused(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $response = $this->app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('POST', 'http://localhost/dashboard/layout', ['REMOTE_ADDR' => '127.0.0.1'])
+                ->withParsedBody(['view' => 'overview', 'card' => 'totals', 'action' => 'hide']),
+        );
+
+        self::assertSame(400, $response->getStatusCode());
+        self::assertSame([], (new DashboardCardRepository($this->db))->layoutFor($this->ownerId, 'overview'));
+    }
+
+    /**
+     * A layout is a personal preference: a Viewer arranges their own, and
+     * nobody's arrangement reaches anybody else's rows.
+     */
+    public function testAViewerArrangesTheirOwnDashboardAndNobodyElses(): void
+    {
+        $response = $this->post('/dashboard/layout', $this->viewerId, [
+            'view' => 'overview',
+            'card' => 'where_it_goes',
+            'action' => 'hide',
+        ]);
+
+        self::assertSame(302, $response->getStatusCode(), 'Not a 403: it changes nothing anybody else sees.');
+        self::assertNotSame([], (new DashboardCardRepository($this->db))->layoutFor($this->viewerId, 'overview'));
+        self::assertSame([], (new DashboardCardRepository($this->db))->layoutFor($this->ownerId, 'overview'));
+        self::assertStringContainsString('Where it goes', $this->body($this->get('/', $this->ownerId)));
+    }
+
+    public function testTheProfileFormsAddressIsGone(): void
+    {
+        $status = $this->post('/profile/dashboard-cards', $this->ownerId, [
+            'card_position' => ['overview' => ['totals' => '1']],
+        ])->getStatusCode();
+
+        self::assertContains($status, [404, 405]);
+    }
+
     public function testTheSubscriptionsTableIsOffUntilTurnedOn(): void
     {
         self::assertStringNotContainsString('id="dashboard-recent"', $this->body($this->get('/', $this->ownerId)));
 
-        $this->container()->get(DashboardLayoutService::class)->update(
-            $this->ownerId,
-            DashboardView::Overview,
-            ['recent' => 1],
-            ['recent' => '1', 'totals' => '1'],
-        );
+        $this->container()->get(DashboardLayoutService::class)
+            ->setVisible($this->ownerId, DashboardView::Overview, DashboardCard::Recent, true);
 
         $body = $this->body($this->get('/', $this->ownerId));
         self::assertStringContainsString('id="dashboard-recent"', $body);
@@ -558,6 +713,28 @@ final class DashboardTest extends DatabaseTestCase
         (new UserRepository($this->db))->updatePreferences($this->ownerId, ['dashboard_view' => $view]);
 
         self::assertLessThanOrEqual(1, substr_count($this->body($this->get('/', $this->ownerId)), 'button-primary'));
+    }
+
+    /**
+     * Customising either view draws a strip of controls for every one of its
+     * cards — Household's too, whose cards include an htmx-swapped chart —
+     * and still wears the accent at most once.
+     *
+     * @dataProvider views
+     */
+    public function testEitherViewCanBeCustomised(string $view): void
+    {
+        (new UserRepository($this->db))->updatePreferences($this->ownerId, ['dashboard_view' => $view]);
+
+        $response = $this->get('/?layout=edit', $this->ownerId);
+        $body = $this->body($response);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(
+            count(DashboardCard::defaultOrder(DashboardView::from($view))),
+            substr_count($body, 'class="card-controls"'),
+        );
+        self::assertLessThanOrEqual(1, substr_count($body, 'button-primary'));
     }
 
     /**
@@ -701,6 +878,35 @@ final class DashboardTest extends DatabaseTestCase
             (new ServerRequestFactory())
                 ->createServerRequest('POST', 'http://localhost' . $path, ['REMOTE_ADDR' => '127.0.0.1'])
                 ->withParsedBody($body)
+                ->withHeader(CsrfTokenManager::HEADER_NAME, $this->container()->get(CsrfTokenManager::class)->token()),
+        );
+    }
+
+    /**
+     * One view's card keys in the order this user has them.
+     *
+     * @return list<string>
+     */
+    private function overviewOrder(int $userId): array
+    {
+        return array_map(
+            static fn (array $entry): string => $entry['card']->value,
+            $this->container()->get(DashboardLayoutService::class)->forUser($userId, DashboardView::Overview),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function postHtmx(string $path, int $userId, array $body = []): ResponseInterface
+    {
+        $this->signIn($userId);
+
+        return $this->app->handle(
+            (new ServerRequestFactory())
+                ->createServerRequest('POST', 'http://localhost' . $path, ['REMOTE_ADDR' => '127.0.0.1'])
+                ->withParsedBody($body)
+                ->withHeader('HX-Request', 'true')
                 ->withHeader(CsrfTokenManager::HEADER_NAME, $this->container()->get(CsrfTokenManager::class)->token()),
         );
     }

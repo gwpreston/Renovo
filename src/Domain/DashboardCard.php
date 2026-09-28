@@ -123,7 +123,7 @@ enum DashboardCard: string
      * Whether a card is shown to an account that has not said otherwise.
      *
      * The subscriptions table is the Subscriptions page's own subject, so on
-     * the dashboard it is an opt-in: listed in the layout form, off until
+     * the dashboard it is an opt-in: listed while customising, off until
      * somebody turns it on.
      */
     public function visibleByDefault(): bool

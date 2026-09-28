@@ -1,0 +1,53 @@
+{#
+    One card's controls while the dashboard is being customised.
+
+    A form of its own per card, because the buttons have to work with no
+    script: each sends the view, the card and what to do with it, and the
+    server answers by coming back to this card. With script the arrows move
+    the card in place and the handle drags it, and only Show and Hide still
+    reload — showing a hidden card needs content that was never drawn.
+
+    The handle does nothing without script, so it is hidden until the script
+    that makes it work has arrived.
+#}
+{% set name = t(card.labelKey()) %}
+<form method="post" action="/dashboard/layout" class="card-controls">
+    {{ csrf_field() }}
+    <input type="hidden" name="view" value="{{ card.view.value }}">
+    <input type="hidden" name="card" value="{{ card.value }}">
+
+    <button type="button" class="icon-button card-drag" data-card-drag hidden
+            aria-label="{{ t('dashboard.layout_drag', {'card': name}) }}"
+            title="{{ t('dashboard.layout_drag', {'card': name}) }}">
+        {{- icon('drag', 'icon icon-button-icon') -}}
+    </button>
+
+    <span class="card-controls-name">{{ name }}</span>
+
+    <button type="submit" name="action" value="up" class="icon-button" data-card-move="-1"
+            aria-label="{{ t('dashboard.layout_move_up', {'card': name}) }}"
+            title="{{ t('dashboard.layout_move_up', {'card': name}) }}"
+            {{ first ? 'disabled' : '' }}>
+        {{- icon('move-up', 'icon icon-button-icon') -}}
+    </button>
+    <button type="submit" name="action" value="down" class="icon-button" data-card-move="1"
+            aria-label="{{ t('dashboard.layout_move_down', {'card': name}) }}"
+            title="{{ t('dashboard.layout_move_down', {'card': name}) }}"
+            {{ last ? 'disabled' : '' }}>
+        {{- icon('move-down', 'icon icon-button-icon') -}}
+    </button>
+
+    {% if visible %}
+        <button type="submit" name="action" value="hide" class="icon-button"
+                aria-label="{{ t('dashboard.layout_hide', {'card': name}) }}"
+                title="{{ t('dashboard.layout_hide', {'card': name}) }}">
+            {{- icon('hide-card', 'icon icon-button-icon') -}}
+        </button>
+    {% else %}
+        <button type="submit" name="action" value="show" class="icon-button"
+                aria-label="{{ t('dashboard.layout_show', {'card': name}) }}"
+                title="{{ t('dashboard.layout_show', {'card': name}) }}">
+            {{- icon('show-card', 'icon icon-button-icon') -}}
+        </button>
+    {% endif %}
+</form>

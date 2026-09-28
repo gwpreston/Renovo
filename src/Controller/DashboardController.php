@@ -16,6 +16,7 @@ use App\Service\UserPreferencesService;
 use App\Support\Clock;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Slim\Exception\HttpBadRequestException;
 use Slim\Views\Twig;
 
 final class DashboardController extends Controller
@@ -69,7 +70,17 @@ final class DashboardController extends Controller
         // at `/`, it made the dashboard unreachable for anyone whose preference
         // was some other screen.
         $view = $user->dashboardViewPreference();
-        $cards = $this->layout->visibleFor($user->id, $view);
+
+        // Customising draws every card of the view, hidden ones included, so
+        // a hidden card can be found and shown again. Hidden cards are drawn
+        // as a placeholder only, which is why the table below still asks
+        // whether its own card is visible rather than merely present.
+        $editing = ($request->getQueryParams()['layout'] ?? null) === 'edit';
+        $layout = $this->layout->forUser($user->id, $view);
+        $cards = array_values(array_map(
+            static fn (array $entry): DashboardCard => $entry['card'],
+            array_filter($layout, static fn (array $entry): bool => $entry['visible']),
+        ));
 
         $data = [];
         if ($scope->hasHousehold()) {
@@ -88,6 +99,8 @@ final class DashboardController extends Controller
             'dashboard_view' => $view,
             'dashboard_views' => DashboardView::cases(),
             'dashboard_cards' => $cards,
+            'dashboard_layout' => $layout,
+            'editing' => $editing,
             'first_name' => $user->firstName(),
             'today' => $this->clock->today(),
         ]);
@@ -110,5 +123,59 @@ final class DashboardController extends Controller
         );
 
         return $this->redirectAfterWrite($request, $response, '/');
+    }
+
+    /**
+     * One change to the layout of the view being customised.
+     *
+     * Either the whole order, as `order[]` — what a drag sends — or one card
+     * and what to do with it: `up`, `down`, `show` or `hide`, the buttons that
+     * work with no script and from the keyboard. Like the view toggle it is a
+     * personal preference and acts on the session's own account only, so it
+     * asks for no permission.
+     *
+     * The script's saves are htmx requests and get an empty 204: it has
+     * already moved the card on the page, and a redirect would reload it.
+     */
+    public function updateLayout(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body = $this->body($request);
+        $userId = $this->user($request)->id;
+
+        $view = DashboardView::tryFrom(is_scalar($body['view'] ?? null) ? (string) $body['view'] : '');
+        if ($view === null) {
+            throw new HttpBadRequestException($request, 'Unknown dashboard view.');
+        }
+
+        $anchor = '';
+        if (is_array($body['order'] ?? null)) {
+            $keys = array_values(array_filter(array_map(
+                static fn (mixed $key): string => is_scalar($key) ? (string) $key : '',
+                $body['order'],
+            ), static fn (string $key): bool => $key !== ''));
+
+            $this->layout->reorder($userId, $view, $keys);
+        } else {
+            $card = DashboardCard::tryFrom(is_scalar($body['card'] ?? null) ? (string) $body['card'] : '');
+            if ($card === null || $card->view() !== $view) {
+                throw new HttpBadRequestException($request, 'Unknown dashboard card.');
+            }
+
+            match ($body['action'] ?? null) {
+                'up' => $this->layout->move($userId, $view, $card, -1),
+                'down' => $this->layout->move($userId, $view, $card, 1),
+                'show' => $this->layout->setVisible($userId, $view, $card, true),
+                'hide' => $this->layout->setVisible($userId, $view, $card, false),
+                default => throw new HttpBadRequestException($request, 'Unknown layout action.'),
+            };
+
+            $anchor = '#card-' . $card->value;
+        }
+
+        if ($this->isHtmx($request)) {
+            return $response->withStatus(204);
+        }
+
+        return $this->redirect($response, '/?layout=edit' . $anchor);
     }
 }

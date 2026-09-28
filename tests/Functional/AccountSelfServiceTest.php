@@ -131,7 +131,6 @@ final class AccountSelfServiceTest extends DatabaseTestCase
             '/profile/avatar',
             '/profile/two-step/totp',
             '/profile/preferences',
-            '/profile/dashboard-cards',
             '/logout',
         ];
 

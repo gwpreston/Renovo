@@ -33,6 +33,7 @@
                 account — a write, so it is a POST with its token — and it works
                 with no script at all.
             #}
+            <div class="dashboard-head-actions">
             <form method="post" action="/dashboard/view" class="segmented dashboard-views"
                   aria-label="{{ t('dashboard.view_choice') }}">
                 {{ csrf_field() }}
@@ -43,7 +44,28 @@
                     </button>
                 {% endfor %}
             </form>
+
+            {#
+                Customising is a mode of this page rather than a page of its
+                own, so what is being arranged is the dashboard itself. A link
+                in and a link out: entering and leaving change nothing stored.
+            #}
+            {% if editing %}
+                <a href="/" class="button button-primary dashboard-customise">
+                    {{- icon('check') }} {{ t('dashboard.layout_done') -}}
+                </a>
+            {% else %}
+                <a href="/?layout=edit" class="button button-outline dashboard-customise">
+                    {{- icon('edit') }} {{ t('dashboard.layout_customise') -}}
+                </a>
+            {% endif %}
+            </div>
         </div>
+
+        {% if editing %}
+            <p class="muted dashboard-layout-hint">{{ t('dashboard.layout_hint') }}</p>
+            <p class="dashboard-layout-status" role="status" data-card-layout-status></p>
+        {% endif %}
 
         {#
             One template per card, included in the order this user chose for
@@ -54,13 +76,46 @@
             Each card says how many of the six columns and how many rows it
             wants. On a narrow screen every card takes the full width, so the
             same list becomes a stack.
+
+            While customising, every card of the view is walked, hidden ones
+            too: a hidden card is a placeholder carrying its name and a Show
+            button, so it can be found again. The controls sit beside the card
+            rather than around it, because a card may hold a form of its own.
         #}
-        <div class="bento">
-            {% for card in dashboard_cards %}
-                <div class="bento-item bento-span-{{ card.columnSpan }}{{ card.rowSpan > 1 ? ' bento-rows-' ~ card.rowSpan : '' }}">
-                    {% include card.template %}
-                </div>
-            {% endfor %}
-        </div>
+        {% if editing %}
+            <div class="bento is-editing" data-card-layout data-view="{{ dashboard_view.value }}"
+                 data-moved-message="{{ t('dashboard.layout_moved', {'card': '{card}', 'position': '{position}'}) }}"
+                 data-failed-message="{{ t('dashboard.layout_failed') }}">
+                {% for entry in dashboard_layout %}
+                    {% set card = entry.card %}
+                    <div class="bento-item bento-span-{{ entry.visible ? card.columnSpan : 2 }}{{ entry.visible and card.rowSpan > 1 ? ' bento-rows-' ~ card.rowSpan : '' }}{{ entry.visible ? '' : ' is-hidden-card' }}"
+                         id="card-{{ card.value }}" data-card="{{ card.value }}"
+                         data-card-name="{{ t(card.labelKey()) }}">
+                        {% include 'dashboard/_card_controls.twig' with {
+                            'card': card,
+                            'visible': entry.visible,
+                            'first': loop.first,
+                            'last': loop.last,
+                        } only %}
+                        {% if entry.visible %}
+                            {% include card.template %}
+                        {% else %}
+                            <section class="card card-placeholder">
+                                <h2 class="stat-label">{{ t(card.labelKey()) }}</h2>
+                                <p class="muted">{{ t('dashboard.layout_hidden') }}</p>
+                            </section>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="bento">
+                {% for card in dashboard_cards %}
+                    <div class="bento-item bento-span-{{ card.columnSpan }}{{ card.rowSpan > 1 ? ' bento-rows-' ~ card.rowSpan : '' }}">
+                        {% include card.template %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
     {% endif %}
 {% endblock %}

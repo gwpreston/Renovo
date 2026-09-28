@@ -728,7 +728,6 @@ return [
     'flash.password_changed' => 'Your password has been changed. Sign in with it now.',
     'flash.two_factor_expired' => 'That sign-in attempt expired. Start again.',
     'flash.preferences_saved' => 'Your preferences have been saved.',
-    'flash.dashboard_cards_saved' => 'Your dashboard cards have been saved.',
     'flash.details_saved' => 'Your details have been saved.',
     'flash.email_change_resent' =>
         'A new confirmation link is on its way to the new address. The earlier link no longer works.',
@@ -1181,6 +1180,18 @@ return [
     'dashboard.forecast' => 'Forecast',
     'dashboard.free_trials' => 'Free trials',
     'dashboard.greeting' => 'Welcome back, {name}',
+    'dashboard.layout_customise' => 'Customise',
+    'dashboard.layout_done' => 'Done',
+    'dashboard.layout_drag' => 'Drag to move {card}',
+    'dashboard.layout_failed' => 'That change could not be saved. The card is back where it was.',
+    'dashboard.layout_hidden' => 'Hidden',
+    'dashboard.layout_hide' => 'Hide {card}',
+    'dashboard.layout_hint' =>
+        'Drag a card by its handle, or use the arrows, to move it. Hidden cards stay here so you can show them again.',
+    'dashboard.layout_move_down' => 'Move {card} down',
+    'dashboard.layout_move_up' => 'Move {card} up',
+    'dashboard.layout_moved' => '{card} moved to position {position}',
+    'dashboard.layout_show' => 'Show {card}',
     'dashboard.metrics' => 'Spending at a glance',
     'dashboard.month_bar_label' => '{charged} already charged, {due} still due',
     'dashboard.month_so_far' => '{month} so far',
@@ -1609,12 +1620,6 @@ return [
     'settings.allow_registration' => 'Allow anyone to create an account',
     'settings.api_key' => 'API key',
     'settings.base_currency' => 'Base currency',
-    'settings.card_position' => 'Position of the {card} card',
-    'settings.card_visible' => 'Show',
-    'settings.dashboard_cards' => 'Dashboard cards',
-    'settings.dashboard_cards_for' => '{view} dashboard cards',
-    'settings.dashboard_cards_hint' =>
-        'Lower numbers come first. Clear the box to hide a card without losing where you had put it.',
     'settings.data_isolation' => 'Data isolation',
     'settings.demo_mode' => 'Read-only demonstration',
     'settings.demo_mode_hint' =>
@@ -2347,8 +2352,6 @@ return [
     // Phase 27: the profile
     // -----------------------------------------------------------------------
     'profile.appearance_heading' => 'Appearance & preferences',
-    'profile.dashboard_cards_heading' => 'Dashboard cards',
-    'profile.dashboard_cards_save' => 'Save dashboard cards',
     'profile.new_recovery_codes' => 'New recovery codes',
     'profile.passkey_added' => 'Passkey · added {date}',
     'profile.passkey_remove' => 'Remove {name}',

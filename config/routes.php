@@ -151,6 +151,9 @@ return static function (App $app): void {
         // Which dashboard the account opens on. A personal preference, like the
         // theme and palette under /profile, so it needs no permission.
         $group->post('/dashboard/view', [DashboardController::class, 'updateView']);
+        // Which cards that dashboard shows and in what order, arranged on the
+        // dashboard itself. Personal in the same way, so no permission either.
+        $group->post('/dashboard/layout', [DashboardController::class, 'updateLayout']);
 
         // Inside the authenticated group, unlike the login routes: signing out
         // is something a signed-in user does, and the audit entry needs to know
@@ -350,7 +353,6 @@ return static function (App $app): void {
         // one form: with script it posts on each change and restyles the page
         // in place, without it one button sends the lot.
         $group->post('/profile/preferences', [ProfileController::class, 'updatePreferences']);
-        $group->post('/profile/dashboard-cards', [ProfileController::class, 'updateDashboardCards']);
 
         // Phase 15: account self-service. No permission on any of them, by the
         // same rule as the preferences above and the security routes below —
