@@ -347,11 +347,13 @@ Built in phases:
 That is the v1 feature set, Phase 7 the toolchain under it, Phase 8 the design
 language on top and Phase 14 the pass that made it one interface rather than
 seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync —
-see the end of `PHASE.md` for what was deferred and why.
+[`ROADMAP.md`](ROADMAP.md) lists what was deferred, what may come after v1, and
+what is ruled out.
 
 The current phase is **Phase 29 — the signed-out screens**.
-`PHASE.md` holds its scope, decisions and status; each earlier phase's brief is
-archived as `PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
+[`docs/phases/PHASE.md`](docs/phases/PHASE.md) holds its scope, decisions and
+status; each earlier phase's brief is archived beside it as
+`docs/phases/PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
 
 ---
 
