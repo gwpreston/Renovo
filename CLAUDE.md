@@ -1,8 +1,9 @@
 # CLAUDE.md
 
-Operating manual for this repository. Read this before making changes. The full
-feature spec and staged build plan live in `SPEC.md` (the phased-prompts
-document); this file is the day-to-day conventions and guardrails.
+Operating manual for this repository. Read this before making changes. The
+master conventions live in `SPEC.md`, each phase's brief in `docs/phases/`, and
+what may come after v1 in `ROADMAP.md`; this file is the day-to-day conventions
+and guardrails.
 
 ## What this is
 
@@ -99,6 +100,8 @@ public/       Web root (index.php, assets, build). Nothing else is
               web-accessible. `public/build/` is generated — never edit it, and
               never commit it.
 migrations/   Phinx migrations + seeds.
+docs/         `api.md` (the prose API reference) and `phases/` (the current
+              phase brief, `PHASE.md`, and every earlier one, `PHASE-<n>.md`).
 bin/          CLI entry points (e.g. the scheduler command).
 config/       DI, routes, settings.
 tests/        PHPUnit tests.
@@ -214,12 +217,19 @@ private-IP rejection + allowlist override, and permission/isolation
 - Don't use SQLite — develop and test against Postgres or MySQL, the same
   engines used in production.
 
-## Current phase — READ PHASE.md FIRST
+## Current phase — READ docs/phases/PHASE.md FIRST
 
-Before planning or writing any code, read PHASE.md. It defines the ONLY scope
-you may build right now. Do not build features from a later phase, even if they
-appear in SPEC.md — leave clean seams instead. If PHASE.md and this file seem to
-conflict about scope, stop and ask.
+Before planning or writing any code, read `docs/phases/PHASE.md`. It defines the
+ONLY scope you may build right now. Earlier phases' briefs are archived beside
+it as `docs/phases/PHASE-<n>.md`; when a new phase starts, the finished brief is
+archived there under its number and `PHASE.md` is replaced.
+
+Do not build features from a later phase, even if they appear in SPEC.md —
+leave clean seams instead. If PHASE.md and this file seem to conflict about
+scope, stop and ask.
+
+`ROADMAP.md` lists candidates for after v1. It is **not scope**: nothing in it
+may be built until a phase brief in `docs/phases/PHASE.md` names it.
 
 The re-skin that ran from Phase 18 to Phase 28 is complete: every screen now
 follows the prototype. A new screen reuses what those phases built — the shell,
