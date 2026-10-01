@@ -475,7 +475,12 @@ final class SpendHistoryService
                 ];
             }
 
-            $date = $cycle->advance($date, $subscription->cycleDays, $subscription->anchorDay);
+            $date = $cycle->advance(
+                $date,
+                $subscription->cycleDays,
+                $subscription->anchorDay,
+                $subscription->cycleInterval,
+            );
             $iterations++;
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\BillingCycle;
 use App\Domain\Entity\Subscription;
 use App\Domain\Entity\SubscriptionSplit;
 use App\Domain\Permission;
@@ -41,10 +42,15 @@ final class SubscriptionFormService
         'price',
         'billing_cycle',
         'cycle_days',
+        'cycle_interval',
         'converts_to_price',
         'converts_to_billing_cycle',
         'converts_to_cycle_days',
+        'converts_to_cycle_interval',
     ];
+
+    /** The form's "Every N" kind: a unit and a count rather than a cycle. */
+    public const CYCLE_KIND_EVERY = 'every';
 
     public function __construct(
         private readonly SubscriptionService $subscriptions,
@@ -278,6 +284,8 @@ final class SubscriptionFormService
     {
         unset($input['split_mode'], $input['split_with'], $input['shares']);
 
+        $input = $this->cycle($input);
+
         if (!array_key_exists('reminder_mode', $input)) {
             return $input;
         }
@@ -303,6 +311,49 @@ final class SubscriptionFormService
         }
 
         unset($input['reminder_mode'], $input['reminder_day']);
+
+        return $input;
+    }
+
+    /**
+     * The cycle control's shape onto the one `billing_cycle` the service
+     * reads: "Every [N] [months]" is monthly with an interval of N, and
+     * Quarterly and Custom days are themselves.
+     *
+     * The interval and the last-day switch are hidden, never disabled, so
+     * they arrive with whatever they last held. A cycle that takes no
+     * interval is sent 1, and a trial converting to one is sent none: a
+     * field nobody can see must not fail the save. The API, which does not
+     * come through here, is told when it asks for an interval it cannot have.
+     *
+     * @param array<string, mixed> $input
+     * @return array<string, mixed>
+     */
+    private function cycle(array $input): array
+    {
+        if (array_key_exists('cycle_kind', $input)) {
+            $kind = is_scalar($input['cycle_kind']) ? (string) $input['cycle_kind'] : '';
+            $unit = is_scalar($input['cycle_unit'] ?? null) ? (string) $input['cycle_unit'] : '';
+            $input['billing_cycle'] = $kind === self::CYCLE_KIND_EVERY ? $unit : $kind;
+            unset($input['cycle_kind'], $input['cycle_unit']);
+        }
+
+        $cycle = BillingCycle::tryFromString(is_scalar($input['billing_cycle'] ?? null)
+            ? (string) $input['billing_cycle']
+            : null);
+        if (array_key_exists('cycle_interval', $input) && ($cycle === null || !$cycle->allowsInterval())) {
+            $input['cycle_interval'] = '1';
+        }
+
+        $convertsTo = BillingCycle::tryFromString(is_scalar($input['converts_to_billing_cycle'] ?? null)
+            ? (string) $input['converts_to_billing_cycle']
+            : null);
+        if (
+            array_key_exists('converts_to_cycle_interval', $input)
+            && ($convertsTo === null || !$convertsTo->allowsInterval())
+        ) {
+            $input['converts_to_cycle_interval'] = '';
+        }
 
         return $input;
     }

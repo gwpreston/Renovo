@@ -621,7 +621,8 @@ final class ScenarioPlannerTest extends DatabaseTestCase
             $html,
         );
         self::assertStringContainsString(
-            'href="/subscriptions/' . $this->domainId . '/edit?price=10.00&amp;billing_cycle=monthly"',
+            'href="/subscriptions/' . $this->domainId
+            . '/edit?price=10.00&amp;billing_cycle=monthly&amp;cycle_interval=1"',
             $html,
         );
 
@@ -634,11 +635,13 @@ final class ScenarioPlannerTest extends DatabaseTestCase
         self::assertMatchesRegularExpression('#id="effective_from"[^>]*\s+value="2026-02-03"#', $edit);
 
         $cycle = $this->body($this->get(
-            '/subscriptions/' . $this->domainId . '/edit?price=10.00&billing_cycle=monthly',
+            '/subscriptions/' . $this->domainId . '/edit?price=10.00&billing_cycle=monthly&cycle_interval=1',
             $this->ownerId,
         ));
         self::assertStringContainsString('value="10.00"', $cycle);
-        self::assertMatchesRegularExpression('#value="monthly"\s+id="billing_cycle-monthly"\s+checked#', $cycle);
+        self::assertMatchesRegularExpression('#value="every"\s+id="cycle_kind-every"\s+checked#', $cycle);
+        self::assertMatchesRegularExpression('#<option value="monthly" selected>#', $cycle);
+        self::assertMatchesRegularExpression('#id="cycle_interval"[^>]*\s+value="1"#', $cycle);
     }
 
     public function testCancellingFromThePlannerComesBackToThePlanner(): void

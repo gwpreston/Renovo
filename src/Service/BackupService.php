@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Application\Api\Resource;
 use App\Application\Api\SubscriptionPayload;
 use App\Domain\AuditAction;
+use App\Domain\BillingCycle;
 use App\Domain\Currency;
 use App\Domain\Money;
 use App\Domain\Entity\Attachment;
@@ -515,6 +516,23 @@ final class BackupService
         // Read-only in the API, and so dropped by the payload translation; a
         // restore writes it with the row. Absent from older archives.
         $input['cancelled_at'] = is_string($row['cancelled_at'] ?? null) ? $row['cancelled_at'] : '';
+
+        // The anchor is derived from the payment date on every save, except
+        // the one the form's "last day of the month" sets — which a restore
+        // has to ask for, or a row billed on 30 April would come back
+        // anchored to the 30th. Only for a monthly row on a month end, the
+        // one place it can have been set, so an old archive cannot fail.
+        $date = is_string($row['next_payment_date'] ?? null)
+            ? DateTimeImmutable::createFromFormat('!Y-m-d', $row['next_payment_date'])
+            : false;
+        if (
+            ($row['anchor_day'] ?? null) === BillingCycle::LAST_DAY_ANCHOR
+            && ($row['billing_cycle'] ?? null) === BillingCycle::Monthly->value
+            && $date !== false
+            && $date->format('j') === $date->format('t')
+        ) {
+            $input['anchor_last_day'] = '1';
+        }
 
         return $input;
     }

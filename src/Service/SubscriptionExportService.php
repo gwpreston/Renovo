@@ -40,7 +40,7 @@ final class SubscriptionExportService
 
     private const COLUMNS = [
         'name', 'plan', 'price', 'currency', 'type', 'billing cycle', 'cycle days',
-        'next payment date', 'start date', 'category', 'tags', 'payment method',
+        'cycle interval', 'next payment date', 'start date', 'category', 'tags', 'payment method',
         'owner', 'payer', 'visibility', 'active', 'cancelled on', 'notice period',
         'notice unit', 'trial end', 'price after trial', 'notes',
     ];
@@ -103,6 +103,7 @@ final class SubscriptionExportService
             $subscription->type->value,
             $subscription->billingCycle->value ?? '',
             $subscription->cycleDays !== null ? (string) $subscription->cycleDays : '',
+            $subscription->billingCycle !== null ? (string) $subscription->cycleInterval : '',
             $subscription->nextPaymentDate?->format('Y-m-d') ?? '',
             $subscription->startDate?->format('Y-m-d') ?? '',
             $subscription->categoryName ?? '',

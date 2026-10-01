@@ -4,175 +4,147 @@ Single source of truth for what to build **right now**. SPEC.md = full plan ·
 build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
 copy this file to `docs/phases/PHASE.md`.
 
-# Phase 32 — billing every N weeks, months or years
+# Phase 33 — introductory and promotional prices
 
-Renovo bills weekly, monthly, quarterly, yearly or every N days. That leaves out
-cycles people really pay on: six-monthly car insurance, a water bill every two
-months, a two-yearly membership, a fortnightly cleaner. The only way to enter
-those today is a custom number of days, and 182 days is not six months — it
-drifts off the anchor day and the forecast puts the charge in the wrong month
-within a couple of years.
+"Spotify: £5.99 for three months, then £11.99." Renovo can already hold that:
+the current price is £5.99 and a scheduled row takes it to £11.99 on 1 December,
+and `PriceChangeScanner` will announce the rise. What it cannot say is *why* the
+price is going up. A promotion ending and a provider raising its prices look
+identical, and they are different conversations: one was always coming and is
+the moment to cancel or renegotiate; the other is news.
 
-This phase adds an **interval** to the calendar cycles: every *N* weeks, months
-or years. Quarterly stays as it is, so no stored row and no historical figure
-changes.
+This phase marks a price as **promotional**, gives the form one place to enter
+an offer and what follows it, and makes every surface that shows a price rise
+say "intro offer ends" when that is what is happening.
 
 ## Depends on
 
-- **Phase 2** — `BillingCycle` normalisation (integer-only, 365.25-day year),
-  `advance()` and `addMonths()` with the anchor day, trial conversion to a
-  cycle (`converts_to_billing_cycle`).
-- **Phase 5** — import presets and `RowTranslator::cycle()`; export and backup.
-- **Phase 5 / API** — `SubscriptionPayload`, `openapi/openapi.yaml`,
-  `docs/api.md`.
-- **Phase 11** — the forecast, which walks billing dates with `advance()`.
+- **Phase 2** — `subscription_price_history`, `PriceHistoryService`
+  (current / scheduled / history), `applyDueChanges()`, `PriceChangeSource`.
+- **Phase 13** — `SpendInsightService` and `InsightKind::PriceRising`.
+- **Phase 20** — the price-change alert (`AlertType::PriceChange`) and its
+  routes.
+- **Phase 2** — trials, which remain the model for a period that is **free**.
 
 ## The model
 
-- A new `cycle_interval` (positive integer, default **1**) qualifies
-  `billing_cycle`.
-- It applies to **Weekly**, **Monthly** and **Yearly**. **Quarterly** keeps
-  interval 1 (it *is* every three months, and is kept so its label and existing
-  rows are untouched). **CustomDays** keeps interval 1 — its count is already
-  the interval.
-- Bounds: weekly 1–52, monthly 1–24, yearly 1–10. Beyond those, custom days or
-  a one-off is the honest model.
-
-### Normalisation
-
-Still integer-only, through `Rounding`:
-
-| Cycle | Annual minor units |
-| --- | --- |
-| every N weeks | `multiplyDivide(price, 36525, 7 × 100 × N)` |
-| every N months | `multiplyDivide(price, 12, N)` |
-| every N years | `divide(price, N)` |
-
-`monthlyMinor()` stays derived from the annual figure, so the monthly and yearly
-columns of a report still agree. With N = 1 every result is identical to
-today's — asserted by test, because changing it would change every historical
-statistic.
-
-### Advancing
-
-`advance()` takes the interval: N × 7 days, `addMonths(N)`, `addMonths(12N)`,
-each with the anchor day restored as today.
-
-### Last day of the month
-
-A **"On the last day of the month"** option on the form, for monthly and
-N-monthly cycles, stores `anchor_day = 31`. `addMonths()` already clamps to the
-month's length, so this needs no new logic — only a way to choose it. Without
-it, a subscription first billed on 30 April anchors to the 30th and is billed on
-30 May, not 31 May.
+- A price-history row gains **`is_promotional`**. It describes the price, not
+  why the row was written: an intro price can be the row a subscription was
+  created with (`initial`) or one entered later (`manual`), so this is a flag
+  beside `source`, not a new source.
+- A promotion **ends** where the next row for the subscription takes effect.
+  There is no separate end date to drift out of step with the history.
+- A promotional row with no later row is allowed: the offer's end is not known.
+  It is badged, and an insight asks for the end date.
+- **Free periods are trials.** "Three months free" is a trial ending in three
+  months converting to the normal price; the form says so rather than adding a
+  second way to model it.
 
 ## In scope this phase (build ONLY these)
 
-### A. Domain and persistence
+### A. Entering an offer
 
-- `BillingCycle::annualMinor()`, `monthlyMinor()` and `advance()` take an
-  interval (default 1); `assertInterval()` enforces the bounds per cycle.
-- `Subscription` gains `cycleInterval` and `convertsToCycleInterval`.
-- `SubscriptionRepository`, `SubscriptionFormService`, `SubscriptionService`,
-  `TrialService` (conversion to an N-cycle), `ForecastService`,
-  `CalendarService` and `CalendarFeedService` carry it through. Every caller of
-  `annualMinor()` / `monthlyMinor()` / `advance()` passes it — found by
-  PHPStan, since the parameter is added before the default is relied on.
+- On the subscription form and on the price change form, **This is an
+  introductory or promotional price** reveals two fields: **Offer ends** (date)
+  and **Then costs** (amount, defaulting to the current non-promotional price if
+  one exists).
+- Saving writes the promotional row and, if an end date is given, a scheduled
+  row at the "then" price with `source = scheduled` and a note naming the
+  offer's end — in one transaction, through `PriceHistoryService`.
+- Editing the end date moves the scheduled row; removing the flag clears it on
+  that row only. Neither rewrites a row whose date has passed.
+- The trial section's hint: "For a free period, use a trial instead."
 
-### B. The form
+### B. Showing it
 
-- The billing cycle control becomes **Every [N] [weeks / months / years]**, plus
-  **Quarterly** and **Custom days** as today. N defaults to 1 and is hidden for
-  Quarterly and Custom days.
-- The "last day of the month" option, as above.
-- The cadence label everywhere a cycle is shown: "Every 6 months",
-  "Every 2 years", "Fortnightly" (weekly × 2); unchanged for N = 1.
+- A **Promo** chip beside the price on the list, detail and money pages, with
+  "until {date}" when the end is known.
+- The money page's trend step at the end of an offer is labelled **Offer
+  ended** rather than "Price rise".
+- The calendar and Forecast show the first full-price charge with the same
+  label.
 
-### C. Import, export, backup and API
+### C. Insights and alerts
 
-- **Import fix**: `RowTranslator::cycle()` currently turns "6 months" into
-  **every 6 days** — the digit pattern matches the number and ignores the unit.
-  It now reads the unit: "6 months" → monthly × 6, "2 years" → yearly × 2,
-  "2 weeks" and "fortnightly" → weekly × 2, "N days" → custom days as before.
-  The Wallos preset maps its cycle and frequency columns to cycle and interval.
-- **Export** (CSV and JSON) and **backup** include `cycle_interval`; a backup
-  without it restores with 1.
-- **API**: `cycle_interval` and `converts_to_cycle_interval` on the subscription
-  resource, read and write, documented in `openapi/openapi.yaml` and
-  `docs/api.md`. Omitted on write means 1.
+- A new insight, **`PromoEnding`**: "Spotify's intro price ends on 1 Dec — then
+  £11.99 a month (+£6.00)". Ranked with `PriceRising`, and a row it describes is
+  **not** also listed under `PriceRising`.
+- **`PromoNoEnd`**: "Spotify is on an intro price with no end date — add one
+  so you're warned before it rises." Lowest rank.
+- The price-change alert keeps its type, lead times and routes; when the row
+  being replaced is promotional, its wording becomes "Intro offer ends" with the
+  new price and the difference. No new notification preference.
+
+### D. API, export, import, backup
+
+- `is_promotional` on the price-history resource (read, and write where price
+  history is writable), in `openapi/openapi.yaml` and `docs/api.md`.
+- Export and backup carry it; a backup without it restores with `false`.
 
 ## Data-model changes
 
 Migrations, sequenced after the last existing one, each with an explicit
 `down()`, verified on PostgreSQL and MySQL:
 
-1. `add_cycle_interval_to_subscriptions` — `cycle_interval` smallint, not null,
-   default `1`.
-2. `add_converts_to_cycle_interval_to_subscriptions` — nullable smallint.
+1. `add_is_promotional_to_subscription_price_history` — boolean, not null,
+   default `false`.
 
-No new table. No data step: every existing row is interval 1, which is what it
-already means.
+No new table. The alert reuses `notification_log` and the existing
+price-change routes.
 
 ## Explicitly out of scope (leave clean seams, do NOT stub)
 
-- **Business-day adjustment** (moving a charge off a weekend or bank holiday).
-  It shifts dates by a day or two and never changes a total, and it would need
-  bank-holiday data bundled per locale under the offline rule.
-- **Nth weekday** rules ("the last Friday of the month").
-- Converting existing custom-day rows (e.g. 182 days) to an interval. They are
-  left alone; a user can edit one.
-- Any new cadence colour or chart series — an N-cycle uses its unit's.
+- **Discount rules** ("20% off", "£20 off") stored as rules. The price actually
+  charged is what is recorded; the "then costs" price is the reference.
+- **"You've saved £X through promotions"** — it needs a ledger of what was
+  actually charged. Phase 36, after Phase 34.
+- A separate promotion entity, codes, or provider-specific offer data.
 
 ## Decisions & assumptions (confirm or correct before build)
 
-- **Quarterly stays a stored value**, not migrated to monthly × 3, so no row, no
-  saved view filter and no API client sees a change.
-- **Interval bounds** as above. Say if you want wider ones.
-- **Fortnightly imports as weekly × 2** rather than custom 14 days. The dates
-  are identical; the label is better.
-- **The import fix is a behaviour change**: a file that previously imported
-  "6 months" as six days now imports it correctly. Noted in the changelog.
+- **A flag, not a source.** Keeps `source` answering "why this row exists" and
+  lets an initial price be promotional.
+- **The end of an offer is the next row**, not its own column.
+- **No new alert type.** The price-change alert covers it with promo-specific
+  wording, so nobody has to opt in to a new route.
+- **`PromoEnding` replaces `PriceRising`** for the same row; the two never both
+  appear.
 
 ## Status
 
-- [ ] `BillingCycle` interval: normalisation, advance, bounds
-- [ ] `Subscription` and trial conversion carry the interval
-- [ ] Repository, form, services, forecast and calendar pass it through
-- [ ] Form: Every N unit, last day of the month, cadence labels
-- [ ] Import unit parsing and the Wallos frequency mapping; export, backup
-- [ ] API resource, OpenAPI and `docs/api.md`
-- [ ] Migrations on both engines
+- [ ] Migration on both engines; `PriceChange` entity and repository carry the
+      flag
+- [ ] `PriceHistoryService`: write offer + follow-on row atomically; move and
+      clear without touching past rows
+- [ ] Form fields on the subscription and price change forms; trial hint
+- [ ] Promo chip, "Offer ended" trend label, calendar and forecast labels
+- [ ] `PromoEnding` and `PromoNoEnd` insights; alert wording
+- [ ] API, OpenAPI, `docs/api.md`, export, backup
 - [ ] New strings in `translations/en.php`
 - [ ] `composer check`, `i18n:check`, offline guard green on both engines
 
 ## Definition of done
 
-Every-N-weeks, -months and -years subscriptions can be created, edited,
-imported, exported, restored and read through the API; they normalise and
-advance correctly with no drift off the anchor day; every existing row's figures
-are unchanged to the minor unit; the gates pass on both engines. Then update
+A user can record an introductory price and what it becomes; every place that
+shows the change calls it the end of an offer; the user is warned before it
+ends with the right wording; current-price resolution, the forecast and the
+totals are unchanged by the flag; the gates pass on both engines. Then update
 `PHASE.md` to the next phase.
 
 ## Tests
 
-- With interval 1, every cycle's `annualMinor()`, `monthlyMinor()` and
-  `advance()` equal the current results (the existing billing-normalisation
-  suite passes unchanged).
-- Monthly × 6 at £180.00: annual £360.00, monthly £30.00; advancing from
-  31 August gives 28/29 February then 31 August.
-- Yearly × 2 at £50.00: annual £25.00; advancing from 29 February 2028 gives
-  28 February 2030 then 29 February 2032.
-- Weekly × 2 equals custom 14 days for dates and annual figure.
-- `anchor_day = 31` on monthly: 31 Jan → 28/29 Feb → 31 Mar → 30 Apr → 31 May.
-- An interval outside its bounds is a validation error, not a clamp.
-- A trial converting to monthly × 2 produces its first charge on the
-  conversion date and the next one two months later.
-- The forecast places a six-monthly charge in the right two months each year
-  for the whole horizon.
-- Import: "6 months" → monthly × 6; "2 years" → yearly × 2; "fortnightly" →
-  weekly × 2; "45 days" and "45" → custom 45 days; an unrecognised value →
-  monthly, shown in the preview.
-- Export → import round-trips the interval; a backup without the column
-  restores with 1.
-- The API rejects an interval on Quarterly or Custom days, and a missing one
-  means 1. `OpenApiCoverageTest` and `ApiDocCoverageTest` pass.
+- Saving an offer with an end date writes a promotional row and a scheduled row
+  at the "then" price, in one transaction; a failure writes neither.
+- Current-price resolution and the forecast are identical with and without the
+  flag on the same rows (the flag changes wording only).
+- Moving the end date moves the scheduled row; a row whose date has passed is
+  never rewritten.
+- `PromoEnding` lists the row and `PriceRising` does not; a non-promotional rise
+  still appears under `PriceRising`.
+- A promotional row with no later row produces `PromoNoEnd` and no alert.
+- The price-change alert for a promotional row uses the offer wording and is
+  sent once per change (reminder idempotency suite passes).
+- Price-history scoping: a private row's promotional history reaches its payer
+  only.
+- API, export and backup round-trip the flag; `OpenApiCoverageTest` and
+  `ApiDocCoverageTest` pass.

@@ -128,6 +128,9 @@ final class ScenarioService
                 'cycle_days' => $subscription->isTrial
                     ? $subscription->cycleDaysAfterConversion()
                     : $subscription->cycleDays,
+                'cycle_interval' => $subscription->isTrial
+                    ? $subscription->cycleIntervalAfterConversion()
+                    : $subscription->cycleInterval,
             ];
         }
 
@@ -297,7 +300,13 @@ final class ScenarioService
         }
 
         $prefix = $subscription->isTrial ? 'converts_to_' : '';
-        $query = [$prefix . 'price' => $price, $prefix . 'billing_cycle' => $change->cycle?->value];
+        // A named cycle is one of its units, so the form is told the interval
+        // too rather than left to prefill the row's own.
+        $query = [
+            $prefix . 'price' => $price,
+            $prefix . 'billing_cycle' => $change->cycle?->value,
+            $prefix . 'cycle_interval' => '1',
+        ];
         if ($change->cycleDays !== null) {
             $query[$prefix . 'cycle_days'] = (string) $change->cycleDays;
         }
@@ -307,7 +316,15 @@ final class ScenarioService
 
     private function changesCycle(Subscription $subscription, ScenarioChange $change): bool
     {
-        return $change->cycle !== null && $change->cycle !== $this->cycleOf($subscription);
+        if ($change->cycle === null) {
+            return false;
+        }
+
+        $interval = $subscription->isTrial
+            ? $subscription->cycleIntervalAfterConversion()
+            : $subscription->cycleInterval;
+
+        return $change->cycle !== $this->cycleOf($subscription) || $interval !== 1;
     }
 
     /**

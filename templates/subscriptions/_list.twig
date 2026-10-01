@@ -332,7 +332,7 @@
         <span class="num">{{ subscription.price.amountMinor|money(subscription.price.currency) }}</span>
         <span class="muted">
             {%- if subscription.billingCycle -%}
-                {{ t('subscriptions_list.per_cycle.' ~ subscription.billingCycle.value, {'days': subscription.cycleDays ?? 0}) }}
+                {{ t('subscriptions_list.per_cycle.' ~ subscription.billingCycle.value, {'days': subscription.cycleDays ?? 0, 'n': subscription.cycleInterval}) }}
             {%- else -%}
                 {{ ' ' ~ type_label(subscription.type.value) }}
             {%- endif -%}

@@ -104,7 +104,7 @@
                                 </span>
                                 <span class="account-row-meta">
                                     {% if subscription.plan %}{{ subscription.plan }} · {% endif %}
-                                    {% if row.cycle_value %}{{ cycle_label(row.cycle_value, row.cycle_days) }} · {% endif %}
+                                    {% if row.cycle_value %}{{ cycle_label(row.cycle_value, row.cycle_days, row.cycle_interval) }} · {% endif %}
                                     <span class="num">{{ row.price.amountMinor|money(row.price.currency) }}</span>
                                 </span>
                             </span>

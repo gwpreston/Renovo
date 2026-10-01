@@ -44,7 +44,6 @@ final class RowTranslator
         'week' => 'weekly',
         '1 week' => 'weekly',
         'every week' => 'weekly',
-        'fortnightly' => 'custom_days',
         'monthly' => 'monthly',
         'month' => 'monthly',
         '1 month' => 'monthly',
@@ -82,9 +81,10 @@ final class RowTranslator
             $currency = $this->defaultCurrency;
         }
 
-        [$cycle, $cycleDays] = $this->cycle(
+        [$cycle, $cycleDays, $cycleInterval] = $this->cycle(
             $this->value($row, ImportField::BillingCycle),
             $this->value($row, ImportField::CycleDays),
+            $this->value($row, ImportField::CycleInterval),
         );
 
         $trialEnd = $this->date($this->value($row, ImportField::TrialEndDate));
@@ -96,6 +96,7 @@ final class RowTranslator
             'subscription_type' => $this->type($this->value($row, ImportField::SubscriptionType))->value,
             'billing_cycle' => $cycle,
             'cycle_days' => $cycleDays,
+            'cycle_interval' => $cycleInterval,
             'next_payment_date' => $this->date($this->value($row, ImportField::NextPaymentDate)),
             'start_date' => $this->date($this->value($row, ImportField::StartDate)),
             'notes' => $this->value($row, ImportField::Notes),
@@ -163,42 +164,89 @@ final class RowTranslator
     }
 
     /**
-     * @return array{0: string, 1: string} The cycle value and the custom-day count.
+     * The cycle, read for its unit as well as its number: "6 months" is
+     * every six months, not every six days, and "Every 2 Years" — Wallos's
+     * own spelling — is every two years. A separate interval column (a
+     * tracker that stores the unit and the count apart) multiplies a plain
+     * unit: "monthly" with 6 is every six months.
+     *
+     * Every three months is Quarterly and every twelve is Yearly, the labels
+     * those cycles already have. A count beyond a cycle's bounds is passed
+     * through rather than clamped, so the preview reports it as the error it
+     * is instead of importing a different cycle.
+     *
+     * @return array{0: string, 1: string, 2: string} The cycle value, the
+     *         custom-day count and the interval.
      */
-    private function cycle(string $raw, string $days): array
+    private function cycle(string $raw, string $days, string $interval): array
     {
-        $normalised = strtolower(trim($raw));
+        $normalised = strtolower(trim((string) preg_replace('/\s+/', ' ', $raw)));
+        $interval = trim($interval);
+        $count = ctype_digit($interval) && (int) $interval > 0 ? (int) $interval : 1;
 
         if ($normalised === 'fortnightly' || $normalised === 'biweekly') {
-            return ['custom_days', '14'];
+            return $this->every(BillingCycle::Weekly, 2 * $count);
         }
 
-        if (isset(self::CYCLE_WORDS[$normalised])) {
-            return [self::CYCLE_WORDS[$normalised], $days];
+        if ($normalised === 'daily' || $normalised === 'day') {
+            return [BillingCycle::CustomDays->value, (string) $count, '1'];
         }
 
-        $direct = BillingCycle::tryFromString($normalised);
-        if ($direct !== null) {
-            return [$direct->value, $days];
+        $word = self::CYCLE_WORDS[$normalised] ?? null;
+        $cycle = BillingCycle::tryFromString($word ?? $normalised);
+        if ($cycle === BillingCycle::CustomDays) {
+            return [$cycle->value, $days, '1'];
+        }
+        if ($cycle !== null) {
+            return $this->every($cycle, $count);
         }
 
-        // "every 45 days", or just "45". The pattern only matches when there
-        // are digits, so an empty value falls through to the default below.
-        if (preg_match('/(\d+)\s*(day|days)?/', $normalised, $matches) === 1) {
-            $count = (int) $matches[1];
-            if ($count > 0 && $count <= 3650) {
-                return ['custom_days', (string) $count];
+        // "every 6 months", "2 years", "45 days", or just "45". The pattern
+        // only matches when there are digits, so an empty value falls through
+        // to the default below.
+        if (preg_match('/^(?:every )?(\d+) ?([a-z]*)$/', $normalised, $matches) === 1) {
+            $number = (int) $matches[1];
+            $unit = match ($matches[2]) {
+                '', 'd', 'day', 'days' => BillingCycle::CustomDays,
+                'w', 'wk', 'wks', 'week', 'weeks' => BillingCycle::Weekly,
+                'm', 'mo', 'mos', 'mon', 'month', 'months' => BillingCycle::Monthly,
+                'y', 'yr', 'yrs', 'year', 'years' => BillingCycle::Yearly,
+                default => null,
+            };
+
+            if ($unit === BillingCycle::CustomDays && $number > 0 && $number <= 3650) {
+                return [$unit->value, (string) $number, '1'];
+            }
+            if ($unit !== null && $unit !== BillingCycle::CustomDays && $number > 0) {
+                return $this->every($unit, $number);
             }
         }
 
         if ($days !== '' && ctype_digit($days)) {
-            return ['custom_days', $days];
+            return [BillingCycle::CustomDays->value, $days, '1'];
         }
 
         // Nothing recognisable. Monthly is the commonest cycle by a wide margin
         // and is shown in the preview, where it can be corrected before it is
         // written.
-        return [BillingCycle::Monthly->value, ''];
+        return [BillingCycle::Monthly->value, '', '1'];
+    }
+
+    /**
+     * Every N of a cycle, in the cycle's own name where it has one.
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private function every(BillingCycle $cycle, int $count): array
+    {
+        if ($cycle === BillingCycle::Monthly && $count === 3) {
+            return [BillingCycle::Quarterly->value, '', '1'];
+        }
+        if ($cycle === BillingCycle::Monthly && $count % 12 === 0) {
+            return [BillingCycle::Yearly->value, '', (string) intdiv($count, 12)];
+        }
+
+        return [$cycle->value, '', (string) $count];
     }
 
     private function type(string $raw): SubscriptionType

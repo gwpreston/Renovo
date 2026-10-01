@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
+use App\Domain\BillingCycle;
 use App\Application\Middleware\AuthenticationMiddleware;
 use App\Domain\Entity\Subscription;
 use App\Domain\ExchangeRate;
@@ -356,7 +357,8 @@ final class SubscriptionFormTest extends DatabaseTestCase
         self::assertSame($page, $dialog);
 
         $expected = [
-            'name', 'plan', 'price', 'currency', 'category_id', 'billing_cycle', 'subscription_type',
+            'name', 'plan', 'price', 'currency', 'category_id', 'cycle_kind', 'cycle_unit', 'cycle_interval',
+            'anchor_last_day', 'subscription_type',
             'next_payment_date', 'payment_method_id', 'reminder_mode', 'owner_user_id', 'split_mode',
             'visibility', 'is_trial', 'trial_end_date', 'converts_to_price', 'notice_period_amount', 'tags',
             'website_url', 'logo', 'start_date', 'notes', 'payer_user_id', 'is_active',
@@ -495,6 +497,63 @@ final class SubscriptionFormTest extends DatabaseTestCase
     }
 
     // ---------------------------------------------------------------- helpers
+
+    // -------------------------------------------------------------- interval
+
+    public function testEveryNMonthsIsSavedFromTheFormAndShownAsItsCadence(): void
+    {
+        $response = $this->request('POST', '/subscriptions', $this->form([
+            'price' => '180.00',
+            'cycle_kind' => 'every',
+            'cycle_unit' => 'monthly',
+            'cycle_interval' => '6',
+            'anchor_last_day' => '0',
+        ]));
+        self::assertSame(302, $response->getStatusCode());
+
+        $subscription = $this->onlySubscription();
+        self::assertSame(BillingCycle::Monthly, $subscription->billingCycle);
+        self::assertSame(6, $subscription->cycleInterval);
+
+        self::assertStringContainsString('/6 mo', $this->body($this->request('GET', '/subscriptions')));
+
+        $edit = $this->body($this->request('GET', '/subscriptions/' . $subscription->id . '/edit'));
+        self::assertMatchesRegularExpression('#value="every"\s+id="cycle_kind-every"\s+checked#', $edit);
+        self::assertMatchesRegularExpression('#<option value="monthly" selected>#', $edit);
+        self::assertMatchesRegularExpression('#id="cycle_interval"[^>]*\s+value="6"#', $edit);
+    }
+
+    public function testTheLastDayOfTheMonthIsChosenAndShownAgainOnEdit(): void
+    {
+        $this->request('POST', '/subscriptions', $this->form([
+            'cycle_kind' => 'every',
+            'cycle_unit' => 'monthly',
+            'cycle_interval' => '1',
+            'next_payment_date' => '2027-04-30',
+            'anchor_last_day' => '1',
+        ]));
+
+        $subscription = $this->onlySubscription();
+        self::assertSame(31, $subscription->anchorDay);
+
+        $edit = $this->body($this->request('GET', '/subscriptions/' . $subscription->id . '/edit'));
+        self::assertMatchesRegularExpression('#id="anchor_last_day"[^>]*\s+checked#', $edit);
+    }
+
+    public function testARejectedIntervalComesBackWithTheChoiceItWasGiven(): void
+    {
+        $response = $this->request('POST', '/subscriptions', $this->form([
+            'cycle_kind' => 'every',
+            'cycle_unit' => 'yearly',
+            'cycle_interval' => '11',
+        ]));
+
+        self::assertSame(422, $response->getStatusCode());
+        $html = $this->body($response);
+        self::assertStringContainsString('id="cycle_interval-error"', $html);
+        self::assertMatchesRegularExpression('#<option value="yearly" selected>#', $html);
+        self::assertSame([], $this->all());
+    }
 
     /**
      * @param array<string, mixed> $overrides

@@ -48,7 +48,7 @@
                         </th>
                         <td>
                             {% if subscription.billingCycle %}
-                                {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays) }}
+                                {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays, subscription.cycleInterval) }}
                             {% else %}
                                 {{ type_label(subscription.type.value) }}
                             {% endif %}

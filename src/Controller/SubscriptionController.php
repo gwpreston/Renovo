@@ -305,6 +305,15 @@ final class SubscriptionController extends Controller
             'subscription_type' => $subscription->type->value,
             'billing_cycle' => $subscription->billingCycle?->value,
             'cycle_days' => $subscription->cycleDays,
+            'cycle_interval' => $subscription->cycleInterval,
+            // On when the anchor is the 31st and the next charge sits on a
+            // shorter month's end — the one case the switch is what keeps the
+            // anchor. A row dated the 31st anchors there without it, so it is
+            // not shown a switch nobody turned on.
+            'anchor_last_day' => $subscription->billingCycle === BillingCycle::Monthly
+                && $subscription->anchorDay === BillingCycle::LAST_DAY_ANCHOR
+                && $subscription->nextPaymentDate !== null
+                && (int) $subscription->nextPaymentDate->format('j') < BillingCycle::LAST_DAY_ANCHOR ? '1' : '0',
             'next_payment_date' => $subscription->nextPaymentDate?->format('Y-m-d'),
             'start_date' => $subscription->startDate?->format('Y-m-d'),
             'is_trial' => $subscription->isTrial ? '1' : '0',
@@ -312,6 +321,7 @@ final class SubscriptionController extends Controller
             'converts_to_price' => $subscription->convertsToPrice?->toDecimalString(),
             'converts_to_billing_cycle' => $subscription->convertsToBillingCycle?->value,
             'converts_to_cycle_days' => $subscription->convertsToCycleDays,
+            'converts_to_cycle_interval' => $subscription->convertsToCycleInterval,
             'notice_period_amount' => $subscription->noticePeriod->amount,
             'notice_period_unit' => $subscription->noticePeriod->unit,
             'category_id' => $subscription->categoryId,

@@ -41,7 +41,7 @@
                     subscription.priceAfterConversion.currency) }}</strong>
                 {% if subscription.billingCycleAfterConversion %}
                     · {{ cycle_label(subscription.billingCycleAfterConversion.value,
-                        subscription.cycleDaysAfterConversion) }}
+                        subscription.cycleDaysAfterConversion, subscription.cycleIntervalAfterConversion) }}
                 {% endif %}
             </p>
         </section>

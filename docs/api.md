@@ -649,6 +649,7 @@ The writable half of a subscription. Required: `name`, `price_minor`,
 | `subscription_type` | enum | `recurring` (default), `one_off`, `lifetime`. |
 | `billing_cycle` | enum, null | `weekly`, `monthly`, `quarterly`, `yearly`, `custom_days`. |
 | `cycle_days` | integer, null | 1–3650. Required when `billing_cycle` is `custom_days`. |
+| `cycle_interval` | integer, null | Every N of the cycle's unit — `monthly` with `6` is every six months, `weekly` with `2` fortnightly. Weekly 1–52, monthly 1–24, yearly 1–10; `quarterly` and `custom_days` take only 1, and anything else is a 422, never a clamp. Omitted or null is 1 on a new subscription; on a PUT that keeps the same `billing_cycle`, an absent key keeps the current interval. |
 | `next_payment_date` | date, null | Required for a recurring subscription that is not a trial. |
 | `start_date` | date, null | |
 | `notice_period_amount` | integer, null | 0–3650. |
@@ -659,6 +660,7 @@ The writable half of a subscription. Required: `name`, `price_minor`,
 | `converts_to_price_minor` | integer, null | |
 | `converts_to_billing_cycle` | enum, null | As `billing_cycle`. |
 | `converts_to_cycle_days` | integer, null | |
+| `converts_to_cycle_interval` | integer, null | As `cycle_interval`, for the cycle it converts to — bounded the same way, and an absent key on a PUT that keeps `converts_to_billing_cycle` keeps it. Null when it converts to the cycle it already has. |
 | `is_active` | boolean | Default `true`. `false` pauses it. Stays `false` while the subscription is cancelled. |
 | `plan` | string, null | Max 60 — "Standard", "Family". An absent key keeps the current value. |
 | `visibility` | enum | `household` (default) or `payer`. `payer` keeps it to its owner: hidden from every other member in either isolation mode, and out of their totals. Only the owner may set it, only when `payer_user_id` is the owner or null, and never on a split subscription. An absent key keeps the current setting. |
@@ -675,7 +677,7 @@ Everything in `SubscriptionInput`, plus these read-only fields:
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | integer | |
-| `anchor_day` | integer, null | The day of the month billing returns to after a short month. |
+| `anchor_day` | integer, null | The day of the month billing returns to after a short month. `31` on a monthly subscription is the last day of every month, as the web form's "On the last day of the month" sets it; a PUT that leaves the payment date on a month end keeps it. |
 | `category_name` | string, null | |
 | `payment_method_name` | string, null | |
 | `split_mode` | string | Shared-cost splits are read here, written in the web interface. |

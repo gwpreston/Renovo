@@ -34,7 +34,7 @@
                     </p>
                     <p class="hint">
                         {{ t('dashboard.converts_to') }}
-                        <strong class="num">{{ row.converts_to.amountMinor|money(row.converts_to.currency) }}</strong>{% if row.converts_to_cycle %} {{ cycle_label(row.converts_to_cycle.value, trial.cycleDaysAfterConversion) }}{% endif %}
+                        <strong class="num">{{ row.converts_to.amountMinor|money(row.converts_to.currency) }}</strong>{% if row.converts_to_cycle %} {{ cycle_label(row.converts_to_cycle.value, trial.cycleDaysAfterConversion, trial.cycleIntervalAfterConversion) }}{% endif %}
                         {% if row.approx_base %}
                             <span class="num">({{ t('dashboard.approx', {'amount': row.approx_base.amountMinor|money(row.approx_base.currency)}) }})</span>
                         {% endif %}

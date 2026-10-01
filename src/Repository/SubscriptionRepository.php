@@ -348,6 +348,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
         int $id,
         ?BillingCycle $cycle,
         ?int $cycleDays,
+        int $cycleInterval,
         DateTimeImmutable $nextPaymentDate,
     ): void {
         $this->updateScoped($scope, $id, [
@@ -355,8 +356,10 @@ final class SubscriptionRepository extends AbstractScopedRepository
             'converts_to_price_minor' => null,
             'converts_to_billing_cycle' => null,
             'converts_to_cycle_days' => null,
+            'converts_to_cycle_interval' => null,
             'billing_cycle' => $cycle?->value,
             'cycle_days' => $cycleDays,
+            'cycle_interval' => $cycleInterval,
             'next_payment_date' => $nextPaymentDate->format('Y-m-d'),
             'anchor_day' => (int) $nextPaymentDate->format('j'),
             'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
@@ -957,6 +960,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
             type: $type,
             billingCycle: $cycle,
             cycleDays: $this->nullableInt($row['cycle_days'] ?? null),
+            cycleInterval: (int) ($row['cycle_interval'] ?? 1),
             nextPaymentDate: $this->nullableDate($row['next_payment_date'] ?? null),
             startDate: $this->nullableDate($row['start_date'] ?? null),
             anchorDay: $this->nullableInt($row['anchor_day'] ?? null),
@@ -973,6 +977,7 @@ final class SubscriptionRepository extends AbstractScopedRepository
                 $this->nullableString($row['converts_to_billing_cycle'] ?? null),
             ),
             convertsToCycleDays: $this->nullableInt($row['converts_to_cycle_days'] ?? null),
+            convertsToCycleInterval: $this->nullableInt($row['converts_to_cycle_interval'] ?? null),
             splitMode: SplitMode::tryFromString($this->nullableString($row['split_mode'] ?? null))
                 ?? SplitMode::None,
             usageCount: (int) ($row['usage_count'] ?? 0),

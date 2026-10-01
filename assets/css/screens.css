@@ -2365,13 +2365,23 @@ a.segmented-option {
     display: none;
 }
 
-.subscription-form:has(input[name='billing_cycle'][value='custom_days']:checked) .reveal-custom-cycle,
+.subscription-form:has(input[name='cycle_kind'][value='custom_days']:checked) .reveal-custom-cycle,
+.subscription-form:has(input[name='cycle_kind'][value='every']:checked) .reveal-cycle-every,
+.subscription-form:has(input[name='cycle_kind'][value='every']:checked):has(#cycle_unit option[value='monthly']:checked) .reveal-last-day,
+.subscription-form:has(#converts_to_billing_cycle option[value='weekly']:checked) .reveal-trial-cycle-every,
+.subscription-form:has(#converts_to_billing_cycle option[value='monthly']:checked) .reveal-trial-cycle-every,
+.subscription-form:has(#converts_to_billing_cycle option[value='yearly']:checked) .reveal-trial-cycle-every,
 .subscription-form:has(input[name='reminder_mode'][value='days']:checked) .reveal-reminder-days,
 .subscription-form:has(input[name='split_mode'][value='equal']:checked) .reveal-split-equal,
 .subscription-form:has(input[name='split_mode'][value='custom']:checked) .reveal-split-custom,
 .subscription-form:has(#is_trial:checked) .reveal-trial,
 .subscription-form:has(#converts_to_billing_cycle option[value='custom_days']:checked) .reveal-trial-custom-cycle {
     display: grid;
+}
+
+/* "Every [2] [months]": the count is a figure a few digits wide, not a line. */
+.subscription-form .cycle-every > input {
+    flex: 0 0 5.5rem;
 }
 
 /* Chips are revealed as the row of chips they are, not a column. */

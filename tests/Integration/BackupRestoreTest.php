@@ -707,6 +707,56 @@ final class BackupRestoreTest extends DatabaseTestCase
         self::assertSame($this->targetUser->id, $restored['Mine']->subjectUserId);
     }
 
+    public function testTheIntervalAndTheLastDayAnchorSurviveTheRoundTrip(): void
+    {
+        $this->subscriptions->create($this->source, [
+            'name' => 'Car insurance',
+            'price' => '180.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'cycle_interval' => '6',
+            'next_payment_date' => '2026-06-30',
+            'anchor_last_day' => '1',
+        ]);
+
+        $this->backups->restore($this->target, $this->targetUser, $this->export());
+
+        $restored = $this->subscriptions->allForStats($this->target, activeOnly: false)[0];
+        self::assertSame(6, $restored->cycleInterval);
+        self::assertSame(31, $restored->anchorDay);
+    }
+
+    public function testABackupFromBeforeIntervalsRestoresWithOne(): void
+    {
+        $this->subscriptions->create($this->source, [
+            'name' => 'Old archive',
+            'price' => '10.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'cycle_interval' => '6',
+            'next_payment_date' => '2026-07-01',
+        ]);
+
+        // Take the column out, as an archive written before Phase 32 has it.
+        $archive = $this->export();
+        $data = $this->readArchiveJson($archive, 'data.json');
+        self::assertArrayHasKey('cycle_interval', $data['subscriptions'][0]);
+        unset($data['subscriptions'][0]['cycle_interval'], $data['subscriptions'][0]['converts_to_cycle_interval']);
+
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($archive) === true);
+        $zip->addFromString('data.json', json_encode($data, JSON_THROW_ON_ERROR));
+        $zip->close();
+
+        $summary = $this->backups->restore($this->target, $this->targetUser, $archive);
+        self::assertSame(1, $summary['subscriptions']);
+
+        $restored = $this->subscriptions->allForStats($this->target, activeOnly: false)[0];
+        self::assertSame(1, $restored->cycleInterval);
+    }
+
     private function partnerScope(): Scope
     {
         return Scope::forMember(

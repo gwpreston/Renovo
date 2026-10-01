@@ -28,6 +28,10 @@ enum ImportField: string
     case SubscriptionType = 'subscription_type';
     case BillingCycle = 'billing_cycle';
     case CycleDays = 'cycle_days';
+    // Every N of the cycle's unit, for a file that keeps the count in a
+    // column of its own. Optional: "every 6 months" in the cycle column says
+    // the same thing without it.
+    case CycleInterval = 'cycle_interval';
     case NextPaymentDate = 'next_payment_date';
     case StartDate = 'start_date';
     case Category = 'category';
@@ -62,7 +66,7 @@ enum ImportField: string
     public function hintKey(): ?string
     {
         return match ($this) {
-            self::Price, self::PriceMinor, self::ConvertsToPriceMinor, self::BillingCycle,
+            self::Price, self::PriceMinor, self::ConvertsToPriceMinor, self::BillingCycle, self::CycleInterval,
             self::NextPaymentDate, self::StartDate, self::TrialEndDate, self::Tags,
             self::IsActive, self::NoticePeriodUnit => 'import_field.' . $this->value . '.hint',
             default => null,

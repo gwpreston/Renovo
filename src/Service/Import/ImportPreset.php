@@ -39,6 +39,9 @@ final class ImportPreset
                 'subscription_type' => ['type', 'subscription type', 'kind'],
                 'billing_cycle' => ['billing cycle', 'cycle', 'frequency', 'interval', 'period', 'recurrence'],
                 'cycle_days' => ['cycle days', 'days between payments', 'interval days'],
+                // Not "interval" or "frequency": those are spellings of the
+                // cycle itself ("Monthly") far more often than of a count.
+                'cycle_interval' => ['cycle interval', 'cycle_interval', 'repeat every', 'interval count'],
                 'next_payment_date' => [
                     'next payment date', 'next payment', 'next billing', 'next renewal',
                     'renewal date', 'next due', 'due date', 'next_payment',
@@ -67,6 +70,7 @@ final class ImportPreset
                 'subscription_type' => ['subscription_type'],
                 'billing_cycle' => ['billing_cycle'],
                 'cycle_days' => ['cycle_days'],
+                'cycle_interval' => ['cycle_interval'],
                 'next_payment_date' => ['next_payment_date'],
                 'start_date' => ['start_date'],
                 'category' => ['category_name'],
@@ -87,7 +91,11 @@ final class ImportPreset
                 'name' => ['name'],
                 'price' => ['price'],
                 'currency' => ['currency'],
-                'billing_cycle' => ['cycle', 'frequency'],
+                // Wallos's export writes one "Payment Cycle" — "Monthly",
+                // "Every 3 Months" — which the cycle reads whole. Its database
+                // keeps the unit and the count apart, as cycle and frequency.
+                'billing_cycle' => ['payment cycle', 'cycle'],
+                'cycle_interval' => ['frequency'],
                 'next_payment_date' => ['next_payment', 'next payment'],
                 'start_date' => ['start_date', 'start date'],
                 'category' => ['category'],

@@ -221,7 +221,9 @@ final class SpendInsightService
             'date' => $rise['date'] ?? $today,
             'from' => Money::of($to->amountMinor - $step, $to->currency),
             'to' => $to,
-            'monthly_minor' => $cycle === null ? 0 : $cycle->monthlyMinor($step, $subscription->cycleDays),
+            'monthly_minor' => $cycle === null
+                ? 0
+                : $cycle->monthlyMinor($step, $subscription->cycleDays, $subscription->cycleInterval),
             'annual_minor' => $rise['annual_minor'],
         ];
     }
@@ -261,7 +263,11 @@ final class SpendInsightService
             }
 
             $price = $subscription->priceAfterConversion();
-            $annual = $cycle->annualMinor($price->amountMinor, $subscription->cycleDaysAfterConversion());
+            $annual = $cycle->annualMinor(
+                $price->amountMinor,
+                $subscription->cycleDaysAfterConversion(),
+                $subscription->cycleIntervalAfterConversion(),
+            );
 
             $insights[] = $this->insight(
                 InsightKind::TrialConverting,
@@ -355,7 +361,7 @@ final class SpendInsightService
                 $insights[] = $this->insight(
                     InsightKind::PriceRisen,
                     $subscription,
-                    $cycle->annualMinor($step, $subscription->cycleDays),
+                    $cycle->annualMinor($step, $subscription->cycleDays, $subscription->cycleInterval),
                     $current->price->currency,
                     difference: $step,
                     date: $current->effectiveFrom,
@@ -367,7 +373,7 @@ final class SpendInsightService
                 $insights[] = $this->insight(
                     InsightKind::PriceRising,
                     $subscription,
-                    $cycle->annualMinor($step, $subscription->cycleDays),
+                    $cycle->annualMinor($step, $subscription->cycleDays, $subscription->cycleInterval),
                     $scheduled->price->currency,
                     difference: $step,
                     date: $scheduled->effectiveFrom,

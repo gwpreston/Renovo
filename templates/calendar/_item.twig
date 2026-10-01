@@ -32,7 +32,7 @@
                 {%- if details is not empty -%}
                     {{ details|join(' · ') }}
                 {%- elseif subscription.billingCycle -%}
-                    {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays) }}
+                    {{ cycle_label(subscription.billingCycle.value, subscription.cycleDays, subscription.cycleInterval) }}
                 {%- else -%}
                     {{ kind.label(item.kind) }}
                 {%- endif -%}

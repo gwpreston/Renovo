@@ -333,9 +333,11 @@ final class AppExtension extends AbstractExtension
     /**
      * A billing cycle, including the custom one, whose message carries the
      * day count as an ICU plural so that a language with more than two forms
-     * can state all of them.
+     * can state all of them. An interval above 1 — every six months, every
+     * two weeks — is a plural message of its own; at 1 the cycle's plain
+     * name is unchanged.
      */
-    public function cycleLabel(?string $cycle, ?int $cycleDays = null): string
+    public function cycleLabel(?string $cycle, ?int $cycleDays = null, ?int $interval = null): string
     {
         $resolved = BillingCycle::tryFromString($cycle);
 
@@ -347,6 +349,10 @@ final class AppExtension extends AbstractExtension
             return $cycleDays === null
                 ? $this->translator->trans('cycle.custom')
                 : $this->translator->trans($resolved->labelKey(), ['days' => $cycleDays]);
+        }
+
+        if ($interval !== null && $interval > 1 && $resolved->allowsInterval()) {
+            return $this->translator->trans($resolved->labelKey() . '_every', ['n' => $interval]);
         }
 
         return $this->translator->trans($resolved->labelKey());

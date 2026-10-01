@@ -11,7 +11,8 @@
     billed, Trial ends" on the way in. A group of choices inside a section is a
     radio group named by its label for the same reason.
 
-    What a choice reveals — "every N days" for a custom cycle, the weights for
+    What a choice reveals — "every N" for a regular cycle, "every N days" for a
+    custom one, the last-day option for a monthly one, the weights for
     custom shares, the trial's dates — is shown by the stylesheet from the
     checked state (`:has()`), so it works with no script at all. Nothing that
     is hidden is disabled: the server reads only what the choice makes
@@ -156,22 +157,67 @@
                 <p class="hint" id="subscription_type-hint">{{ t('subscriptions_form.type_hint') }}</p>
             </div>
 
+            {#
+                Every N weeks, months or years, or one of the two cycles that
+                take no interval. `SubscriptionFormService` turns the kind and
+                the unit back into the one `billing_cycle` the service reads.
+                A re-render after an error has the posted kind and unit; a
+                fresh or edit form has only the stored cycle.
+            #}
             {% set cycle = values.billing_cycle|default('monthly') %}
+            {% set cycle_kind = values.cycle_kind|default(cycle in ['quarterly', 'custom_days'] ? cycle : 'every') %}
+            {% set cycle_unit = values.cycle_unit|default(cycle in ['weekly', 'monthly', 'yearly'] ? cycle : 'monthly') %}
             <div class="field recurring-only" role="radiogroup" aria-labelledby="billing_cycle-label"
                  {% if errors.billing_cycle is defined %}aria-describedby="billing_cycle-error"{% endif %}>
                 <span class="group-label" id="billing_cycle-label">{{ t('subscriptions_form.billing_cycle') }}</span>
                 <div class="segmented">
-                    {% for option in cycles %}
+                    {% for kind in ['every', 'quarterly', 'custom_days'] %}
                         <label class="segmented-option">
-                            <input type="radio" name="billing_cycle" value="{{ option.value }}"
-                                   id="billing_cycle-{{ option.value }}"
-                                   {{ cycle == option.value ? 'checked' : '' }}>
-                            <span>{{ cycle_label(option.value) }}</span>
+                            <input type="radio" name="cycle_kind" value="{{ kind }}"
+                                   id="cycle_kind-{{ kind }}"
+                                   {{ cycle_kind == kind ? 'checked' : '' }}>
+                            <span>{{ kind == 'every' ? t('subscriptions_form.cycle_kind_every') : cycle_label(kind) }}</span>
                         </label>
                     {% endfor %}
                 </div>
                 {% if errors.billing_cycle is defined %}
                     <p class="field-error" id="billing_cycle-error">{{ error_message(errors.billing_cycle) }}</p>
+                {% endif %}
+            </div>
+
+            <div class="field reveal reveal-cycle-every">
+                <span class="group-label" id="cycle_interval-label">{{ t('subscriptions_form.cycle_every') }}</span>
+                <div class="input-group cycle-every">
+                    <input type="number" id="cycle_interval" name="cycle_interval" min="1" max="52" class="num"
+                           value="{{ values.cycle_interval|default(1) }}"
+                           aria-labelledby="cycle_interval-label"
+                           {% if errors.cycle_interval is defined %}aria-invalid="true" aria-describedby="cycle_interval-error"{% endif %}>
+                    <select id="cycle_unit" name="cycle_unit" aria-label="{{ t('subscriptions_form.cycle_unit') }}">
+                        {% for unit in ['weekly', 'monthly', 'yearly'] %}
+                            <option value="{{ unit }}" {{ cycle_unit == unit ? 'selected' : '' }}>
+                                {{ t('subscriptions_form.cycle_unit.' ~ unit) }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if errors.cycle_interval is defined %}
+                    <p class="field-error" id="cycle_interval-error">{{ error_message(errors.cycle_interval) }}</p>
+                {% endif %}
+            </div>
+
+            <div class="reveal reveal-last-day">
+                <input type="hidden" name="anchor_last_day" value="0">
+                <label class="choice toggle">
+                    <span>
+                        <span class="choice-title">{{ t('subscriptions_form.anchor_last_day') }}</span>
+                        <span class="choice-note" id="anchor_last_day-hint">{{ t('subscriptions_form.anchor_last_day_hint') }}</span>
+                    </span>
+                    <input type="checkbox" class="toggle" role="switch" id="anchor_last_day" name="anchor_last_day" value="1"
+                           {{ values.anchor_last_day|default('0') == '1' ? 'checked' : '' }}
+                           aria-describedby="anchor_last_day-hint{% if errors.anchor_last_day is defined %} anchor_last_day-error{% endif %}">
+                </label>
+                {% if errors.anchor_last_day is defined %}
+                    <p class="field-error" id="anchor_last_day-error">{{ error_message(errors.anchor_last_day) }}</p>
                 {% endif %}
             </div>
 
@@ -482,6 +528,19 @@
                             {% endfor %}
                         </select>
                     </div>
+                </div>
+
+                <div class="field reveal reveal-trial-cycle-every">
+                    <label for="converts_to_cycle_interval">{{ t('subscriptions_form.converts_to_cycle_interval') }}</label>
+                    <input type="number" id="converts_to_cycle_interval" name="converts_to_cycle_interval"
+                           min="1" max="52" class="num" value="{{ values.converts_to_cycle_interval|default(1) }}"
+                           aria-describedby="converts_to_cycle_interval-hint{% if errors.converts_to_cycle_interval is defined %} converts_to_cycle_interval-error{% endif %}">
+                    <p class="hint" id="converts_to_cycle_interval-hint">{{ t('subscriptions_form.converts_to_cycle_interval_hint') }}</p>
+                    {% if errors.converts_to_cycle_interval is defined %}
+                        <p class="field-error" id="converts_to_cycle_interval-error">
+                            {{ error_message(errors.converts_to_cycle_interval) }}
+                        </p>
+                    {% endif %}
                 </div>
 
                 <div class="field reveal reveal-trial-custom-cycle">
