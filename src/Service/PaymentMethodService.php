@@ -104,6 +104,25 @@ final class PaymentMethodService
     }
 
     /**
+     * Replace the logo and nothing else — the API's path, which uploads a
+     * file on its own rather than with the name and colour.
+     *
+     * @throws ValidationException when the file is not an image LogoStorage accepts.
+     */
+    public function replaceLogo(Scope $scope, int $id, UploadedFileInterface $logo): void
+    {
+        $existing = $this->methods->find($scope, $id) ?? throw ScopeViolationException::forRow('payment_methods', $id);
+
+        // A part that arrived with no file in it: there is nothing to replace
+        // the logo with, and answering success would say otherwise.
+        $logoPath = $this->logos->store($logo)
+            ?? throw ValidationException::field('logo', 'error.logo.type');
+
+        $this->methods->setLogo($scope, $id, $logoPath);
+        $this->logos->delete($existing->logoPath);
+    }
+
+    /**
      * Put a restored logo on a method — the backup path, where the file is
      * already on disk and has already been through LogoStorage.
      */

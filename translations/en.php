@@ -2234,6 +2234,7 @@ return [
     'error.api.read_only_tokens_only' => 'This endpoint accepts read-only tokens only.',
     'error.api.subscription_not_found' => 'No such subscription.',
     'error.api.subscription_unreadable' => 'The subscription could not be read back.',
+    'error.api.tag_not_found' => 'No such tag.',
     'error.api.token_invalid' => 'That API token is not valid.',
     'error.api.token_read_only' => 'This token is read-only.',
     'error.api.token_required' => 'This endpoint requires an API token.',

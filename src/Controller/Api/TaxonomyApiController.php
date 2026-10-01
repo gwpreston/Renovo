@@ -14,6 +14,8 @@ use App\Service\PaymentMethodService;
 use App\Service\TagService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\UploadedFileInterface;
+use Slim\Exception\HttpBadRequestException;
 use Slim\Exception\HttpNotFoundException;
 
 /**
@@ -21,14 +23,13 @@ use Slim\Exception\HttpNotFoundException;
  *
  * Payment methods sit here for the reason categories do: a subscription refers
  * to one by id, and a client needs to be able to resolve it. Their logos are
- * files, managed on the web screen, and are not uploaded through this API —
- * the same line the subscription resource draws around its own logo.
+ * uploaded and cleared on a path of their own, as a subscription's are,
+ * because a file does not travel in a JSON body.
  *
- * They travel together because a subscription refers to both and a client that
- * cannot resolve a `category_id` or invent a tag has only half an API. Tags have
- * no create endpoint on purpose: they are created by naming them on a
- * subscription, exactly as in the web form, and a separate endpoint would give
- * two ways to make one and two chances to get the deduplication wrong.
+ * They travel together because a subscription refers to all three and a client
+ * that cannot resolve a `category_id` or a tag has only half an API. A tag can
+ * be made here or by naming it on a subscription; both go through TagService,
+ * so there is one rule for what counts as the same tag.
  */
 final class TaxonomyApiController extends ApiController
 {
@@ -137,6 +138,35 @@ final class TaxonomyApiController extends ApiController
         return $this->json($response, ['data' => $this->findPaymentMethod($request, (int) $id)]);
     }
 
+    /**
+     * Replace the method's logo: multipart form data with a `logo` part, read
+     * by LogoStorage from its contents exactly as the web form's upload is.
+     */
+    public function uploadPaymentMethodLogo(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $file = $request->getUploadedFiles()['logo'] ?? null;
+        if (!$file instanceof UploadedFileInterface) {
+            throw new HttpBadRequestException($request, 'Send the image as multipart form data in a "logo" part.');
+        }
+
+        $this->paymentMethods->replaceLogo($this->scope($request), (int) $id, $file);
+
+        return $this->json($response, ['data' => $this->findPaymentMethod($request, (int) $id)]);
+    }
+
+    public function deletePaymentMethodLogo(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $this->paymentMethods->clearLogo($this->scope($request), (int) $id);
+
+        return $this->noContent($response);
+    }
+
     public function deletePaymentMethod(
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -155,6 +185,27 @@ final class TaxonomyApiController extends ApiController
                 $this->tags->all($this->scope($request)),
             ),
         ]);
+    }
+
+    public function createTag(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $id = $this->tags->create($this->scope($request), $this->string($this->payload($request), 'name'));
+
+        return $this->json($response, ['data' => $this->findTag($request, $id)], 201);
+    }
+
+    /**
+     * Rename. Every subscription carrying the tag carries it by id, so each
+     * of them shows the new name.
+     */
+    public function updateTag(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        string $id,
+    ): ResponseInterface {
+        $this->tags->rename($this->scope($request), (int) $id, $this->string($this->payload($request), 'name'));
+
+        return $this->json($response, ['data' => $this->findTag($request, (int) $id)]);
     }
 
     public function deleteTag(
@@ -179,6 +230,20 @@ final class TaxonomyApiController extends ApiController
         }
 
         throw new HttpNotFoundException($request, $this->translator->trans('error.api.category_not_found'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function findTag(ServerRequestInterface $request, int $id): array
+    {
+        foreach ($this->tags->all($this->scope($request)) as $tag) {
+            if ($tag->id === $id) {
+                return Resource::tag($tag);
+            }
+        }
+
+        throw new HttpNotFoundException($request, $this->translator->trans('error.api.tag_not_found'));
     }
 
     /**

@@ -8,6 +8,14 @@ Before upgrading, **back up your database**, then run `vendor/bin/phinx migrate`
 
 ## [Unreleased]
 
+### Added
+
+- **API** — tags can be created (`POST /api/v1/tags`) and renamed
+  (`PUT /api/v1/tags/{id}`), and a payment method's logo can be uploaded and
+  removed (`POST`/`DELETE /api/v1/payment-methods/{id}/logo`). The web
+  interface could already do all four. The OpenAPI document is now version
+  1.1.0; nothing that existed in 1.0.0 changed. *Phase 30.*
+
 ## [1.0.0] - 2026-10-01
 
 The first release: a self-hosted, multi-user tracker for subscriptions and

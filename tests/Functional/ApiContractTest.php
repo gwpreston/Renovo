@@ -341,8 +341,8 @@ final class ApiContractTest extends ApiTestCase
         ]));
         self::assertSame('Bills', $updated['data']['name']);
 
-        // Tags are created by naming them on a subscription, which is the only
-        // way to make one — so this also proves that path works.
+        // Naming tags on a subscription creates them; ApiTaxonomyTest covers
+        // the tag endpoints' own create and rename.
         $this->createSubscription(['tags' => ['music', 'shared']]);
 
         $tags = $this->decode($this->api('GET', '/api/v1/tags', $this->ownerToken))['data'];

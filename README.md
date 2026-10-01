@@ -350,7 +350,8 @@ seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync �
 [`ROADMAP.md`](ROADMAP.md) lists what was deferred, what may come after v1, and
 what is ruled out.
 
-The current phase is **Phase 29 — the signed-out screens**.
+The current phase is **Phase 30 — API catch-up: tags and payment-method
+logos**, the first after v1.
 [`docs/phases/PHASE.md`](docs/phases/PHASE.md) holds its scope, decisions and
 status; each earlier phase's brief is archived beside it as
 `docs/phases/PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.

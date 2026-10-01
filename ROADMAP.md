@@ -23,6 +23,10 @@ brief in `docs/phases/PHASE.md`, and releases group finished phases (v1.1,
 v1.2, … and v2 for anything that breaks an upgrade path). *This process is a
 proposal; adjust it before the first post-v1 phase starts.*
 
+**In progress: Phase 30**, an API catch-up for tags and payment-method logos
+([brief](docs/phases/PHASE.md)). It went ahead of the item ranked first below
+at the owner's request; that item keeps its ranking.
+
 The items below were deferred during v1. Each names where it was deferred.
 Only the first is ranked; the rest are unordered until someone picks them up.
 
@@ -43,6 +47,21 @@ Only the first is ranked; the rest are unordered until someone picks them up.
 - **Name the inviter on an invitation.** Nothing records who sent an invite,
   so the page says only "You have been invited to join {household}". A
   data-model change. *Phase 29.*
+
+### API
+
+Each of these is editable or readable in the web interface and has no
+endpoint in `/api/v1`. Phase 30 closed the tag and payment-method logo gaps.
+
+- **Splits, scheduled price changes and usage.** Each is a sub-resource with
+  rules of its own (a split totals its shares, a price change has an effective
+  date that interacts with price history, usage has a period), so each needs
+  its shape designed before clients depend on it. *Phase 5.*
+- **Budgets and price history** as resources, at least for reading. *Phase 5.*
+- **A payment method's `icon`**, which today is set only when defaults are
+  seeded. *Phases 17, 30.*
+- **Bulk edit, saved views and members.** These are web-only today, and none
+  was in Phase 5's scope. *Phase 30.*
 
 ### Notifications
 
