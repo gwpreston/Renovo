@@ -10,6 +10,7 @@ use App\Domain\Entity\Subscription;
 use App\Domain\Money;
 use App\Domain\NoticePeriod;
 use App\Domain\PriceChangeSource;
+use App\Domain\PromoOffer;
 use App\Domain\SubscriptionFilter;
 use App\Domain\SubscriptionType;
 use App\Domain\Visibility;
@@ -79,12 +80,13 @@ final class SubscriptionService
      */
     public function create(Scope $scope, array $input, bool $restoring = false): int
     {
-        [$data, $tagIds] = $this->validate($scope, $input, restoring: $restoring);
+        [$data, $tagIds, $offer] = $this->validate($scope, $input, restoring: $restoring);
 
         // The subscription and the first row of its price history are one
-        // fact, so they are written as one. A subscription with no history
-        // would have no current price to resolve and no trend to draw.
-        return $this->db->transactional(function () use ($scope, $data, $tagIds): int {
+        // fact, so they are written as one — with the end of an intro offer,
+        // when there is one. A subscription with no history would have no
+        // current price to resolve and no trend to draw.
+        return $this->db->transactional(function () use ($scope, $data, $tagIds, $offer): int {
             $id = $this->subscriptions->create($scope, $data, $tagIds);
 
             $this->priceHistory->recordInitialPrice(
@@ -93,6 +95,7 @@ final class SubscriptionService
                 Money::of((int) $data['price_minor'], (string) $data['currency']),
                 $this->date((string) ($data['start_date'] ?? '')),
                 (int) $data['owner_user_id'],
+                $offer === false ? null : $offer,
             );
 
             return $id;
@@ -106,11 +109,23 @@ final class SubscriptionService
     public function update(Scope $scope, int $id, array $input): void
     {
         $existing = $this->subscriptions->find($scope, $id);
-        [$data, $tagIds] = $this->validate($scope, $input, $id);
+        [$data, $tagIds, $offer] = $this->validate($scope, $input, $id);
 
         $price = Money::of((int) $data['price_minor'], (string) $data['currency']);
+        // Read before anything is written: a moved price writes a new row
+        // that already carries the flag.
+        $wasOnOffer = $offer !== false && $this->priceHistory->promotionFor($scope, $id) !== null;
 
-        $this->db->transactional(function () use ($scope, $id, $data, $tagIds, $existing, $price): void {
+        $this->db->transactional(function () use (
+            $scope,
+            $id,
+            $data,
+            $tagIds,
+            $existing,
+            $price,
+            $offer,
+            $wasOnOffer,
+        ): void {
             $this->subscriptions->update($scope, $id, $data, $tagIds);
 
             // A price that has actually moved becomes a new history row rather
@@ -125,7 +140,15 @@ final class SubscriptionService
                         ? PriceChangeSource::Manual
                         : PriceChangeSource::CurrencyChange,
                     (int) $data['owner_user_id'],
+                    isPromotional: $offer !== false && $offer !== null,
                 );
+            }
+
+            // After the price, so the offer is about the row now in force.
+            // Only when the form had the offer fields at all: a bulk edit or
+            // an API PUT, which do not, leaves an offer as it was.
+            if ($offer !== false) {
+                $this->priceHistory->reviseOffer($scope, $id, $offer, (int) $data['owner_user_id'], $wasOnOffer);
             }
         });
     }
@@ -534,7 +557,7 @@ final class SubscriptionService
      * import.
      *
      * @param array<string, mixed> $input
-     * @return array{0: array<string, mixed>, 1: list<int>}
+     * @return array{0: array<string, mixed>, 1: list<int>, 2: PromoOffer|false|null}
      * @throws ValidationException
      */
     private function validate(
@@ -617,6 +640,8 @@ final class SubscriptionService
 
         [$trial, $trialErrors] = $this->validateTrial($input, $type, $existing);
         $errors += $trialErrors;
+
+        $offer = $this->validateOffer($scope, $input, $type, $currency, $price, $startDate, $existing, $errors);
 
         $noticeAmountRaw = trim($this->str($input, 'notice_period_amount'));
         $noticeAmount = $noticeAmountRaw === '' ? null : (int) $noticeAmountRaw;
@@ -752,7 +777,62 @@ final class SubscriptionService
             }
         }
 
-        return [$data, $tagIds];
+        return [$data, $tagIds, $offer];
+    }
+
+    /**
+     * Read the intro-offer fields, when the form sent them.
+     *
+     * `false` when it did not — the switch is absent from a bulk edit and an
+     * API body, and "not asked" must not read as "turned off". Null when it
+     * did and the switch is off. A one-off purchase has no next price for an
+     * offer to end in, so it never carries one.
+     *
+     * The price changes from today if it moved, otherwise the offer is about
+     * the row already in force; either way the end must come after today,
+     * and for a new subscription after its start.
+     *
+     * @param array<string, mixed> $input
+     * @param array<string, string> $errors
+     */
+    private function validateOffer(
+        Scope $scope,
+        array $input,
+        SubscriptionType $type,
+        string $currency,
+        ?Money $price,
+        ?DateTimeImmutable $startDate,
+        ?Subscription $existing,
+        array &$errors,
+    ): PromoOffer|false|null {
+        if (!array_key_exists('is_promotional', $input)) {
+            return false;
+        }
+
+        if (!$type->hasBillingCycle() || $price === null) {
+            return null;
+        }
+
+        $today = $this->clock->today();
+        $startsOn = $existing === null && $startDate !== null && $startDate > $today ? $startDate : $today;
+        $fallback = $existing === null ? null : $this->priceHistory->ordinaryPrice($scope, $existing->id);
+
+        $offer = $this->priceHistory->readOffer($input, $currency, $startsOn, $fallback, $errors);
+
+        // A running offer owns the announced row after it, and moving its end
+        // moves that row. A new one may not end beyond a change already
+        // announced, because it would end there instead.
+        if (
+            $existing !== null
+            && $offer?->endsOn !== null
+            && !isset($errors['offer_ends_on'])
+            && $this->priceHistory->promotionFor($scope, $existing->id) === null
+            && $this->priceHistory->hasAnnouncedBetween($scope, $existing->id, $today, $offer->endsOn)
+        ) {
+            $errors['offer_ends_on'] = 'error.offer.change_announced';
+        }
+
+        return $offer;
     }
 
     /**

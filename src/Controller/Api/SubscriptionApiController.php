@@ -11,7 +11,9 @@ use App\Application\Middleware\TokenAuthenticationMiddleware;
 use App\Domain\Entity\ApiToken;
 use App\Domain\SubscriptionFilter;
 use App\Security\Scope;
+use App\Domain\Entity\Subscription;
 use App\Service\LogoStorage;
+use App\Service\PriceHistoryService;
 use App\Service\SubscriptionService;
 use App\Support\Clock;
 use Psr\Http\Message\ResponseInterface;
@@ -41,6 +43,7 @@ final class SubscriptionApiController extends ApiController
     public function __construct(
         Translator $translator,
         private readonly SubscriptionService $subscriptions,
+        private readonly PriceHistoryService $priceHistory,
         private readonly LogoStorage $logos,
         private readonly Clock $clock,
     ) {
@@ -78,10 +81,15 @@ final class SubscriptionApiController extends ApiController
 
         $today = $this->clock->today();
         $total = $this->subscriptions->count($scope, $filter);
+        $promotions = $this->priceHistory->promotions($scope);
 
         return $this->json($response, [
             'data' => array_map(
-                fn ($subscription): array => Resource::subscription($subscription, $today),
+                fn ($subscription): array => Resource::subscription(
+                    $subscription,
+                    $today,
+                    $promotions[$subscription->id] ?? null,
+                ),
                 $this->subscriptions->list($scope, $filter),
             ),
             'meta' => [
@@ -98,12 +106,13 @@ final class SubscriptionApiController extends ApiController
         ResponseInterface $response,
         string $id,
     ): ResponseInterface {
-        $subscription = $this->subscriptions->find($this->scope($request), (int) $id);
+        $scope = $this->scope($request);
+        $subscription = $this->subscriptions->find($scope, (int) $id);
         if ($subscription === null) {
             throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
-        return $this->json($response, ['data' => Resource::subscription($subscription, $this->clock->today())]);
+        return $this->json($response, ['data' => $this->resource($scope, $subscription)]);
     }
 
     public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -123,7 +132,7 @@ final class SubscriptionApiController extends ApiController
 
         return $this->json(
             $response,
-            ['data' => Resource::subscription($created, $this->clock->today())],
+            ['data' => $this->resource($scope, $created)],
             201,
         )->withHeader('Location', sprintf('/api/v1/subscriptions/%d', $id));
     }
@@ -155,7 +164,7 @@ final class SubscriptionApiController extends ApiController
             throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
-        return $this->json($response, ['data' => Resource::subscription($updated, $this->clock->today())]);
+        return $this->json($response, ['data' => $this->resource($scope, $updated)]);
     }
 
     public function delete(
@@ -220,7 +229,7 @@ final class SubscriptionApiController extends ApiController
             throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
-        return $this->json($response, ['data' => Resource::subscription($updated, $this->clock->today())]);
+        return $this->json($response, ['data' => $this->resource($scope, $updated)]);
     }
 
     /**
@@ -260,7 +269,7 @@ final class SubscriptionApiController extends ApiController
             throw new HttpNotFoundException($request, $this->translator->trans('error.api.subscription_not_found'));
         }
 
-        return $this->json($response, ['data' => Resource::subscription($updated, $this->clock->today())]);
+        return $this->json($response, ['data' => $this->resource($scope, $updated)]);
     }
 
     public function deleteLogo(
@@ -291,6 +300,18 @@ final class SubscriptionApiController extends ApiController
      * housekeeping one nobody asked for, is not what "read-only" means to the
      * person who chose it.
      */
+    /**
+     * @return array<string, mixed>
+     */
+    private function resource(Scope $scope, Subscription $subscription): array
+    {
+        return Resource::subscription(
+            $subscription,
+            $this->clock->today(),
+            $this->priceHistory->promotionFor($scope, $subscription->id),
+        );
+    }
+
     private function advanceDuePayments(ServerRequestInterface $request, Scope $scope): void
     {
         $token = $request->getAttribute(TokenAuthenticationMiddleware::ATTRIBUTE_TOKEN);

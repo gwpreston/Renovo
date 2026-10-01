@@ -21,6 +21,9 @@
                         <a href="/subscriptions/{{ row.subscription.id }}/money">{{ row.subscription.name }}</a>
                     </span>
                     <span class="forecast-row-detail muted">
+                        {% if row.ends_offer %}
+                            <span class="badge badge-info">{{ t('price_change.offer_ends') }}</span>
+                        {% endif %}
                         {{ t('forecast.change_from', {'date': row.change.effectiveFrom|local_date('d MMM y')}) }}
                     </span>
                     <span class="forecast-row-figure num">

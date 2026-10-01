@@ -140,6 +140,46 @@
                 </div>
             </div>
 
+            {#
+                An intro price and what follows it. The end is written as the
+                scheduled change it is — the offer ends where the next price
+                takes effect — so there is no second date to keep in step.
+            #}
+            <div class="recurring-only">
+                <input type="hidden" name="is_promotional" value="0">
+                <label class="choice toggle">
+                    <span>
+                        <span class="choice-title">{{ t('subscriptions_form.is_promotional') }}</span>
+                        <span class="choice-note">{{ t('subscriptions_form.is_promotional_note') }}</span>
+                    </span>
+                    <input type="checkbox" class="toggle" role="switch" id="is_promotional" name="is_promotional" value="1"
+                           {{ values.is_promotional|default('0') == '1' ? 'checked' : '' }}>
+                </label>
+
+                <div class="reveal reveal-offer field-grid">
+                    <div class="field">
+                        <label for="offer_ends_on">{{ t('field.offer_ends_on') }}</label>
+                        <input type="date" id="offer_ends_on" name="offer_ends_on"
+                               value="{{ values.offer_ends_on|default('') }}"
+                               aria-describedby="offer_ends_on-hint{% if errors.offer_ends_on is defined %} offer_ends_on-error{% endif %}">
+                        <p class="hint" id="offer_ends_on-hint">{{ t('subscriptions_form.offer_ends_hint') }}</p>
+                        {% if errors.offer_ends_on is defined %}
+                            <p class="field-error" id="offer_ends_on-error">{{ error_message(errors.offer_ends_on) }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="field">
+                        <label for="offer_then_price">{{ t('field.offer_then_price') }}</label>
+                        <input type="text" id="offer_then_price" name="offer_then_price" inputmode="decimal" class="num"
+                               value="{{ values.offer_then_price|default('') }}" placeholder="{{ 11.99|decimal(2) }}"
+                               {% if errors.offer_then_price is defined %}aria-describedby="offer_then_price-error"{% endif %}>
+                        {% if errors.offer_then_price is defined %}
+                            <p class="field-error" id="offer_then_price-error">{{ error_message(errors.offer_then_price) }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
             {% set type = values.subscription_type|default('recurring') %}
             <div class="field" role="radiogroup" aria-labelledby="subscription_type-label"
                  aria-describedby="subscription_type-hint">
@@ -480,6 +520,7 @@
         {# ------------------------------------------------------------------ #}
         <fieldset class="form-section recurring-only">
             <legend>{{ t('subscriptions_form.free_trial') }}</legend>
+            <p class="hint">{{ t('subscriptions_form.trial_free_period_hint') }}</p>
 
             <input type="hidden" name="is_trial" value="0">
             {# A switch at the end of its row, the words before it. #}

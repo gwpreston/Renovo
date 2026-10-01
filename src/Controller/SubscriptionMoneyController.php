@@ -63,6 +63,7 @@ final class SubscriptionMoneyController extends Controller
             'subscription' => $subscription,
             'trend' => $this->priceHistory->trendFor($scope, $subscription->id),
             'next_change' => $this->priceHistory->nextScheduledChange($scope, $subscription->id),
+            'promotion' => $this->priceHistory->promotionFor($scope, $subscription->id),
             'participants' => $participants,
             'shares' => $this->splits->sharesOf($subscription, $participants),
             'can_edit_split' => $this->splits->canEdit($scope, $subscription),

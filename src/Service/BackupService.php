@@ -89,6 +89,7 @@ final class BackupService
         private readonly HouseholdRepository $households,
         private readonly MembershipRepository $memberships,
         private readonly AuditLogService $audit,
+        private readonly PriceHistoryService $priceHistory,
         private readonly Clock $clock,
         private readonly string $logoDirectory,
     ) {
@@ -123,9 +124,16 @@ final class BackupService
         // created fresh — so a positional reference is the only one that still
         // means something on the way back in.
         $positions = [];
+        $promotions = $this->priceHistory->promotions($scope);
         foreach ($this->subscriptions->allForStats($scope, activeOnly: false) as $subscription) {
             $positions[$subscription->id] = count($subscriptions);
-            $subscriptions[] = $this->exportSubscription($subscription, $today, $emails, $logos);
+            $subscriptions[] = $this->exportSubscription(
+                $subscription,
+                $today,
+                $emails,
+                $logos,
+                $promotions[$subscription->id] ?? null,
+            );
         }
 
         $attachments = [];
@@ -517,6 +525,20 @@ final class BackupService
         // restore writes it with the row. Absent from older archives.
         $input['cancelled_at'] = is_string($row['cancelled_at'] ?? null) ? $row['cancelled_at'] : '';
 
+        // An intro offer, read-only in the API and so written here. Absent
+        // from older archives, which restore as an ordinary price. An end
+        // that has passed since the backup was taken is not an end the form
+        // would accept, so the price comes back badged with its end unknown.
+        $input['is_promotional'] = ($row['price_is_promotional'] ?? false) === true ? '1' : '0';
+        $endsOn = is_string($row['promo_ends_on'] ?? null)
+            ? DateTimeImmutable::createFromFormat('!Y-m-d', $row['promo_ends_on'])
+            : false;
+        $then = $row['promo_then_price_minor'] ?? null;
+        if ($input['is_promotional'] === '1' && $endsOn !== false && $endsOn > $this->clock->today() && is_int($then)) {
+            $input['offer_ends_on'] = $endsOn->format('Y-m-d');
+            $input['offer_then_price'] = Money::of($then, (string) ($input['currency'] ?? 'GBP'))->toDecimalString();
+        }
+
         // The anchor is derived from the payment date on every save, except
         // the one the form's "last day of the month" sets — which a restore
         // has to ask for, or a row billed on 30 April would come back
@@ -734,6 +756,7 @@ final class BackupService
     /**
      * @param array<string, string> $emails
      * @param array<string, string> $logos Stored path => archive entry name.
+     * @param array{ends_on: DateTimeImmutable|null, then: Money|null}|null $promotion
      * @return array<string, mixed>
      */
     private function exportSubscription(
@@ -741,8 +764,9 @@ final class BackupService
         DateTimeImmutable $today,
         array $emails,
         array &$logos,
+        ?array $promotion,
     ): array {
-        $row = Resource::subscription($subscription, $today);
+        $row = Resource::subscription($subscription, $today, $promotion);
 
         // Ids mean nothing in another instance; email addresses do.
         $row['owner_email'] = $emails[(string) $subscription->ownerUserId] ?? null;

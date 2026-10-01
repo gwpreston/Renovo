@@ -16,6 +16,7 @@ use App\Service\BackupService;
 use App\Service\BudgetService;
 use App\Service\CategoryService;
 use App\Service\PaymentMethodService;
+use App\Service\PriceHistoryService;
 use App\Service\SubscriptionService;
 use App\Service\ValidationException;
 use App\Support\Clock;
@@ -632,6 +633,92 @@ final class BackupRestoreTest extends DatabaseTestCase
         self::assertSame(\App\Domain\Visibility::Payer, $restored['Mine']->visibility);
         self::assertSame('2026-06-01', $restored['Gone']->cancelledAt?->format('Y-m-d'));
         self::assertFalse($restored['Gone']->isActive);
+    }
+
+    public function testAnIntroOfferSurvivesTheRoundTrip(): void
+    {
+        $base = [
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-06-15',
+            'is_promotional' => '1',
+        ];
+        $this->subscriptions->create($this->source, [
+            'name' => 'Spotify',
+            'price' => '5.99',
+            'offer_ends_on' => '2026-09-01',
+            'offer_then_price' => '11.99',
+        ] + $base);
+        $this->subscriptions->create($this->source, ['name' => 'Open-ended', 'price' => '3.00'] + $base);
+        $this->subscriptions->create($this->source, [
+            'name' => 'Ordinary',
+            'price' => '9.99',
+            'is_promotional' => '0',
+        ] + $base);
+
+        $archive = $this->export();
+        $rows = [];
+        foreach ($this->readArchiveJson($archive, 'data.json')['subscriptions'] as $row) {
+            $rows[$row['name']] = $row;
+        }
+        self::assertTrue($rows['Spotify']['price_is_promotional']);
+        self::assertSame('2026-09-01', $rows['Spotify']['promo_ends_on']);
+        self::assertSame(1199, $rows['Spotify']['promo_then_price_minor']);
+        self::assertTrue($rows['Open-ended']['price_is_promotional']);
+        self::assertNull($rows['Open-ended']['promo_ends_on']);
+        self::assertFalse($rows['Ordinary']['price_is_promotional']);
+
+        $summary = $this->backups->restore($this->target, $this->targetUser, $archive);
+        self::assertSame(3, $summary['subscriptions']);
+        self::assertSame(0, $summary['skipped']);
+
+        $prices = $this->container->get(PriceHistoryService::class);
+        $restored = [];
+        foreach ($this->subscriptions->allForStats($this->target, activeOnly: false) as $subscription) {
+            $restored[$subscription->name] = $prices->promotionFor($this->target, $subscription->id);
+        }
+
+        self::assertSame('2026-09-01', $restored['Spotify']['ends_on']?->format('Y-m-d'));
+        self::assertSame(1199, $restored['Spotify']['then']?->amountMinor);
+        self::assertNotNull($restored['Open-ended']);
+        self::assertNull($restored['Open-ended']['ends_on']);
+        self::assertNull($restored['Ordinary']);
+    }
+
+    public function testABackupFromBeforeIntroOffersRestoresAnOrdinaryPrice(): void
+    {
+        $this->subscriptions->create($this->source, [
+            'name' => 'Spotify',
+            'price' => '5.99',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'next_payment_date' => '2026-06-15',
+            'is_promotional' => '1',
+        ]);
+
+        $archive = $this->export();
+        $data = $this->readArchiveJson($archive, 'data.json');
+        foreach ($data['subscriptions'] as $index => $row) {
+            unset(
+                $data['subscriptions'][$index]['price_is_promotional'],
+                $data['subscriptions'][$index]['promo_ends_on'],
+                $data['subscriptions'][$index]['promo_then_price_minor'],
+            );
+        }
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($archive) === true);
+        $zip->addFromString('data.json', json_encode($data, JSON_THROW_ON_ERROR));
+        $zip->close();
+
+        $summary = $this->backups->restore($this->target, $this->targetUser, $archive);
+        self::assertSame(1, $summary['subscriptions']);
+
+        $restored = $this->subscriptions->allForStats($this->target, activeOnly: false)[0];
+        $history = $this->container->get(PriceHistoryService::class)->historyFor($this->target, $restored->id);
+        self::assertCount(1, $history);
+        self::assertFalse($history[0]->isPromotional);
     }
 
     public function testAnotherMembersPrivateSubscriptionIsLeftOutAndCounted(): void

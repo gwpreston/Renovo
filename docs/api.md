@@ -689,6 +689,9 @@ Everything in `SubscriptionInput`, plus these read-only fields:
 | `next_charge_date` | date, null | The trial's conversion date while a trial runs; the next payment date otherwise. |
 | `cancellation_deadline` | date, null | The last day to cancel and avoid the next charge. |
 | `days_until_next_payment` | integer, null | |
+| `price_is_promotional` | boolean | The current price is an introductory or promotional one. Entered in the web interface, which writes the offer's end as a scheduled price change; a PUT leaves it alone. |
+| `promo_ends_on` | date, null | The day the offer ends and the next price takes effect. Null when the price is not promotional or its end is not known. |
+| `promo_then_price_minor` | integer, null | What it costs from `promo_ends_on`, in minor units of its currency. Null with `promo_ends_on`. |
 | `cancelled_at` | date, null | The day it was cancelled. Moved by the cancel and uncancel endpoints only. |
 | `status` | enum | `active`, `trial`, `paused`, `cancelled` — derived in the order cancelled, paused, trial, active. |
 | `created_at` | date-time | |

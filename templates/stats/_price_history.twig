@@ -44,6 +44,9 @@
                             {% if row.is_scheduled %}
                                 <br><span class="badge badge-info">{{ t('subscriptions_money.scheduled') }}</span>
                             {% endif %}
+                            {% if row.ends_offer %}
+                                <br><span class="badge badge-info">{{ t(row.is_scheduled ? 'price_change.offer_ends' : 'price_change.offer_ended') }}</span>
+                            {% endif %}
                         </td>
                         <td>
                             <a href="/subscriptions/{{ row.subscription.id }}/money">{{ row.subscription.name }}</a>

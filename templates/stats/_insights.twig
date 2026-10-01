@@ -104,6 +104,19 @@
             'date': insight.date|local_date,
             'amount': amount,
         }) }}
+    {%- elseif kind == 'promo_ending' -%}
+        {%- set subscription = insight.subscription -%}
+        {{ t('insight.promo_ending.detail', {
+            'name': subscription.name,
+            'date': insight.date|local_date('d MMM'),
+            'price': insight.then.amountMinor|money(insight.then.currency),
+            'per': subscription.billingCycle
+                ? t('subscriptions_list.per_cycle.' ~ subscription.billingCycle.value, {'days': subscription.cycleDays ?? 0, 'n': subscription.cycleInterval})
+                : '',
+            'difference': insight.difference_minor|money(insight.currency, true),
+        }) }}
+    {%- elseif kind == 'promo_no_end' -%}
+        {{ t('insight.promo_no_end.detail', {'name': insight.subscription.name}) }}
     {%- elseif kind == 'overlap' -%}
         {{ t('insight.overlap.detail', {
             'name': insight.subscription.name,

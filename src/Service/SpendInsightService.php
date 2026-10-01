@@ -57,6 +57,7 @@ use DateTimeImmutable;
  *     difference_minor: int|null,
  *     cost_per_use_minor: int|null,
  *     date: DateTimeImmutable|null,
+ *     then: Money|null,
  *     comparable_minor: int|null
  * }
  */
@@ -173,7 +174,8 @@ final class SpendInsightService
      *     from: Money,
      *     to: Money,
      *     monthly_minor: int,
-     *     annual_minor: int
+     *     annual_minor: int,
+     *     ends_offer: bool
      * }|null
      */
     public function nextScheduledRise(Scope $scope, array $subscriptions): ?array
@@ -182,7 +184,10 @@ final class SpendInsightService
         $history = $this->priceHistory->historyBySubscription($scope);
         $rises = array_values(array_filter(
             $this->priceMoves($subscriptions, $history, $today),
-            static fn (array $insight): bool => $insight['kind'] === InsightKind::PriceRising,
+            // An offer ending is the soonest rise as much as an announced
+            // one is, and the banner says which it is.
+            static fn (array $insight): bool => $insight['kind'] === InsightKind::PriceRising
+                || $insight['kind'] === InsightKind::PromoEnding && (int) $insight['difference_minor'] > 0,
         ));
 
         if ($rises === []) {
@@ -225,6 +230,7 @@ final class SpendInsightService
                 ? 0
                 : $cycle->monthlyMinor($step, $subscription->cycleDays, $subscription->cycleInterval),
             'annual_minor' => $rise['annual_minor'],
+            'ends_offer' => $rise['kind'] === InsightKind::PromoEnding,
         ];
     }
 
@@ -352,10 +358,13 @@ final class SpendInsightService
             // `PriceChange::isRiseFrom()` is the rule — not a trial converting,
             // not a currency change — shared with the analytics screen's
             // price-rise count and price history.
+            // An offer that has ended is not a provider raising its price: it
+            // was announced as a PromoEnding, and is no news now.
             if (
                 $current !== null
                 && $current->effectiveFrom > $earliest
                 && $current->isRiseFrom($previous)
+                && !$current->endsOfferFrom($previous)
             ) {
                 $step = (int) $current->differenceFrom($previous);
                 $insights[] = $this->insight(
@@ -368,7 +377,20 @@ final class SpendInsightService
                 );
             }
 
-            if ($scheduled !== null && $scheduled->isRiseFrom($current)) {
+            if ($scheduled !== null && $scheduled->endsOfferFrom($current)) {
+                // `endsOfferFrom()` refuses a currency change, so the step has
+                // a sign. Listed instead of a PriceRising, never beside one.
+                $step = (int) $scheduled->differenceFrom($current);
+                $insights[] = $this->insight(
+                    InsightKind::PromoEnding,
+                    $subscription,
+                    $cycle->annualMinor($step, $subscription->cycleDays, $subscription->cycleInterval),
+                    $scheduled->price->currency,
+                    difference: $step,
+                    date: $scheduled->effectiveFrom,
+                    then: $scheduled->price,
+                );
+            } elseif ($scheduled !== null && $scheduled->isRiseFrom($current)) {
                 $step = (int) $scheduled->differenceFrom($current);
                 $insights[] = $this->insight(
                     InsightKind::PriceRising,
@@ -377,6 +399,21 @@ final class SpendInsightService
                     $scheduled->price->currency,
                     difference: $step,
                     date: $scheduled->effectiveFrom,
+                );
+            }
+
+            // On an offer with no end recorded: the one thing that would
+            // let this list warn about it is missing.
+            if ($current !== null && $current->isPromotional && $scheduled === null) {
+                $insights[] = $this->insight(
+                    InsightKind::PromoNoEnd,
+                    $subscription,
+                    $cycle->annualMinor(
+                        $current->price->amountMinor,
+                        $subscription->cycleDays,
+                        $subscription->cycleInterval,
+                    ),
+                    $current->price->currency,
                 );
             }
         }
@@ -569,6 +606,7 @@ final class SpendInsightService
         ?int $difference = null,
         ?int $costPerUse = null,
         ?DateTimeImmutable $date = null,
+        ?Money $then = null,
     ): array {
         return [
             'kind' => $kind,
@@ -582,6 +620,7 @@ final class SpendInsightService
             'difference_minor' => $difference,
             'cost_per_use_minor' => $costPerUse,
             'date' => $date,
+            'then' => $then,
             'comparable_minor' => $this->rates->convertMinor(
                 $annualMinor,
                 $currency,

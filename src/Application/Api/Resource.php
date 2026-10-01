@@ -10,6 +10,7 @@ use App\Domain\Entity\Category;
 use App\Domain\Entity\PaymentMethod;
 use App\Domain\Entity\Subscription;
 use App\Domain\Entity\Tag;
+use App\Domain\Money;
 use DateTimeImmutable;
 
 /**
@@ -28,10 +29,17 @@ use DateTimeImmutable;
 final class Resource
 {
     /**
+     * `$promotion` is the intro offer the current price is on, from
+     * `PriceHistoryService::promotionFor()` — null for an ordinary price.
+     *
+     * @param array{ends_on: DateTimeImmutable|null, then: Money|null}|null $promotion
      * @return array<string, mixed>
      */
-    public static function subscription(Subscription $subscription, DateTimeImmutable $today): array
-    {
+    public static function subscription(
+        Subscription $subscription,
+        DateTimeImmutable $today,
+        ?array $promotion = null,
+    ): array {
         return [
             'id' => $subscription->id,
             'name' => $subscription->name,
@@ -56,6 +64,11 @@ final class Resource
             'converts_to_billing_cycle' => $subscription->convertsToBillingCycle?->value,
             'converts_to_cycle_days' => $subscription->convertsToCycleDays,
             'converts_to_cycle_interval' => $subscription->convertsToCycleInterval,
+            // Read-only: an offer is entered through the web interface, where
+            // its end is written as the scheduled change it is.
+            'price_is_promotional' => $promotion !== null,
+            'promo_ends_on' => self::date($promotion['ends_on'] ?? null),
+            'promo_then_price_minor' => ($promotion['then'] ?? null)?->amountMinor,
             'is_active' => $subscription->isActive,
             'plan' => $subscription->plan,
             'visibility' => $subscription->visibility->value,

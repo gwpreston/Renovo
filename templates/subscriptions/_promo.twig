@@ -1,0 +1,16 @@
+{#
+    The Promo chip beside a price on an intro offer: "until 1 Dec" when the
+    offer's end is known, plain when it is not. `promotion` is a
+    `PriceHistoryService` Promotion, or null for an ordinary price.
+#}
+{% macro chip(promotion) %}
+    {% if promotion %}
+        <span class="badge badge-info badge-promo">
+            {%- if promotion.ends_on -%}
+                {{ t('promo.chip_until', {'date': promotion.ends_on|local_date('d MMM')}) }}
+            {%- else -%}
+                {{ t('promo.chip') }}
+            {%- endif -%}
+        </span>
+    {% endif %}
+{% endmacro %}

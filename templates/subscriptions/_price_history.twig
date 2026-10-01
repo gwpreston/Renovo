@@ -31,8 +31,15 @@
                         {% endif %}
                     </div>
                     <div class="hint">
-                        {{ price_change_label(entry.change.source.value) }}
-                        {% if entry.change.note %} · {{ entry.change.note }}{% endif %}
+                        {% if entry.change.isPromotional %}
+                            <span class="badge badge-info">{{ t('promo.chip') }}</span>
+                        {% endif %}
+                        {%- if entry.ends_offer -%}
+                            {{ t(entry.is_scheduled ? 'price_change.offer_ends' : 'price_change.offer_ended') }}
+                        {%- else -%}
+                            {{ price_change_label(entry.change.source.value) }}
+                        {%- endif -%}
+                        {% if entry.show_note %} · {{ entry.change.note }}{% endif %}
                         {% if entry.change.createdByName %} · {{ entry.change.createdByName }}{% endif %}
                     </div>
                 </li>
@@ -41,7 +48,7 @@
     {% endif %}
 
     {% if editable %}
-        <form method="post" action="/subscriptions/{{ subscription.id }}/price-changes" class="stack">
+        <form method="post" action="/subscriptions/{{ subscription.id }}/price-changes" class="stack price-change-form">
             {{ csrf_field() }}
             <input type="hidden" name="return_to" value="{{ return_to }}">
             <h3>{{ t('subscriptions_money.schedule_a_price_change') }}</h3>
@@ -64,6 +71,31 @@
                     <label for="effective_from">{{ t('subscriptions_money.starts_on') }}</label>
                     <input type="date" id="effective_from" name="effective_from"
                            value="{{ schedule.effective_from|default('') }}" required>
+                </div>
+            </div>
+
+            {# The new price as an intro offer, and what it becomes. #}
+            <input type="hidden" name="is_promotional" value="0">
+            <label class="choice toggle">
+                <span>
+                    <span class="choice-title">{{ t('subscriptions_form.is_promotional') }}</span>
+                    <span class="choice-note">{{ t('subscriptions_form.is_promotional_note') }}</span>
+                </span>
+                <input type="checkbox" class="toggle" role="switch" id="scheduled_is_promotional" name="is_promotional" value="1">
+            </label>
+
+            <div class="reveal reveal-offer field-grid">
+                <div class="field">
+                    <label for="scheduled_offer_ends_on">{{ t('field.offer_ends_on') }}</label>
+                    <input type="date" id="scheduled_offer_ends_on" name="offer_ends_on"
+                           aria-describedby="scheduled_offer_ends_on-hint">
+                    <p class="hint" id="scheduled_offer_ends_on-hint">{{ t('subscriptions_form.offer_ends_hint') }}</p>
+                </div>
+
+                <div class="field">
+                    <label for="scheduled_offer_then_price">{{ t('field.offer_then_price') }}</label>
+                    <input type="text" id="scheduled_offer_then_price" name="offer_then_price" inputmode="decimal" class="num"
+                           value="{{ offer_then_default|default('') }}" placeholder="{{ 11.99|decimal(2) }}">
                 </div>
             </div>
 

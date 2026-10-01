@@ -37,6 +37,7 @@ use InvalidArgumentException;
  * "Renewing soon" badge, the "in N days" hint and which cancel-by dates the
  * table mentions.
  *
+ * @phpstan-import-type Promotion from PriceHistoryService
  * @phpstan-type Figures array{
  *     totals: list<array{currency: string, amount_minor: int}>,
  *     combined: array{currency: string, amount_minor: int|null, unconvertible: list<string>}
@@ -56,6 +57,7 @@ use InvalidArgumentException;
  *     price_base: Money|null,
  *     monthly: array{state: string, amount_minor: int|null, currency: string},
  *     split: Phrase|null,
+ *     promotion: Promotion|null,
  *     next: array{date: DateTimeImmutable|null, hint: DatedPhrase|null, is_near: bool},
  *     can_update: bool,
  *     can_delete: bool
@@ -74,6 +76,7 @@ final class SubscriptionScreenService
         private readonly ExchangeRateService $rates,
         private readonly InstanceSettingsService $settings,
         private readonly PermissionService $permissions,
+        private readonly PriceHistoryService $priceHistory,
         private readonly Clock $clock,
     ) {
     }
@@ -117,6 +120,7 @@ final class SubscriptionScreenService
         $mayUpdate = $this->permissions->allows($scope, Permission::UpdateSubscription);
         $mayDelete = $this->permissions->allows($scope, Permission::DeleteSubscription);
         $participants = $subscriptions === [] ? [] : $this->splits->allInScope($scope);
+        $promotions = $subscriptions === [] ? [] : $this->priceHistory->promotions($scope);
 
         $rows = [];
         foreach ($subscriptions as $subscription) {
@@ -131,6 +135,7 @@ final class SubscriptionScreenService
                     : $this->rates->convert($subscription->price, $base),
                 'monthly' => $this->monthly($subscription, $base),
                 'split' => $this->splitNote($subscription, $participants[$subscription->id] ?? []),
+                'promotion' => $promotions[$subscription->id] ?? null,
                 'next' => $next,
                 'can_update' => $mayUpdate && $writable,
                 'can_delete' => $mayDelete && $writable,

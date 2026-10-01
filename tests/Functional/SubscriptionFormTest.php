@@ -444,6 +444,129 @@ final class SubscriptionFormTest extends DatabaseTestCase
         );
     }
 
+    // ------------------------------------------------------- intro offers
+
+    public function testAnIntroOfferIsEnteredOnTheFormAndShownWhereverThePriceIs(): void
+    {
+        $ends = (new DateTimeImmutable('+60 days'))->format('Y-m-d');
+        $response = $this->request('POST', '/subscriptions', $this->form([
+            'price' => '5.99',
+            'is_promotional' => '1',
+            'offer_ends_on' => $ends,
+            'offer_then_price' => '11.99',
+        ]));
+        self::assertSame(302, $response->getStatusCode());
+
+        $subscription = $this->onlySubscription();
+        $history = $this->container()->get(PriceHistoryService::class)
+            ->historyFor($this->ownerScope(), $subscription->id);
+        self::assertCount(2, $history);
+        self::assertTrue($history[0]->isPromotional);
+        self::assertSame($ends, $history[1]->effectiveFrom->format('Y-m-d'));
+
+        // The edit form comes back with the switch on and the offer filled in.
+        $edit = $this->body($this->request('GET', '/subscriptions/' . $subscription->id . '/edit'));
+        $form = $this->formElement($edit);
+        self::assertCount(1, $this->xpath($form, './/input[@id="is_promotional"][@checked]'));
+        self::assertCount(1, $this->xpath($form, './/input[@name="offer_ends_on"][@value="' . $ends . '"]'));
+        self::assertCount(1, $this->xpath($form, './/input[@name="offer_then_price"][@value="11.99"]'));
+        self::assertStringContainsString('For a free period, use a trial instead.', $edit);
+        // The step the offer's end takes is called that, not a rise.
+        self::assertStringContainsString('Offer ends', $edit);
+        self::assertStringNotContainsString('Intro offer ended.', $edit);
+
+        self::assertStringContainsString('Promo until', $this->body($this->request('GET', '/subscriptions')));
+
+        $money = $this->body($this->request('GET', '/subscriptions/' . $subscription->id . '/money'));
+        self::assertStringContainsString('id="promotion"', $money);
+        self::assertStringContainsString('£11.99', $money);
+    }
+
+    public function testEveryScreenThatShowsTheStepCallsItTheEndOfAnOffer(): void
+    {
+        // Charged on the 5th; the offer ends on the 1st of the month after
+        // next, so the first full-price charge is on the 5th of that month.
+        $end = (new DateTimeImmutable('first day of +2 months'))->setTime(0, 0);
+        $firstFull = $end->modify('+4 days');
+        $this->request('POST', '/subscriptions', $this->form([
+            'name' => 'Spotify',
+            'price' => '5.99',
+            'next_payment_date' => (new DateTimeImmutable('first day of +1 month'))->modify('+4 days')->format('Y-m-d'),
+            'is_promotional' => '1',
+            'offer_ends_on' => $end->format('Y-m-d'),
+            'offer_then_price' => '11.99',
+        ]));
+        $this->request('POST', '/subscriptions', $this->form([
+            'name' => 'Open-ended',
+            'price' => '3.00',
+            'is_promotional' => '1',
+        ]));
+
+        $stats = $this->request('GET', '/stats');
+        self::assertSame(200, $stats->getStatusCode());
+        $stats = $this->body($stats);
+        self::assertStringContainsString('An intro offer is ending', $stats);
+        self::assertStringContainsString('Spotify’s intro price ends on', $stats);
+        self::assertStringContainsString('then £11.99/mo (+£6.00)', $stats);
+        self::assertStringContainsString('An intro price has no end date', $stats);
+        self::assertStringContainsString('Offer ends', $stats);
+
+        $dashboard = $this->request('GET', '/');
+        self::assertSame(200, $dashboard->getStatusCode());
+        self::assertStringContainsString('Spotify’s intro price ends on', $this->body($dashboard));
+
+        $forecast = $this->request('GET', '/forecast');
+        self::assertSame(200, $forecast->getStatusCode());
+        self::assertStringContainsString('Offer ends', $this->body($forecast));
+
+        $calendar = $this->request(
+            'GET',
+            '/calendar?month=' . $firstFull->format('Y-m') . '&day=' . $firstFull->format('Y-m-d'),
+        );
+        self::assertSame(200, $calendar->getStatusCode());
+        self::assertStringContainsString('Offer ends', $this->body($calendar));
+    }
+
+    public function testAViewerCannotEnterAnOffer(): void
+    {
+        $this->request('POST', '/subscriptions', $this->form([]));
+        $subscription = $this->onlySubscription();
+
+        $viewerId = (new UserRepository($this->db))->create(
+            'viewer@example.test',
+            'Viewer',
+            'hash',
+            false,
+            new DateTimeImmutable(),
+        );
+        (new MembershipRepository($this->db))->create($this->householdId, $viewerId, Role::Viewer);
+        $this->signIn($viewerId);
+
+        $offer = [
+            'is_promotional' => '1',
+            'offer_ends_on' => (new DateTimeImmutable('+60 days'))->format('Y-m-d'),
+            'offer_then_price' => '11.99',
+        ];
+        $schedule = $this->request('POST', '/subscriptions/' . $subscription->id . '/price-changes', [
+            'price' => '5.99',
+            'currency' => 'GBP',
+            'effective_from' => (new DateTimeImmutable('+10 days'))->format('Y-m-d'),
+        ] + $offer);
+        self::assertSame(403, $schedule->getStatusCode());
+
+        $update = $this->request(
+            'POST',
+            '/subscriptions/' . $subscription->id,
+            $this->form(['price' => '5.99'] + $offer),
+        );
+        self::assertSame(403, $update->getStatusCode());
+
+        self::assertCount(
+            1,
+            $this->container()->get(PriceHistoryService::class)->historyFor($this->ownerScope(), $subscription->id),
+        );
+    }
+
     public function testAReturnAddressIsNeverAnywhereButThisSubscriptionsTwoPages(): void
     {
         $this->request('POST', '/subscriptions', $this->form([]));

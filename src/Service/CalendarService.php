@@ -45,7 +45,8 @@ use DateTimeImmutable;
  *     date: DateTimeImmutable,
  *     amount: Money,
  *     approx_base: Money|null,
- *     charge_date: DateTimeImmutable|null
+ *     charge_date: DateTimeImmutable|null,
+ *     ends_offer: bool
  * }
  * @phpstan-type Figures array{
  *     totals: list<array{currency: string, amount_minor: int}>,
@@ -133,6 +134,7 @@ final class CalendarService
                     $charge['subscription'],
                     $charge['date'],
                     $charge['amount'],
+                    endsOffer: $charge['reason'] === 'offer_end',
                 );
             }
         }
@@ -369,6 +371,7 @@ final class CalendarService
         DateTimeImmutable $date,
         Money $amount,
         ?DateTimeImmutable $chargeDate = null,
+        bool $endsOffer = false,
     ): array {
         return [
             'kind' => $kind,
@@ -377,6 +380,9 @@ final class CalendarService
             'amount' => $amount,
             'approx_base' => $this->approxBase($amount),
             'charge_date' => $chargeDate,
+            // The first charge at full price after an intro offer: still a
+            // charge, named for what it is.
+            'ends_offer' => $endsOffer,
         ];
     }
 

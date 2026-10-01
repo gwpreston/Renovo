@@ -2375,7 +2375,17 @@ a.segmented-option {
 .subscription-form:has(input[name='split_mode'][value='equal']:checked) .reveal-split-equal,
 .subscription-form:has(input[name='split_mode'][value='custom']:checked) .reveal-split-custom,
 .subscription-form:has(#is_trial:checked) .reveal-trial,
+.subscription-form:has(#is_promotional:checked) .reveal-offer,
 .subscription-form:has(#converts_to_billing_cycle option[value='custom_days']:checked) .reveal-trial-custom-cycle {
+    display: grid;
+}
+
+/* The price change form reveals its offer fields the same way. */
+.price-change-form .reveal {
+    display: none;
+}
+
+.price-change-form:has(#scheduled_is_promotional:checked) .reveal-offer {
     display: grid;
 }
 
