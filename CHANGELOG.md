@@ -58,5 +58,5 @@ recurring bills. Requires PHP 8.4+ and PostgreSQL or MySQL/MariaDB.
   explicit rollbacks, and sample data with a second household member and a
   year of history. The default port is 9090.
 
-[Unreleased]: https://github.com/gwpreston/renovo/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/gwpreston/renovo/releases/tag/v1.0.0
+[Unreleased]: https://github.com/gwpreston16/Renovo/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/gwpreston16/Renovo/releases/tag/v1.0.0
