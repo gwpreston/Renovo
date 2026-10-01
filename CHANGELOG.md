@@ -8,6 +8,8 @@ Before upgrading, **back up your database**, then run `vendor/bin/phinx migrate`
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-01
+
 ### Added
 
 - **Introductory and promotional prices** — "£5.99 for three months, then
@@ -151,7 +153,8 @@ recurring bills. Requires PHP 8.4+ and PostgreSQL or MySQL/MariaDB.
   explicit rollbacks, and sample data with a second household member and a
   year of history. The default port is 9090.
 
-[Unreleased]: https://github.com/gwpreston16/Renovo/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/gwpreston16/Renovo/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/gwpreston16/Renovo/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/gwpreston16/Renovo/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/gwpreston16/Renovo/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/gwpreston16/Renovo/compare/v1.0.0...v1.1.0
