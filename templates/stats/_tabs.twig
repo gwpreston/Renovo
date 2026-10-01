@@ -1,6 +1,6 @@
 {#
-    Analytics' tabs, as links: what has happened (`/stats`) and what is about
-    to (`/forecast`).
+    Analytics' tabs, as links: what has happened (`/stats`), what is about
+    to (`/forecast`), and what would if something changed (`/forecast/scenario`).
 
     Analytics is one rail item over two screens, and these are what make the
     second one findable — the model is the Settings page's tabs. Each is a
@@ -8,7 +8,7 @@
     the rail lights Analytics on both. `aria-current="page"` marks the one
     shown, and the underline is drawn from it.
 
-    `tab`  'overview' or 'forecast'
+    `tab`  'overview', 'forecast' or 'scenario'
 #}
 <nav class="page-tabs" aria-label="{{ t('stats.tabs_label') }}">
     <ul class="page-tabs-list">
@@ -17,6 +17,9 @@
         </li>
         <li>
             <a href="/forecast" {{ tab == 'forecast' ? 'aria-current="page"' : '' }}>{{ t('stats.tab_forecast') }}</a>
+        </li>
+        <li>
+            <a href="/forecast/scenario" {{ tab == 'scenario' ? 'aria-current="page"' : '' }}>{{ t('stats.tab_scenario') }}</a>
         </li>
     </ul>
 </nav>

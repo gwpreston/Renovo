@@ -1,0 +1,239 @@
+{#
+    The scenario's results: the run-rate and the next twelve months, now and
+    with the scenario, and what each row it changes saves and from when.
+
+    Rendered on its own for an htmx request — the planner's form replaces
+    `#scenario-results` whole whenever a choice changes — and included by the
+    page for a normal load, so the two cannot drift apart.
+
+    Two figures that are easy to mistake for one another, each labelled: the
+    run-rate saving is what the change is worth a month once it has taken
+    effect; the twelve-month saving is money, charge by charge, after every
+    charge a notice period has already committed. A figure in more than one
+    currency is combined only when every currency has a rate.
+
+    Nothing is changed from here. Each row links to the flow that already
+    changes it — cancelling, or the price forms on the edit page — and those
+    are offered only to somebody whose role could use them; the routes they
+    lead to refuse anybody else.
+#}
+{% import 'partials/logo.twig' as logo %}
+{% import _self as scenario %}
+
+{% macro amount(figures, base_currency) %}
+    {%- if figures.totals is empty -%}
+        {{ 0|money(base_currency) }}
+    {%- elseif figures.totals|length == 1 -%}
+        {{ figures.totals[0].amount_minor|money(figures.totals[0].currency) }}
+    {%- elseif figures.combined.amount_minor is not null -%}
+        {{ figures.combined.amount_minor|money(figures.combined.currency) }}
+    {%- else -%}
+        {% for total in figures.totals %}{{ total.amount_minor|money(total.currency) }}{{ not loop.last ? ' · ' : '' }}{% endfor %}
+    {%- endif -%}
+{% endmacro %}
+
+{# A saving below zero is a change that costs more, said so rather than signed. #}
+{% macro saving(figures, base_currency) %}
+    {%- import _self as self -%}
+    {%- if figures.net is not null and figures.net.amount_minor < 0 -%}
+        <span class="scenario-costs-more">{{ t('scenario.costs_more', {
+            'amount': figures.net.amount_minor|abs|money(figures.net.currency),
+        }) }}</span>
+    {%- else -%}
+        {{ self.amount(figures, base_currency) }}
+    {%- endif -%}
+{% endmacro %}
+
+{% set r = results %}
+
+<section class="card scenario-results" id="scenario-results" aria-labelledby="scenario-results-heading"
+         aria-live="polite">
+    <header class="card-header">
+        <div>
+            <h2 id="scenario-results-heading">{{ t('scenario.results_heading') }}</h2>
+            <p class="muted">
+                {{ r.is_empty ? t('scenario.results_empty') : t('scenario.results_note') }}
+            </p>
+        </div>
+    </header>
+
+    <div class="metric-grid scenario-headline">
+        <article class="stat metric">
+            <h3 class="stat-label">{{ t('scenario.monthly_saving') }}</h3>
+            <p class="stat-value num">{{ scenario.saving(r.run_rate.saving.monthly, base_currency) }}</p>
+            <p class="kpi-note muted">{{ t('scenario.monthly_saving_note') }}</p>
+        </article>
+        <article class="stat metric">
+            <h3 class="stat-label">{{ t('scenario.twelve_saving', {'months': r.horizon_months}) }}</h3>
+            <p class="stat-value num">{{ scenario.saving(r.twelve_months.saving, base_currency) }}</p>
+            <p class="kpi-note muted">{{ t('scenario.twelve_saving_note') }}</p>
+        </article>
+    </div>
+
+    <div class="table-scroll">
+        <table class="table scenario-figures">
+            <caption class="visually-hidden">{{ t('scenario.figures_caption') }}</caption>
+            <thead>
+            <tr>
+                <th scope="col"><span class="visually-hidden">{{ t('scenario.figure') }}</span></th>
+                <th scope="col" class="numeric">{{ t('scenario.now') }}</th>
+                <th scope="col" class="numeric">{{ t('scenario.with_changes') }}</th>
+                <th scope="col" class="numeric">{{ t('scenario.difference') }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <th scope="row">{{ t('scenario.run_rate_monthly') }}</th>
+                <td class="numeric num">{{ scenario.amount(r.run_rate.current.monthly, base_currency) }}</td>
+                <td class="numeric num">{{ scenario.amount(r.run_rate.scenario.monthly, base_currency) }}</td>
+                <td class="numeric num">{{ scenario.saving(r.run_rate.saving.monthly, base_currency) }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ t('scenario.run_rate_yearly') }}</th>
+                <td class="numeric num">{{ scenario.amount(r.run_rate.current.yearly, base_currency) }}</td>
+                <td class="numeric num">{{ scenario.amount(r.run_rate.scenario.yearly, base_currency) }}</td>
+                <td class="numeric num">{{ scenario.saving(r.run_rate.saving.yearly, base_currency) }}</td>
+            </tr>
+            <tr>
+                <th scope="row">{{ t('scenario.next_months', {'months': r.horizon_months}) }}</th>
+                <td class="numeric num">{{ scenario.amount(r.twelve_months.current, base_currency) }}</td>
+                <td class="numeric num">{{ scenario.amount(r.twelve_months.scenario, base_currency) }}</td>
+                <td class="numeric num">{{ scenario.saving(r.twelve_months.saving, base_currency) }}</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {% if mine_only %}
+        <p class="hint">{{ t('scenario.mine_run_rate_note') }}</p>
+    {% endif %}
+
+    {% for missing in r.unconvertible %}
+        <p class="hint">{{ t('scenario.unconvertible', {'count': missing.count, 'currency': missing.currency}) }}</p>
+    {% endfor %}
+
+    {% if r.rows is not empty %}
+        <h3 class="scenario-subheading">{{ t('scenario.by_row') }}</h3>
+        <ul class="account-rows scenario-outcomes">
+            {% for row in r.rows %}
+                {% set subscription = row.subscription %}
+                <li class="account-row scenario-outcome" id="scenario-outcome-{{ subscription.id }}">
+                    <span class="scenario-row-logo">{{ logo.mark(subscription, 24) }}</span>
+                    <span class="account-row-text">
+                        <span class="account-row-name">
+                            {{ subscription.name }}
+                            <span class="hint">
+                                {% if row.choice == 'cancel' %}
+                                    {{ t('scenario.outcome_cancel') }}
+                                {% elseif row.change.cycle %}
+                                    {{ t('scenario.outcome_change_cycle', {
+                                        'amount': row.change.price.amountMinor|money(row.change.price.currency),
+                                        'cycle': cycle_label(row.change.cycle.value, row.change.cycleDays),
+                                    }) }}
+                                {% else %}
+                                    {{ t('scenario.outcome_change', {
+                                        'amount': row.change.price.amountMinor|money(row.change.price.currency),
+                                    }) }}
+                                {% endif %}
+                            </span>
+                        </span>
+                        <span class="account-row-meta">
+                            {% if row.starts_on %}
+                                {{ t('scenario.starts_on', {'date': row.starts_on|local_date('d MMM y')}) }}
+                            {% else %}
+                                {{ t('scenario.no_saving_in_horizon', {'months': r.horizon_months}) }}
+                            {% endif %}
+                            · {{ t('scenario.row_monthly', {'amount': row.monthly_saving.amountMinor|money(row.monthly_saving.currency)}) }}
+                        </span>
+                        {% if row.committed is not empty %}
+                            <span class="account-row-meta scenario-committed">
+                                {{ t('scenario.committed', {
+                                    'count': row.committed|length,
+                                    'charges': row.committed|map(c => (c.date|local_date('d MMM')) ~ ', ' ~ (c.amount.amountMinor|money(c.amount.currency)))|join('; '),
+                                    'deadline': row.notice_deadline ? row.notice_deadline|local_date('d MMM') : '',
+                                }) }}
+                            </span>
+                        {% endif %}
+                    </span>
+                    <span class="account-row-actions">
+                        <span class="num scenario-outcome-figure">{{ scenario.saving(row.saving, base_currency) }}</span>
+                        {% if row.choice == 'cancel' %}
+                            {% if can(scope, 'subscription.update') and can_edit_row(scope, subscription) %}
+                                {% set cancel_label = subscription.isTrial ? t('subscriptions_list.cancel_trial') : t('subscriptions_list.cancel') %}
+                                <form method="post" action="/subscriptions/{{ subscription.id }}/cancel" class="inline"
+                                      onsubmit="return confirm('{{ t('confirm.cancel_subscription', {'name': subscription.name})|e('js') }}')">
+                                    {{ csrf_field() }}
+                                    <input type="hidden" name="return_to" value="/forecast/scenario{{ query ? '?' ~ query : '' }}">
+                                    <button type="submit" class="button button-quiet"
+                                            aria-label="{{ t('subscriptions_list.cancel_name', {'name': subscription.name}) }}">{{ cancel_label }}</button>
+                                </form>
+                            {% endif %}
+                        {% elseif row.action_url and can(scope, row.action_permission) and can_edit_row(scope, subscription) %}
+                            <a class="button button-quiet" href="{{ row.action_url }}"
+                               aria-label="{{ t('scenario.change_name', {'name': subscription.name}) }}">{{ t('scenario.change_action') }}</a>
+                        {% endif %}
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if r.months is not null %}
+        <div class="scenario-months" id="scenario-months">
+            <div class="card-header">
+                <h3 class="scenario-subheading">{{ t('scenario.months_heading') }}</h3>
+                {% if r.months.is_drawable %}
+                    <ul class="chart-legend" aria-hidden="true">
+                        <li><span class="chart-key chart-key-previous"></span>{{ t('scenario.now') }}</li>
+                        <li><span class="chart-key chart-key-current"></span>{{ t('scenario.with_changes') }}</li>
+                    </ul>
+                {% endif %}
+            </div>
+            {% if not r.months.is_drawable %}
+                <p class="muted empty">
+                    {{ t('dashboard.spend_bars_unconvertible', {'currencies': r.months.unconvertible|join(', ')}) }}
+                </p>
+            {% else %}
+                <div class="yoy-bars" aria-hidden="true">
+                    <div class="yoy-bars-plot">
+                        {% for bar in r.months.bars %}
+                            <div class="yoy-month{{ bar.differs ? ' is-changed' : '' }}">
+                                <span class="yoy-bar yoy-bar-previous" style="height: {{ bar.current_height }}"
+                                      title="{{ bar.long_label }} · {{ bar.current_display }}"></span>
+                                <span class="yoy-bar yoy-bar-scenario" style="height: {{ bar.scenario_height }}"
+                                      title="{{ bar.long_label }} · {{ bar.scenario_display }}"></span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="spend-bars-labels yoy-labels">
+                        {% for bar in r.months.bars %}
+                            <span class="{{ bar.is_current ? 'is-current' : '' }}">{{ bar.label }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="visually-hidden table-scroll">
+                    <table class="table">
+                        <caption class="visually-hidden">{{ t('scenario.months_alt', {'currency': r.months.currency}) }}</caption>
+                        <thead>
+                        <tr>
+                            <th scope="col">{{ t('field.month') }}</th>
+                            <th scope="col" class="numeric">{{ t('scenario.now') }}</th>
+                            <th scope="col" class="numeric">{{ t('scenario.with_changes') }}</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for bar in r.months.bars %}
+                            <tr>
+                                <th scope="row">{{ bar.long_label }}</th>
+                                <td class="numeric num">{{ bar.current_display }}</td>
+                                <td class="numeric num">{{ bar.scenario_display }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>

@@ -294,7 +294,10 @@ final class SubscriptionController extends Controller
             throw $this->notFound($request);
         }
 
-        return $this->render($request, $response, 'subscriptions/form.twig', $this->formData($request, [
+        // The scenario planner's Change price sends the member here with the
+        // new terms in the query; they fill the form and are saved, if at all,
+        // through it.
+        $values = $this->form->prefill([
             'id' => $subscription->id,
             'name' => $subscription->name,
             'price' => $subscription->price->toDecimalString(),
@@ -322,14 +325,17 @@ final class SubscriptionController extends Controller
             'logo_path' => $subscription->logoPath,
             'website_url' => $subscription->websiteUrl,
             'tags' => implode(', ', array_map(static fn ($tag): string => $tag->name, $subscription->tags)),
-        ]
+        ], $request->getQueryParams());
+
+        return $this->render($request, $response, 'subscriptions/form.twig', $this->formData($request, $values
             // The three reminder states — use my defaults, never, these days —
             // as the chips draw them, and the split as its controls do.
             + $this->form->reminderValues($subscription->reminderDays)
             + $this->form->splitValues(
                 $subscription,
                 $this->splits->participants($scope, $subscription->id),
-            ), [], $subscription->id));
+            ), [], $subscription->id)
+            + ['schedule' => $this->form->schedulePrefill($request->getQueryParams())]);
     }
 
     public function update(ServerRequestInterface $request, ResponseInterface $response, string $id): ResponseInterface
@@ -447,6 +453,16 @@ final class SubscriptionController extends Controller
     {
         $body = $this->body($request);
         $target = is_scalar($body['return_to'] ?? null) ? (string) $body['return_to'] : '';
+
+        // The scenario planner's Cancel comes back to the planner with its
+        // scenario. The path is fixed and the query rebuilt from the planner's
+        // own parameters, so nothing but the planner can be reached this way.
+        if (parse_url($target, PHP_URL_PATH) === '/forecast/scenario') {
+            parse_str((string) parse_url($target, PHP_URL_QUERY), $query);
+            $query = array_intersect_key($query, array_flip(['cancel', 'change', 'mine']));
+
+            return '/forecast/scenario' . ($query === [] ? '' : '?' . http_build_query($query));
+        }
 
         return match ($target) {
             '/' => '/',

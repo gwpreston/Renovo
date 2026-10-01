@@ -185,12 +185,7 @@ final class StatsService
         $upcoming = $this->upcomingRows($this->subscriptions->upcoming($scope, self::UPCOMING_WINDOW_DAYS));
         $trials = $this->subscriptions->trialsEndingSoon($scope, 30);
 
-        $monthlyByCurrency = [];
-        $yearlyByCurrency = [];
-        foreach ($recurring as $currency => $row) {
-            $monthlyByCurrency[(string) $currency] = $row['monthly_minor'];
-            $yearlyByCurrency[(string) $currency] = $row['yearly_minor'];
-        }
+        ['monthly' => $monthlyByCurrency, 'yearly' => $yearlyByCurrency] = $this->runRate($all);
 
         $combinedYearly = $this->combine($yearlyByCurrency);
 
@@ -212,6 +207,41 @@ final class StatsService
             'trials' => $trials,
             'trial_totals' => $this->sumConvertedPrices($trials),
         ];
+    }
+
+    /**
+     * The recurring run-rate: every running subscription's normalised monthly
+     * and yearly cost, summed by currency. A trial counts at the price it has
+     * today, as everywhere the run-rate is shown; one-off and lifetime entries
+     * have no monthly figure and are not in it.
+     *
+     * The dashboard's Monthly and Yearly figures are this, and so is the
+     * scenario planner's "current", which is how the two agree to the minor
+     * unit.
+     *
+     * @param iterable<Subscription> $subscriptions
+     * @return array{monthly: array<string, int>, yearly: array<string, int>}
+     */
+    public function runRate(iterable $subscriptions): array
+    {
+        $monthly = [];
+        $yearly = [];
+
+        foreach ($subscriptions as $subscription) {
+            $monthlyMinor = $subscription->isActive ? $subscription->monthlyMinor() : null;
+            if ($monthlyMinor === null) {
+                continue;
+            }
+
+            $currency = $subscription->price->currency;
+            $monthly[$currency] = ($monthly[$currency] ?? 0) + $monthlyMinor;
+            $yearly[$currency] = ($yearly[$currency] ?? 0) + ($subscription->yearlyMinor() ?? 0);
+        }
+
+        ksort($monthly);
+        ksort($yearly);
+
+        return ['monthly' => $monthly, 'yearly' => $yearly];
     }
 
     /**

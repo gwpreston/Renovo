@@ -595,10 +595,15 @@ final class SubscriptionsScreenTest extends DatabaseTestCase
     {
         $list = $this->section($this->body($this->get('/subscriptions', $this->viewerId)), 'subscription-list');
 
-        $controls = ['/edit', '/toggle', '/cancel', '/uncancel', '/delete', '/subscriptions/bulk', 'name="ids[]"'];
+        $controls = ['/edit', '/toggle', '/cancel', '/uncancel', '/delete', '/subscriptions/bulk', 'name="action"'];
         foreach ($controls as $control) {
             self::assertStringNotContainsString($control, $list, 'a Viewer was shown ' . $control);
         }
+
+        // Selecting rows is still theirs: Plan a scenario writes nothing, so
+        // the bar is drawn with that alone, posting to the planner.
+        self::assertStringContainsString('name="ids[]"', $list);
+        self::assertStringContainsString('action="/forecast/scenario/selection"', $list);
 
         // Hiding the control is not the enforcement; this is.
         foreach (['toggle', 'cancel', 'uncancel', 'delete'] as $action) {

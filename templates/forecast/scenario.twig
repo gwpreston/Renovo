@@ -1,0 +1,173 @@
+{% extends 'layout.twig' %}
+
+{% import 'partials/logo.twig' as logo %}
+
+{% block title %}{{ t('scenario.title') }} — {{ instance_name }}{% endblock %}
+
+{% block heading %}{{ t('stats.title') }}{% endblock %}
+{% block page_subtitle %}{{ t('subtitle.scenario') }}{% endblock %}
+
+{% block page_actions %}
+    <a class="button button-quiet" href="/forecast/scenario{{ mine_toggle_query ? '?' ~ mine_toggle_query : '' }}">
+        {{ mine_only ? t('forecast.show_whole_household') : t('forecast.show_only_my_share') }}
+    </a>
+{% endblock %}
+
+{% block content %}
+    {#
+        Analytics' third tab: what the next twelve months would cost if
+        something changed. Every running subscription is a row, kept by
+        default; set one to Cancel or Change price and the results panel says
+        what it saves, and from when — `ScenarioService`.
+
+        The scenario is the query string: the rows are one GET form, so it
+        works without script and a bookmark keeps it. With script, htmx sends
+        the form whenever a choice changes and replaces only the results panel;
+        a filter change replaces the whole planner. A row the filters hide is
+        still in the form, `hidden`, so its choice is still sent — the filters
+        narrow what is shown, never what is planned.
+
+        Nothing here is changed. The results panel links each row to the flow
+        that already changes it, one at a time.
+    #}
+    {% include 'stats/_tabs.twig' with {tab: 'scenario'} only %}
+
+    {% if mine_only %}
+        <p class="muted note">{{ t('forecast.mine_note') }}</p>
+    {% endif %}
+
+    <div class="scenario-planner" id="scenario-planner">
+        <form class="card scenario-rows" id="scenario-form" method="get" action="/forecast/scenario"
+              aria-labelledby="scenario-rows-heading"
+              hx-get="/forecast/scenario" hx-target="#scenario-results" hx-swap="outerHTML"
+              hx-trigger="change, input[target.type=='text'||target.type=='number'] changed delay:500ms"
+              hx-sync="this:replace">
+            <header class="card-header">
+                <div>
+                    <h2 id="scenario-rows-heading">{{ t('scenario.rows_heading') }}</h2>
+                    <p class="muted">{{ t('scenario.rows_note') }}</p>
+                </div>
+            </header>
+
+            {% if mine_only %}
+                <input type="hidden" name="mine" value="1">
+            {% endif %}
+
+            {% if filter_options.categories or filter_options.tags or filter_options.owners|length > 1 %}
+                <div class="scenario-filters" role="group" aria-label="{{ t('scenario.filters_label') }}">
+                    {% set filter_htmx = 'hx-get="/forecast/scenario" hx-target="#scenario-planner" hx-select="#scenario-planner" hx-swap="outerHTML" hx-trigger="change consume" hx-include="#scenario-form"' %}
+                    {% if filter_options.categories %}
+                        <select name="category" aria-label="{{ t('field.category') }}" {{ filter_htmx|raw }}>
+                            <option value="">{{ t('scenario.any_category') }}</option>
+                            {% for option in filter_options.categories %}
+                                <option value="{{ option.id }}" {{ filters.category == option.id ? 'selected' : '' }}>{{ option.name }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endif %}
+                    {% if filter_options.tags %}
+                        <select name="tag" aria-label="{{ t('field.tag') }}" {{ filter_htmx|raw }}>
+                            <option value="">{{ t('scenario.any_tag') }}</option>
+                            {% for option in filter_options.tags %}
+                                <option value="{{ option.id }}" {{ filters.tag == option.id ? 'selected' : '' }}>{{ option.name }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endif %}
+                    {% if filter_options.owners|length > 1 %}
+                        <select name="owner" aria-label="{{ t('subscriptions_form.paid_by') }}" {{ filter_htmx|raw }}>
+                            <option value="">{{ t('scenario.any_member') }}</option>
+                            {% for option in filter_options.owners %}
+                                <option value="{{ option.id }}" {{ filters.owner == option.id ? 'selected' : '' }}>{{ option.name }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endif %}
+                    <noscript><button type="submit" class="button button-quiet">{{ t('scenario.filter') }}</button></noscript>
+                </div>
+            {% endif %}
+
+            {% if rows is empty %}
+                <p class="muted empty">{{ t('scenario.empty') }}</p>
+            {% else %}
+                {% if shown_count == 0 %}
+                    <p class="muted empty">{{ t('scenario.no_matches') }}</p>
+                {% endif %}
+                <ul class="account-rows scenario-list">
+                    {% for row in rows %}
+                        {% set subscription = row.subscription %}
+                        {% set id = subscription.id %}
+                        <li class="account-row scenario-row is-{{ row.choice }}" id="scenario-row-{{ id }}"
+                            {{ row.is_shown ? '' : 'hidden' }}>
+                            <span class="scenario-row-logo">{{ logo.mark(subscription, 28) }}</span>
+                            <span class="account-row-text">
+                                <span class="account-row-name">
+                                    <a href="/subscriptions/{{ id }}/money">{{ subscription.name }}</a>
+                                    {% if subscription.isTrial %}<span class="badge">{{ t('state.trial') }}</span>{% endif %}
+                                </span>
+                                <span class="account-row-meta">
+                                    {% if subscription.plan %}{{ subscription.plan }} · {% endif %}
+                                    {% if row.cycle_value %}{{ cycle_label(row.cycle_value, row.cycle_days) }} · {% endif %}
+                                    <span class="num">{{ row.price.amountMinor|money(row.price.currency) }}</span>
+                                </span>
+                            </span>
+                            <fieldset class="account-row-actions scenario-choice">
+                                <legend class="visually-hidden">{{ t('scenario.choice_label', {'name': subscription.name}) }}</legend>
+                                <span class="segmented">
+                                    {% for choice in ['keep', 'cancel', 'change'] %}
+                                        <label class="segmented-option">
+                                            <input type="radio" name="choice[{{ id }}]" value="{{ choice }}"
+                                                   {{ row.choice == choice ? 'checked' : '' }}>
+                                            {{ t('scenario.choice_' ~ choice) }}
+                                        </label>
+                                    {% endfor %}
+                                </span>
+                            </fieldset>
+                            <div class="scenario-change" id="scenario-change-{{ id }}">
+                                <div class="field">
+                                    <label for="scenario-price-{{ id }}">{{ t('scenario.new_price') }}</label>
+                                    <div class="input-group">
+                                        <input type="text" id="scenario-price-{{ id }}" name="change[{{ id }}][price]"
+                                               inputmode="decimal" class="num" value="{{ row.input.price }}"
+                                               placeholder="{{ row.price.toDecimalString }}"
+                                               {% if row.errors.price is defined %}aria-invalid="true" aria-describedby="scenario-price-error-{{ id }}"{% endif %}>
+                                        <span class="input-unit">{{ row.price.currency }}</span>
+                                    </div>
+                                    {% if row.errors.price is defined %}
+                                        <p class="field-error" id="scenario-price-error-{{ id }}">{{ error_message(row.errors.price) }}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="field">
+                                    <label for="scenario-cycle-{{ id }}">{{ t('scenario.new_cycle') }}</label>
+                                    <select id="scenario-cycle-{{ id }}" name="change[{{ id }}][cycle]"
+                                            {% if row.errors.cycle is defined %}aria-invalid="true"{% endif %}>
+                                        <option value="">{{ t('scenario.same_cycle') }}</option>
+                                        {% for cycle in cycles %}
+                                            <option value="{{ cycle.value }}" {{ row.input.cycle == cycle.value ? 'selected' : '' }}>{{ cycle_label(cycle.value) }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if row.errors.cycle is defined %}
+                                        <p class="field-error">{{ error_message(row.errors.cycle) }}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="field scenario-days">
+                                    <label for="scenario-days-{{ id }}">{{ t('scenario.cycle_days') }}</label>
+                                    <input type="number" id="scenario-days-{{ id }}" name="change[{{ id }}][days]"
+                                           min="1" max="3650" class="num" value="{{ row.input.days }}"
+                                           {% if row.errors.days is defined %}aria-invalid="true" aria-describedby="scenario-days-error-{{ id }}"{% endif %}>
+                                    {% if row.errors.days is defined %}
+                                        <p class="field-error" id="scenario-days-error-{{ id }}">{{ error_message(row.errors.days) }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                <div class="form-actions scenario-submit">
+                    <button type="submit" class="button">{{ t('scenario.work_it_out') }}</button>
+                    <a class="button button-quiet" href="/forecast/scenario{{ mine_only ? '?mine=1' : '' }}">{{ t('scenario.reset') }}</a>
+                </div>
+            {% endif %}
+        </form>
+
+        {% include 'forecast/_scenario_results.twig' %}
+    </div>
+{% endblock %}

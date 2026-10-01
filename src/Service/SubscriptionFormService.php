@@ -36,6 +36,16 @@ final class SubscriptionFormService
     public const REMINDER_NEVER = 'never';
     public const REMINDER_DAYS = 'days';
 
+    /** The fields the scenario planner's Change price may fill in. */
+    private const PREFILLED = [
+        'price',
+        'billing_cycle',
+        'cycle_days',
+        'converts_to_price',
+        'converts_to_billing_cycle',
+        'converts_to_cycle_days',
+    ];
+
     public function __construct(
         private readonly SubscriptionService $subscriptions,
         private readonly SplitService $splits,
@@ -158,6 +168,46 @@ final class SubscriptionFormService
         }
 
         return $subscription === null || $this->splits->canEdit($scope, $subscription);
+    }
+
+    /**
+     * The edit form's values with the scenario planner's Change price laid
+     * over them: the new price and cycle, or for a trial what it converts to.
+     * Only those fields, only as text, and only to fill the form — nothing is
+     * saved until the member saves it, through the usual validation.
+     *
+     * @param array<string, mixed> $values
+     * @param array<mixed> $query
+     * @return array<string, mixed>
+     */
+    public function prefill(array $values, array $query): array
+    {
+        foreach (self::PREFILLED as $field) {
+            $value = $query[$field] ?? null;
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                $values[$field] = trim((string) $value);
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * The schedule-a-price-change form's price and date from the planner, so
+     * a change on the same cycle arrives filled in from its next charge.
+     *
+     * @param array<mixed> $query
+     * @return array{price: string, effective_from: string}
+     */
+    public function schedulePrefill(array $query): array
+    {
+        $price = is_scalar($query['scheduled_price'] ?? null) ? trim((string) $query['scheduled_price']) : '';
+        $date = is_scalar($query['effective_from'] ?? null) ? (string) $query['effective_from'] : '';
+
+        return [
+            'price' => $price,
+            'effective_from' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1 ? $date : '',
+        ];
     }
 
     /**

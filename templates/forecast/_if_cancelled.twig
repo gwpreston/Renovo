@@ -3,10 +3,12 @@
     the next twelve months, and so what cancelling each today would save.
 
     The figure is the sum of the charges the forecast expects — a price rise
-    already announced counts from its date, a trial only once it converts — in
-    the currency actually charged. Ranked on that sum in the base currency; a
+    already announced counts from its date, a trial only once it converts, and
+    a charge a notice period has already committed not at all — in the
+    currency actually charged. Ranked on that sum in the base currency; a
     subscription whose currency has no rate cannot be ranked, and is counted
-    beneath instead. It links to the subscription and changes nothing.
+    beneath instead. It links to the subscription and changes nothing; Add to
+    scenario opens the planner with that row set to Cancel.
 #}
 {% import 'partials/logo.twig' as logo %}
 
@@ -36,6 +38,9 @@
                             {{ amount.amount_minor|money(amount.currency) }}{{ not loop.last ? ' · ' : '' }}
                         {% endfor %}
                     </span>
+                    <a class="forecast-scenario-link hint"
+                       href="/forecast/scenario?cancel[]={{ row.subscription.id }}{{ mine_only ? '&mine=1' : '' }}"
+                       aria-label="{{ t('forecast.add_to_scenario_name', {'name': row.subscription.name}) }}">{{ t('forecast.add_to_scenario') }}</a>
                 </li>
             {% endfor %}
         </ol>
