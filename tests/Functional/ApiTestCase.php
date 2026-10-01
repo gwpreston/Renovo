@@ -59,7 +59,7 @@ abstract class ApiTestCase extends DatabaseTestCase
         $this->app = $bootstrap(true, [
             SessionInterface::class => $this->session,
             MailerInterface::class => new RecordingMailer(),
-        ]);
+        ] + $this->containerOverrides());
 
         $settings = $this->container()->get(InstanceSettingsService::class);
         $settings->setIsolationMode($this->isolationMode());
@@ -114,6 +114,17 @@ abstract class ApiTestCase extends DatabaseTestCase
     protected function isolationMode(): IsolationMode
     {
         return IsolationMode::Shared;
+    }
+
+    /**
+     * Further container entries, for a test that has to point a service
+     * somewhere harmless — the logo tests, at a temporary directory.
+     *
+     * @return array<string, mixed>
+     */
+    protected function containerOverrides(): array
+    {
+        return [];
     }
 
     protected function container(): ContainerInterface

@@ -135,7 +135,11 @@ the same values `GET /me` returns in its `permissions` array.
 | `POST` | `/payment-methods` | `category.manage` |
 | `PUT` | `/payment-methods/{id}` | `category.manage` |
 | `DELETE` | `/payment-methods/{id}` | `category.manage` |
+| `POST` | `/payment-methods/{id}/logo` | `category.manage` |
+| `DELETE` | `/payment-methods/{id}/logo` | `category.manage` |
 | `GET` | `/tags` | `subscription.view` |
+| `POST` | `/tags` | `tag.manage` |
+| `PUT` | `/tags/{id}` | `tag.manage` |
 | `DELETE` | `/tags/{id}` | `tag.manage` |
 | `GET` | `/calendar.ics` | `subscription.view` |
 
@@ -557,8 +561,7 @@ Create, or rename and recolour. Body:
 The same rules as a category: `name` is required, maximum 60 characters, and
 unique in the household ignoring case; `colour` is nullable and must match
 `^#[0-9a-fA-F]{6}$`. A null colour takes the theme's palette in the breakdown.
-Logos are uploaded on the web screen, not here — the same line the subscription
-resource draws around its own logo.
+A logo doesn't travel in this body; it has an endpoint of its own, below.
 
 Responses: `201`/`200`, `401`, `403`, `404` (on `PUT`), `422`.
 
@@ -568,13 +571,38 @@ Removes the method and unassigns it: every subscription paid with it gets a
 null `payment_method_id`. No subscription is deleted. Responses: `204`, `401`,
 `403`, `404`.
 
+#### `POST /api/v1/payment-methods/{id}/logo`
+
+Replace the method's logo. `multipart/form-data` with a `logo` part — PNG,
+JPEG, GIF or WebP, with the type read from the file's contents — exactly as for
+a [subscription's logo](#logos). Any earlier logo file is deleted.
+
+Returns the updated payment method. Responses: `200`, `400` (no `logo` part),
+`401`, `403`, `404`, `422` (not an accepted image, or too large).
+
+#### `DELETE /api/v1/payment-methods/{id}/logo`
+
+Remove the logo. Responses: `204`, `401`, `403`, `404`.
+
 #### `GET /api/v1/tags`
 
 The household's tags. Responses: `200`, `401`, `403`.
 
-**Tags have no create endpoint.** They are created by naming them in a
-subscription's `tags` array, exactly as in the web form, so that one place
-decides how they are deduplicated.
+#### `POST /api/v1/tags` · `PUT /api/v1/tags/{id}`
+
+Create, or rename. Body:
+
+```json
+{ "name": "Work" }
+```
+
+`name` is required, maximum 50 characters, and unique in the household
+ignoring case. "tv" and "TV" are one tag, the same rule a subscription's `tags`
+array follows, so a tag made here and a tag typed on a subscription can't end
+up as two. An existing name is refused with `422` rather than returned.
+Renaming changes the name on every subscription that carries the tag.
+
+Responses: `201`/`200`, `401`, `403`, `404` (on `PUT`), `422`.
 
 #### `DELETE /api/v1/tags/{id}`
 

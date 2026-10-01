@@ -45,6 +45,10 @@ final class ApiPermissionTest extends ApiTestCase
             ['POST', '/api/v1/payment-methods'],
             ['PUT', '/api/v1/payment-methods/1'],
             ['DELETE', '/api/v1/payment-methods/1'],
+            ['POST', '/api/v1/payment-methods/1/logo'],
+            ['DELETE', '/api/v1/payment-methods/1/logo'],
+            ['POST', '/api/v1/tags'],
+            ['PUT', '/api/v1/tags/1'],
             ['DELETE', '/api/v1/tags/1'],
         ];
     }

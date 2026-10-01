@@ -9,7 +9,7 @@ openapi: 3.0.3
 
 info:
   title: Renovo API
-  version: "1.0.0"
+  version: "1.1.0"
   description: |
     Read and write subscriptions, categories, payment methods, tags and attachments.
 
@@ -623,7 +623,9 @@ paths:
     post:
       tags: [Taxonomy]
       summary: Create a payment method.
-      description: Logos are uploaded on the web screen, not through the API.
+      description: |
+        A logo is uploaded separately, with
+        `POST /api/v1/payment-methods/{id}/logo`.
       requestBody:
         required: true
         content:
@@ -715,14 +717,70 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /api/v1/payment-methods/{id}/logo:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [Taxonomy]
+      summary: Replace the payment method's logo.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [logo]
+              properties:
+                logo:
+                  type: string
+                  format: binary
+                  description: PNG, JPEG, GIF or WebP. The type is read from the file, not its name.
+      responses:
+        "200":
+          description: The updated payment method.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/PaymentMethod"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+    delete:
+      tags: [Taxonomy]
+      summary: Remove the payment method's logo.
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /api/v1/tags:
     get:
       tags: [Taxonomy]
       summary: List tags.
       description: |
-        Tags have no create endpoint. They are created by naming them on a
-        subscription, exactly as in the web form, so there is one place that
-        decides how they are deduplicated.
+        A tag can be created here or by naming it in a subscription's `tags`
+        array. Both follow the same rule: names are compared ignoring case, so
+        "tv" and "TV" are one tag.
       responses:
         "200":
           description: The household's tags.
@@ -741,12 +799,84 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+    post:
+      tags: [Taxonomy]
+      summary: Create a tag.
+      description: An existing name, in any case, is refused with `422`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 50
+                  description: Unique in the household, ignoring case.
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Tag"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
   /api/v1/tags/{id}:
     parameters:
       - name: id
         in: path
         required: true
         schema: { type: integer }
+    put:
+      tags: [Taxonomy]
+      summary: Rename a tag.
+      description: |
+        Every subscription carrying the tag shows the new name. Changing only
+        the case of the tag's own name is allowed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 50
+                  description: Unique in the household, ignoring case.
+      responses:
+        "200":
+          description: The renamed tag.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Tag"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
     delete:
       tags: [Taxonomy]
       summary: Delete a tag.

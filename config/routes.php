@@ -748,8 +748,22 @@ return static function (App $app): void {
         $group->delete('/payment-methods/{id:[0-9]+}', [TaxonomyApiController::class, 'deletePaymentMethod'])
             ->add($requires(Permission::ManageCategories));
 
+        // Phase 30: a file does not travel in the JSON body, so the logo has a
+        // path of its own, as a subscription's does.
+        $group->post('/payment-methods/{id:[0-9]+}/logo', [TaxonomyApiController::class, 'uploadPaymentMethodLogo'])
+            ->add($requires(Permission::ManageCategories));
+
+        $group->delete('/payment-methods/{id:[0-9]+}/logo', [TaxonomyApiController::class, 'deletePaymentMethodLogo'])
+            ->add($requires(Permission::ManageCategories));
+
         $group->get('/tags', [TaxonomyApiController::class, 'tags'])
             ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post('/tags', [TaxonomyApiController::class, 'createTag'])
+            ->add($requires(Permission::ManageTags));
+
+        $group->put('/tags/{id:[0-9]+}', [TaxonomyApiController::class, 'updateTag'])
+            ->add($requires(Permission::ManageTags));
 
         $group->delete('/tags/{id:[0-9]+}', [TaxonomyApiController::class, 'deleteTag'])
             ->add($requires(Permission::ManageTags));
