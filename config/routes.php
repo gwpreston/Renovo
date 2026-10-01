@@ -269,6 +269,17 @@ return static function (App $app): void {
             ->setName('forecast')
             ->add($requires(Permission::ViewSubscriptions));
 
+        // Phase 31: the scenario planner. It writes nothing, so it needs no
+        // more than reading the forecast does — the selection route included,
+        // which is a POST only because the bulk bar carries a CSRF token.
+        $group->get('/forecast/scenario', [ForecastController::class, 'scenario'])
+            ->setName('forecast-scenario')
+            ->add($requires(Permission::ViewSubscriptions));
+
+        $group->post('/forecast/scenario/selection', [ForecastController::class, 'selection'])
+            ->setName('forecast-scenario-selection')
+            ->add($requires(Permission::ViewSubscriptions));
+
         // ------------------------------------------------------------------
         // Phase 6: the calendar, saved views and preferences
         // ------------------------------------------------------------------

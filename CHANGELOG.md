@@ -8,6 +8,30 @@ Before upgrading, **back up your database**, then run `vendor/bin/phinx migrate`
 
 ## [Unreleased]
 
+### Added
+
+- **Scenario planner** — a Scenario tab on the Forecast screen
+  (`/forecast/scenario`) answers "what if I cancelled these, and moved that one
+  to another plan?" before anything is changed. Set any running subscription to
+  Cancel or Change price (a new amount, and optionally a new billing cycle), and
+  it shows the monthly and yearly run-rate saving, the saving over the next 12
+  months charge by charge, and the date each saving starts — a charge a notice
+  period has already committed is named, never counted as saved. The scenario
+  lives in the address, so it can be bookmarked and works without script.
+  Reach it from **If you cancelled**, from **Plan a scenario** on the
+  subscriptions list's selection bar (open to every role that can read the
+  list) and from **What if I cancelled this?** on a subscription's cost page.
+  Each row links to the existing cancel action or price form, prefilled; the
+  planner itself changes nothing. *Phase 31.*
+
+### Fixed
+
+- **If you cancelled** on the Forecast screen no longer counts a charge that
+  cancelling today could not avoid. A subscription on a notice period whose
+  deadline for the next charge has passed was credited with that charge too;
+  its figure, and so possibly its place in the list, now leaves it out. *Phase
+  31.*
+
 ## [1.1.0] - 2026-10-01
 
 ### Added

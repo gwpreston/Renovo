@@ -8,6 +8,7 @@ use App\Domain\BillingCycle;
 use App\Domain\Entity\PriceChange;
 use App\Domain\Entity\Subscription;
 use App\Domain\Money;
+use App\Domain\Scenario;
 use App\Repository\PriceHistoryRepository;
 use App\Security\Scope;
 use App\Support\Clock;
@@ -130,10 +131,18 @@ final class ForecastService
     /**
      * Every individual charge expected in the horizon, in date order.
      *
+     * With a scenario, the same charges with the scenario laid over them —
+     * see `overlay()`. Nothing else differs, so the two lists can be compared
+     * charge for charge.
+     *
      * @return list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}>
      */
-    public function charges(Scope $scope, int $months = self::DEFAULT_MONTHS, ?int $forUserId = null): array
-    {
+    public function charges(
+        Scope $scope,
+        int $months = self::DEFAULT_MONTHS,
+        ?int $forUserId = null,
+        ?Scenario $scenario = null,
+    ): array {
         $today = $this->clock->today();
         $horizon = $today->modify(sprintf('+%d months', $months));
 
@@ -147,7 +156,12 @@ final class ForecastService
                 continue;
             }
 
-            foreach ($this->chargesFor($subscription, $today, $horizon, $scheduled) as $charge) {
+            $walked = $this->chargesFor($subscription, $today, $horizon, $scheduled);
+            if ($scenario !== null) {
+                $walked = $this->overlay($subscription, $walked, $scenario, $today, $horizon);
+            }
+
+            foreach ($walked as $charge) {
                 if ($forUserId !== null) {
                     $participants = $splits[$subscription->id] ?? [];
 
@@ -181,6 +195,29 @@ final class ForecastService
         );
 
         return $charges;
+    }
+
+    /**
+     * Charges cut to the horizon's months.
+     *
+     * The walk runs to the same day `$months` months on, and the months are
+     * this one and the ones after it; a charge in the first days of the month
+     * after the last is in none of them. Every figure that is "the next twelve
+     * months" is a sum over this list, so the Forecast screen and the planner
+     * agree to the minor unit.
+     *
+     * @param list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}> $charges
+     * @return list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}>
+     */
+    public function withinMonths(array $charges, int $months = self::DEFAULT_MONTHS): array
+    {
+        $last = $this->clock->today()->modify('first day of this month')
+            ->modify(sprintf('+%d months', $months))->setTime(0, 0);
+
+        return array_values(array_filter(
+            $charges,
+            static fn (array $charge): bool => $charge['date']->setTime(0, 0) < $last,
+        ));
     }
 
     /**
@@ -299,6 +336,67 @@ final class ForecastService
         );
 
         return $rows;
+    }
+
+    /**
+     * Lay a scenario over one subscription's charges.
+     *
+     * A cancellation removes every charge it can still avoid and keeps the
+     * ones it cannot: those before the first avoidable one, which a notice
+     * period has already committed (`Subscription::isChargeAvoidable()`).
+     *
+     * A change of price takes effect from the next charge, the earliest a
+     * provider would normally apply one. On the same cycle every charge is
+     * repriced where it falls. A change of cycle moves the dates, so the
+     * subscription is walked again — the same walk, on a copy with the new
+     * terms, starting at that next charge. Either way the new price stands for
+     * the whole horizon: a rise announced for the old plan is not the new
+     * plan's.
+     *
+     * @param list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}> $charges
+     * @return list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}>
+     */
+    private function overlay(
+        Subscription $subscription,
+        array $charges,
+        Scenario $scenario,
+        DateTimeImmutable $today,
+        DateTimeImmutable $horizon,
+    ): array {
+        if ($scenario->cancels($subscription->id)) {
+            return array_values(array_filter(
+                $charges,
+                static fn (array $charge): bool => !$subscription->isChargeAvoidable($charge['date'], $today),
+            ));
+        }
+
+        $change = $scenario->changeFor($subscription->id);
+        if ($change === null || $charges === []) {
+            return $charges;
+        }
+
+        $currentCycle = $subscription->isTrial
+            ? $subscription->billingCycleAfterConversion()
+            : $subscription->billingCycle;
+        $currentDays = $subscription->isTrial
+            ? $subscription->cycleDaysAfterConversion()
+            : $subscription->cycleDays;
+
+        $sameCycle = $change->cycle === null
+            || ($change->cycle === $currentCycle
+                && ($change->cycle !== BillingCycle::CustomDays || $change->cycleDays === $currentDays));
+
+        if ($sameCycle) {
+            return array_map(
+                static fn (array $charge): array => ['amount' => $change->price] + $charge,
+                $charges,
+            );
+        }
+
+        $copy = $subscription->withTerms($change->price, $change->cycle, $change->cycleDays, $charges[0]['date']);
+
+        // No scheduled changes: the new plan's price is the one given.
+        return $this->chargesFor($copy, $today, $horizon, []);
     }
 
     /**

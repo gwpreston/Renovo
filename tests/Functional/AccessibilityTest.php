@@ -157,6 +157,10 @@ final class AccessibilityTest extends DatabaseTestCase
             ['/budgets'],
             ['/budgets/new'],
             ['/forecast'],
+            ['/forecast/scenario'],
+            // With a row in the scenario, so the results panel's rows are
+            // drawn too.
+            ['/forecast/scenario?cancel[]={id}&change[{id}][price]=1.00&change[{id}][cycle]=yearly'],
             ['/cancellations'],
             ['/stats'],
             ['/profile'],

@@ -185,6 +185,64 @@ final class Subscription
     }
 
     /**
+     * Whether cancelling today still avoids a charge falling on `$charge`.
+     *
+     * It does when there is no notice period, or when the notice deadline
+     * before that charge is today or later. Every charge it does not avoid is
+     * committed: it happens whatever is done now. The deadline only moves
+     * forward as the charge does, so the committed charges are always the
+     * first few and never one in the middle.
+     *
+     * One rule, read by the scenario planner and by "If you cancelled", so the
+     * two cannot disagree about which charges a cancellation saves.
+     */
+    public function isChargeAvoidable(DateTimeImmutable $charge, DateTimeImmutable $today): bool
+    {
+        $deadline = $this->noticePeriod->deadlineBefore($charge);
+
+        return $deadline === null || $deadline->setTime(0, 0) >= $today->setTime(0, 0);
+    }
+
+    /**
+     * A copy on other terms from its next charge: a price, and optionally a
+     * billing cycle. What a scenario's "change price" means.
+     *
+     * A running trial keeps its trial and changes what it converts to, since
+     * the conversion is its next charge. Anything else is billed from
+     * `$from` — its next charge — on the new cycle, anchored on that day when
+     * the cycle changes and on its own anchor when it does not.
+     */
+    public function withTerms(
+        Money $price,
+        ?BillingCycle $cycle,
+        ?int $cycleDays,
+        DateTimeImmutable $from,
+    ): self {
+        if ($this->isTrial) {
+            $cycle ??= $this->billingCycleAfterConversion();
+
+            return $this->with([
+                'convertsToPrice' => $price,
+                'convertsToBillingCycle' => $cycle,
+                'convertsToCycleDays' => $cycle === BillingCycle::CustomDays
+                    ? ($cycleDays ?? $this->cycleDaysAfterConversion())
+                    : null,
+            ]);
+        }
+
+        $changesCycle = $cycle !== null && $cycle !== $this->billingCycle;
+        $cycle ??= $this->billingCycle;
+
+        return $this->with([
+            'price' => $price,
+            'billingCycle' => $cycle,
+            'cycleDays' => $cycle === BillingCycle::CustomDays ? ($cycleDays ?? $this->cycleDays) : null,
+            'nextPaymentDate' => $from,
+            'anchorDay' => $changesCycle ? (int) $from->format('j') : $this->anchorDay,
+        ]);
+    }
+
+    /**
      * This subscription's own reminder lead times, or null to use the user's.
      *
      * An empty string is not the same as null and the difference is the point:
@@ -298,6 +356,17 @@ final class Subscription
         $months = (int) $since->setTime(0, 0)->diff($today->setTime(0, 0))->format('%r%a');
 
         return max(1, (int) round($months / 30.44));
+    }
+
+    /**
+     * A copy with some properties replaced. The constructor's parameters are
+     * its properties, so the copy is built through it and stays readonly.
+     *
+     * @param array<string, mixed> $changes
+     */
+    private function with(array $changes): self
+    {
+        return new self(...array_merge(get_object_vars($this), $changes));
     }
 
     private function daysUntil(?DateTimeImmutable $date, DateTimeImmutable $today): ?int

@@ -9,6 +9,7 @@ use App\Repository\MembershipRepository;
 use App\Security\SessionInterface;
 use App\Service\AttachmentService;
 use App\Service\PriceHistoryService;
+use App\Service\ScenarioService;
 use App\Service\SplitService;
 use App\Service\SubscriptionService;
 use App\Service\UsageService;
@@ -37,6 +38,7 @@ final class SubscriptionMoneyController extends Controller
         private readonly UsageService $usage,
         private readonly MembershipRepository $memberships,
         private readonly AttachmentService $attachments,
+        private readonly ScenarioService $scenarios,
     ) {
         parent::__construct($view, $session, $translator);
     }
@@ -68,6 +70,7 @@ final class SubscriptionMoneyController extends Controller
                 ? $this->memberships->findMembersOfHousehold((int) $scope->householdId)
                 : [],
             'max_rating' => UsageService::MAX_RATING,
+            'can_plan' => $this->scenarios->isPlannable($subscription),
             'attachments' => $this->attachments->forSubscription($scope, $subscription->id),
             'errors' => [],
         ]);

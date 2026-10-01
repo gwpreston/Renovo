@@ -8,6 +8,7 @@ use App\Domain\Entity\Subscription;
 use App\Domain\Money;
 use App\Domain\Rounding;
 use App\Security\Scope;
+use App\Support\Clock;
 use App\Support\CssPercent;
 use App\Support\DateFormatter;
 use App\Support\MoneyFormatter;
@@ -49,6 +50,7 @@ final class ForecastScreenService
         private readonly InstanceSettingsService $settings,
         private readonly MoneyFormatter $money,
         private readonly DateFormatter $dates,
+        private readonly Clock $clock,
     ) {
     }
 
@@ -71,15 +73,9 @@ final class ForecastScreenService
         $charges = $this->forecast->charges($scope, $horizon, $forUserId);
         $months = $this->forecast->monthsOf($charges, $horizon);
 
-        // The walk runs to the same day twelve months on, and the months are
-        // this one and the eleven after it; a charge in the first days of the
-        // thirteenth month is not in the chart, so it is in none of the
-        // figures either.
-        $inWindow = array_flip(array_column($months, 'month'));
-        $charges = array_values(array_filter(
-            $charges,
-            static fn (array $charge): bool => isset($inWindow[$charge['date']->format('Y-m')]),
-        ));
+        // A charge in the first days of the thirteenth month is not in the
+        // chart, so it is in none of the figures either.
+        $charges = $this->forecast->withinMonths($charges, $horizon);
 
         $chart = $this->chart($months);
 
@@ -229,7 +225,10 @@ final class ForecastScreenService
      *
      * The saving is the sum of the charges the forecast expects — not the
      * yearly run-rate — so a price rise announced for June counts from June,
-     * and a trial counts only once it converts. Ranked on that sum converted
+     * and a trial counts only once it converts. A charge a notice period has
+     * already committed is not a saving, and is left out: cancelling today
+     * would not avoid it (`Subscription::isChargeAvoidable()`, the planner's
+     * rule too). Ranked on that sum converted
      * into the base currency, and shown in the currency actually charged. A
      * subscription whose currency has no rate cannot be ranked, so it is left
      * out and counted. One-off purchases are not listed: there is nothing to
@@ -241,12 +240,16 @@ final class ForecastScreenService
     private function ifCancelled(array $charges): array
     {
         $base = $this->settings->baseCurrency();
+        $today = $this->clock->today();
 
         /** @var array<int, array{subscription: Subscription, by_currency: array<string, int>, count: int}> $grouped */
         $grouped = [];
         foreach ($charges as $charge) {
             $subscription = $charge['subscription'];
-            if (!$subscription->type->countsTowardsRecurringTotals()) {
+            if (
+                !$subscription->type->countsTowardsRecurringTotals()
+                || !$subscription->isChargeAvoidable($charge['date'], $today)
+            ) {
                 continue;
             }
 

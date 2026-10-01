@@ -39,15 +39,20 @@
             A plain POST rather than an htmx swap: a bulk edit changes rows that
             may drop out of the current filter, so a full reload is the honest
             response.
-        #}
-        {% if can_bulk %}
-            <form id="bulk-form" class="bulk-bar" method="post" action="/subscriptions/bulk" data-bulk-bar>
-                {{ csrf_field() }}
-                <p class="bulk-count" data-bulk-count aria-live="polite"
-                   data-count-label="{{ t('subscriptions_list.selected_count', {'count': '%d'}) }}">
-                    {{ t('subscriptions_list.with_selected') }}
-                </p>
 
+            Plan a scenario is offered to everybody who can read the list: it
+            writes nothing, and opens the planner with the ticked rows set to
+            Cancel. A member who cannot bulk edit gets the bar with that alone.
+        #}
+        <form id="bulk-form" class="bulk-bar" method="post"
+              action="{{ can_bulk ? '/subscriptions/bulk' : '/forecast/scenario/selection' }}" data-bulk-bar>
+            {{ csrf_field() }}
+            <p class="bulk-count" data-bulk-count aria-live="polite"
+               data-count-label="{{ t('subscriptions_list.selected_count', {'count': '%d'}) }}">
+                {{ t('subscriptions_list.with_selected') }}
+            </p>
+
+            {% if can_bulk %}
                 <label for="bulk-action" class="visually-hidden">{{ t('subscriptions_list.with_selected') }}</label>
                 <select id="bulk-action" name="action">
                     <option value="category">{{ t('subscriptions_list.set_category') }}</option>
@@ -83,21 +88,23 @@
                 </select>
 
                 <button type="submit" class="button">{{ t('action.apply') }}</button>
+            {% endif %}
+            <button type="submit" class="button button-quiet"
+                    formaction="/forecast/scenario/selection">{{ t('subscriptions_list.plan_scenario') }}</button>
+            {% if can_bulk %}
                 <p class="hint bulk-hint">{{ t('subscriptions_list.convert_note') }}</p>
-            </form>
-        {% endif %}
+            {% endif %}
+        </form>
 
         <div class="table-scroll subscription-table">
             <table class="table">
                 <thead>
                 <tr>
-                    {% if can_bulk %}
-                        <th scope="col" class="select-column">
-                            <input type="checkbox" data-select-all hidden
-                                   aria-label="{{ t('subscriptions_list.select_all') }}">
-                            <span class="visually-hidden">{{ t('subscriptions_list.select') }}</span>
-                        </th>
-                    {% endif %}
+                    <th scope="col" class="select-column">
+                        <input type="checkbox" data-select-all hidden
+                               aria-label="{{ t('subscriptions_list.select_all') }}">
+                        <span class="visually-hidden">{{ t('subscriptions_list.select') }}</span>
+                    </th>
                     <th scope="col">{{ list.sort_link('name', t('subscriptions_list.service'), filter) }}</th>
                     <th scope="col">{{ t('field.category') }}</th>
                     <th scope="col">{{ t('subscriptions_form.paid_by') }}</th>
@@ -112,13 +119,11 @@
                 {% for row in rows %}
                     {% set subscription = row.subscription %}
                     <tr class="{{ subscription.isActive ? 'is-running' : 'is-paused' }}">
-                        {% if can_bulk %}
-                            <td class="select-column">
-                                <input type="checkbox" name="ids[]" value="{{ subscription.id }}" form="bulk-form"
-                                       data-bulk-select
-                                       aria-label="{{ t('subscriptions_list.select_one', {'name': subscription.name}) }}">
-                            </td>
-                        {% endif %}
+                        <td class="select-column">
+                            <input type="checkbox" name="ids[]" value="{{ subscription.id }}" form="bulk-form"
+                                   data-bulk-select
+                                   aria-label="{{ t('subscriptions_list.select_one', {'name': subscription.name}) }}">
+                        </td>
                         <td>{{ list.service(row) }}</td>
                         <td>
                             {% if subscription.categoryName %}

@@ -3,9 +3,10 @@
     every scheduled one, with the step from the one before it. Shared by the
     edit page, where `editable` adds the schedule-a-change form, and the cost
     page, which is the read-only view. `return_to` says which of the two the
-    schedule form comes back to.
+    schedule form comes back to. `schedule`, when the scenario planner sent
+    the member here, fills that form in: the new price, from the next charge.
 #}
-<section class="card price-history" aria-labelledby="price-history-heading">
+<section class="card price-history" id="price-history" aria-labelledby="price-history-heading">
     <h2 id="price-history-heading">{{ t('subscriptions_money.price_history') }}</h2>
     <p class="muted">{{ t('subscriptions_money.history_note') }}</p>
 
@@ -51,6 +52,7 @@
                     <label for="scheduled_price">{{ t('subscriptions_money.new_price') }}</label>
                     <div class="input-group">
                         <input type="text" id="scheduled_price" name="price" inputmode="decimal"
+                               value="{{ schedule.price|default('') }}"
                                placeholder="{{ 12.99|decimal(2) }}" required>
                         <select name="currency" aria-label="{{ t('field.currency') }}">
                             <option value="{{ subscription.price.currency }}">{{ subscription.price.currency }}</option>
@@ -60,7 +62,8 @@
 
                 <div class="field">
                     <label for="effective_from">{{ t('subscriptions_money.starts_on') }}</label>
-                    <input type="date" id="effective_from" name="effective_from" required>
+                    <input type="date" id="effective_from" name="effective_from"
+                           value="{{ schedule.effective_from|default('') }}" required>
                 </div>
             </div>
 

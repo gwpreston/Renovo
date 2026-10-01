@@ -1,130 +1,178 @@
 # PHASE.md — current build state
 
 Single source of truth for what to build **right now**. SPEC.md = full plan ·
-CLAUDE.md = standing rules · ROADMAP.md = candidates after v1. When this phase
-is done, archive this file as `docs/phases/PHASE-30.md` and replace it.
+build-guide = file map · CLAUDE.md = standing rules. When you start this phase,
+copy this file to `docs/phases/PHASE.md`.
 
-# Phase 30 — API catch-up: tags and payment-method logos
+# Phase 32 — billing every N weeks, months or years
 
-The first phase after v1. It closes two gaps where `/api/v1` falls short of the
-web interface **and its stated reason for doing so no longer holds**:
+Renovo bills weekly, monthly, quarterly, yearly or every N days. That leaves out
+cycles people really pay on: six-monthly car insurance, a water bill every two
+months, a two-yearly membership, a fortnightly cleaner. The only way to enter
+those today is a custom number of days, and 182 days is not six months — it
+drifts off the anchor day and the forecast puts the charge in the wrong month
+within a couple of years.
 
-- **Tags can be listed and deleted but not created or renamed.** The API says
-  tags are made only by naming them on a subscription. That was true until
-  Phase 28 gave Settings a tag section with its own create and rename routes
-  (`POST /tags`, `POST /tags/{id}`). A client can now do less with a tag than a
-  member in a browser can.
-- **Payment-method logos can't be uploaded or cleared.** The API leaves them out
-  as "the same line the subscription resource draws around its own logo", but
-  subscriptions *do* have `POST`/`DELETE /subscriptions/{id}/logo`. The reason
-  contradicts the code next to it.
-
-Everything here is additive: no existing request or response changes shape, so
-no client breaks. It is a v1.1 candidate.
-
-ROADMAP.md ranks encrypting notification channel secrets first. This phase goes
-ahead of it at the owner's request, and that item keeps its ranking for the
-phase after this one.
+This phase adds an **interval** to the calendar cycles: every *N* weeks, months
+or years. Quarterly stays as it is, so no stored row and no historical figure
+changes.
 
 ## Depends on
 
-- **Phase 5** — the versioned API, tokens, the OpenAPI bijection test and the
-  prose reference's coverage test.
-- **Phase 17** — payment methods and their logos (`LogoStorage`).
-- **Phase 28** — `TagService::create` and `TagService::rename`, which the web's
-  tag section already calls.
+- **Phase 2** — `BillingCycle` normalisation (integer-only, 365.25-day year),
+  `advance()` and `addMonths()` with the anchor day, trial conversion to a
+  cycle (`converts_to_billing_cycle`).
+- **Phase 5** — import presets and `RowTranslator::cycle()`; export and backup.
+- **Phase 5 / API** — `SubscriptionPayload`, `openapi/openapi.yaml`,
+  `docs/api.md`.
+- **Phase 11** — the forecast, which walks billing dates with `advance()`.
+
+## The model
+
+- A new `cycle_interval` (positive integer, default **1**) qualifies
+  `billing_cycle`.
+- It applies to **Weekly**, **Monthly** and **Yearly**. **Quarterly** keeps
+  interval 1 (it *is* every three months, and is kept so its label and existing
+  rows are untouched). **CustomDays** keeps interval 1 — its count is already
+  the interval.
+- Bounds: weekly 1–52, monthly 1–24, yearly 1–10. Beyond those, custom days or
+  a one-off is the honest model.
+
+### Normalisation
+
+Still integer-only, through `Rounding`:
+
+| Cycle | Annual minor units |
+| --- | --- |
+| every N weeks | `multiplyDivide(price, 36525, 7 × 100 × N)` |
+| every N months | `multiplyDivide(price, 12, N)` |
+| every N years | `divide(price, N)` |
+
+`monthlyMinor()` stays derived from the annual figure, so the monthly and yearly
+columns of a report still agree. With N = 1 every result is identical to
+today's — asserted by test, because changing it would change every historical
+statistic.
+
+### Advancing
+
+`advance()` takes the interval: N × 7 days, `addMonths(N)`, `addMonths(12N)`,
+each with the anchor day restored as today.
+
+### Last day of the month
+
+A **"On the last day of the month"** option on the form, for monthly and
+N-monthly cycles, stores `anchor_day = 31`. `addMonths()` already clamps to the
+month's length, so this needs no new logic — only a way to choose it. Without
+it, a subscription first billed on 30 April anchors to the 30th and is billed on
+30 May, not 31 May.
 
 ## In scope this phase (build ONLY these)
 
-| Method | Path | Permission | Returns |
-| --- | --- | --- | --- |
-| `POST` | `/api/v1/tags` | `tag.manage` | `201` + the tag |
-| `PUT` | `/api/v1/tags/{id}` | `tag.manage` | `200` + the tag |
-| `POST` | `/api/v1/payment-methods/{id}/logo` | `category.manage` | `200` + the method |
-| `DELETE` | `/api/v1/payment-methods/{id}/logo` | `category.manage` | `204` |
+### A. Domain and persistence
 
-- **Tags** take `{ "name": "…" }` and go through the same `TagService` methods
-  as the web form. Its rules apply unchanged: required, at most 50 characters,
-  and unique in the household ignoring case. "tv" and "TV" are one tag, as they
-  are when typed on a subscription. A rename renames the tag on every
-  subscription that carries it.
-- **Logos** are `multipart/form-data` with a `logo` part, like the subscription
-  logo: PNG, JPEG, GIF or WebP, with the type read from the file's contents.
-  Uploading replaces any earlier logo and deletes its file. Clearing removes the
-  logo and its file.
-- The OpenAPI document and `docs/api.md` describe all four, and the out-of-date
-  "no create endpoint" and "logos are uploaded on the web screen" text is
-  removed from the spec, the prose reference and the controller.
+- `BillingCycle::annualMinor()`, `monthlyMinor()` and `advance()` take an
+  interval (default 1); `assertInterval()` enforces the bounds per cycle.
+- `Subscription` gains `cycleInterval` and `convertsToCycleInterval`.
+- `SubscriptionRepository`, `SubscriptionFormService`, `SubscriptionService`,
+  `TrialService` (conversion to an N-cycle), `ForecastService`,
+  `CalendarService` and `CalendarFeedService` carry it through. Every caller of
+  `annualMinor()` / `monthlyMinor()` / `advance()` passes it — found by
+  PHPStan, since the parameter is added before the default is relied on.
+
+### B. The form
+
+- The billing cycle control becomes **Every [N] [weeks / months / years]**, plus
+  **Quarterly** and **Custom days** as today. N defaults to 1 and is hidden for
+  Quarterly and Custom days.
+- The "last day of the month" option, as above.
+- The cadence label everywhere a cycle is shown: "Every 6 months",
+  "Every 2 years", "Fortnightly" (weekly × 2); unchanged for N = 1.
+
+### C. Import, export, backup and API
+
+- **Import fix**: `RowTranslator::cycle()` currently turns "6 months" into
+  **every 6 days** — the digit pattern matches the number and ignores the unit.
+  It now reads the unit: "6 months" → monthly × 6, "2 years" → yearly × 2,
+  "2 weeks" and "fortnightly" → weekly × 2, "N days" → custom days as before.
+  The Wallos preset maps its cycle and frequency columns to cycle and interval.
+- **Export** (CSV and JSON) and **backup** include `cycle_interval`; a backup
+  without it restores with 1.
+- **API**: `cycle_interval` and `converts_to_cycle_interval` on the subscription
+  resource, read and write, documented in `openapi/openapi.yaml` and
+  `docs/api.md`. Omitted on write means 1.
 
 ## Data-model changes
 
-**None.**
+Migrations, sequenced after the last existing one, each with an explicit
+`down()`, verified on PostgreSQL and MySQL:
+
+1. `add_cycle_interval_to_subscriptions` — `cycle_interval` smallint, not null,
+   default `1`.
+2. `add_converts_to_cycle_interval_to_subscriptions` — nullable smallint.
+
+No new table. No data step: every existing row is interval 1, which is what it
+already means.
 
 ## Explicitly out of scope (leave clean seams, do NOT stub)
 
-- Shared-cost splits, scheduled price changes and the usage counter. These are
-  still deferred for the reasons recorded in Phase 5.
-- Budgets, price history, forecasts and statistics as API resources.
-- Setting a payment method's `icon` through the API. Today it is set only when
-  defaults are seeded.
-- Bulk edit, saved views, members, notifications, import, backup and instance
-  administration.
-
-Each of these is listed in ROADMAP.md under **API**.
+- **Business-day adjustment** (moving a charge off a weekend or bank holiday).
+  It shifts dates by a day or two and never changes a total, and it would need
+  bank-holiday data bundled per locale under the offline rule.
+- **Nth weekday** rules ("the last Friday of the month").
+- Converting existing custom-day rows (e.g. 182 days) to an interval. They are
+  left alone; a user can edit one.
+- Any new cadence colour or chart series — an N-cycle uses its unit's.
 
 ## Decisions & assumptions (confirm or correct before build)
 
-- **No new permission.** Tags use `tag.manage` and payment-method logos use
-  `category.manage`, the same permissions their web routes use. The role matrix
-  in `docs/api.md` doesn't change.
-- **The logo replace is a service method** (`PaymentMethodService::replaceLogo`)
-  rather than storage calls in the controller. This keeps the rule "logic in
-  services", and leaves the web's `update()` path as it is.
-- **An existing tag name is a `422`, not a `200` with the existing tag.** An
-  idempotent "create or return" would differ from the web form, which refuses
-  a duplicate. A client that wants that behaviour can `GET /tags` first.
+- **Quarterly stays a stored value**, not migrated to monthly × 3, so no row, no
+  saved view filter and no API client sees a change.
+- **Interval bounds** as above. Say if you want wider ones.
+- **Fortnightly imports as weekly × 2** rather than custom 14 days. The dates
+  are identical; the label is better.
+- **The import fix is a behaviour change**: a file that previously imported
+  "6 months" as six days now imports it correctly. Noted in the changelog.
 
 ## Status
 
-- [x] Routes for the four endpoints, each naming its permission
-- [x] `TaxonomyApiController`: tag create and rename, payment-method logo upload
-      and clear; the stale docblock rewritten
-- [x] `PaymentMethodService::replaceLogo`
-- [x] `openapi/openapi.yaml` and `docs/api.md` describe all four; stale text gone
-- [x] Tests: contract, Viewer and Contributor 403, cross-household 404,
-      duplicate 422, logo type rejection (`ApiTaxonomyTest`, `ApiPermissionTest`)
-- [x] `CHANGELOG.md` Unreleased entry; ROADMAP.md updated
-- [ ] `composer check` and the API coverage tests green on both engines —
-      Postgres green; MySQL leg still to run
-
-## Decisions as built
-
-- **The OpenAPI document is version 1.1.0.** The change is additive, so it is a
-  minor version; the path prefix stays `/api/v1`.
-- **A `logo` part with no file in it is a `422`**, not a `200` that changes
-  nothing. A missing part is still a `400`, as for a subscription's logo.
-- **`ApiTestCase::containerOverrides()`** lets an API test replace a container
-  entry. The logo tests use it to write into a temporary directory instead of
-  `public/assets/logos`.
+- [ ] `BillingCycle` interval: normalisation, advance, bounds
+- [ ] `Subscription` and trial conversion carry the interval
+- [ ] Repository, form, services, forecast and calendar pass it through
+- [ ] Form: Every N unit, last day of the month, cadence labels
+- [ ] Import unit parsing and the Wallos frequency mapping; export, backup
+- [ ] API resource, OpenAPI and `docs/api.md`
+- [ ] Migrations on both engines
+- [ ] New strings in `translations/en.php`
+- [ ] `composer check`, `i18n:check`, offline guard green on both engines
 
 ## Definition of done
 
-An API client can do everything with tags and payment-method logos that the
-Settings page can. Every new route names its permission, and roles and isolation
-are enforced through the same scoping layer as the web interface. The spec, the
-prose reference and the route table agree, and the gates pass on Postgres and
-MySQL. Then archive this file and start the next phase.
+Every-N-weeks, -months and -years subscriptions can be created, edited,
+imported, exported, restored and read through the API; they normalise and
+advance correctly with no drift off the anchor day; every existing row's figures
+are unchanged to the minor unit; the gates pass on both engines. Then update
+`PHASE.md` to the next phase.
 
 ## Tests
 
-- Creating a tag returns `201` and the tag. A name that differs from an
-  existing one only in case returns `422`.
-- Renaming a tag returns `200`, and a subscription carrying it shows the new
-  name.
-- A Viewer gets `403` on all four routes. A Contributor gets `403` on all four,
-  since neither permission is a Contributor's.
-- Another household's tag or payment-method id returns `404`.
-- Uploading a PNG returns `200` with `logo_path` set. A non-image upload returns
-  `422`, and a request with no `logo` part returns `400`.
-- Clearing returns `204`, after which `logo_path` is null and the file is gone.
-- `OpenApiCoverageTest` and `ApiDocCoverageTest` pass.
+- With interval 1, every cycle's `annualMinor()`, `monthlyMinor()` and
+  `advance()` equal the current results (the existing billing-normalisation
+  suite passes unchanged).
+- Monthly × 6 at £180.00: annual £360.00, monthly £30.00; advancing from
+  31 August gives 28/29 February then 31 August.
+- Yearly × 2 at £50.00: annual £25.00; advancing from 29 February 2028 gives
+  28 February 2030 then 29 February 2032.
+- Weekly × 2 equals custom 14 days for dates and annual figure.
+- `anchor_day = 31` on monthly: 31 Jan → 28/29 Feb → 31 Mar → 30 Apr → 31 May.
+- An interval outside its bounds is a validation error, not a clamp.
+- A trial converting to monthly × 2 produces its first charge on the
+  conversion date and the next one two months later.
+- The forecast places a six-monthly charge in the right two months each year
+  for the whole horizon.
+- Import: "6 months" → monthly × 6; "2 years" → yearly × 2; "fortnightly" →
+  weekly × 2; "45 days" and "45" → custom 45 days; an unrecognised value →
+  monthly, shown in the preview.
+- Export → import round-trips the interval; a backup without the column
+  restores with 1.
+- The API rejects an interval on Quarterly or Custom days, and a missing one
+  means 1. `OpenApiCoverageTest` and `ApiDocCoverageTest` pass.
