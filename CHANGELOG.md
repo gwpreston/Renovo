@@ -8,6 +8,8 @@ Before upgrading, **back up your database**, then run `vendor/bin/phinx migrate`
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-01
+
 ### Added
 
 - **API** — tags can be created (`POST /api/v1/tags`) and renamed
@@ -66,5 +68,6 @@ recurring bills. Requires PHP 8.4+ and PostgreSQL or MySQL/MariaDB.
   explicit rollbacks, and sample data with a second household member and a
   year of history. The default port is 9090.
 
-[Unreleased]: https://github.com/gwpreston16/Renovo/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/gwpreston16/Renovo/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/gwpreston16/Renovo/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/gwpreston16/Renovo/releases/tag/v1.0.0
