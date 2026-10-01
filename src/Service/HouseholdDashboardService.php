@@ -244,7 +244,11 @@ final class HouseholdDashboardService
 
             $price = $trial->priceAfterConversion();
             $byCurrency[$price->currency] = ($byCurrency[$price->currency] ?? 0)
-                + $cycle->monthlyMinor($price->amountMinor, $trial->cycleDaysAfterConversion());
+                + $cycle->monthlyMinor(
+                    $price->amountMinor,
+                    $trial->cycleDaysAfterConversion(),
+                    $trial->cycleIntervalAfterConversion(),
+                );
         }
         ksort($byCurrency);
 

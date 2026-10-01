@@ -326,8 +326,9 @@ final class ForecastScreenService
                 'subscription' => $subscription,
                 'date' => $charge['date'],
                 'amount' => $charge['amount'],
-                'cycle_key' => $subscription->billingCycleAfterConversion()?->labelKey(),
+                'cycle_value' => $subscription->billingCycleAfterConversion()?->value,
                 'cycle_days' => $subscription->cycleDaysAfterConversion(),
+                'cycle_interval' => $subscription->cycleIntervalAfterConversion(),
                 'kept' => $this->totalsList($byCurrency),
             ];
         }

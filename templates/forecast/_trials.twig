@@ -25,8 +25,8 @@
                     </span>
                     <span class="forecast-row-detail muted">
                         {{ t('forecast.trial_converts_on', {'date': trial.date|local_date('d MMM')}) }}
-                        {% if trial.cycle_key is not null %}
-                            · {{ t(trial.cycle_key, {'days': trial.cycle_days}) }}
+                        {% if trial.cycle_value is not null %}
+                            · {{ cycle_label(trial.cycle_value, trial.cycle_days, trial.cycle_interval) }}
                         {% endif %}
                     </span>
                     <span class="forecast-row-figure">

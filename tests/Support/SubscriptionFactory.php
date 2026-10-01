@@ -59,6 +59,8 @@ final class SubscriptionFactory
         ?DateTimeImmutable $cancelledAt = null,
         Visibility $visibility = Visibility::Household,
         ?string $plan = null,
+        int $cycleInterval = 1,
+        ?int $convertsToCycleInterval = null,
     ): Subscription {
         return new Subscription(
             id: $id,
@@ -100,6 +102,8 @@ final class SubscriptionFactory
             visibility: $visibility,
             cancelledAt: $cancelledAt,
             plan: $plan,
+            cycleInterval: $cycleInterval,
+            convertsToCycleInterval: $convertsToCycleInterval,
         );
     }
 }

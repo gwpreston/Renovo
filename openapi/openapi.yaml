@@ -9,7 +9,7 @@ openapi: 3.0.3
 
 info:
   title: Renovo API
-  version: "1.1.0"
+  version: "1.2.0"
   description: |
     Read and write subscriptions, categories, payment methods, tags and attachments.
 
@@ -1102,6 +1102,19 @@ components:
           minimum: 1
           maximum: 3650
           description: Required when billing_cycle is custom_days.
+        cycle_interval:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 52
+          default: 1
+          description: |
+            Every N of the cycle's unit: monthly with 6 is every six months,
+            weekly with 2 is fortnightly. Weekly takes 1–52, monthly 1–24 and
+            yearly 1–10; quarterly and custom_days take only 1, and any other
+            value is a 422 rather than a clamp. Omitted or null is 1 on a new
+            subscription; on a PUT that keeps the same billing_cycle, an
+            absent key keeps the current interval.
         next_payment_date:
           type: string
           format: date
@@ -1130,6 +1143,15 @@ components:
           nullable: true
           enum: [weekly, monthly, quarterly, yearly, custom_days]
         converts_to_cycle_days: { type: integer, nullable: true }
+        converts_to_cycle_interval:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 52
+          description: |
+            The interval of the cycle the trial converts to, bounded as
+            cycle_interval, and kept the same way when a PUT omits it. Null
+            when it converts to the cycle it already has.
         is_active:
           type: boolean
           default: true
@@ -1190,7 +1212,11 @@ components:
             anchor_day:
               type: integer
               nullable: true
-              description: The day of the month billing returns to after a short month.
+              description: |
+                The day of the month billing returns to after a short month.
+                31 on a monthly subscription means the last day of every
+                month, as the web form's "On the last day of the month" sets
+                it; a PUT that leaves the payment date on a month end keeps it.
             category_name: { type: string, nullable: true }
             payment_method_name: { type: string, nullable: true }
             split_mode: { type: string }

@@ -16,10 +16,12 @@ use App\Security\Scope;
 use App\Security\SessionInterface;
 use App\Domain\TokenAbility;
 use App\Service\ApiTokenService;
+use App\Service\ImportService;
 use App\Service\InstanceSettingsService;
 use App\Service\ValidationException;
 use App\Tests\Integration\DatabaseTestCase;
 use App\Tests\Support\ArraySession;
+use App\Tests\Support\FakeUpload;
 use App\Tests\Support\RecordingMailer;
 use DateTimeImmutable;
 use Psr\Container\ContainerInterface;
@@ -364,6 +366,41 @@ final class InteroperabilityPagesTest extends DatabaseTestCase
             $response->getStatusCode(),
             sprintf('%s %s must reject a request with no CSRF token.', $method, $path),
         );
+    }
+
+    public function testThePreviewNamesEachRowsCycleAsItWillBeImported(): void
+    {
+        $this->signIn($this->ownerId);
+
+        $container = $this->app->getContainer();
+        self::assertNotNull($container);
+        $imports = $container->get(ImportService::class);
+
+        $id = $imports->stage(FakeUpload::of(
+            "Name,Price,Billing cycle\nInsurance,180.00,6 months\nCleaner,40.00,fortnightly\n"
+            . "Water,45.00,45 days\nMystery,5.00,whenever\n",
+            'cycles.csv',
+        ));
+        $this->session->set('import_id', $id);
+
+        try {
+            $response = $this->request('POST', '/import/preview', ['mapping' => [
+                'name' => 'Name',
+                'price' => 'Price',
+                'billing_cycle' => 'Billing cycle',
+            ]]);
+            self::assertSame(200, $response->getStatusCode());
+
+            $html = (string) $response->getBody();
+            self::assertStringContainsString('<td>Every 6 months</td>', $html);
+            self::assertStringContainsString('<td>Fortnightly</td>', $html);
+            self::assertStringContainsString('<td>Every 45 days</td>', $html);
+            // The value nothing recognised, shown as the guess it became.
+            self::assertStringContainsString('<td>Monthly</td>', $html);
+        } finally {
+            $imports->discard($id);
+            FakeUpload::cleanUp();
+        }
     }
 
     private function tokenService(): ApiTokenService

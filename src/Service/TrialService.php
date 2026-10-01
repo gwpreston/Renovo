@@ -96,9 +96,18 @@ final class TrialService
         $price = $trial->priceAfterConversion();
         $cycle = $trial->billingCycleAfterConversion();
         $cycleDays = $trial->cycleDaysAfterConversion();
+        $interval = $trial->cycleIntervalAfterConversion();
 
-        $this->db->transactional(function () use ($scope, $trial, $trialEnd, $price, $cycle, $cycleDays): void {
-            $this->subscriptions->convertTrial($scope, $trial->id, $cycle, $cycleDays, $trialEnd);
+        $this->db->transactional(function () use (
+            $scope,
+            $trial,
+            $trialEnd,
+            $price,
+            $cycle,
+            $cycleDays,
+            $interval,
+        ): void {
+            $this->subscriptions->convertTrial($scope, $trial->id, $cycle, $cycleDays, $interval, $trialEnd);
 
             // Dated to the trial's last day, not to today. If nobody opened the
             // application for a fortnight, the conversion still happened when

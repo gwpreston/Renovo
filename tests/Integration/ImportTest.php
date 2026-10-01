@@ -308,6 +308,105 @@ final class ImportTest extends DatabaseTestCase
         );
     }
 
+    /**
+     * The interval survives each of the three ways out and back in: the
+     * API's representation, and the list's CSV and JSON.
+     *
+     * @return array<string, array{string}>
+     */
+    public static function intervalRoundTrips(): array
+    {
+        return ['renovo' => ['renovo'], 'csv' => ['csv'], 'json' => ['json']];
+    }
+
+    /**
+     * @dataProvider intervalRoundTrips
+     */
+    public function testTheIntervalRoundTripsThroughEveryExport(string $format): void
+    {
+        $this->subscriptions->create($this->scope, [
+            'name' => 'Car insurance',
+            'price' => '180.00',
+            'currency' => 'GBP',
+            'subscription_type' => 'recurring',
+            'billing_cycle' => 'monthly',
+            'cycle_interval' => '6',
+            'next_payment_date' => '2026-08-31',
+        ]);
+
+        if ($format === 'renovo') {
+            $original = $this->subscriptions->allForStats($this->scope, activeOnly: false)[0];
+            $contents = json_encode(
+                ['subscriptions' => [Resource::subscription($original, $this->clock->today())]],
+                JSON_THROW_ON_ERROR,
+            );
+            $preset = 'renovo';
+            $name = 'renovo-export.json';
+        } else {
+            $export = $this->container()->get(\App\Service\SubscriptionExportService::class);
+            $filter = \App\Domain\SubscriptionFilter::fromQueryParams([])->withIncludeInactive();
+            $contents = $format === 'csv' ? $export->csv($this->scope, $filter) : $export->json($this->scope, $filter);
+            $preset = ImportPreset::AUTOMATIC;
+            $name = 'subscriptions.' . $format;
+        }
+
+        $id = $this->imports->stage(FakeUpload::of($contents, $name));
+        $file = $this->imports->read($id);
+        $mapping = $this->imports->suggestMapping($preset, $file->headers);
+        self::assertArrayHasKey('cycle_interval', $mapping);
+
+        $target = $this->secondHousehold();
+        $result = $this->imports->commit($target, $this->user, $id, $mapping, 'GBP');
+        self::assertSame(['imported' => 1, 'skipped' => 0], $result);
+
+        $imported = $this->subscriptions->allForStats($target, activeOnly: false)[0];
+        self::assertSame('monthly', $imported->billingCycle?->value);
+        self::assertSame(6, $imported->cycleInterval);
+        self::assertSame(36000, $imported->yearlyMinor());
+    }
+
+    public function testSixMonthsImportsAsSixMonthsNotSixDays(): void
+    {
+        $csv = <<<CSV
+        Name,Price,Currency,Billing cycle,Next payment date
+        Car insurance,180.00,GBP,6 months,2026-08-31
+        Membership,50.00,GBP,2 years,2028-02-29
+        Cleaner,40.00,GBP,Fortnightly,2026-06-05
+        Water,45.00,GBP,45 days,2026-06-20
+        Mystery,5.00,GBP,whenever,2026-06-20
+        CSV;
+
+        $id = $this->imports->stage(FakeUpload::of($csv, 'cycles.csv'));
+        $file = $this->imports->read($id);
+        $mapping = $this->imports->suggestMapping(ImportPreset::AUTOMATIC, $file->headers);
+
+        // The preview shows the guess before anything is written, including
+        // the fallback to monthly for a value nothing recognised.
+        $preview = $this->imports->preview($this->scope, $id, $mapping, 'GBP');
+        $mystery = array_values(array_filter(
+            $preview,
+            static fn (array $row): bool => $row['input']['name'] === 'Mystery',
+        ));
+        self::assertSame('monthly', $mystery[0]['input']['billing_cycle']);
+
+        $this->imports->commit($this->scope, $this->user, $id, $mapping, 'GBP');
+
+        $byName = [];
+        foreach ($this->subscriptions->allForStats($this->scope, activeOnly: false) as $subscription) {
+            $byName[$subscription->name] = [
+                $subscription->billingCycle?->value,
+                $subscription->cycleInterval,
+                $subscription->cycleDays,
+            ];
+        }
+
+        self::assertSame(['monthly', 6, null], $byName['Car insurance']);
+        self::assertSame(['yearly', 2, null], $byName['Membership']);
+        self::assertSame(['weekly', 2, null], $byName['Cleaner']);
+        self::assertSame(['custom_days', 1, 45], $byName['Water']);
+        self::assertSame(['monthly', 1, null], $byName['Mystery']);
+    }
+
     public function testAnInvalidRowIsReportedInThePreviewAndSkippedOnCommit(): void
     {
         $csv = <<<CSV

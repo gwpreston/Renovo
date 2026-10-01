@@ -178,7 +178,12 @@ final class CalendarFeedService
         $cycle = $subscription->billingCycle;
 
         while ($date < $today) {
-            $date = $cycle->advance($date, $subscription->cycleDays, $subscription->anchorDay);
+            $date = $cycle->advance(
+                $date,
+                $subscription->cycleDays,
+                $subscription->anchorDay,
+                $subscription->cycleInterval,
+            );
             if (count($dates) > self::MAX_OCCURRENCES) {
                 return [];
             }
@@ -186,7 +191,12 @@ final class CalendarFeedService
 
         while ($date <= $horizon && count($dates) < self::MAX_OCCURRENCES) {
             $dates[] = $date;
-            $date = $cycle->advance($date, $subscription->cycleDays, $subscription->anchorDay);
+            $date = $cycle->advance(
+                $date,
+                $subscription->cycleDays,
+                $subscription->anchorDay,
+                $subscription->cycleInterval,
+            );
         }
 
         return $dates;

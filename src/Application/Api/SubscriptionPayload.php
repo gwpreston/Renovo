@@ -96,6 +96,17 @@ final class SubscriptionPayload
             $input['plan'] = self::string($json, 'plan') ?? '';
         }
 
+        // And for the intervals. Absent or null is 1 on a new row, and on an
+        // edit keeps the interval of a cycle that has not changed — a client
+        // written before intervals existed must not turn a six-monthly policy
+        // monthly by putting it back.
+        if (array_key_exists('cycle_interval', $json)) {
+            $input['cycle_interval'] = self::intString($json, 'cycle_interval');
+        }
+        if (array_key_exists('converts_to_cycle_interval', $json)) {
+            $input['converts_to_cycle_interval'] = self::intString($json, 'converts_to_cycle_interval');
+        }
+
         // The logo is not part of this representation: it is a file, with its
         // own upload and delete endpoints. Carrying the stored path forward
         // keeps a PUT from wiping an image the client was never shown.

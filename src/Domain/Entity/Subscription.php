@@ -96,6 +96,13 @@ final class Subscription
          * each category's bar in it without a query per category.
          */
         public readonly ?string $categoryColour = null,
+        /**
+         * Every N weeks, months or years — a six-monthly policy is monthly
+         * with 6. Always 1 for quarterly and custom-day cycles.
+         */
+        public readonly int $cycleInterval = 1,
+        /** The interval of the cycle a trial converts to; null for its own. */
+        public readonly ?int $convertsToCycleInterval = null,
     ) {
     }
 
@@ -135,7 +142,7 @@ final class Subscription
             return null;
         }
 
-        return $this->billingCycle->monthlyMinor($this->price->amountMinor, $this->cycleDays);
+        return $this->billingCycle->monthlyMinor($this->price->amountMinor, $this->cycleDays, $this->cycleInterval);
     }
 
     public function yearlyMinor(): ?int
@@ -144,7 +151,7 @@ final class Subscription
             return null;
         }
 
-        return $this->billingCycle->annualMinor($this->price->amountMinor, $this->cycleDays);
+        return $this->billingCycle->annualMinor($this->price->amountMinor, $this->cycleDays, $this->cycleInterval);
     }
 
     /**
@@ -211,6 +218,10 @@ final class Subscription
      * the conversion is its next charge. Anything else is billed from
      * `$from` — its next charge — on the new cycle, anchored on that day when
      * the cycle changes and on its own anchor when it does not.
+     *
+     * A scenario names a cycle, not an interval: "same cycle" (null) keeps
+     * the interval, and a named cycle runs every one of its units — "Monthly"
+     * chosen for a six-monthly policy is a change to every month.
      */
     public function withTerms(
         Money $price,
@@ -219,6 +230,7 @@ final class Subscription
         DateTimeImmutable $from,
     ): self {
         if ($this->isTrial) {
+            $interval = $cycle === null ? $this->cycleIntervalAfterConversion() : 1;
             $cycle ??= $this->billingCycleAfterConversion();
 
             return $this->with([
@@ -227,16 +239,19 @@ final class Subscription
                 'convertsToCycleDays' => $cycle === BillingCycle::CustomDays
                     ? ($cycleDays ?? $this->cycleDaysAfterConversion())
                     : null,
+                'convertsToCycleInterval' => $interval,
             ]);
         }
 
-        $changesCycle = $cycle !== null && $cycle !== $this->billingCycle;
+        $changesCycle = $cycle !== null && ($cycle !== $this->billingCycle || $this->cycleInterval !== 1);
+        $interval = $cycle === null ? $this->cycleInterval : 1;
         $cycle ??= $this->billingCycle;
 
         return $this->with([
             'price' => $price,
             'billingCycle' => $cycle,
             'cycleDays' => $cycle === BillingCycle::CustomDays ? ($cycleDays ?? $this->cycleDays) : null,
+            'cycleInterval' => $interval,
             'nextPaymentDate' => $from,
             'anchorDay' => $changesCycle ? (int) $from->format('j') : $this->anchorDay,
         ]);
@@ -320,6 +335,11 @@ final class Subscription
     public function cycleDaysAfterConversion(): ?int
     {
         return $this->convertsToBillingCycle !== null ? $this->convertsToCycleDays : $this->cycleDays;
+    }
+
+    public function cycleIntervalAfterConversion(): int
+    {
+        return $this->convertsToBillingCycle !== null ? ($this->convertsToCycleInterval ?? 1) : $this->cycleInterval;
     }
 
     /**

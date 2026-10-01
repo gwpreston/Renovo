@@ -112,7 +112,11 @@ final class PriceChangeScanner
 
         $difference = $change->price->amountMinor - $previous->price->amountMinor;
         if ($subscription->type->countsTowardsRecurringTotals() && $subscription->billingCycle !== null) {
-            $yearly = $subscription->billingCycle->annualMinor($difference, $subscription->cycleDays);
+            $yearly = $subscription->billingCycle->annualMinor(
+                $difference,
+                $subscription->cycleDays,
+                $subscription->cycleInterval,
+            );
             $lines[] = $this->translator->trans('alert.price_change.yearly', [
                 'amount' => $this->money->formatMinor($yearly, $change->price->currency, signed: true),
             ]);

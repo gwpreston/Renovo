@@ -201,7 +201,7 @@ final class ForecastScreenTest extends DatabaseTestCase
         self::assertSame('Trial plan', $trials[0]['subscription']->name);
         self::assertSame('2026-04-10', $trials[0]['date']->format('Y-m-d'));
         self::assertSame(5000, $trials[0]['amount']->amountMinor);
-        self::assertSame('cycle.yearly', $trials[0]['cycle_key']);
+        self::assertSame('yearly', $trials[0]['cycle_value']);
     }
 
     public function testThePriceChangesCardNamesTheRiseAndThePriceItReplaces(): void

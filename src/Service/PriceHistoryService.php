@@ -184,7 +184,7 @@ final class PriceHistoryService
                     'annual_minor' => $difference !== null
                         && $cycle !== null
                         && $subscription->type->countsTowardsRecurringTotals()
-                            ? $cycle->annualMinor($difference, $subscription->cycleDays)
+                            ? $cycle->annualMinor($difference, $subscription->cycleDays, $subscription->cycleInterval)
                             : null,
                 ];
             }

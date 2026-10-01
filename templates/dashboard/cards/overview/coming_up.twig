@@ -36,7 +36,7 @@
                         <a href="/subscriptions/{{ subscription.id }}{{ can_edit_row(scope, subscription) ? '/edit' : '/money' }}">{{ subscription.name }}</a>
                         <span class="hint">
                             <span class="visually-hidden">{{ row.date|local_date('d MMMM') }} · </span>
-                            {% if row.is_trial_conversion %}{{ t('dashboard.trial_converts') }}{% elseif subscription.billingCycle %}{{ cycle_label(subscription.billingCycle.value, subscription.cycleDays) }}{% endif %}
+                            {% if row.is_trial_conversion %}{{ t('dashboard.trial_converts') }}{% elseif subscription.billingCycle %}{{ cycle_label(subscription.billingCycle.value, subscription.cycleDays, subscription.cycleInterval) }}{% endif %}
                         </span>
                     </span>
                     {% if subscription.ownerName %}

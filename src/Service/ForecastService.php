@@ -55,7 +55,7 @@ final class ForecastService
     /** A charge that recurs monthly or more often. */
     public const CADENCE_REGULAR = 'regular';
 
-    /** A charge that lands as a lump: quarterly, yearly, a long custom cycle or a one-off. */
+    /** A charge that lands as a lump: quarterly, yearly, every N months, a long custom cycle or a one-off. */
     public const CADENCE_LONG = 'long';
 
     /**
@@ -266,9 +266,17 @@ final class ForecastService
         $days = $subscription->isTrial
             ? $subscription->cycleDaysAfterConversion()
             : $subscription->cycleDays;
+        $interval = $subscription->isTrial
+            ? $subscription->cycleIntervalAfterConversion()
+            : $subscription->cycleInterval;
 
+        // By how often it lands, not by its unit: every four weeks is still
+        // regular, and a six-monthly policy is a lump like a quarterly one.
         return match ($cycle) {
-            BillingCycle::Weekly, BillingCycle::Monthly => self::CADENCE_REGULAR,
+            BillingCycle::Weekly => $interval * 7 <= self::REGULAR_MAX_DAYS
+                ? self::CADENCE_REGULAR
+                : self::CADENCE_LONG,
+            BillingCycle::Monthly => $interval === 1 ? self::CADENCE_REGULAR : self::CADENCE_LONG,
             BillingCycle::CustomDays => $days !== null && $days <= self::REGULAR_MAX_DAYS
                 ? self::CADENCE_REGULAR
                 : self::CADENCE_LONG,
@@ -381,9 +389,15 @@ final class ForecastService
         $currentDays = $subscription->isTrial
             ? $subscription->cycleDaysAfterConversion()
             : $subscription->cycleDays;
+        $currentInterval = $subscription->isTrial
+            ? $subscription->cycleIntervalAfterConversion()
+            : $subscription->cycleInterval;
 
+        // A named cycle is one of its units, so "Monthly" for a six-monthly
+        // policy moves the dates as surely as "Yearly" would.
         $sameCycle = $change->cycle === null
             || ($change->cycle === $currentCycle
+                && $currentInterval === 1
                 && ($change->cycle !== BillingCycle::CustomDays || $change->cycleDays === $currentDays));
 
         if ($sameCycle) {
@@ -442,7 +456,12 @@ final class ForecastService
                 ];
             }
 
-            $date = $cycle->advance($date, $subscription->cycleDays, $subscription->anchorDay);
+            $date = $cycle->advance(
+                $date,
+                $subscription->cycleDays,
+                $subscription->anchorDay,
+                $subscription->cycleInterval,
+            );
             $iterations++;
         }
 
@@ -497,6 +516,7 @@ final class ForecastService
                 $date,
                 $subscription->cycleDaysAfterConversion(),
                 (int) $conversion->format('j'),
+                $subscription->cycleIntervalAfterConversion(),
             );
             $iterations++;
         }

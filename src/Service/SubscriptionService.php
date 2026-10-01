@@ -171,7 +171,7 @@ final class SubscriptionService
      * @param array<string, mixed> $input
      * @return array{0: array<string, mixed>, 1: array<string, string>}
      */
-    private function validateTrial(array $input, SubscriptionType $type): array
+    private function validateTrial(array $input, SubscriptionType $type, ?Subscription $existing): array
     {
         $none = [
             'is_trial' => false,
@@ -179,6 +179,7 @@ final class SubscriptionService
             'converts_to_price_minor' => null,
             'converts_to_billing_cycle' => null,
             'converts_to_cycle_days' => null,
+            'converts_to_cycle_interval' => null,
         ];
 
         if (($input['is_trial'] ?? '0') !== '1' || !$type->hasBillingCycle()) {
@@ -218,6 +219,19 @@ final class SubscriptionService
                 $errors['converts_to_cycle_days'] = 'error.cycle_days.range';
             }
         }
+        // Null with no converts-to cycle: it converts to the cycle it has,
+        // interval and all.
+        $convertsToInterval = $convertsToCycle === null
+            ? null
+            : $this->cycleInterval($input, 'converts_to_cycle_interval', $convertsToCycle, $errors);
+        if (
+            $convertsToCycle !== null
+            && !array_key_exists('converts_to_cycle_interval', $input)
+            && $existing?->convertsToBillingCycle === $convertsToCycle
+        ) {
+            // As for the cycle itself: absent on an edit keeps what is there.
+            $convertsToInterval = $existing->convertsToCycleInterval;
+        }
 
         if ($errors !== []) {
             return [$none, $errors];
@@ -229,6 +243,7 @@ final class SubscriptionService
             'converts_to_price_minor' => $convertsToMinor,
             'converts_to_billing_cycle' => $convertsToCycle?->value,
             'converts_to_cycle_days' => $convertsToCycleDays,
+            'converts_to_cycle_interval' => $convertsToInterval,
         ], []];
     }
 
@@ -430,7 +445,12 @@ final class SubscriptionService
 
         $iterations = 0;
         while ($current < $today->setTime(0, 0) && $iterations < self::MAX_ADVANCE_ITERATIONS) {
-            $current = $cycle->advance($current, $subscription->cycleDays, $subscription->anchorDay);
+            $current = $cycle->advance(
+                $current,
+                $subscription->cycleDays,
+                $subscription->anchorDay,
+                $subscription->cycleInterval,
+            );
             $iterations++;
         }
 
@@ -560,6 +580,7 @@ final class SubscriptionService
 
         $cycle = null;
         $cycleDays = null;
+        $cycleInterval = 1;
         if ($type->hasBillingCycle()) {
             $cycle = BillingCycle::tryFromString($this->str($input, 'billing_cycle'));
             if ($cycle === null) {
@@ -569,6 +590,15 @@ final class SubscriptionService
                 if ($cycleDays < 1 || $cycleDays > 3650) {
                     $errors['cycle_days'] = 'error.cycle_days.range';
                 }
+            }
+            if ($cycle !== null) {
+                $cycleInterval = $this->cycleInterval($input, 'cycle_interval', $cycle, $errors);
+            }
+            if ($cycle !== null && !array_key_exists('cycle_interval', $input) && $existing?->billingCycle === $cycle) {
+                // The payment-method rule again: a client written before
+                // intervals existed does not send one, and its edit must not
+                // turn a six-monthly policy into a monthly one.
+                $cycleInterval = $existing->cycleInterval;
             }
         }
 
@@ -585,7 +615,7 @@ final class SubscriptionService
 
         $startDate = $this->date($this->str($input, 'start_date'));
 
-        [$trial, $trialErrors] = $this->validateTrial($input, $type);
+        [$trial, $trialErrors] = $this->validateTrial($input, $type, $existing);
         $errors += $trialErrors;
 
         $noticeAmountRaw = trim($this->str($input, 'notice_period_amount'));
@@ -642,6 +672,8 @@ final class SubscriptionService
             $errors['notes'] = 'error.notes.too_long_5000';
         }
 
+        $anchorDay = $this->anchorDay($input, $cycle, $nextPaymentDate, $existing, $errors);
+
         // Null when the field was not submitted at all, which is what keeps a
         // form that does not show it — a bulk edit, a later API — from wiping a
         // per-subscription reminder schedule it never asked about.
@@ -665,9 +697,10 @@ final class SubscriptionService
             'cycle_days' => $cycleDays,
             'next_payment_date' => $nextPaymentDate?->format('Y-m-d'),
             'start_date' => $startDate?->format('Y-m-d'),
+            'cycle_interval' => $cycleInterval,
             // The anchor day is remembered so a subscription billed on the
             // 31st returns to the 31st after a short month.
-            'anchor_day' => $nextPaymentDate !== null ? (int) $nextPaymentDate->format('j') : null,
+            'anchor_day' => $anchorDay,
             'notice_period_amount' => $notice->amount,
             'notice_period_unit' => $notice->isSet() ? $notice->unit : null,
             'reminder_days' => $reminderDays,
@@ -676,6 +709,7 @@ final class SubscriptionService
             'converts_to_price_minor' => $trial['converts_to_price_minor'],
             'converts_to_billing_cycle' => $trial['converts_to_billing_cycle'],
             'converts_to_cycle_days' => $trial['converts_to_cycle_days'],
+            'converts_to_cycle_interval' => $trial['converts_to_cycle_interval'],
             // A cancelled row stays switched off whatever the form, the API or
             // an import says: `cancelled_at` set means `is_active` false, and
             // only `uncancel()` may take the first step back.
@@ -873,6 +907,87 @@ final class SubscriptionService
         // A sane upper bound: the field is free text, and nothing good comes
         // of a single subscription creating two hundred tags.
         return array_slice($names, 0, 25);
+    }
+
+    /**
+     * Every N weeks, months or years. Absent or empty is 1, which is what
+     * every cycle meant before intervals existed. Out of bounds is an error,
+     * never a clamp — and so is any interval but 1 on a cycle that takes
+     * none, so a client asking for "quarterly, every 2" is told rather than
+     * quietly billed every three months.
+     *
+     * @param array<string, mixed>  $input
+     * @param array<string, string> $errors
+     */
+    private function cycleInterval(array $input, string $key, BillingCycle $cycle, array &$errors): int
+    {
+        $raw = trim($this->str($input, $key));
+        if ($raw === '') {
+            return 1;
+        }
+
+        $interval = ctype_digit($raw) ? (int) $raw : 0;
+        if (!$cycle->isValidInterval($interval)) {
+            $errors[$key] = $cycle->allowsInterval()
+                ? 'error.cycle_interval.' . $cycle->value
+                : 'error.cycle_interval.not_allowed';
+
+            return 1;
+        }
+
+        return $interval;
+    }
+
+    /**
+     * The day of the month the subscription returns to after a short month.
+     *
+     * Normally the day of its next payment. "On the last day of the month"
+     * stores 31, which `BillingCycle::addMonths()` clamps to every month's
+     * own end — the only way to say 31 May after a first charge on 30 April.
+     * It is offered for monthly cycles and asks for a payment date that is
+     * already a month's last day; any other date would be a first charge
+     * the rule itself contradicts.
+     *
+     * Absent — the API, an import — keeps a stored last-day anchor for as
+     * long as the date still sits on a month end, so a save that never
+     * mentioned the option does not quietly drop it.
+     *
+     * @param array<string, mixed>  $input
+     * @param array<string, string> $errors
+     */
+    private function anchorDay(
+        array $input,
+        ?BillingCycle $cycle,
+        ?DateTimeImmutable $nextPaymentDate,
+        ?Subscription $existing,
+        array &$errors,
+    ): ?int {
+        if ($nextPaymentDate === null) {
+            return null;
+        }
+
+        $day = (int) $nextPaymentDate->format('j');
+        $isMonthEnd = $day === (int) $nextPaymentDate->format('t');
+
+        if ($cycle !== BillingCycle::Monthly) {
+            return $day;
+        }
+
+        $lastDay = array_key_exists('anchor_last_day', $input)
+            ? $this->str($input, 'anchor_last_day') === '1'
+            : $existing?->anchorDay === BillingCycle::LAST_DAY_ANCHOR && $isMonthEnd;
+
+        if (!$lastDay) {
+            return $day;
+        }
+
+        if (!$isMonthEnd) {
+            $errors['anchor_last_day'] = 'error.anchor_last_day.not_month_end';
+
+            return $day;
+        }
+
+        return BillingCycle::LAST_DAY_ANCHOR;
     }
 
     /**

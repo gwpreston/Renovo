@@ -38,7 +38,7 @@
                         <td class="muted">{{ row.row }}</td>
                         <td>{{ row.input.name }}</td>
                         <td>{{ row.input.price }} {{ row.input.currency }}</td>
-                        <td>{{ row.input.billing_cycle|replace({'_': ' '}) }}</td>
+                        <td>{{ cycle_label(row.input.billing_cycle, row.input.cycle_days ?: null, row.input.cycle_interval ?: null) }}</td>
                         <td>{{ row.input.next_payment_date ?: '—' }}</td>
                         <td>{{ row.category ?: '—' }}</td>
                         <td>

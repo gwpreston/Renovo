@@ -8,6 +8,38 @@ Before upgrading, **back up your database**, then run `vendor/bin/phinx migrate`
 
 ## [Unreleased]
 
+### Added
+
+- **Billing every N weeks, months or years** — six-monthly car insurance, a
+  two-monthly water bill, a two-yearly membership, a fortnightly cleaner. The
+  form's billing cycle is now **Every [N] [weeks / months / years]**, beside
+  Quarterly and Custom days. An N-monthly or N-yearly charge advances by
+  calendar months and stays on its day, where a custom 182 days drifted off it.
+  Labels read "Every 6 months", "Every 2 years" and "Fortnightly"; an interval
+  of 1 is unchanged everywhere, and so is every existing row's figure. A trial
+  can convert to an N-cycle too. *Phase 32.*
+- **On the last day of the month** — a switch for monthly cycles, so a charge
+  first taken on 30 April is next taken on 31 May. *Phase 32.*
+- **API**: `cycle_interval` and `converts_to_cycle_interval` on the
+  subscription resource, read and write. Omitted means 1 on a new subscription,
+  and keeps the current interval on a PUT that keeps the cycle. An interval on
+  Quarterly or Custom days, or beyond its bounds (weekly 52, monthly 24, yearly
+  10), is a 422. The list export (CSV and JSON) and the backup carry the
+  interval; a backup made before it restores with 1. *Phase 32.*
+
+### Changed
+
+- **Import reads the cycle's unit.** "6 months" used to import as every six
+  *days*; it now imports as every six months, "2 years" as every two years, and
+  "2 weeks" and "fortnightly" as every two weeks (fortnightly was previously a
+  custom 14 days — the dates are identical). "45 days" and a bare "45" are
+  still custom days. The Wallos preset reads its "Payment Cycle" ("Every 3
+  Months") and, for a file with one, its frequency column. A file imported
+  before this change is not altered; re-import it, or edit the rows. *Phase 32.*
+- The forecast counts an N-cycle as a lump unless it bills at least monthly
+  (every four weeks or less), so a six-monthly policy is treated like a
+  quarterly one rather than as a regular monthly charge. *Phase 32.*
+
 ## [1.2.0] - 2026-10-01
 
 ### Added
