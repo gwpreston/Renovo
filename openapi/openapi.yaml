@@ -9,7 +9,7 @@ openapi: 3.0.3
 
 info:
   title: Renovo API
-  version: "1.2.0"
+  version: "1.3.0"
   description: |
     Read and write subscriptions, categories, payment methods, tags and attachments.
 
@@ -1252,6 +1252,26 @@ components:
               nullable: true
               description: Read-only. The last day to cancel and avoid the next charge.
             days_until_next_payment: { type: integer, nullable: true }
+            price_is_promotional:
+              type: boolean
+              description: |
+                Read-only. The current price is an introductory or promotional
+                one. Entered in the web interface, where the offer's end is
+                written as a scheduled price change; a PUT leaves it alone.
+            promo_ends_on:
+              type: string
+              format: date
+              nullable: true
+              description: |
+                Read-only. The day the offer's price ends and the next price
+                takes effect. Null when the price is not promotional, or the
+                end is not known.
+            promo_then_price_minor:
+              type: integer
+              nullable: true
+              description: |
+                Read-only. What it costs from promo_ends_on, in minor units of
+                the subscription's currency. Null with promo_ends_on.
             cancelled_at:
               type: string
               format: date

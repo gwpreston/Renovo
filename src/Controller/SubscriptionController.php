@@ -335,7 +335,7 @@ final class SubscriptionController extends Controller
             'logo_path' => $subscription->logoPath,
             'website_url' => $subscription->websiteUrl,
             'tags' => implode(', ', array_map(static fn ($tag): string => $tag->name, $subscription->tags)),
-        ], $request->getQueryParams());
+        ] + $this->priceHistory->offerFormValues($scope, $subscription->id), $request->getQueryParams());
 
         return $this->render($request, $response, 'subscriptions/form.twig', $this->formData($request, $values
             // The three reminder states — use my defaults, never, these days —
@@ -558,6 +558,11 @@ final class SubscriptionController extends Controller
             // The edit page's own sections: the price history with its
             // schedule-a-change form, and the attachments.
             'trend' => $subscription !== null ? $this->priceHistory->trendFor($scope, $subscription->id) : [],
+            // What the schedule form's "then costs" starts as: the ordinary
+            // price an offer would go back to.
+            'offer_then_default' => $subscription !== null
+                ? $this->priceHistory->ordinaryPrice($scope, $subscription->id)?->toDecimalString()
+                : null,
             'attachments' => $subscription !== null
                 ? $this->attachments->forSubscription($scope, $subscription->id)
                 : [],

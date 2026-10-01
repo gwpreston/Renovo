@@ -133,6 +133,80 @@ final class PriceChangeAlertTest extends NotificationTestCase
         self::assertSame(1299, $this->subscriptions->find($this->scope($this->alice), $id)?->price->amountMinor);
     }
 
+    public function testTheEndOfAnIntroOfferIsAnnouncedWithTheOfferWordingOnce(): void
+    {
+        $this->addChannel($this->alice);
+        $id = $this->subscriptionWithHistory('Spotify', 1199);
+
+        // £5.99 from 1 Oct, until 1 Dec, then £11.99: two rows, one alert —
+        // the intro price itself is not news, its end is.
+        $this->prices->schedule($this->scope($this->alice), $id, [
+            'price' => '5.99',
+            'effective_from' => '2026-10-01',
+            'is_promotional' => '1',
+            'offer_ends_on' => '2026-12-01',
+            'offer_then_price' => '11.99',
+        ]);
+
+        $this->runner->run();
+        self::assertSame(1, $this->priceAlertCount());
+
+        $alert = $this->priceAlerts()[0];
+        self::assertSame('Spotify: intro offer ends', $alert->title);
+        self::assertStringContainsString('Intro offer ends on 1 Dec 2026', $alert->lines[0]);
+        self::assertStringContainsString('£11.99', $alert->lines[0]);
+        self::assertStringContainsString('+£6.00', $alert->lines[0]);
+
+        // The offer starts. Moving its end then moves the row rather than
+        // writing another, so the ledger has already seen it.
+        $this->clock->advanceTo(new DateTimeImmutable('2026-10-02 08:00:00'));
+        $this->runner->run();
+        $this->prices->reviseOffer(
+            $this->scope($this->alice),
+            $id,
+            new \App\Domain\PromoOffer(new DateTimeImmutable('2027-01-01'), Money::of(1199, 'GBP')),
+            $this->alice,
+        );
+        $this->runner->run();
+        $this->clock->advanceTo(new DateTimeImmutable('2027-01-02 08:00:00'));
+        $this->runner->run();
+
+        self::assertSame(1, $this->priceAlertCount());
+        $history = $this->prices->historyFor($this->scope($this->alice), $id);
+        self::assertCount(3, $history);
+        self::assertSame('2027-01-01', $history[2]->effectiveFrom->format('Y-m-d'));
+    }
+
+    public function testAnIntroPriceWithNoEndRaisesNoAlert(): void
+    {
+        $this->addChannel($this->alice);
+        $id = $this->subscriptionWithHistory('Spotify', 1199);
+
+        $this->prices->recordCurrentPrice(
+            $this->scope($this->alice),
+            $id,
+            Money::of(599, 'GBP'),
+            PriceChangeSource::Manual,
+            $this->alice,
+            isPromotional: true,
+        );
+
+        $this->runner->run();
+
+        self::assertSame(0, $this->priceAlertCount());
+    }
+
+    public function testARiseThatEndsNoOfferKeepsTheOrdinaryWording(): void
+    {
+        $this->addChannel($this->alice);
+        $id = $this->subscriptionWithHistory('Netflix', 1099);
+
+        $this->changePrice($id, 1299);
+        $this->runner->run();
+
+        self::assertSame('Netflix is going up', $this->priceAlerts()[0]->title);
+    }
+
     public function testEveryoneWhoCanSeeTheSubscriptionIsTold(): void
     {
         $this->addChannel($this->alice);

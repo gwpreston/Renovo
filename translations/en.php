@@ -312,6 +312,10 @@ return [
     'error.member.removal_choice_required' =>
         'Choose what should happen to the subscriptions nobody else has seen.',
     'error.member.role_invalid' => 'Choose a role from the list.',
+    'error.offer.change_announced' =>
+        'A price change is already announced before then, so the offer would end there. Choose an earlier date, or leave it blank.',
+    'error.offer.ends_past' => 'The offer has to end after today, and after the price starts.',
+    'error.offer.then_required' => 'Enter what it costs once the offer ends.',
     'error.palette.unknown' => 'Choose one of the palettes shown.',
     'flash.avatar_missing' => 'There was no picture to remove.',
     'flash.avatar_removed' => 'Your picture has been removed.',
@@ -443,10 +447,19 @@ return [
 
     'price_change.initial' => 'Starting price',
     'price_change.manual' => 'Price changed',
+    'price_change.offer_ended' => 'Offer ended',
+    'price_change.offer_ends' => 'Offer ends',
     'price_change.scheduled' => 'Scheduled change',
     'price_change.trial_conversion' => 'Free trial ended',
     'price_change.currency_change' => 'Currency converted',
     'price_change.unknown' => 'Price',
+    // promo — an introductory price, beside the price it is
+    'promo.chip' => 'Promo',
+    'promo.chip_until' => 'Promo until {date}',
+    'promo.heading' => 'Intro offer',
+    'promo.no_end' => 'No end date yet — add one on the edit page so you’re warned before the price goes up.',
+    'promo.on_price' => 'On an introductory price of',
+    'promo.then' => 'From {date} it costs',
 
     'split.none' => 'Not split',
     'split.equal' => 'Split equally',
@@ -462,7 +475,9 @@ return [
 
     'alert.price_change' => 'Price change',
     'alert.price_change.line' => '{old} → {new} from {date}',
+    'alert.price_change.offer_line' => 'Intro offer ends on {date} — then {new} ({difference})',
     'alert.price_change.title_fall' => '{name} is going down',
+    'alert.price_change.title_offer_ends' => '{name}: intro offer ends',
     'alert.price_change.title_rise' => '{name} is going up',
     'alert.price_change.yearly' => '{amount} a year',
     'alert.renewal' => 'Upcoming renewal',
@@ -1222,6 +1237,8 @@ return [
     'dashboard.nothing_due' => 'Nothing due.',
     'dashboard.nothing_renewing' => 'Nothing renewing in the near window.',
     'dashboard.of_household_spend' => '{percent}% of household spend',
+    'dashboard.offer_ends' => 'Intro offer ending',
+    'dashboard.offer_ends_title' => '{name}’s intro price ends on {date}: {from} becomes {to}',
     'dashboard.other_categories' => '{count, plural, one {# other category} other {# other categories}}',
     'dashboard.pace_budget_to_date' => 'budget to date',
     'dashboard.pace_of_monthly' => 'An even pace of twelve times the {budget} monthly household budget.',
@@ -1317,6 +1334,8 @@ return [
     'field.alert' => 'Alert',
     'field.amount' => 'Amount',
     'field.category' => 'Category',
+    'field.offer_ends_on' => 'Offer ends',
+    'field.offer_then_price' => 'Then costs',
     'field.payment_method' => 'Payment method',
     'field.change' => 'Change',
     'field.date' => 'Date',
@@ -1449,6 +1468,10 @@ return [
     'insight.price_rising.detail' =>
         '{name} goes up by {difference} on {date} — {amount} a year more than now.',
     'insight.price_rising.headline' => 'A price is going up',
+    'insight.promo_ending.detail' => '{name}’s intro price ends on {date} — then {price}{per} ({difference}).',
+    'insight.promo_ending.headline' => 'An intro offer is ending',
+    'insight.promo_no_end.detail' => '{name} is on an intro price with no end date — add one so you’re warned before it rises.',
+    'insight.promo_no_end.headline' => 'An intro price has no end date',
     'insight.rarely_used.detail' =>
         '{name} costs {amount} a year and has been used {count, plural, one {# time} other {# times}}.',
     'insight.rarely_used.headline' => 'Paid for, barely used',
@@ -1960,10 +1983,13 @@ return [
     'subscriptions_form.end_it' => 'Stop paying for it',
     'subscriptions_form.every_n_days' => 'Every how many days',
     'subscriptions_form.free_trial' => 'Free trial',
+    'subscriptions_form.is_promotional' => 'This is an introductory or promotional price',
+    'subscriptions_form.is_promotional_note' => 'We’ll warn you before it goes up to the full price.',
     'subscriptions_form.is_trial' => 'This is a free trial',
     'subscriptions_form.is_trial_note' => 'We’ll remind you before it converts to a paid plan.',
     'subscriptions_form.isolated_owner_note' =>
         'This instance keeps members\' subscriptions separate, so new entries belong to you.',
+    'subscriptions_form.offer_ends_hint' => 'The first day at the full price. Leave it blank if you don’t know yet.',
     'subscriptions_form.only_me_note' =>
         'Only you will see it, in either isolation mode — nobody else in the household, Owner/Admins '
         . 'included, and it stays out of their totals.',
@@ -2022,6 +2048,7 @@ return [
     'subscriptions_form.tags_hint' => 'Comma separated. New tags are created automatically.',
     'subscriptions_form.trial_end_hint' => 'The last free day — and the day the first charge falls.',
     'subscriptions_form.trial_ends' => 'Trial ends',
+    'subscriptions_form.trial_free_period_hint' => 'For a free period, use a trial instead.',
     'subscriptions_form.type_hint' => 'One-off and lifetime entries are tracked but left out of monthly totals.',
     'subscriptions_form.use_my_usual_reminders' => 'Use my usual reminders',
 

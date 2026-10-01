@@ -8,6 +8,29 @@ Before upgrading, **back up your database**, then run `vendor/bin/phinx migrate`
 
 ## [Unreleased]
 
+### Added
+
+- **Introductory and promotional prices** — "£5.99 for three months, then
+  £11.99". On the subscription form and the price change form, **This is an
+  introductory or promotional price** reveals **Offer ends** and **Then
+  costs**; saving records the intro price and schedules the price it becomes.
+  Moving the end date moves that scheduled change; turning the switch off
+  unmarks the price and leaves the change as an ordinary one. A row whose date
+  has passed is never rewritten. A **Promo** chip ("until 1 Dec") sits beside
+  the price on the list and the cost page, and the price history, analytics,
+  forecast and calendar call the step **Offer ends** / **Offer ended** rather
+  than a rise.
+  Totals, forecasts and current prices are unchanged by the flag. *Phase 33.*
+- **Insights**: *An intro offer is ending* (ranked with price rises, and never
+  listed as one too) and *An intro price has no end date* (asks for it). The
+  price-change alert keeps its routes and preference and says "Intro offer
+  ends" when that is what is happening; the intro price itself raises no
+  alert. *Phase 33.*
+- **API**: read-only `price_is_promotional`, `promo_ends_on` and
+  `promo_then_price_minor` on the subscription resource. The list export and
+  the backup carry them; a backup made before them restores as an ordinary
+  price. *Phase 33.*
+
 ## [1.3.0] - 2026-10-01
 
 ### Added

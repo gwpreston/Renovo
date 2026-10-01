@@ -27,6 +27,14 @@ enum InsightKind: string
     /** An announced increase that has not taken effect yet. */
     case PriceRising = 'price_rising';
 
+    /**
+     * An intro price about to end. The same moment as a rise — ranked with
+     * it — and a different conversation: it was always coming, and it is the
+     * time to cancel or renegotiate. A row this describes is never also a
+     * `PriceRising`.
+     */
+    case PromoEnding = 'promo_ending';
+
     /** An increase that already has. */
     case PriceRisen = 'price_risen';
 
@@ -37,16 +45,23 @@ enum InsightKind: string
     case RarelyUsed = 'rarely_used';
 
     /**
+     * On an intro price with no end recorded: nothing to warn about until
+     * the end date is added. The least urgent thing on the list.
+     */
+    case PromoNoEnd = 'promo_no_end';
+
+    /**
      * Where this kind sorts against the others. Lower is shown first.
      */
     public function rank(): int
     {
         return match ($this) {
             self::TrialConverting => 0,
-            self::PriceRising => 1,
+            self::PriceRising, self::PromoEnding => 1,
             self::PriceRisen => 2,
             self::Overlap => 3,
             self::RarelyUsed => 4,
+            self::PromoNoEnd => 5,
         };
     }
 
@@ -65,9 +80,10 @@ enum InsightKind: string
     {
         return match ($this) {
             self::TrialConverting => 'trial',
-            self::PriceRising, self::PriceRisen => 'trend-up',
+            self::PriceRising, self::PriceRisen, self::PromoEnding => 'trend-up',
             self::Overlap => 'groups',
             self::RarelyUsed => 'rarely-used',
+            self::PromoNoEnd => 'clock',
         };
     }
 
@@ -79,9 +95,9 @@ enum InsightKind: string
     {
         return match ($this) {
             self::TrialConverting => 'info',
-            self::PriceRising, self::PriceRisen => 'warn',
+            self::PriceRising, self::PriceRisen, self::PromoEnding => 'warn',
             self::Overlap => 'accent',
-            self::RarelyUsed => 'neutral',
+            self::RarelyUsed, self::PromoNoEnd => 'neutral',
         };
     }
 }

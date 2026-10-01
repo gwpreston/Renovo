@@ -147,7 +147,7 @@ final class ForecastService
         $horizon = $today->modify(sprintf('+%d months', $months));
 
         $subscriptions = $this->subscriptions->allForStats($scope);
-        $scheduled = $this->priceHistory->findScheduledAfter($scope, $today);
+        [$scheduled, $offerEnds] = $this->announced($scope, $today);
         $splits = $forUserId === null ? [] : $this->splits->allInScope($scope);
 
         $charges = [];
@@ -156,7 +156,10 @@ final class ForecastService
                 continue;
             }
 
-            $walked = $this->chargesFor($subscription, $today, $horizon, $scheduled);
+            $walked = $this->markOfferEnds(
+                $this->chargesFor($subscription, $today, $horizon, $scheduled),
+                $offerEnds[$subscription->id] ?? [],
+            );
             if ($scenario !== null) {
                 $walked = $this->overlay($subscription, $walked, $scenario, $today, $horizon);
             }
@@ -296,7 +299,13 @@ final class ForecastService
      * same proportion `charges()` applies — so the card and the charges agree.
      *
      * @param array<int, Subscription> $subscriptions Keyed by id.
-     * @return list<array{subscription: Subscription, change: PriceChange, previous: Money, price: Money}>
+     * @return list<array{
+     *     subscription: Subscription,
+     *     change: PriceChange,
+     *     previous: Money,
+     *     price: Money,
+     *     ends_offer: bool
+     * }>
      */
     public function scheduledChanges(
         Scope $scope,
@@ -314,8 +323,10 @@ final class ForecastService
                 : $this->splits->chargeShare($amount, $subscription, $splits[$subscription->id] ?? [], $forUserId);
         };
 
+        [$scheduled, $offerEnds] = $this->announced($scope, $today);
+
         $rows = [];
-        foreach ($this->priceHistory->findScheduledAfter($scope, $today) as $subscriptionId => $changes) {
+        foreach ($scheduled as $subscriptionId => $changes) {
             $subscription = $subscriptions[$subscriptionId] ?? null;
             if ($subscription === null) {
                 continue;
@@ -332,6 +343,7 @@ final class ForecastService
                     'change' => $change,
                     'previous' => $share($previous, $subscription),
                     'price' => $share($change->price, $subscription),
+                    'ends_offer' => isset($offerEnds[$subscriptionId][$change->id]),
                 ];
                 $previous = $change->price;
             }
@@ -411,6 +423,69 @@ final class ForecastService
 
         // No scheduled changes: the new plan's price is the one given.
         return $this->chargesFor($copy, $today, $horizon, []);
+    }
+
+    /**
+     * The announced changes in scope, and which of them end an intro offer.
+     *
+     * One read of the whole history rather than of the announced rows alone:
+     * whether the first announced row ends an offer is a question about the
+     * row in force before it, which the announced rows do not include. The
+     * second list changes wording and nothing else — every amount comes from
+     * the first.
+     *
+     * @return array{
+     *     0: array<int, list<PriceChange>>,
+     *     1: array<int, array<int, DateTimeImmutable>>
+     * } Announced changes, earliest first, and the offer ends among them by
+     *   change id, both keyed by subscription id.
+     */
+    private function announced(Scope $scope, DateTimeImmutable $today): array
+    {
+        $scheduled = [];
+        $offerEnds = [];
+        foreach ($this->priceHistory->findAllBySubscription($scope) as $subscriptionId => $changes) {
+            $previous = null;
+            foreach ($changes as $change) {
+                if ($change->isScheduled($today)) {
+                    $scheduled[$subscriptionId][] = $change;
+                    if ($change->endsOfferFrom($previous)) {
+                        $offerEnds[$subscriptionId][$change->id] = $change->effectiveFrom;
+                    }
+                }
+                $previous = $change;
+            }
+        }
+
+        return [$scheduled, $offerEnds];
+    }
+
+    /**
+     * Name the first charge at the price an offer ends in.
+     *
+     * The charge is the one on or after the offer's end, which is when the
+     * full price is first taken; its amount is already that price, because
+     * the walk reads the same announced row. A trial converting keeps its own
+     * reason — that is the louder of the two.
+     *
+     * @param list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}> $charges
+     * @param array<int, DateTimeImmutable> $offerEnds
+     * @return list<array{subscription: Subscription, date: DateTimeImmutable, amount: Money, reason: string}>
+     */
+    private function markOfferEnds(array $charges, array $offerEnds): array
+    {
+        foreach ($offerEnds as $endsOn) {
+            foreach ($charges as $index => $charge) {
+                if ($charge['date'] >= $endsOn) {
+                    if ($charge['reason'] === 'renewal') {
+                        $charges[$index]['reason'] = 'offer_end';
+                    }
+                    break;
+                }
+            }
+        }
+
+        return $charges;
     }
 
     /**

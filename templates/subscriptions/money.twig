@@ -1,6 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% import 'partials/payment_method.twig' as payment_method %}
+{% import 'subscriptions/_promo.twig' as promo %}
 
 {% block title %}{{ subscription.name }} — {{ t('subscriptions_money.title') }} — {{ instance_name }}{% endblock %}
 
@@ -26,6 +27,24 @@
             <span class="visually-hidden">{{ t('field.payment_method') }}</span>
             {{ payment_method.for_subscription(subscription) }}
         </p>
+    {% endif %}
+
+    {% if promotion %}
+        <section class="card callout" id="promotion">
+            <h2>{{ t('promo.heading') }} {{ promo.chip(promotion) }}</h2>
+            <p>
+                {{ t('promo.on_price') }}
+                <strong class="num">{{ promotion.change.price.amountMinor|money(promotion.change.price.currency) }}</strong>.
+            </p>
+            {% if promotion.ends_on and promotion.then %}
+                <p>
+                    {{ t('promo.then', {'date': promotion.ends_on|local_date('d MMM y')}) }}
+                    <strong class="num">{{ promotion.then.amountMinor|money(promotion.then.currency) }}</strong>.
+                </p>
+            {% else %}
+                <p class="muted">{{ t('promo.no_end') }}</p>
+            {% endif %}
+        </section>
     {% endif %}
 
     {% if subscription.isTrial and subscription.trialEndDate %}

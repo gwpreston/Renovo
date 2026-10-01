@@ -28,6 +28,9 @@
                 }) }}
             {%- else -%}
                 {{ kind.icon(item.kind) }}<span class="visually-hidden">{{ kind.label(item.kind) }}: </span>
+                {%- if item.ends_offer -%}
+                    <span class="badge badge-info">{{ t('price_change.offer_ends') }}</span>{{ ' ' }}
+                {%- endif -%}
                 {%- set details = [subscription.plan, subscription.paymentMethodName]|filter(v => v) -%}
                 {%- if details is not empty -%}
                     {{ details|join(' · ') }}

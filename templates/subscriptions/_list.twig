@@ -327,6 +327,7 @@
     the cycle would be.
 #}
 {% macro price(row) %}
+    {% import 'subscriptions/_promo.twig' as promo %}
     {% set subscription = row.subscription %}
     <span class="price-figure">
         <span class="num">{{ subscription.price.amountMinor|money(subscription.price.currency) }}</span>
@@ -338,6 +339,7 @@
             {%- endif -%}
         </span>
     </span>
+    {{ promo.chip(row.promotion) }}
     {% if row.price_base %}
         <span class="hint num price-base">{{ t('subscriptions_list.approximately', {
             'amount': row.price_base.amountMinor|money(row.price_base.currency),

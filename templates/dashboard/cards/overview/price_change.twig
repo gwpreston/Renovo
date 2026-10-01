@@ -1,6 +1,7 @@
 {#
     The next price rise: the soonest scheduled increase the Phase 13 rule
-    reports, old price to new, and what it adds over a month and a year.
+    reports — or an intro offer ending, called that — old price to new, and
+    what it adds over a month and a year.
     Absent when there is none — never a placeholder, never a made-up one.
 #}
 {% if price_change %}
@@ -8,9 +9,9 @@
     <section class="card price-banner" aria-labelledby="price-banner-heading">
         <span class="kpi-icon kpi-icon-warn">{{ icon('trend-up') }}</span>
         <div>
-            <h2 id="price-banner-heading" class="stat-label price-banner-label">{{ t('dashboard.price_change') }}</h2>
+            <h2 id="price-banner-heading" class="stat-label price-banner-label">{{ t(rise.ends_offer ? 'dashboard.offer_ends' : 'dashboard.price_change') }}</h2>
             <p class="price-banner-title">
-                {{ t('dashboard.price_rises', {
+                {{ t(rise.ends_offer ? 'dashboard.offer_ends_title' : 'dashboard.price_rises', {
                     'name': rise.subscription.name,
                     'from': rise.from.amountMinor|money(rise.from.currency),
                     'to': rise.to.amountMinor|money(rise.to.currency),

@@ -42,11 +42,13 @@ final class SubscriptionExportService
         'name', 'plan', 'price', 'currency', 'type', 'billing cycle', 'cycle days',
         'cycle interval', 'next payment date', 'start date', 'category', 'tags', 'payment method',
         'owner', 'payer', 'visibility', 'active', 'cancelled on', 'notice period',
-        'notice unit', 'trial end', 'price after trial', 'notes',
+        'notice unit', 'trial end', 'price after trial', 'intro price', 'offer ends',
+        'price after offer', 'notes',
     ];
 
     public function __construct(
         private readonly SubscriptionService $subscriptions,
+        private readonly PriceHistoryService $priceHistory,
     ) {
     }
 
@@ -59,8 +61,10 @@ final class SubscriptionExportService
 
         fputcsv($handle, self::COLUMNS, escape: '');
 
+        $promotions = $this->priceHistory->promotions($scope);
         foreach ($this->subscriptions->list($scope, $filter->unpaged()) as $subscription) {
-            fputcsv($handle, array_map($this->cell(...), $this->row($subscription)), escape: '');
+            $row = $this->row($subscription, $promotions[$subscription->id] ?? null);
+            fputcsv($handle, array_map($this->cell(...), $row), escape: '');
         }
 
         rewind($handle);
@@ -73,8 +77,9 @@ final class SubscriptionExportService
     public function json(Scope $scope, SubscriptionFilter $filter): string
     {
         $rows = [];
+        $promotions = $this->priceHistory->promotions($scope);
         foreach ($this->subscriptions->list($scope, $filter->unpaged()) as $subscription) {
-            $rows[] = array_combine(self::COLUMNS, $this->row($subscription));
+            $rows[] = array_combine(self::COLUMNS, $this->row($subscription, $promotions[$subscription->id] ?? null));
         }
 
         $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR;
@@ -91,9 +96,10 @@ final class SubscriptionExportService
     }
 
     /**
+     * @param array{ends_on: \DateTimeImmutable|null, then: Money|null}|null $promotion
      * @return list<string>
      */
-    private function row(Subscription $subscription): array
+    private function row(Subscription $subscription, ?array $promotion): array
     {
         return [
             $subscription->name,
@@ -120,6 +126,9 @@ final class SubscriptionExportService
             $subscription->isTrial && $subscription->convertsToPrice instanceof Money
                 ? $subscription->convertsToPrice->toDecimalString()
                 : '',
+            $promotion !== null ? 'yes' : 'no',
+            ($promotion['ends_on'] ?? null)?->format('Y-m-d') ?? '',
+            ($promotion['then'] ?? null)?->toDecimalString() ?? '',
             $subscription->notes ?? '',
         ];
     }

@@ -14,9 +14,20 @@ use DateTimeImmutable;
 /**
  * Price history, scoped exactly like the subscriptions it describes.
  *
- * There is no update method and no delete method, and that is the design
- * rather than an omission — the table is append-only. Rows disappear only when
- * their subscription does, by cascade.
+ * Append-only for anything that has happened. A row that has taken effect is
+ * never rewritten and never deleted except with its subscription, by cascade:
+ * what a subscription cost last March is a fact.
+ *
+ * Two narrow exceptions, each its own method, so that neither can grow into a
+ * general update:
+ *
+ *  - an **announced** row — one whose date has not arrived — is a plan, and
+ *    the end of an intro offer is a plan that moves. `reviseAnnounced()` and
+ *    `deleteAnnounced()` carry `effective_from > today` in their own `WHERE`,
+ *    so a past row cannot be reached through them whatever the caller passes;
+ *  - the **promotional flag** labels a price rather than being part of it, so
+ *    `setPromotional()` may change it on any row. Price, date and source stay
+ *    as they were.
  */
 final class PriceHistoryRepository extends AbstractScopedRepository
 {
@@ -37,8 +48,8 @@ final class PriceHistoryRepository extends AbstractScopedRepository
      * way to find out about.
      *
      * Read-only, as everywhere. There is no write path through this hook: the
-     * table has no update or delete, and the only insert goes through a caller
-     * that must first prove it may write to the subscription.
+     * few writes this table allows use the write predicate, never this one,
+     * and their callers must first prove they may write to the subscription.
      *
      * @param array<string, mixed> $params
      */
@@ -72,6 +83,7 @@ final class PriceHistoryRepository extends AbstractScopedRepository
             'currency',
             'effective_from',
             'source',
+            'is_promotional',
             'created_at',
         ];
     }
@@ -283,6 +295,7 @@ final class PriceHistoryRepository extends AbstractScopedRepository
         PriceChangeSource $source,
         ?string $note = null,
         ?int $ownerUserId = null,
+        bool $isPromotional = false,
     ): int {
         return $this->insertScoped($scope, [
             'subscription_id' => $subscriptionId,
@@ -291,6 +304,7 @@ final class PriceHistoryRepository extends AbstractScopedRepository
             'effective_from' => $effectiveFrom->format('Y-m-d'),
             'source' => $source->value,
             'note' => $note,
+            'is_promotional' => $isPromotional,
             'created_by_user_id' => $scope->userId,
             'created_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
             // A subscription owned by another member in SHARED mode must have
@@ -298,6 +312,92 @@ final class PriceHistoryRepository extends AbstractScopedRepository
             // the moment the instance switched to ISOLATED.
             'owner_user_id' => $ownerUserId ?? $scope->userId,
         ]);
+    }
+
+    /**
+     * Move an announced row, or change what it will cost.
+     *
+     * Only a row whose date has not arrived, and only to a date that has not
+     * arrived either — both enforced here rather than trusted from the caller.
+     * Moving a row into the past would change which price is current without
+     * a row saying so.
+     *
+     * @return bool Whether a row was revised.
+     */
+    public function reviseAnnounced(
+        Scope $scope,
+        int $id,
+        DateTimeImmutable $effectiveFrom,
+        Money $price,
+        ?string $note,
+        DateTimeImmutable $today,
+    ): bool {
+        if ($effectiveFrom <= $today) {
+            return false;
+        }
+
+        $params = [
+            'set_effective_from' => $effectiveFrom->format('Y-m-d'),
+            'set_price_minor' => $price->amountMinor,
+            'set_currency' => $price->currency,
+            'set_note' => $note,
+            '__id' => $id,
+            '__today' => $today->format('Y-m-d'),
+        ];
+
+        $sql = 'UPDATE ' . $this->quote($this->table())
+            . ' SET ' . $this->quote('effective_from') . ' = :set_effective_from,'
+            . ' ' . $this->quote('price_minor') . ' = :set_price_minor,'
+            . ' ' . $this->quote('currency') . ' = :set_currency,'
+            . ' ' . $this->quote('note') . ' = :set_note'
+            . ' WHERE ' . $this->qualify('id') . ' = :__id'
+            . ' AND ' . $this->qualify('effective_from') . ' > :__today'
+            . ' AND ' . $this->scopePredicate($scope, $params);
+
+        // MySQL reports zero for an update that wrote the values already
+        // there; that is still "the row was in reach", so ask again rather
+        // than reading zero as a refusal.
+        return $this->db->execute($sql, $params) > 0 || $this->isAnnounced($scope, $id, $today);
+    }
+
+    /**
+     * Withdraw an announced row — the end of an offer that is no longer known.
+     *
+     * @return bool Whether a row was deleted.
+     */
+    public function deleteAnnounced(Scope $scope, int $id, DateTimeImmutable $today): bool
+    {
+        $params = ['__id' => $id, '__today' => $today->format('Y-m-d')];
+        $sql = 'DELETE FROM ' . $this->quote($this->table())
+            . ' WHERE ' . $this->quote('id') . ' = :__id'
+            . ' AND ' . $this->quote('effective_from') . ' > :__today'
+            . ' AND ' . $this->scopePredicateUnqualified($scope, $params);
+
+        return $this->db->execute($sql, $params) > 0;
+    }
+
+    /**
+     * Mark a recorded price as promotional, or not.
+     *
+     * The one column a past row may have changed: it labels the price rather
+     * than recording it, so correcting it rewrites no fact. Within write
+     * scope, not the wider read scope.
+     */
+    public function setPromotional(Scope $scope, int $id, bool $isPromotional): void
+    {
+        $this->updateScoped($scope, $id, ['is_promotional' => $isPromotional]);
+    }
+
+    private function isAnnounced(Scope $scope, int $id, DateTimeImmutable $today): bool
+    {
+        $params = ['__id' => $id, '__today' => $today->format('Y-m-d')];
+        $sql = 'SELECT 1 FROM ' . $this->quote($this->table())
+            . ' WHERE ' . $this->qualify('id') . ' = :__id'
+            . ' AND ' . $this->qualify('effective_from') . ' > :__today'
+            . ' AND ' . $this->scopePredicate($scope, $params)
+            . ' LIMIT 1';
+
+        return $this->db->fetchValue($sql, $params) !== null;
     }
 
     private function selectWithAuthor(): string
@@ -325,6 +425,7 @@ final class PriceHistoryRepository extends AbstractScopedRepository
             note: ($row['note'] ?? null) === null || $row['note'] === '' ? null : (string) $row['note'],
             createdByName: ($row['created_by_name'] ?? null) === null ? null : (string) $row['created_by_name'],
             createdAt: new DateTimeImmutable((string) $row['created_at']),
+            isPromotional: $this->db->platform()->toBoolean($row['is_promotional'] ?? false),
         );
     }
 }
