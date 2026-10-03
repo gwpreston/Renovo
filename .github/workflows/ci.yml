@@ -120,13 +120,19 @@ jobs:
       SESSION_COOKIE_SECURE: 'false'
 
     steps:
+      # Full history, so the coverage step can diff this branch against the
+      # one it is merging into.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      # Coverage is measured on the Postgres leg only: the same code runs on
+      # both, so a second measurement adds nothing but time.
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
           extensions: intl, pdo_pgsql, pdo_mysql, curl, zip, sodium, openssl
-          coverage: none
+          coverage: ${{ matrix.driver == 'pgsql' && 'pcov' || 'none' }}
           tools: composer:v2
 
       - uses: ramsey/composer-install@v3
@@ -154,7 +160,29 @@ jobs:
           vendor/bin/phinx migrate --configuration phinx.php
 
       - name: PHPUnit
+        if: matrix.driver != 'pgsql'
         run: vendor/bin/phpunit
+
+      - name: PHPUnit, with coverage
+        if: matrix.driver == 'pgsql'
+        run: vendor/bin/phpunit --coverage-clover build/coverage.xml
+
+      # Code a pull request adds or changes is covered to at least 80%. Measured
+      # on the diff rather than the total, because the total barely moves when
+      # one PR lands untested code. Pull requests only: on a push there is no
+      # base to diff against, and an empty diff would pass having checked
+      # nothing.
+      - name: Changed lines are covered (80%)
+        if: matrix.driver == 'pgsql' && github.event_name == 'pull_request'
+        run: |
+          pipx run --spec diff-cover==10.6.0 diff-cover build/coverage.xml \
+            --compare-branch=origin/${{ github.base_ref }} --fail-under=80
+
+      # And the whole suite does not slide below the floor, which many small,
+      # individually passing PRs could otherwise add up to.
+      - name: Overall coverage stays above the floor (85%)
+        if: matrix.driver == 'pgsql'
+        run: php bin/console coverage:check build/coverage.xml
 
   # The asset build, and the rule that makes it worth having: a self-hosted
   # instance may have no route to a CDN, so nothing the browser loads may come
