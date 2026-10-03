@@ -31,6 +31,7 @@ use App\Service\ImportService;
 use App\Service\InstanceSettingsService;
 use App\Service\Notification\ReminderRunner;
 use App\Support\Clock;
+use App\Support\CoverageFloor;
 use App\Support\ExternalAssetScanner;
 use Psr\Container\ContainerInterface;
 use Slim\App;
@@ -261,6 +262,37 @@ switch ($command) {
         ));
         exit(1);
 
+    case 'coverage:check':
+        // The floor under the whole suite's line coverage. CI holds each pull
+        // request's changed lines to 80% separately (diff-cover); this catches
+        // the slow slide that many small, individually passing PRs can add up
+        // to. Reads a Clover report the suite has already written.
+        $report = $argv[2] ?? 'build/coverage.xml';
+        $minimum = isset($argv[3]) ? (int) $argv[3] : CoverageFloor::MINIMUM_PERCENT;
+
+        try {
+            $floor = CoverageFloor::fromCloverFile($report);
+        } catch (RuntimeException $e) {
+            fwrite(STDERR, 'FAIL ' . $e->getMessage() . PHP_EOL);
+            exit(1);
+        }
+
+        $summary = sprintf(
+            '%.2f%% of lines covered (%d/%d); the floor is %d%%.',
+            $floor->percent(),
+            $floor->covered,
+            $floor->statements,
+            $minimum,
+        );
+
+        if ($floor->meets($minimum)) {
+            $out('OK   ' . $summary);
+            exit(0);
+        }
+
+        fwrite(STDERR, 'FAIL ' . $summary . PHP_EOL);
+        exit(1);
+
     case 'list':
     case '--help':
     case '-h':
@@ -273,6 +305,7 @@ switch ($command) {
         $out('  maintenance:prune    Delete expired sessions, tokens, throttle, notification and audit records');
         $out('  i18n:check           Compare every locale with the base catalogue and report any drift');
         $out('  assets:offline-check Fail if any template or built asset references a third-party host');
+        $out('  coverage:check       Fail if a Clover report\'s line coverage is under the floor (default 85%)');
         $out('  demo:seed            Create the demonstration household and its subscriptions');
         exit(0);
 

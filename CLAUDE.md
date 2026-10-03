@@ -140,6 +140,14 @@ vendor/bin/phpunit           # tests
 vendor/bin/phpcs             # PSR-12 lint
 vendor/bin/phpstan analyse   # static analysis
 
+# Coverage (PCOV). Set DB_NAME=renovo_test, or the database tests skip and the
+# total comes out low. Writes build/coverage.xml and checks the 85% floor.
+DB_NAME=renovo_test composer coverage
+# Optional, needs pipx (`brew install pipx`): the 80% check CI runs on the
+# lines this branch changes. It reads the git diff, so a new file it has never
+# seen is skipped silently: commit (or `git add -N`) new files first.
+pipx run --spec diff-cover==10.6.0 diff-cover build/coverage.xml --compare-branch=master --fail-under=80
+
 # Nothing is loaded from a third-party host (CI runs this after the build)
 php bin/console assets:offline-check
 
@@ -152,8 +160,8 @@ vendor/bin/phpunit tests/Unit/OpenApiCoverageTest.php tests/Unit/ApiDocCoverageT
 php bin/console reminders:run
 ```
 
-CI runs lint + static analysis + tests + a Docker image build on every PR, and
-(from their respective phases) validates the OpenAPI spec, the prose API
+CI runs lint + static analysis + tests + coverage + a Docker image build on
+every PR, and (from their respective phases) validates the OpenAPI spec, the prose API
 reference and locale completeness. Don't merge red CI.
 
 ## Database rules
@@ -196,11 +204,17 @@ reference and locale completeness. Don't merge red CI.
 
 ## Testing expectations
 
-Every change ships with tests. High-value areas that must stay green: billing
-normalisation, trial-conversion timing, price-history current-price resolution,
-budget projection/threshold logic, reminder idempotency, the SSRF client's
-private-IP rejection + allowlist override, and permission/isolation
-(Viewer 403, ISOLATED hides others' rows).
+Every change ships with tests. **Code a phase adds or changes is covered to at
+least 80%** (line coverage of the diff), and the suite as a whole stays at or
+above **85%**; CI enforces both on the Postgres leg. Run `composer coverage`
+before calling a phase done. The percentage is the minimum, not the goal: a
+line can be executed without anything asserting it is right, so the
+high-value areas below still need tests written for them.
+
+High-value areas that must stay green: billing normalisation, trial-conversion
+timing, price-history current-price resolution, budget projection/threshold
+logic, reminder idempotency, the SSRF client's private-IP rejection + allowlist
+override, and permission/isolation (Viewer 403, ISOLATED hides others' rows).
 
 ## Guardrails — don't do these
 

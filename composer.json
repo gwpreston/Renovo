@@ -50,11 +50,19 @@
         "sort-packages": true,
         "allow-plugins": {}
     },
+    "scripts-descriptions": {
+        "coverage": "Run the suite with PCOV, write build/coverage.xml and check the 85% floor"
+    },
     "scripts": {
         "test": "phpunit",
         "lint": "phpcs",
         "lint:fix": "phpcbf",
         "stan": "phpstan analyse --memory-limit=512M",
+        "coverage": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php -d pcov.enabled=1 vendor/bin/phpunit --coverage-text --only-summary-for-coverage-text --coverage-clover build/coverage.xml",
+            "@php bin/console coverage:check build/coverage.xml"
+        ],
         "migrate": "phinx migrate",
         "rollback": "phinx rollback",
         "seed": "phinx seed:run",

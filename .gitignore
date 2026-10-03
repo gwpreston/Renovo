@@ -66,6 +66,8 @@ docker-compose.override.yml
 # ---------------------------------------------------------------------------
 .phpunit.result.cache
 /.phpunit.cache/
+# Coverage reports from `composer coverage`.
+/build/
 /.php-cs-fixer.cache
 /.phpcs-cache
 /phpstan.neon
