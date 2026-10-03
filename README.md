@@ -350,8 +350,46 @@ seven screens. Deliberately not in it: OIDC/SSO, and bank or transaction sync �
 [`ROADMAP.md`](ROADMAP.md) lists what was deferred, what may come after v1, and
 what is ruled out.
 
-The current phase is **Phase 30 — API catch-up: tags and payment-method
-logos**, the first after v1.
+Since v1, each phase has shipped as a minor release (see
+[`CHANGELOG.md`](CHANGELOG.md)):
+
+- **Phase 30 — API catch-up: tags and payment-method logos — complete
+  (1.1.0).** An API client can now do with tags and payment-method logos what
+  the Settings page can: create (`POST /api/v1/tags`) and rename
+  (`PUT /api/v1/tags/{id}`) a tag, and upload or clear a payment method's logo
+  (`POST`/`DELETE /api/v1/payment-methods/{id}/logo`). No new permission, and
+  nothing that existed changed shape; the OpenAPI document is version 1.1.0.
+  No migrations. See [The API](#the-api).
+- **Phase 31 — the scenario planner — complete (1.2.0).** A **Scenario** tab
+  on the Forecast screen (`/forecast/scenario`) answers "what if I cancelled
+  these, and moved that one to another plan?" before anything changes. Set any
+  running subscription to Cancel or Change price (a new amount, optionally a
+  new cycle) and it shows the run-rate saving, the saving over the next twelve
+  months and the date each saving starts — a charge a notice period has
+  already committed is named, never counted as saved. The scenario lives in
+  the address, and the planner itself writes nothing. **If you cancelled** now
+  applies the same notice rule. No migrations. See [Forecast](#forecast).
+- **Phase 32 — billing every N weeks, months or years — complete (1.3.0).**
+  Six-monthly insurance, a two-monthly water bill, a fortnightly cleaner: the
+  billing cycle is now **Every [N] [weeks / months / years]** beside Quarterly
+  and Custom days, advancing by calendar months so the charge stays on its
+  day, with a **last day of the month** switch. An interval of 1 changes no
+  existing figure. Import reads the cycle's unit ("6 months" no longer imports
+  as six days), and the API, export and backup carry the interval. Two
+  migrations. See [How costs are normalised](#how-costs-are-normalised).
+- **Phase 33 — introductory and promotional prices — complete (1.4.0).**
+  "£5.99 for three months, then £11.99." A price can be marked promotional,
+  with **Offer ends** and **Then costs** scheduling the price it becomes; a
+  **Promo** chip sits beside it, and price history, analytics, the forecast,
+  the calendar and the price-change alert say "Offer ends" rather than calling
+  it a rise. Insights flag an offer that is ending and one with no end date.
+  A price that has taken effect is never rewritten. One migration. See
+  [Price history](#price-history).
+
+The current phase is **Phase 34 — the payment ledger**: one row per charge,
+written as each billing date passes, which a member can confirm, correct or
+mark as skipped. It is not bank sync — every row comes from Renovo's own
+billing rules or a member's entry.
 [`docs/phases/PHASE.md`](docs/phases/PHASE.md) holds its scope, decisions and
 status; each earlier phase's brief is archived beside it as
 `docs/phases/PHASE-<n>.md`. `SPEC.md` has the conventions every phase followed.
