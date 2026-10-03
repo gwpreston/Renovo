@@ -60,7 +60,8 @@ names a version explicitly (e.g. a patch release for fixes).
   Phase 30 → 1.1.0 … Phase 33 → 1.4.0).
 - Several phases outstanding: **one minor release covering all of them**,
   unless the user asks for one release per phase.
-- Fixes only, no phase: a **patch**, only when the user asks for it.
+- Fixes only, no phase: a **patch**, only when the user asks for it — use the
+  `hotfix` skill, which numbers it (`PHASE-N.M.md`) and records it.
 - An argument (`/release 1.5.0`) overrides the default.
 
 Check the tag doesn't exist: `git rev-parse -q --verify "refs/tags/vX.Y.Z"`
